@@ -1,9 +1,12 @@
 import sys
 from types import SimpleNamespace
 
+import httpx
+
 from minerva_travel.image_generation import (
     PlaceholderImageGenerator,
     ReplicateImageGenerator,
+    _write_replicate_output,
     cover_prompt,
     landmark_lineart_prompt,
 )
@@ -63,6 +66,25 @@ def test_replicate_image_generator_writes_file_output(tmp_path, monkeypatch):
 
     assert result == output
     assert output.read_bytes() == b"generated-image"
+
+
+def test_replicate_output_download_retries_transient_read_errors(tmp_path, monkeypatch):
+    output = tmp_path / "image.png"
+
+    class FlakyFileOutput:
+        attempts = 0
+
+        def read(self):
+            self.attempts += 1
+            if self.attempts == 1:
+                raise httpx.ReadError("Connection reset by peer")
+            return b"generated-after-retry"
+
+    monkeypatch.setattr("minerva_travel.image_generation.sleep", lambda _: None)
+
+    _write_replicate_output([FlakyFileOutput()], output)
+
+    assert output.read_bytes() == b"generated-after-retry"
 
 
 def test_landmark_lineart_prompt_preserves_reference_composition():

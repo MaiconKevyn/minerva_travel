@@ -293,19 +293,49 @@ def landmark_lineart_prompt(landmark_name: str, city: str, country: str) -> str:
 def _write_replicate_output(output: object, output_path: Path) -> None:
     candidate = output[0] if isinstance(output, list) else output
     if hasattr(candidate, "read"):
-        output_path.write_bytes(candidate.read())
+        output_path.write_bytes(_read_replicate_file_output(candidate))
         return
     if isinstance(candidate, str):
-        import httpx
-
-        response = httpx.get(candidate, timeout=120)
-        response.raise_for_status()
-        output_path.write_bytes(response.content)
+        output_path.write_bytes(_download_replicate_url(candidate))
         return
     if isinstance(candidate, bytes):
         output_path.write_bytes(candidate)
         return
     raise TypeError(f"Unsupported Replicate output type: {type(candidate)!r}")
+
+
+def _read_replicate_file_output(candidate: object) -> bytes:
+    def operation() -> bytes:
+        return candidate.read()
+
+    return _run_download_with_retry(operation)
+
+
+def _download_replicate_url(url: str) -> bytes:
+    import httpx
+
+    def operation() -> bytes:
+        response = httpx.get(url, timeout=120)
+        response.raise_for_status()
+        return response.content
+
+    return _run_download_with_retry(operation)
+
+
+def _run_download_with_retry(operation) -> bytes:
+    import httpx
+
+    last_error: Exception | None = None
+    for attempt in range(4):
+        try:
+            return operation()
+        except (httpx.HTTPError, OSError) as error:
+            last_error = error
+            if isinstance(error, httpx.HTTPStatusError) and error.response.status_code < 500:
+                raise
+            sleep(2 * (attempt + 1))
+    assert last_error is not None
+    raise last_error
 
 
 def _run_replicate_with_retry(replicate_module, model: str, **kwargs: object) -> object:
