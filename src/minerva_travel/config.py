@@ -13,6 +13,16 @@ def image_provider() -> str:
     return os.getenv("IMAGE_PROVIDER", "placeholder")
 
 
+def image_generation_concurrency() -> int:
+    load_project_env()
+    raw_value = os.getenv("IMAGE_GENERATION_CONCURRENCY", "2")
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return 2
+    return max(1, value)
+
+
 def cors_allowed_origins() -> list[str]:
     load_project_env()
     raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")

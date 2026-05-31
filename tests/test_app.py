@@ -1,8 +1,10 @@
+import threading
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from minerva_travel.app import app
+from minerva_travel.app import app, custom_destinations_from_form, generate_selected_landmark_art
 
 
 def test_home_page_lists_reference_landmarks():
@@ -287,15 +289,22 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
     )
 
     assert response.status_code == 200
-    assert generated_landmarks == [
-        ("Cristo Redentor", "Rio de Janeiro", "Brasil"),
-        ("Usina do Gasometro", "Porto Alegre", "Brasil"),
-    ]
-    assert [(name, city, country) for name, city, country, _ in generated_lineart] == [
-        ("Cristo Redentor", "Rio de Janeiro", "Brasil"),
-        ("Usina do Gasometro", "Porto Alegre", "Brasil"),
-    ]
-    assert [reference.name for *_, reference in generated_lineart] == [
+    assert sorted(generated_landmarks) == sorted(
+        [
+            ("Cristo Redentor", "Rio de Janeiro", "Brasil"),
+            ("Usina do Gasometro", "Porto Alegre", "Brasil"),
+        ]
+    )
+    assert sorted(
+        (name, city, country)
+        for name, city, country, _ in generated_lineart
+    ) == sorted(
+        [
+            ("Cristo Redentor", "Rio de Janeiro", "Brasil"),
+            ("Usina do Gasometro", "Porto Alegre", "Brasil"),
+        ]
+    )
+    assert sorted(reference.name for *_, reference in generated_lineart) == [
         "cristo-redentor.png",
         "usina-do-gasometro.png",
     ]
@@ -303,3 +312,54 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
         "runtime/generated/landmarks" in reference.as_posix()
         for *_, reference in generated_lineart
     )
+
+
+def test_selected_landmark_art_generates_multiple_landmarks_concurrently(monkeypatch):
+    destinations, selected = custom_destinations_from_form(
+        "Cristo Redentor, Rio de Janeiro, Brasil\n"
+        "Usina do Gasometro, Porto Alegre, Brasil"
+    )
+    active_image_generations = 0
+    max_active_image_generations = 0
+    lock = threading.Lock()
+
+    class SlowGenerator:
+        def generate_landmark_image(self, landmark_name, city, country, output_path):
+            nonlocal active_image_generations, max_active_image_generations
+            with lock:
+                active_image_generations += 1
+                max_active_image_generations = max(
+                    max_active_image_generations,
+                    active_image_generations,
+                )
+            time.sleep(0.05)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(f"{landmark_name}|{city}|{country}".encode())
+            with lock:
+                active_image_generations -= 1
+            return output_path
+
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(f"lineart|{reference_image.name}".encode())
+            return output_path
+
+    monkeypatch.setenv("IMAGE_GENERATION_CONCURRENCY", "2")
+
+    images, lineart_images = generate_selected_landmark_art(
+        destinations=destinations,
+        selected=selected,
+        request_id="parallel-test",
+        generator=SlowGenerator(),
+    )
+
+    assert len(images) == 2
+    assert len(lineart_images) == 2
+    assert max_active_image_generations == 2

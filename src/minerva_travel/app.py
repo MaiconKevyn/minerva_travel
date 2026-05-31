@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
@@ -11,7 +12,7 @@ from pydantic import BaseModel
 
 from minerva_travel import storage
 from minerva_travel.catalog import load_catalog
-from minerva_travel.config import cors_allowed_origins, image_provider
+from minerva_travel.config import cors_allowed_origins, image_generation_concurrency, image_provider
 from minerva_travel.custom_landmarks import (
     CustomLandmarkInput,
     build_custom_destinations,
@@ -339,10 +340,9 @@ def generate_selected_landmark_art(
     generator,
 ) -> tuple[dict[str, Path], dict[str, Path]]:
     selected_ids = set(selected)
-    images: dict[str, Path] = {}
-    lineart_images: dict[str, Path] = {}
     image_output_dir = Path("runtime/generated/landmarks") / request_id
     lineart_output_dir = Path("runtime/generated/lineart") / request_id
+    generation_jobs = []
     for destination in destinations:
         for landmark in destination.landmarks:
             selection_id = f"{destination.id}:{landmark.id}"
@@ -350,20 +350,62 @@ def generate_selected_landmark_art(
                 continue
             image_output_path = image_output_dir / destination.id / f"{landmark.id}.png"
             lineart_output_path = lineart_output_dir / destination.id / f"{landmark.id}.png"
-            images[selection_id] = generator.generate_landmark_image(
-                landmark_name=landmark.name,
-                city=destination.city,
-                country=destination.country,
-                output_path=image_output_path,
+            generation_jobs.append(
+                (
+                    selection_id,
+                    landmark.name,
+                    destination.city,
+                    destination.country,
+                    image_output_path,
+                    lineart_output_path,
+                )
             )
-            lineart_images[selection_id] = generator.generate_landmark_lineart(
-                landmark_name=landmark.name,
-                city=destination.city,
-                country=destination.country,
-                reference_image=images[selection_id],
-                output_path=lineart_output_path,
-            )
+
+    if not generation_jobs:
+        return {}, {}
+
+    max_workers = min(image_generation_concurrency(), len(generation_jobs))
+    images: dict[str, Path] = {}
+    lineart_images: dict[str, Path] = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(
+                _generate_landmark_art_pair,
+                generator,
+                *generation_job,
+            ): generation_job[0]
+            for generation_job in generation_jobs
+        }
+        for future in as_completed(futures):
+            selection_id, image_path, lineart_path = future.result()
+            images[selection_id] = image_path
+            lineart_images[selection_id] = lineart_path
     return images, lineart_images
+
+
+def _generate_landmark_art_pair(
+    generator,
+    selection_id: str,
+    landmark_name: str,
+    city: str,
+    country: str,
+    image_output_path: Path,
+    lineart_output_path: Path,
+) -> tuple[str, Path, Path]:
+    image_path = generator.generate_landmark_image(
+        landmark_name=landmark_name,
+        city=city,
+        country=country,
+        output_path=image_output_path,
+    )
+    lineart_path = generator.generate_landmark_lineart(
+        landmark_name=landmark_name,
+        city=city,
+        country=country,
+        reference_image=image_path,
+        output_path=lineart_output_path,
+    )
+    return selection_id, image_path, lineart_path
 
 
 def custom_destinations_from_form(raw: str | None) -> tuple[list[Destination], list[str]]:
