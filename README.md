@@ -121,6 +121,7 @@ IMAGE_PROVIDER=replicate
 REPLICATE_API_TOKEN=sua_chave_aqui
 OPENAI_API_KEY=sua_chave_openai_aqui
 OPENAI_LANDMARK_MODEL=gpt-4o-2024-08-06
+CORS_ALLOW_ORIGINS=*
 ```
 
 Frontend `frontend/.env.local`:

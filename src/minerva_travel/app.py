@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from minerva_travel import storage
 from minerva_travel.catalog import load_catalog
-from minerva_travel.config import image_provider
+from minerva_travel.config import cors_allowed_origins, image_provider
 from minerva_travel.custom_landmarks import (
     CustomLandmarkInput,
     build_custom_destinations,
@@ -35,8 +35,8 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 app = FastAPI(title="Minerva Travel MVP")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
+    allow_origins=cors_allowed_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -47,6 +47,25 @@ def test_api_catalog_returns_destinations_and_landmarks():
     assert payload["destinations"][0]["landmarks"][0]["selection_id"] == "paris:eiffel-tower"
 
 
+def test_landmarks_parse_allows_browser_preflight_from_frontend_origin():
+    client = TestClient(app)
+
+    response = client.options(
+        "/api/landmarks/parse",
+        headers={
+            "Origin": "https://minerva-travel.hostingerapp.com",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] in {
+        "*",
+        "https://minerva-travel.hostingerapp.com",
+    }
+
+
 def test_resolve_custom_landmarks_structures_freeform_list():
     client = TestClient(app)
 
