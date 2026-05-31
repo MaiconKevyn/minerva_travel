@@ -354,8 +354,14 @@ p {
   background: #fffdf7;
   border: 3px solid var(--blue);
   border-radius: 0.04in;
-  display: inline-block;
+  box-sizing: border-box;
+  display: block;
+  flex: 0 0 0.42in;
   height: 0.42in;
+  max-height: 0.42in;
+  max-width: 0.42in;
+  min-height: 0.42in;
+  min-width: 0.42in;
   width: 0.42in;
 }
 
