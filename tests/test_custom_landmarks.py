@@ -15,6 +15,20 @@ def test_parse_custom_landmarks_from_text_lines():
     assert landmarks[0].country == "Italy"
 
 
+def test_parse_custom_landmarks_from_json_keeps_child_friendly_description():
+    landmarks = parse_custom_landmarks(
+        '[{"name":"Cristo Redentor","city":"Rio de Janeiro","country":"Brasil",'
+        '"description":["O Cristo Redentor fica no alto do Corcovado.",'
+        '"Ele parece abracar a cidade inteira."]}]'
+    )
+    destinations, _selected = build_custom_destinations(landmarks)
+
+    assert destinations[0].landmarks[0].description == [
+        "O Cristo Redentor fica no alto do Corcovado.",
+        "Ele parece abracar a cidade inteira.",
+    ]
+
+
 def test_build_custom_destinations_groups_by_city_and_creates_selection_ids():
     landmarks = parse_custom_landmarks(
         "Colosseum, Rome, Italy\nTrevi Fountain, Rome, Italy\nLouvre, Paris, France"

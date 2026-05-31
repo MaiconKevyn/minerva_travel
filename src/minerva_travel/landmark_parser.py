@@ -14,6 +14,7 @@ class ParsedLandmark(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     city: str = Field(min_length=2, max_length=80)
     country: str = Field(min_length=2, max_length=80)
+    description: list[str] = Field(default_factory=list, min_length=1, max_length=2)
     confidence: float = Field(ge=0, le=1)
 
 
@@ -48,7 +49,10 @@ def _create_structured_response(api_key: str, model: str, message: str) -> dict[
                     "Agrupe cada item com cidade e pais quando puder inferir pelo texto. "
                     "Quando a cidade ou pais nao estiver claro, use "
                     "'Roteiro personalizado' e 'Personalizado'. Preserve nomes conhecidos "
-                    "em uma forma clara para o usuario confirmar."
+                    "em uma forma clara para o usuario confirmar. Para cada ponto turistico, "
+                    "crie uma descricao curta em portugues do Brasil para criancas e familia: "
+                    "1 ou 2 frases simples, curiosas, educativas e sem inventar detalhes "
+                    "muito especificos quando nao tiver certeza."
                 ),
             },
             {"role": "user", "content": message},
@@ -72,6 +76,12 @@ def _create_structured_response(api_key: str, model: str, message: str) -> dict[
                                     "name": {"type": "string"},
                                     "city": {"type": "string"},
                                     "country": {"type": "string"},
+                                    "description": {
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "maxItems": 2,
+                                        "items": {"type": "string"},
+                                    },
                                     "confidence": {
                                         "type": "number",
                                         "minimum": 0,
@@ -82,6 +92,7 @@ def _create_structured_response(api_key: str, model: str, message: str) -> dict[
                                     "name",
                                     "city",
                                     "country",
+                                    "description",
                                     "confidence",
                                 ],
                             },
@@ -91,7 +102,7 @@ def _create_structured_response(api_key: str, model: str, message: str) -> dict[
                 },
             }
         },
-        "max_output_tokens": 1500,
+        "max_output_tokens": 2500,
     }
     with httpx.Client(timeout=45) as client:
         response = client.post(

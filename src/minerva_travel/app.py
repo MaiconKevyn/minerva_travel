@@ -1,3 +1,4 @@
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Annotated
@@ -12,7 +13,11 @@ from pydantic import BaseModel
 
 from minerva_travel import storage
 from minerva_travel.catalog import load_catalog
-from minerva_travel.config import cors_allowed_origins, image_generation_concurrency, image_provider
+from minerva_travel.config import (
+    cors_allowed_origins,
+    image_generation_concurrency,
+    image_provider,
+)
 from minerva_travel.custom_landmarks import (
     CustomLandmarkInput,
     build_custom_destinations,
@@ -146,14 +151,23 @@ def parse_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
             name=item["name"] if isinstance(item, dict) else item.name,
             city=item["city"] if isinstance(item, dict) else item.city,
             country=item["country"] if isinstance(item, dict) else item.country,
+            description=_parsed_landmark_description(item),
         )
         for item in parsed_landmarks
     ]
     custom_destinations, selected_landmarks = build_custom_destinations(custom_inputs)
     return {
-        "custom_landmarks": "\n".join(
-            f"{landmark.name}, {landmark.city}, {landmark.country}"
-            for landmark in custom_inputs
+        "custom_landmarks": json.dumps(
+            [
+                {
+                    "name": landmark.name,
+                    "city": landmark.city,
+                    "country": landmark.country,
+                    "description": landmark.description,
+                }
+                for landmark in custom_inputs
+            ],
+            ensure_ascii=False,
         ),
         "selected_landmarks": selected_landmarks,
         "destinations": serialize_preview_destinations(
@@ -162,6 +176,13 @@ def parse_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
             {},
         ),
     }
+
+
+def _parsed_landmark_description(item: ParsedLandmark | dict[str, object]) -> list[str]:
+    raw_description = item.get("description", []) if isinstance(item, dict) else item.description
+    if not isinstance(raw_description, list):
+        return []
+    return [str(paragraph).strip() for paragraph in raw_description if str(paragraph).strip()]
 
 
 @app.post("/api/landmarks/parse-preview")

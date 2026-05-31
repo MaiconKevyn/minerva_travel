@@ -1,3 +1,4 @@
+import json
 import threading
 import time
 from pathlib import Path
@@ -96,12 +97,20 @@ def test_parse_landmarks_returns_structured_landmarks(monkeypatch):
                 "name": "Torre Eiffel",
                 "city": "Paris",
                 "country": "Franca",
+                "description": [
+                    "A Torre Eiffel foi construida para uma grande exposicao em Paris.",
+                    "Hoje ela ajuda as criancas a reconhecerem a cidade em qualquer desenho.",
+                ],
                 "confidence": 0.98,
             },
             {
                 "name": "Museu do Louvre",
                 "city": "Paris",
                 "country": "Franca",
+                "description": [
+                    "O Louvre guarda obras famosas e muito antigas.",
+                    "Sua piramide de vidro parece uma entrada para uma aventura de arte.",
+                ],
                 "confidence": 0.96,
             },
         ]
@@ -116,11 +125,22 @@ def test_parse_landmarks_returns_structured_landmarks(monkeypatch):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["custom_landmarks"] == (
-        "Torre Eiffel, Paris, Franca\nMuseu do Louvre, Paris, Franca"
-    )
+    custom_landmarks = json.loads(payload["custom_landmarks"])
+    assert custom_landmarks[0] == {
+        "name": "Torre Eiffel",
+        "city": "Paris",
+        "country": "Franca",
+        "description": [
+            "A Torre Eiffel foi construida para uma grande exposicao em Paris.",
+            "Hoje ela ajuda as criancas a reconhecerem a cidade em qualquer desenho.",
+        ],
+    }
     assert payload["destinations"][0]["city"] == "Paris"
     assert payload["destinations"][0]["landmarks"][0]["name"] == "Torre Eiffel"
+    assert payload["destinations"][0]["landmarks"][0]["description"] == [
+        "A Torre Eiffel foi construida para uma grande exposicao em Paris.",
+        "Hoje ela ajuda as criancas a reconhecerem a cidade em qualquer desenho.",
+    ]
     assert payload["destinations"][0]["landmarks"][0]["image"] is None
     assert payload["destinations"][0]["landmarks"][1]["image"] is None
 
