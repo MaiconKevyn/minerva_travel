@@ -334,16 +334,16 @@ p {
 
 .visit-row {
   align-items: center;
-  bottom: 0.6in;
+  bottom: 0.55in;
   display: flex;
-  gap: 0.12in;
+  gap: 0.16in;
   left: 0.7in;
   position: absolute;
 }
 
 .visit-row span:first-child {
   color: var(--ink);
-  font-size: 13pt;
+  font-size: 14pt;
   font-weight: 900;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -351,10 +351,12 @@ p {
 }
 
 .checkbox {
-  border: 2px solid var(--blue);
+  background: #fffdf7;
+  border: 3px solid var(--blue);
+  border-radius: 0.04in;
   display: inline-block;
-  height: 0.24in;
-  width: 0.24in;
+  height: 0.42in;
+  width: 0.42in;
 }
 
 .stamp {
