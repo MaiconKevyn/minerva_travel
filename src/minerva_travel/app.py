@@ -285,14 +285,14 @@ async def generate_pdf_from_form(
     )
     request_id = uuid4().hex
     photo_path = await storage.save_upload(family_photo)
-    destination_names = [destination.city for destination in catalog.destinations]
+    cover_landmark_names = selected_landmark_names(catalog.destinations, selected)
     cover_path = storage.generated_path(f"{request_id}-cover.png")
     generator = get_image_generator(image_provider())
     generator.generate_cover(
         family_photo=photo_path,
         output_path=cover_path,
         title=request.title,
-        destination_names=destination_names,
+        destination_names=cover_landmark_names,
     )
 
     wikimedia_assets = load_wikimedia_manifest()
@@ -315,6 +315,16 @@ async def generate_pdf_from_form(
 
 def _split_names(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def selected_landmark_names(destinations: list[Destination], selected: list[str]) -> list[str]:
+    selected_ids = set(selected)
+    names: list[str] = []
+    for destination in destinations:
+        for landmark in destination.landmarks:
+            if f"{destination.id}:{landmark.id}" in selected_ids:
+                names.append(landmark.name)
+    return names
 
 
 def custom_destinations_from_form(raw: str | None) -> tuple[list[Destination], list[str]]:

@@ -179,3 +179,39 @@ def test_api_generate_accepts_custom_landmarks_without_catalog_selection(
     assert response.status_code == 200
     payload = response.json()
     assert payload["download_url"].startswith("/download/")
+
+
+def test_api_generate_uses_confirmed_landmarks_for_cover_prompt(
+    tmp_path,
+    monkeypatch,
+):
+    captured_cover_landmarks = []
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            captured_cover_landmarks.extend(destination_names)
+            output_path.write_bytes(b"cover")
+            return output_path
+
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", lambda *_: {})
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Guia do Brasil",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "custom_landmarks": (
+                "Cristo Redentor, Rio de Janeiro, Brasil\n"
+                "Usina do Gasometro, Porto Alegre, Brasil"
+            ),
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert captured_cover_landmarks == ["Cristo Redentor", "Usina do Gasometro"]

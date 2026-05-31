@@ -110,14 +110,15 @@ class ReplicateImageGenerator:
 
 
 def cover_prompt(title: str, destination_names: list[str]) -> str:
-    destinations = ", ".join(destination_names)
+    landmarks = ", ".join(destination_names)
     return (
         "Transform the reference photo into a polished children's book watercolor "
         "illustration for a personalized family travel guide cover. Preserve the "
         "main couple's recognizable composition, friendly smiles, approximate hair "
         "colors, glasses, and pose, but render them as soft illustrated characters, "
         "not a photorealistic copy. Use warm natural light, soft pastel colors, "
-        f"and subtle travel landmarks inspired by {destinations} in the background. "
+        "and a subtle background inspired by these confirmed tourist landmarks: "
+        f"{landmarks}. "
         "Vertical cover composition, generous clean space for title text added later. "
         f"Do not include any readable text, logos, watermark, or the title '{title}' "
         "inside the image."
