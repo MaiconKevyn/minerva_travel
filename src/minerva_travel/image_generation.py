@@ -24,6 +24,15 @@ class ImageGenerator(Protocol):
     ) -> Path:
         """Generate an image for a tourist landmark and return its local path."""
 
+    def generate_landmark_lineart(
+        self,
+        landmark_name: str,
+        city: str,
+        country: str,
+        output_path: Path,
+    ) -> Path:
+        """Generate a black-and-white coloring image for a tourist landmark."""
+
 
 class PlaceholderImageGenerator:
     def generate_cover(
@@ -119,6 +128,28 @@ class PlaceholderImageGenerator:
         image.save(output_path)
         return output_path
 
+    def generate_landmark_lineart(
+        self,
+        landmark_name: str,
+        city: str,
+        country: str,
+        output_path: Path,
+    ) -> Path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        image = Image.new("RGB", (1200, 850), "white")
+        draw = ImageDraw.Draw(image)
+        font_large = _font(52)
+        font_medium = _font(30)
+
+        draw.rounded_rectangle((90, 90, 1110, 760), radius=30, outline="black", width=6)
+        draw.ellipse((190, 145, 1010, 700), outline="black", width=4)
+        draw.line((260, 650, 600, 220, 940, 650), fill="black", width=8)
+        draw.rectangle((500, 650, 700, 735), outline="black", width=8)
+        draw.text((600, 405), landmark_name, anchor="mm", fill="black", font=font_large)
+        draw.text((600, 480), f"{city}, {country}", anchor="mm", fill="black", font=font_medium)
+        image.save(output_path)
+        return output_path
+
 
 def get_image_generator(provider: str) -> ImageGenerator:
     if provider == "placeholder":
@@ -186,6 +217,34 @@ class ReplicateImageGenerator:
         _write_replicate_output(output, output_path)
         return output_path
 
+    def generate_landmark_lineart(
+        self,
+        landmark_name: str,
+        city: str,
+        country: str,
+        output_path: Path,
+    ) -> Path:
+        import replicate
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        prompt = landmark_lineart_prompt(
+            landmark_name=landmark_name,
+            city=city,
+            country=country,
+        )
+        output = _run_replicate_with_retry(
+            replicate,
+            self.landmark_model,
+            input={
+                "prompt": prompt,
+                "aspect_ratio": "4:3",
+                "output_format": "png",
+                "num_outputs": 1,
+            },
+        )
+        _write_replicate_output(output, output_path)
+        return output_path
+
 
 def cover_prompt(title: str, destination_names: list[str]) -> str:
     landmarks = ", ".join(destination_names)
@@ -211,6 +270,17 @@ def landmark_prompt(landmark_name: str, city: str, country: str) -> str:
         "texture, soft illustrated edges, clean vertical-friendly editorial composition, "
         "charming but accurate landmark exterior, calm open sky, subtle travel-book mood, "
         "no readable text, no labels, no watermark, no logo, no signature."
+    )
+
+
+def landmark_lineart_prompt(landmark_name: str, city: str, country: str) -> str:
+    return (
+        f"Simple representative exterior view of {landmark_name} in {city}, {country}. "
+        "Black and white children's coloring book page, clean outline drawing only, "
+        "white background, bold smooth contour lines, simple shapes, clear empty areas "
+        "for a child to color, accurate recognizable landmark silhouette, no color, "
+        "no grayscale shading, no filled areas, no gradients, no text, no labels, "
+        "no watermark, no logo, no signature."
     )
 
 

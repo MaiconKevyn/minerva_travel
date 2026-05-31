@@ -90,14 +90,16 @@ def test_build_guide_context_prefers_generated_landmark_images():
         selected_landmarks=["paris:eiffel-tower"],
     )
     generated_path = Path("runtime/generated/landmarks/request/paris/eiffel-tower.png")
+    lineart_path = Path("runtime/generated/lineart/request/paris/eiffel-tower.png")
 
     context = build_guide_context(
         request,
         catalog,
         Path("runtime/generated/cover.png"),
         landmark_images={"paris:eiffel-tower": generated_path},
+        landmark_lineart_images={"paris:eiffel-tower": lineart_path},
     )
 
     landmark = context.destinations[0].landmarks[0]
     assert landmark.image == generated_path
-    assert landmark.lineart_image == generated_path
+    assert landmark.lineart_image == lineart_path

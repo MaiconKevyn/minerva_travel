@@ -125,8 +125,9 @@ OPENAI_LANDMARK_MODEL=gpt-4o-2024-08-06
 CORS_ALLOW_ORIGINS=*
 ```
 
-Com `IMAGE_PROVIDER=replicate`, o backend usa a foto enviada para gerar a capa
-e tambem gera uma imagem em estilo aquarela para cada ponto turistico confirmado.
+Com `IMAGE_PROVIDER=replicate`, o backend usa a foto enviada para gerar a capa,
+gera uma imagem colorida em estilo aquarela para cada ponto turistico confirmado
+e gera uma segunda imagem em line art preto e branco para a secao de colorir.
 
 Frontend `frontend/.env.local`:
 

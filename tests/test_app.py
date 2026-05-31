@@ -198,6 +198,11 @@ def test_api_generate_uses_confirmed_landmarks_for_cover_prompt(
             output_path.write_bytes(f"{landmark_name}|{city}|{country}".encode())
             return output_path
 
+        def generate_landmark_lineart(self, landmark_name, city, country, output_path):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(f"lineart|{landmark_name}|{city}|{country}".encode())
+            return output_path
+
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
     monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", lambda *_: {})
     monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
@@ -227,6 +232,7 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
     monkeypatch,
 ):
     generated_landmarks = []
+    generated_lineart = []
 
     class FakeGenerator:
         def generate_cover(self, family_photo, output_path, title, destination_names):
@@ -237,6 +243,12 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
             generated_landmarks.append((landmark_name, city, country))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(b"landmark")
+            return output_path
+
+        def generate_landmark_lineart(self, landmark_name, city, country, output_path):
+            generated_lineart.append((landmark_name, city, country))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"lineart")
             return output_path
 
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
@@ -260,6 +272,10 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
 
     assert response.status_code == 200
     assert generated_landmarks == [
+        ("Cristo Redentor", "Rio de Janeiro", "Brasil"),
+        ("Usina do Gasometro", "Porto Alegre", "Brasil"),
+    ]
+    assert generated_lineart == [
         ("Cristo Redentor", "Rio de Janeiro", "Brasil"),
         ("Usina do Gasometro", "Porto Alegre", "Brasil"),
     ]

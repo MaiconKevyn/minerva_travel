@@ -295,7 +295,7 @@ async def generate_pdf_from_form(
         destination_names=cover_landmark_names,
     )
 
-    landmark_images = generate_selected_landmark_images(
+    landmark_images, landmark_lineart_images = generate_selected_landmark_art(
         catalog.destinations,
         selected,
         request_id,
@@ -306,6 +306,7 @@ async def generate_pdf_from_form(
         catalog,
         cover_path,
         landmark_images=landmark_images,
+        landmark_lineart_images=landmark_lineart_images,
     )
     pdf_output = storage.pdf_path(f"{request_id}.pdf")
     write_pdf(context, pdf_output)
@@ -331,28 +332,37 @@ def selected_landmark_names(destinations: list[Destination], selected: list[str]
     return names
 
 
-def generate_selected_landmark_images(
+def generate_selected_landmark_art(
     destinations: list[Destination],
     selected: list[str],
     request_id: str,
     generator,
-) -> dict[str, Path]:
+) -> tuple[dict[str, Path], dict[str, Path]]:
     selected_ids = set(selected)
     images: dict[str, Path] = {}
-    output_dir = Path("runtime/generated/landmarks") / request_id
+    lineart_images: dict[str, Path] = {}
+    image_output_dir = Path("runtime/generated/landmarks") / request_id
+    lineart_output_dir = Path("runtime/generated/lineart") / request_id
     for destination in destinations:
         for landmark in destination.landmarks:
             selection_id = f"{destination.id}:{landmark.id}"
             if selection_id not in selected_ids:
                 continue
-            output_path = output_dir / destination.id / f"{landmark.id}.png"
+            image_output_path = image_output_dir / destination.id / f"{landmark.id}.png"
+            lineart_output_path = lineart_output_dir / destination.id / f"{landmark.id}.png"
             images[selection_id] = generator.generate_landmark_image(
                 landmark_name=landmark.name,
                 city=destination.city,
                 country=destination.country,
-                output_path=output_path,
+                output_path=image_output_path,
             )
-    return images
+            lineart_images[selection_id] = generator.generate_landmark_lineart(
+                landmark_name=landmark.name,
+                city=destination.city,
+                country=destination.country,
+                output_path=lineart_output_path,
+            )
+    return images, lineart_images
 
 
 def custom_destinations_from_form(raw: str | None) -> tuple[list[Destination], list[str]]:
