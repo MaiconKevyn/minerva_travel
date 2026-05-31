@@ -5,6 +5,7 @@ from minerva_travel.image_generation import (
     PlaceholderImageGenerator,
     ReplicateImageGenerator,
     cover_prompt,
+    landmark_lineart_prompt,
 )
 
 
@@ -62,3 +63,46 @@ def test_replicate_image_generator_writes_file_output(tmp_path, monkeypatch):
 
     assert result == output
     assert output.read_bytes() == b"generated-image"
+
+
+def test_landmark_lineart_prompt_preserves_reference_composition():
+    prompt = landmark_lineart_prompt(
+        landmark_name="Cristo Redentor",
+        city="Rio de Janeiro",
+        country="Brasil",
+    )
+
+    assert "Transform the reference landmark illustration" in prompt
+    assert "Preserve the same composition" in prompt
+    assert "Cristo Redentor" in prompt
+    assert "No color" in prompt
+
+
+def test_replicate_lineart_uses_generated_landmark_as_reference(tmp_path, monkeypatch):
+    reference = tmp_path / "landmark.png"
+    output = tmp_path / "lineart.png"
+    reference.write_bytes(b"reference-image")
+
+    class FakeFileOutput:
+        def read(self):
+            return b"generated-lineart"
+
+    def fake_run(model, input, wait):
+        assert model == "black-forest-labs/flux-kontext-pro"
+        assert input["input_image"].name == str(reference)
+        assert input["aspect_ratio"] == "4:3"
+        assert wait == 60
+        return [FakeFileOutput()]
+
+    monkeypatch.setitem(sys.modules, "replicate", SimpleNamespace(run=fake_run))
+
+    result = ReplicateImageGenerator().generate_landmark_lineart(
+        landmark_name="Cristo Redentor",
+        city="Rio de Janeiro",
+        country="Brasil",
+        reference_image=reference,
+        output_path=output,
+    )
+
+    assert result == output
+    assert output.read_bytes() == b"generated-lineart"

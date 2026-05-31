@@ -198,9 +198,18 @@ def test_api_generate_uses_confirmed_landmarks_for_cover_prompt(
             output_path.write_bytes(f"{landmark_name}|{city}|{country}".encode())
             return output_path
 
-        def generate_landmark_lineart(self, landmark_name, city, country, output_path):
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_bytes(f"lineart|{landmark_name}|{city}|{country}".encode())
+            output_path.write_bytes(
+                f"lineart|{landmark_name}|{city}|{country}|{reference_image.name}".encode()
+            )
             return output_path
 
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
@@ -245,8 +254,15 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
             output_path.write_bytes(b"landmark")
             return output_path
 
-        def generate_landmark_lineart(self, landmark_name, city, country, output_path):
-            generated_lineart.append((landmark_name, city, country))
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            generated_lineart.append((landmark_name, city, country, reference_image))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(b"lineart")
             return output_path
@@ -275,7 +291,15 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
         ("Cristo Redentor", "Rio de Janeiro", "Brasil"),
         ("Usina do Gasometro", "Porto Alegre", "Brasil"),
     ]
-    assert generated_lineart == [
+    assert [(name, city, country) for name, city, country, _ in generated_lineart] == [
         ("Cristo Redentor", "Rio de Janeiro", "Brasil"),
         ("Usina do Gasometro", "Porto Alegre", "Brasil"),
     ]
+    assert [reference.name for *_, reference in generated_lineart] == [
+        "cristo-redentor.png",
+        "usina-do-gasometro.png",
+    ]
+    assert all(
+        "runtime/generated/landmarks" in reference.as_posix()
+        for *_, reference in generated_lineart
+    )

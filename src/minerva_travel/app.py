@@ -360,6 +360,7 @@ def generate_selected_landmark_art(
                 landmark_name=landmark.name,
                 city=destination.city,
                 country=destination.country,
+                reference_image=images[selection_id],
                 output_path=lineart_output_path,
             )
     return images, lineart_images

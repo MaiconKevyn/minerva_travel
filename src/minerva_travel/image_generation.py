@@ -29,6 +29,7 @@ class ImageGenerator(Protocol):
         landmark_name: str,
         city: str,
         country: str,
+        reference_image: Path,
         output_path: Path,
     ) -> Path:
         """Generate a black-and-white coloring image for a tourist landmark."""
@@ -133,6 +134,7 @@ class PlaceholderImageGenerator:
         landmark_name: str,
         city: str,
         country: str,
+        reference_image: Path,
         output_path: Path,
     ) -> Path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -222,6 +224,7 @@ class ReplicateImageGenerator:
         landmark_name: str,
         city: str,
         country: str,
+        reference_image: Path,
         output_path: Path,
     ) -> Path:
         import replicate
@@ -232,16 +235,18 @@ class ReplicateImageGenerator:
             city=city,
             country=country,
         )
-        output = _run_replicate_with_retry(
-            replicate,
-            self.landmark_model,
-            input={
-                "prompt": prompt,
-                "aspect_ratio": "4:3",
-                "output_format": "png",
-                "num_outputs": 1,
-            },
-        )
+        with reference_image.open("rb") as image_file:
+            output = _run_replicate_with_retry(
+                replicate,
+                self.model,
+                input={
+                    "prompt": prompt,
+                    "input_image": image_file,
+                    "aspect_ratio": "4:3",
+                    "output_format": "png",
+                },
+                wait=60,
+            )
         _write_replicate_output(output, output_path)
         return output_path
 
@@ -275,10 +280,11 @@ def landmark_prompt(landmark_name: str, city: str, country: str) -> str:
 
 def landmark_lineart_prompt(landmark_name: str, city: str, country: str) -> str:
     return (
-        f"Simple representative exterior view of {landmark_name} in {city}, {country}. "
-        "Black and white children's coloring book page, clean outline drawing only, "
-        "white background, bold smooth contour lines, simple shapes, clear empty areas "
-        "for a child to color, accurate recognizable landmark silhouette, no color, "
+        "Transform the reference landmark illustration into a black and white "
+        "children's coloring book page. Preserve the same composition, viewpoint, "
+        f"main shapes, and recognizable silhouette of {landmark_name} in {city}, {country}. "
+        "Use clean outline drawing only on a white background, bold smooth contour "
+        "lines, simple shapes, and clear empty areas for a child to color. No color, "
         "no grayscale shading, no filled areas, no gradients, no text, no labels, "
         "no watermark, no logo, no signature."
     )
