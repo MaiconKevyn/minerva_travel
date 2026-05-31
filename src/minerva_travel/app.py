@@ -434,7 +434,66 @@ def custom_destinations_from_form(raw: str | None) -> tuple[list[Destination], l
         custom_landmarks = parse_custom_landmarks(raw)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    custom_landmarks = enrich_missing_custom_descriptions(custom_landmarks)
     return build_custom_destinations(custom_landmarks)
+
+
+def enrich_missing_custom_descriptions(
+    custom_landmarks: list[CustomLandmarkInput],
+) -> list[CustomLandmarkInput]:
+    if not custom_landmarks or all(landmark.description for landmark in custom_landmarks):
+        return custom_landmarks
+
+    message = "\n".join(
+        f"{landmark.name}, {landmark.city}, {landmark.country}"
+        for landmark in custom_landmarks
+    )
+    try:
+        parsed_landmarks = parse_landmarks_from_message(message)
+    except (RuntimeError, ValueError, httpx.HTTPError):
+        return custom_landmarks
+
+    descriptions_by_key = {
+        _landmark_description_key(
+            item["name"] if isinstance(item, dict) else item.name,
+            item["city"] if isinstance(item, dict) else item.city,
+            item["country"] if isinstance(item, dict) else item.country,
+        ): _parsed_landmark_description(item)
+        for item in parsed_landmarks
+    }
+    descriptions_by_name = {
+        _normalize_landmark_text(item["name"] if isinstance(item, dict) else item.name): (
+            _parsed_landmark_description(item)
+        )
+        for item in parsed_landmarks
+    }
+
+    enriched: list[CustomLandmarkInput] = []
+    for landmark in custom_landmarks:
+        if landmark.description:
+            enriched.append(landmark)
+            continue
+        description = descriptions_by_key.get(
+            _landmark_description_key(landmark.name, landmark.city, landmark.country)
+        ) or descriptions_by_name.get(_normalize_landmark_text(landmark.name), [])
+        enriched.append(
+            landmark.model_copy(update={"description": description})
+            if description
+            else landmark
+        )
+    return enriched
+
+
+def _landmark_description_key(name: str, city: str, country: str) -> tuple[str, str, str]:
+    return (
+        _normalize_landmark_text(name),
+        _normalize_landmark_text(city),
+        _normalize_landmark_text(country),
+    )
+
+
+def _normalize_landmark_text(value: str) -> str:
+    return " ".join(value.strip().casefold().split())
 
 
 def fetch_custom_wikimedia_assets(

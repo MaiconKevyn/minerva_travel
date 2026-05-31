@@ -89,6 +89,33 @@ def test_resolve_custom_landmarks_structures_freeform_list():
     )
 
 
+def test_custom_destinations_from_text_enriches_missing_descriptions(monkeypatch):
+    def fake_parse(message: str):
+        assert "Torre Eiffel, Paris, Franca" in message
+        return [
+            {
+                "name": "Torre Eiffel",
+                "city": "Paris",
+                "country": "Franca",
+                "description": [
+                    "A Torre Eiffel foi feita de milhares de pecas de metal.",
+                    "Do alto dela, Paris parece um mapa cheio de caminhos.",
+                ],
+                "confidence": 0.98,
+            }
+        ]
+
+    monkeypatch.setattr("minerva_travel.app.parse_landmarks_from_message", fake_parse)
+
+    destinations, selected = custom_destinations_from_form("Torre Eiffel, Paris, Franca")
+
+    assert selected == ["custom-paris:torre-eiffel"]
+    assert destinations[0].landmarks[0].description == [
+        "A Torre Eiffel foi feita de milhares de pecas de metal.",
+        "Do alto dela, Paris parece um mapa cheio de caminhos.",
+    ]
+
+
 def test_parse_landmarks_returns_structured_landmarks(monkeypatch):
     def fake_parse(message: str):
         assert "Paris" in message
