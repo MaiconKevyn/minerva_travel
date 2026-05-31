@@ -6,7 +6,8 @@ MVP local para gerar um guia de viagem infantil personalizado em PDF.
 
 - Roteiro baseado em `docs/PEQUENOS_EXPLORADORES_EUROPA_2026 - PDF.pdf`.
 - Frontend Vite/React com upload de foto, dados da familia, selecao de roteiro e preview.
-- Capa gerada por provider configuravel (`placeholder` ou `replicate`).
+- Capa e imagens dos pontos turisticos geradas por provider configuravel
+  (`placeholder` ou `replicate`).
 - Interpretacao de pontos turisticos em linguagem natural via OpenAI no backend.
 - PDF final para download no navegador.
 
@@ -68,7 +69,7 @@ Sagrada Familia, Barcelona, Spain
 ```
 
 O backend valida e estrutura esses itens em cidades/destinos internos, cria
-`selection_id` automaticamente e tenta buscar imagens no Wikimedia Commons para
+`selection_id` automaticamente e gera as imagens dos pontos confirmados para
 usar no PDF.
 
 Tambem existe o fluxo em linguagem natural para o frontend:
@@ -123,6 +124,9 @@ OPENAI_API_KEY=sua_chave_openai_aqui
 OPENAI_LANDMARK_MODEL=gpt-4o-2024-08-06
 CORS_ALLOW_ORIGINS=*
 ```
+
+Com `IMAGE_PROVIDER=replicate`, o backend usa a foto enviada para gerar a capa
+e tambem gera uma imagem em estilo aquarela para cada ponto turistico confirmado.
 
 Frontend `frontend/.env.local`:
 

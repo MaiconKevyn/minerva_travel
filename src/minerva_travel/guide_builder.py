@@ -10,8 +10,10 @@ def build_guide_context(
     catalog: Catalog,
     cover_image: Path,
     wikimedia_assets: dict[str, WikimediaAsset] | None = None,
+    landmark_images: dict[str, Path] | None = None,
 ) -> GuideContext:
     wikimedia_assets = wikimedia_assets or {}
+    landmark_images = landmark_images or {}
     selected_by_destination: dict[str, set[str]] = defaultdict(set)
     for selected in request.selected_landmarks:
         destination_id, landmark_id = selected.split(":", maxsplit=1)
@@ -28,7 +30,17 @@ def build_guide_context(
                 continue
             selection_id = f"{destination.id}:{landmark.id}"
             asset = wikimedia_assets.get(selection_id)
-            if asset:
+            generated_image = landmark_images.get(selection_id)
+            if generated_image:
+                landmarks.append(
+                    landmark.model_copy(
+                        update={
+                            "image": generated_image,
+                            "lineart_image": generated_image,
+                        }
+                    )
+                )
+            elif asset:
                 landmarks.append(landmark.model_copy(update={"image": asset.local_path}))
             else:
                 landmarks.append(landmark)

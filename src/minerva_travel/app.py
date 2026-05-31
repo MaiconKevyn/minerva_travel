@@ -295,13 +295,17 @@ async def generate_pdf_from_form(
         destination_names=cover_landmark_names,
     )
 
-    wikimedia_assets = load_wikimedia_manifest()
-    wikimedia_assets.update(fetch_custom_wikimedia_assets(custom_destinations, request_id))
+    landmark_images = generate_selected_landmark_images(
+        catalog.destinations,
+        selected,
+        request_id,
+        generator,
+    )
     context = build_guide_context(
         request,
         catalog,
         cover_path,
-        wikimedia_assets=wikimedia_assets,
+        landmark_images=landmark_images,
     )
     pdf_output = storage.pdf_path(f"{request_id}.pdf")
     write_pdf(context, pdf_output)
@@ -325,6 +329,30 @@ def selected_landmark_names(destinations: list[Destination], selected: list[str]
             if f"{destination.id}:{landmark.id}" in selected_ids:
                 names.append(landmark.name)
     return names
+
+
+def generate_selected_landmark_images(
+    destinations: list[Destination],
+    selected: list[str],
+    request_id: str,
+    generator,
+) -> dict[str, Path]:
+    selected_ids = set(selected)
+    images: dict[str, Path] = {}
+    output_dir = Path("runtime/generated/landmarks") / request_id
+    for destination in destinations:
+        for landmark in destination.landmarks:
+            selection_id = f"{destination.id}:{landmark.id}"
+            if selection_id not in selected_ids:
+                continue
+            output_path = output_dir / destination.id / f"{landmark.id}.png"
+            images[selection_id] = generator.generate_landmark_image(
+                landmark_name=landmark.name,
+                city=destination.city,
+                country=destination.country,
+                output_path=output_path,
+            )
+    return images
 
 
 def custom_destinations_from_form(raw: str | None) -> tuple[list[Destination], list[str]]:

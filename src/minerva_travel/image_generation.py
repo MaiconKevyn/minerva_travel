@@ -1,4 +1,5 @@
 from pathlib import Path
+from time import sleep
 from typing import Protocol
 
 from PIL import Image, ImageDraw, ImageFont
@@ -13,6 +14,15 @@ class ImageGenerator(Protocol):
         destination_names: list[str],
     ) -> Path:
         """Generate a cover image and return its local path."""
+
+    def generate_landmark_image(
+        self,
+        landmark_name: str,
+        city: str,
+        country: str,
+        output_path: Path,
+    ) -> Path:
+        """Generate an image for a tourist landmark and return its local path."""
 
 
 class PlaceholderImageGenerator:
@@ -71,6 +81,44 @@ class PlaceholderImageGenerator:
         image.save(output_path)
         return output_path
 
+    def generate_landmark_image(
+        self,
+        landmark_name: str,
+        city: str,
+        country: str,
+        output_path: Path,
+    ) -> Path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        image = Image.new("RGB", (1200, 850), "#f7efe3")
+        draw = ImageDraw.Draw(image)
+        font_large = _font(58)
+        font_medium = _font(34)
+
+        draw.rounded_rectangle(
+            (70, 70, 1130, 780),
+            radius=36,
+            fill="#d8ebf1",
+            outline="#6a93b8",
+            width=6,
+        )
+        draw.ellipse((160, 125, 1040, 720), fill="#fff7df", outline="#d77a61", width=4)
+        draw.text(
+            (600, 375),
+            landmark_name,
+            anchor="mm",
+            fill="#214c70",
+            font=font_large,
+        )
+        draw.text(
+            (600, 455),
+            f"{city}, {country}",
+            anchor="mm",
+            fill="#7d6549",
+            font=font_medium,
+        )
+        image.save(output_path)
+        return output_path
+
 
 def get_image_generator(provider: str) -> ImageGenerator:
     if provider == "placeholder":
@@ -82,6 +130,7 @@ def get_image_generator(provider: str) -> ImageGenerator:
 
 class ReplicateImageGenerator:
     model = "black-forest-labs/flux-kontext-pro"
+    landmark_model = "black-forest-labs/flux-schnell"
 
     def generate_cover(
         self,
@@ -95,7 +144,8 @@ class ReplicateImageGenerator:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         prompt = cover_prompt(title=title, destination_names=destination_names)
         with family_photo.open("rb") as image_file:
-            output = replicate.run(
+            output = _run_replicate_with_retry(
+                replicate,
                 self.model,
                 input={
                     "prompt": prompt,
@@ -105,6 +155,34 @@ class ReplicateImageGenerator:
                 },
                 wait=60,
             )
+        _write_replicate_output(output, output_path)
+        return output_path
+
+    def generate_landmark_image(
+        self,
+        landmark_name: str,
+        city: str,
+        country: str,
+        output_path: Path,
+    ) -> Path:
+        import replicate
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        prompt = landmark_prompt(
+            landmark_name=landmark_name,
+            city=city,
+            country=country,
+        )
+        output = _run_replicate_with_retry(
+            replicate,
+            self.landmark_model,
+            input={
+                "prompt": prompt,
+                "aspect_ratio": "4:3",
+                "output_format": "png",
+                "num_outputs": 1,
+            },
+        )
         _write_replicate_output(output, output_path)
         return output_path
 
@@ -125,6 +203,17 @@ def cover_prompt(title: str, destination_names: list[str]) -> str:
     )
 
 
+def landmark_prompt(landmark_name: str, city: str, country: str) -> str:
+    return (
+        f"Representative exterior view of {landmark_name} in {city}, {country}. "
+        "Polished children's book watercolor illustration matching a premium family "
+        "travel guide cover, soft pastel colors, warm natural light, gentle paper "
+        "texture, soft illustrated edges, clean vertical-friendly editorial composition, "
+        "charming but accurate landmark exterior, calm open sky, subtle travel-book mood, "
+        "no readable text, no labels, no watermark, no logo, no signature."
+    )
+
+
 def _write_replicate_output(output: object, output_path: Path) -> None:
     candidate = output[0] if isinstance(output, list) else output
     if hasattr(candidate, "read"):
@@ -141,6 +230,20 @@ def _write_replicate_output(output: object, output_path: Path) -> None:
         output_path.write_bytes(candidate)
         return
     raise TypeError(f"Unsupported Replicate output type: {type(candidate)!r}")
+
+
+def _run_replicate_with_retry(replicate_module, model: str, **kwargs: object) -> object:
+    last_error: Exception | None = None
+    for attempt in range(4):
+        try:
+            return replicate_module.run(model, **kwargs)
+        except Exception as error:
+            last_error = error
+            if "429" not in str(error) and "throttled" not in str(error).lower():
+                raise
+            sleep(10 * (attempt + 1))
+    assert last_error is not None
+    raise last_error
 
 
 def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
