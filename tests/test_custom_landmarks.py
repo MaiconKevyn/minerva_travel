@@ -1,0 +1,37 @@
+from minerva_travel.custom_landmarks import (
+    build_custom_destinations,
+    parse_custom_landmarks,
+    required_terms,
+)
+
+
+def test_parse_custom_landmarks_from_text_lines():
+    landmarks = parse_custom_landmarks(
+        "Colosseum, Rome, Italy\nTrevi Fountain, Rome, Italy"
+    )
+
+    assert [landmark.name for landmark in landmarks] == ["Colosseum", "Trevi Fountain"]
+    assert landmarks[0].city == "Rome"
+    assert landmarks[0].country == "Italy"
+
+
+def test_build_custom_destinations_groups_by_city_and_creates_selection_ids():
+    landmarks = parse_custom_landmarks(
+        "Colosseum, Rome, Italy\nTrevi Fountain, Rome, Italy\nLouvre, Paris, France"
+    )
+
+    destinations, selected = build_custom_destinations(landmarks)
+
+    assert [destination.city for destination in destinations] == ["Rome", "Paris"]
+    assert selected == [
+        "custom-rome:colosseum",
+        "custom-rome:trevi-fountain",
+        "custom-paris:louvre",
+    ]
+    assert destinations[0].landmarks[0].representative_query == (
+        "Colosseum Rome Italy tourist attraction exterior"
+    )
+
+
+def test_required_terms_ignores_common_words():
+    assert required_terms("The Tower of London") == ["tower", "london"]

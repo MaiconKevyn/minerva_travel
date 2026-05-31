@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minerva Travel MVP</title>
+  <style>
+    body {
+      background: #f6f1e8;
+      color: #1f3442;
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 32px;
+    }
+    main {
+      margin: 0 auto;
+      max-width: 980px;
+    }
+    form {
+      background: #fffaf1;
+      border: 1px solid #ddcfb8;
+      border-radius: 8px;
+      padding: 24px;
+    }
+    label,
+    fieldset {
+      display: block;
+      margin: 0 0 18px;
+    }
+    input[type="text"],
+    input[type="number"],
+    input[type="file"] {
+      display: block;
+      margin-top: 6px;
+      padding: 10px;
+      width: 100%;
+    }
+    fieldset {
+      border: 1px solid #ddcfb8;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    legend {
+      font-weight: 700;
+    }
+    .destination {
+      margin: 0 0 20px;
+    }
+    .landmark {
+      display: inline-block;
+      margin: 6px 14px 6px 0;
+    }
+    button {
+      background: #1f5d89;
+      border: 0;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 12px 18px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Minerva Travel MVP</h1>
+    <form action="/generate" method="post" enctype="multipart/form-data">
+      <label>
+        Foto da familia
+        <input name="family_photo" type="file" accept="image/png,image/jpeg" required>
+      </label>
+      <label>
+        Titulo do guia
+        <input name="title" type="text" value="{{ catalog.title }}" required>
+      </label>
+      <label>
+        Nomes das criancas
+        <input name="children_names" type="text" value="Alice, Antonio" required>
+      </label>
+      <label>
+        Nomes dos pais
+        <input name="parents_names" type="text" value="Ana, Otavio" required>
+      </label>
+      <label>
+        Ano da viagem
+        <input name="year" type="number" value="2026" min="2024" max="2100" required>
+      </label>
+
+      <fieldset>
+        <legend>Locais turisticos</legend>
+        {% for destination in catalog.destinations %}
+          <div class="destination">
+            <h2>{{ destination.display_title }}</h2>
+            {% for landmark in destination.landmarks %}
+              <label class="landmark">
+                <input type="checkbox" name="selected_landmarks" value="{{ destination.id }}:{{ landmark.id }}" checked>
+                {{ landmark.name }}
+              </label>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </fieldset>
+      <button type="submit">Gerar PDF</button>
+    </form>
+  </main>
+</body>
+</html>

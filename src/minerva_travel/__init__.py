@@ -1,0 +1,1 @@
+"""Minerva Travel PDF generator."""

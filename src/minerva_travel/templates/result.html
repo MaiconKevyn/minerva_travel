@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF pronto</title>
+  <style>
+    body {
+      background: #f6f1e8;
+      color: #1f3442;
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 32px;
+    }
+    main {
+      background: #fffaf1;
+      border: 1px solid #ddcfb8;
+      border-radius: 8px;
+      margin: 0 auto;
+      max-width: 720px;
+      padding: 24px;
+    }
+    a {
+      background: #1f5d89;
+      border-radius: 6px;
+      color: white;
+      display: inline-block;
+      font-weight: 700;
+      padding: 12px 18px;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>PDF pronto</h1>
+    <p>Guia gerado para {{ request.children_display }}.</p>
+    <a href="{{ download_url }}">Baixar PDF</a>
+  </main>
+</body>
+</html>

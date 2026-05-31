@@ -1,0 +1,588 @@
+{
+  "id": "europe-2026",
+  "title": "Pequenos Exploradores pela Europa",
+  "destinations": [
+    {
+      "id": "paris",
+      "country": "Franca",
+      "city": "Paris",
+      "display_title": "FRANCA - PARIS",
+      "intro": [
+        "Paris e uma cidade linda e cheia de historia.",
+        "E conhecida como a cidade luz, cidade do amor e da arte.",
+        "La existem torres famosas, museus incriveis, jardins bonitos e comidas deliciosas.",
+        "Passear por Paris e como caminhar dentro de um livro de historias."
+      ],
+      "favorites_prompt": "Meus lugares favoritos em Paris foram...",
+      "coloring_title": "DESENHOS PARA COLORIR",
+      "coloring_subtitle": "Para colorir e desenhar",
+      "landmarks": [
+        {
+          "id": "eiffel-tower",
+          "name": "Torre Eiffel",
+          "description": [
+            "A Torre Eiffel e uma torre muito alta e famosa.",
+            "Ela e o simbolo de Paris e do alto dela da para ver a cidade inteira."
+          ],
+          "image": "assets/landmarks/paris/eiffel-tower.png",
+          "lineart_image": "assets/lineart/paris/eiffel-tower.png",
+          "sort_order": 1,
+          "representative_query": "Eiffel Tower Paris France landmark",
+          "required_terms": [
+            "eiffel",
+            "tower"
+          ],
+          "rejected_terms": [
+            "replica",
+            "texas",
+            "from the eiffel tower",
+            "champ de mars from",
+            "gustave",
+            "portrait",
+            "bust",
+            "statue"
+          ]
+        },
+        {
+          "id": "arc-de-triomphe",
+          "name": "Arco do Triunfo",
+          "description": [
+            "O Arco do Triunfo e um arco gigante construido para homenagear pessoas importantes da Franca.",
+            "Tambem e um simbolo de Paris."
+          ],
+          "image": "assets/landmarks/paris/arc-de-triomphe.png",
+          "lineart_image": "assets/lineart/paris/arc-de-triomphe.png",
+          "sort_order": 2,
+          "representative_query": "Arc de Triomphe Paris monument",
+          "required_terms": [
+            "arc",
+            "triomphe"
+          ],
+          "rejected_terms": [
+            "painting",
+            "canadians passing"
+          ]
+        },
+        {
+          "id": "champs-elysees",
+          "name": "Champs-Elysees",
+          "description": [
+            "A Champs-Elysees e uma avenida grande e bonita, cheia de lojas, cafes e luzes.",
+            "E a rua mais famosa de Paris."
+          ],
+          "image": "assets/landmarks/paris/champs-elysees.png",
+          "lineart_image": "assets/lineart/paris/champs-elysees.png",
+          "sort_order": 3,
+          "representative_query": "Avenue des Champs Elysees Paris street",
+          "required_terms": [
+            "champs",
+            "elysees"
+          ],
+          "rejected_terms": [
+            "1885",
+            "char de",
+            "algerie"
+          ]
+        },
+        {
+          "id": "louvre",
+          "name": "Museu do Louvre",
+          "description": [
+            "O Louvre e um dos museus mais famosos do mundo.",
+            "La ficam quadros e estatuas muito importantes, como a Monalisa."
+          ],
+          "image": "assets/landmarks/paris/louvre.png",
+          "lineart_image": "assets/lineart/paris/louvre.png",
+          "sort_order": 4,
+          "representative_query": "Louvre Pyramid museum Paris exterior",
+          "required_terms": [
+            "louvre"
+          ],
+          "rejected_terms": [
+            "interior",
+            "queue"
+          ]
+        },
+        {
+          "id": "orsay",
+          "name": "Museu d'Orsay",
+          "description": [
+            "O Museu d'Orsay tem muitos quadros coloridos e esculturas.",
+            "Ele fica em um predio que antes era uma estacao de trem, muito lindo."
+          ],
+          "image": "assets/landmarks/paris/orsay.png",
+          "lineart_image": "assets/lineart/paris/orsay.png",
+          "sort_order": 5,
+          "representative_query": "Musee d'Orsay Paris exterior",
+          "required_terms": [
+            "orsay"
+          ],
+          "rejected_terms": [
+            "painting",
+            "joconde",
+            "toulouse",
+            "sermon",
+            "chocolate",
+            "dessert"
+          ]
+        },
+        {
+          "id": "sacre-coeur",
+          "name": "Basilica de Sacre-Coeur",
+          "description": [
+            "A Sacre-Coeur e uma igreja branca que fica no alto de um morro.",
+            "De la, a vista de Paris e linda."
+          ],
+          "image": "assets/landmarks/paris/sacre-coeur.png",
+          "lineart_image": "assets/lineart/paris/sacre-coeur.png",
+          "sort_order": 6,
+          "representative_query": "Basilique Sacre Coeur Montmartre Paris exterior",
+          "required_terms": [
+            "sacre",
+            "coeur"
+          ],
+          "rejected_terms": [
+            "detail",
+            "cor jesu",
+            "dome",
+            "interior"
+          ]
+        },
+        {
+          "id": "luxembourg",
+          "name": "Palacio e Jardim de Luxemburgo",
+          "description": [
+            "O Palacio de Luxemburgo fica ao lado de jardins grandes e bonitos.",
+            "E um lugar perfeito para passear e descansar."
+          ],
+          "image": "assets/landmarks/paris/luxembourg.png",
+          "lineart_image": "assets/lineart/paris/luxembourg.png",
+          "sort_order": 7,
+          "representative_query": "Jardin du Luxembourg Paris palace garden",
+          "required_terms": [
+            "luxembourg"
+          ],
+          "rejected_terms": [
+            "orangerie only"
+          ]
+        },
+        {
+          "id": "versailles",
+          "name": "Palacio de Versalhes",
+          "description": [
+            "O Palacio de Versalhes e um palacio enorme onde viveram reis e rainhas.",
+            "Ele tem saloes luxuosos e jardins gigantes, muito chique."
+          ],
+          "image": "assets/landmarks/paris/versailles.png",
+          "lineart_image": "assets/lineart/paris/versailles.png",
+          "sort_order": 8,
+          "representative_query": "Palace of Versailles exterior gardens",
+          "required_terms": [
+            "versailles"
+          ],
+          "rejected_terms": [
+            "portrait"
+          ]
+        },
+        {
+          "id": "seine",
+          "name": "Rio Sena",
+          "description": [
+            "O Rio Sena passa por Paris.",
+            "Fazer um passeio de barco e uma forma divertida de ver a cidade."
+          ],
+          "image": "assets/landmarks/paris/seine.png",
+          "lineart_image": "assets/lineart/paris/seine.png",
+          "sort_order": 9,
+          "representative_query": "Seine river Paris Eiffel bridges",
+          "required_terms": [
+            "seine"
+          ],
+          "rejected_terms": [
+            "map"
+          ]
+        },
+        {
+          "id": "palais-garnier",
+          "name": "Opera de Paris (Palais Garnier)",
+          "description": [
+            "A Opera de Paris e um predio muito bonito onde acontecem apresentacoes de musica, danca e teatro.",
+            "Bailarinas famosas ja dancaram la."
+          ],
+          "image": "assets/landmarks/paris/palais-garnier.png",
+          "lineart_image": "assets/lineart/paris/palais-garnier.png",
+          "sort_order": 10,
+          "representative_query": "Paris Opera full frontal architecture Palais Garnier",
+          "required_terms": [
+            "paris",
+            "opera"
+          ],
+          "rejected_terms": [
+            "detail",
+            "musee de l opera",
+            "statue",
+            "carpeaux",
+            "sculpture"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "london",
+      "country": "Inglaterra",
+      "city": "Londres",
+      "display_title": "INGLATERRA - LONDRES",
+      "intro": [
+        "Londres e uma cidade cheia de historia, castelos, pontes famosas e onibus vermelhos.",
+        "E um lugar animado, onde tradicao e modernidade caminham juntas.",
+        "A Inglaterra e uma monarquia, um pais que tem reis e rainhas."
+      ],
+      "favorites_prompt": "Meus lugares favoritos em Londres foram...",
+      "coloring_title": "DESENHOS PARA COLORIR",
+      "coloring_subtitle": "Para colorir e desenhar",
+      "landmarks": [
+        {
+          "id": "big-ben",
+          "name": "Big Ben",
+          "description": [
+            "O Big Ben e um relogio muito grande que fica em uma torre famosa de Londres.",
+            "E um dos principais pontos turisticos da cidade."
+          ],
+          "image": "assets/landmarks/london/big-ben.png",
+          "lineart_image": "assets/lineart/london/big-ben.png",
+          "sort_order": 1,
+          "representative_query": "Big Ben Elizabeth Tower Westminster London clock tower",
+          "required_terms": [
+            "big",
+            "ben",
+            "clock"
+          ],
+          "rejected_terms": [
+            "leiden",
+            "academiegebouw",
+            "stained glass",
+            "interior"
+          ]
+        },
+        {
+          "id": "london-eye",
+          "name": "London Eye",
+          "description": [
+            "A London Eye e uma roda-gigante enorme.",
+            "La de cima e possivel ver toda a cidade de Londres."
+          ],
+          "image": "assets/landmarks/london/london-eye.png",
+          "lineart_image": "assets/lineart/london/london-eye.png",
+          "sort_order": 2,
+          "representative_query": "London Eye ferris wheel London landmark",
+          "required_terms": [
+            "london",
+            "eye"
+          ],
+          "rejected_terms": [
+            "construction detail"
+          ]
+        },
+        {
+          "id": "buckingham-palace",
+          "name": "Buckingham Palace + Troca da Guarda",
+          "description": [
+            "O Buckingham Palace e o palacio onde mora o rei da Inglaterra.",
+            "A Troca da Guarda e uma cerimonia com musica e uniformes bonitos."
+          ],
+          "image": "assets/landmarks/london/buckingham-palace.png",
+          "lineart_image": "assets/lineart/london/buckingham-palace.png",
+          "sort_order": 3,
+          "representative_query": "Buckingham Palace London exterior",
+          "required_terms": [
+            "buckingham"
+          ],
+          "rejected_terms": [
+            "statue only"
+          ]
+        },
+        {
+          "id": "westminster-abbey",
+          "name": "Abadia de Westminster",
+          "description": [
+            "A Abadia de Westminster e uma igreja muito antiga e importante.",
+            "Reis e rainhas se casaram la em cerimonias especiais."
+          ],
+          "image": "assets/landmarks/london/westminster-abbey.png",
+          "lineart_image": "assets/lineart/london/westminster-abbey.png",
+          "sort_order": 4,
+          "representative_query": "Westminster Abbey London building exterior",
+          "required_terms": [
+            "westminster",
+            "abbey"
+          ],
+          "rejected_terms": [
+            "painting",
+            "yale",
+            "bluck",
+            "courtyard",
+            "detail",
+            "statue only",
+            "interior"
+          ]
+        },
+        {
+          "id": "tower-bridge",
+          "name": "Tower Bridge + Rio Tamisa",
+          "description": [
+            "A Tower Bridge e uma ponte famosa de Londres.",
+            "O Rio Tamisa atravessa Londres e passa por muitos pontos importantes da cidade."
+          ],
+          "image": "assets/landmarks/london/tower-bridge.png",
+          "lineart_image": "assets/lineart/london/tower-bridge.png",
+          "sort_order": 5,
+          "representative_query": "Tower Bridge London",
+          "required_terms": [
+            "tower",
+            "bridge"
+          ],
+          "rejected_terms": [
+            "plaque",
+            "interior"
+          ]
+        },
+        {
+          "id": "red-phone-booth",
+          "name": "Cabine telefonica vermelha",
+          "description": [
+            "A cabine telefonica vermelha e antiga e virou um simbolo da cidade.",
+            "Atualmente ela e muito usada para tirar fotos."
+          ],
+          "image": "assets/landmarks/london/red-phone-booth.png",
+          "lineart_image": "assets/lineart/london/red-phone-booth.png",
+          "sort_order": 6,
+          "representative_query": "red telephone box London street",
+          "required_terms": [
+            "telephone"
+          ],
+          "rejected_terms": [
+            "toy",
+            "miniature"
+          ]
+        },
+        {
+          "id": "red-bus",
+          "name": "Onibus Vermelho",
+          "description": [
+            "O onibus vermelho de dois andares e um dos simbolos mais conhecidos de Londres.",
+            "E muito legal andar nele e ver tudo mais alto."
+          ],
+          "image": "assets/landmarks/london/red-bus.png",
+          "lineart_image": "assets/lineart/london/red-bus.png",
+          "sort_order": 7,
+          "representative_query": "London red double decker bus street",
+          "required_terms": [
+            "bus"
+          ],
+          "rejected_terms": [
+            "model",
+            "toy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cambridge",
+      "country": "Inglaterra",
+      "city": "Cambridge",
+      "display_title": "INGLATERRA - CAMBRIDGE",
+      "intro": [
+        "Cambridge e uma cidade estudantil, conhecida por suas belas escolas e passeios de barco pelo rio Cam.",
+        "Esse passeio se chama punting, um barquinho empurrado com um bastao comprido.",
+        "A Universidade de Cambridge e uma das mais antigas do mundo."
+      ],
+      "favorites_prompt": "Meus lugares favoritos em Cambridge foram...",
+      "coloring_title": "DESENHOS PARA COLORIR",
+      "coloring_subtitle": "Para colorir e desenhar",
+      "landmarks": [
+        {
+          "id": "cambridge-university",
+          "name": "Universidade de Cambridge",
+          "description": [
+            "A Universidade de Cambridge e uma das universidades mais antigas e famosas do mundo.",
+            "Muitas pessoas importantes estudaram nessa cidade cheia de historia."
+          ],
+          "image": "assets/landmarks/cambridge/cambridge-university.png",
+          "lineart_image": "assets/lineart/cambridge/cambridge-university.png",
+          "sort_order": 1,
+          "representative_query": "King's College Chapel Cambridge",
+          "required_terms": [
+            "cambridge"
+          ],
+          "rejected_terms": [
+            "logo",
+            "map",
+            "detail"
+          ]
+        },
+        {
+          "id": "river-cam",
+          "name": "Passeio de barco pelo Rio Cam",
+          "description": [
+            "O passeio pelo Rio Cam se chama punting.",
+            "O barquinho e empurrado com um bastao comprido enquanto a cidade aparece ao redor."
+          ],
+          "image": "assets/landmarks/cambridge/river-cam.png",
+          "lineart_image": "assets/lineart/cambridge/river-cam.png",
+          "sort_order": 2,
+          "representative_query": "punting River Cam Cambridge boats",
+          "required_terms": [
+            "cambridge",
+            "punt"
+          ],
+          "rejected_terms": [
+            "map"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lisbon",
+      "country": "Portugal",
+      "city": "Lisboa",
+      "display_title": "PORTUGAL - LISBOA",
+      "intro": [
+        "Lisboa e uma cidade alegre, com bondinhos amarelos, castelos, doces famosos e um rio muito bonito.",
+        "E um lugar perfeito para passear com a familia."
+      ],
+      "favorites_prompt": "Meus lugares favoritos em Lisboa foram...",
+      "coloring_title": "DESENHOS PARA COLORIR",
+      "coloring_subtitle": "Para colorir e desenhar",
+      "landmarks": [
+        {
+          "id": "oceanario",
+          "name": "Oceanario",
+          "description": [
+            "O Oceanario e um aquario gigante, onde vivem peixes grandes, pequenos e de varias partes do mundo.",
+            "E um dos aquarios mais visitados da Europa."
+          ],
+          "image": "assets/landmarks/lisbon/oceanario.png",
+          "lineart_image": "assets/lineart/lisbon/oceanario.png",
+          "sort_order": 1,
+          "representative_query": "Oceanario de Lisboa aquarium exterior",
+          "required_terms": [
+            "oceanario"
+          ],
+          "rejected_terms": [
+            "fish only"
+          ]
+        },
+        {
+          "id": "yellow-tram",
+          "name": "Eletrico amarelo",
+          "description": [
+            "O eletrico amarelo e um bondinho famoso que anda pelas ruas de Lisboa.",
+            "Ele deixa o passeio pela cidade ainda mais divertido."
+          ],
+          "image": "assets/landmarks/lisbon/yellow-tram.png",
+          "lineart_image": "assets/lineart/lisbon/yellow-tram.png",
+          "sort_order": 2,
+          "representative_query": "Lisbon Tram 28 yellow tram street",
+          "required_terms": [
+            "tram"
+          ],
+          "rejected_terms": [
+            "model",
+            "toy"
+          ]
+        },
+        {
+          "id": "jeronimos",
+          "name": "Mosteiro dos Jeronimos",
+          "description": [
+            "E um predio muito antigo e bonito, com muitas pedras desenhadas e detalhes diferentes.",
+            "Ele homenageia a epoca em que portugueses faziam grandes viagens pelo mar."
+          ],
+          "image": "assets/landmarks/lisbon/jeronimos.png",
+          "lineart_image": "assets/lineart/lisbon/jeronimos.png",
+          "sort_order": 3,
+          "representative_query": "Jeronimos Monastery Lisbon exterior",
+          "required_terms": [
+            "jeronimos"
+          ],
+          "rejected_terms": [
+            "detail only"
+          ]
+        },
+        {
+          "id": "descobrimentos",
+          "name": "Padrao dos Descobrimentos e das Caravelas",
+          "description": [
+            "O Padrao dos Descobrimentos homenageia os navegadores portugueses.",
+            "Ele lembra as viagens de barco feitas ha muitos anos pelas caravelas."
+          ],
+          "image": "assets/landmarks/lisbon/descobrimentos.png",
+          "lineart_image": "assets/lineart/lisbon/descobrimentos.png",
+          "sort_order": 4,
+          "representative_query": "Padrao dos Descobrimentos Lisboa",
+          "required_terms": [
+            "padrao"
+          ],
+          "rejected_terms": [
+            "detail only"
+          ]
+        },
+        {
+          "id": "santo-antonio",
+          "name": "Igreja Santo Antonio",
+          "description": [
+            "A Igreja de Santo Antonio e uma igreja pequena e especial em Lisboa.",
+            "Muitas pessoas visitam esse lugar para conhecer a historia desse santo."
+          ],
+          "image": "assets/landmarks/lisbon/santo-antonio.png",
+          "lineart_image": "assets/lineart/lisbon/santo-antonio.png",
+          "sort_order": 5,
+          "representative_query": "Igreja de Santo Antonio Lisboa exterior",
+          "required_terms": [
+            "antonio"
+          ],
+          "rejected_terms": [
+            "painting",
+            "statue only"
+          ]
+        },
+        {
+          "id": "pastel-de-belem",
+          "name": "Comer Pastel de Belem",
+          "description": [
+            "O Pastel de Belem e um doce tipico portugues, muito famoso e delicioso.",
+            "E uma parada obrigatoria em Lisboa."
+          ],
+          "image": "assets/landmarks/lisbon/pastel-de-belem.png",
+          "lineart_image": "assets/lineart/lisbon/pastel-de-belem.png",
+          "sort_order": 6,
+          "representative_query": "Pastel de Belem Lisboa",
+          "required_terms": [
+            "belem"
+          ],
+          "rejected_terms": [
+            "menu"
+          ]
+        },
+        {
+          "id": "praca-comercio",
+          "name": "Praca do Comercio / Rio Tejo",
+          "description": [
+            "A Praca do Comercio e uma praca grande e bonita, perto do Rio Tejo.",
+            "Esse rio corta a cidade de Lisboa."
+          ],
+          "image": "assets/landmarks/lisbon/praca-comercio.png",
+          "lineart_image": "assets/lineart/lisbon/praca-comercio.png",
+          "sort_order": 7,
+          "representative_query": "Praca do Comercio Lisboa",
+          "required_terms": [
+            "comercio"
+          ],
+          "rejected_terms": [
+            "map"
+          ]
+        }
+      ]
+    }
+  ]
+}

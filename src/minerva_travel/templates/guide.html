@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>{{ guide.request.title }}</title>
+  <style>{{ css }}</style>
+</head>
+<body class="{% if preview %}preview-mode{% endif %}">
+  <main class="guide-shell">
+    <section class="page cover-page">
+      <div class="cover-art">
+        <img class="cover-image" src="{{ guide.cover_image }}" alt="">
+      </div>
+      <div class="cover-panel">
+        <p class="eyebrow">diario ilustrado de viagem</p>
+        <h1>{{ guide.request.title }}</h1>
+        <p class="cover-names">{{ guide.request.children_display }}</p>
+        <p class="cover-meta">{{ guide.request.year }} com {{ guide.request.parents_display }}</p>
+      </div>
+    </section>
+
+    <section class="page letter-page">
+      <div class="page-kicker">antes de embarcar</div>
+      <h2>Nossa grande aventura</h2>
+      <div class="letter-card">
+        <p>{{ guide.request.children_display }}, este guia foi criado para acompanhar uma viagem cheia de descobertas.</p>
+        <p>Em cada cidade, voces vao encontrar lugares famosos, historias curiosas e espacos para marcar tudo que conheceram.</p>
+        <p class="callout">Quando visitarem um lugar, marquem o quadradinho e guardem a lembranca desta aventura.</p>
+      </div>
+      <div class="mini-map">
+        {% for item in guide.destinations %}
+          <span>{{ item.destination.city }}</span>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% for item in guide.destinations %}
+      <section class="page city-page">
+        <div class="city-header">
+          <p class="page-kicker">{{ item.destination.country }}</p>
+          <h2>{{ item.destination.city }}</h2>
+          <p>{{ item.destination.display_title }}</p>
+        </div>
+
+        <div class="city-copy">
+          {% for paragraph in item.destination.intro %}
+            <p>{{ paragraph }}</p>
+          {% endfor %}
+        </div>
+
+        <div class="overview-grid">
+          {% for landmark in item.landmarks[:6] %}
+            <figure class="overview-card">
+              <img src="{{ landmark.image }}" alt="">
+              <figcaption>{{ landmark.name }}</figcaption>
+            </figure>
+          {% endfor %}
+        </div>
+        <div class="stamp">diario de viagem</div>
+      </section>
+
+      {% for landmark in item.landmarks %}
+        <section class="page landmark-page">
+          <div class="landmark-hero">
+            <img class="landmark-image" src="{{ landmark.image }}" alt="">
+            <div class="image-number">{{ loop.index }}</div>
+          </div>
+
+          <div class="landmark-content">
+            <p class="page-kicker">{{ item.destination.city }}</p>
+            <h2>{{ landmark.name }}</h2>
+            {% for paragraph in landmark.description %}
+              <p>{{ paragraph }}</p>
+            {% endfor %}
+          </div>
+
+          <div class="visit-row">
+            <span>JA VISITEI</span>
+            <span class="checkbox"></span>
+          </div>
+          <div class="stamp">diario de viagem</div>
+        </section>
+      {% endfor %}
+
+      <section class="page notes-page">
+        <p class="page-kicker">{{ item.destination.city }}</p>
+        <h2>Lugares favoritos</h2>
+        <p>{{ item.destination.favorites_prompt }}</p>
+        <div class="writing-lines"></div>
+        <div class="stamp">memorias</div>
+      </section>
+
+      <section class="page coloring-page">
+        <p class="page-kicker">{{ item.destination.city }}</p>
+        <h2>{{ item.destination.coloring_title }}</h2>
+        <p>{{ item.destination.coloring_subtitle }}</p>
+        <div class="coloring-frame">
+          <img class="lineart-image" src="{{ item.landmarks[0].lineart_image }}" alt="">
+        </div>
+      </section>
+    {% endfor %}
+
+    <section class="page closing-page">
+      <div class="closing-card">
+        <p class="page-kicker">ate a proxima aventura</p>
+        <h2>Nossa Grande Aventura</h2>
+        <p>{{ guide.request.children_display }}, nossa viagem chegou ao fim, mas as memorias vao ficar para sempre.</p>
+        <p>Que este livro lembre voces de como e bom explorar o mundo, fazer perguntas e se encantar com as pequenas e grandes coisas da vida.</p>
+        <p class="signature">Com todo o amor,<br>{{ guide.request.parents_display }}</p>
+      </div>
+    </section>
+
+    {% if guide.image_credits %}
+      <section class="page credits-page">
+        <p class="page-kicker">fontes publicas</p>
+        <h2>Creditos das imagens</h2>
+        <p>Algumas imagens dos pontos turisticos foram obtidas de fontes publicas e mantem seus creditos abaixo.</p>
+        <ul>
+          {% for credit in guide.image_credits %}
+            <li>
+              <strong>{{ credit.landmark_name }}</strong>
+              <span>{{ credit.credit }}</span>
+              <span>Licenca: {{ credit.license_short_name }}</span>
+              <span>Fonte: {{ credit.source_url }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  </main>
+</body>
+</html>

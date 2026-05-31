@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+runtime/
+output/
+docs/
+.env
+.idea/
+.superpowers/
+frontendv2/
+node_modules/
+dist/
