@@ -1,9 +1,11 @@
 # Deploy na Hostinger
 
-Este projeto deve ficar em um unico repositorio. A Hostinger deve publicar
-apenas o frontend React/Vite. Para facilitar a deteccao do painel, existe um
-`package.json` na raiz do repositorio que delega o build para
-`frontend_atual/apps/web` e copia o resultado final para `dist`.
+Este projeto fica em um unico repositorio, mas a Hostinger deve usar a branch
+dedicada `hostinger-frontend`. Essa branch contem somente o app React/Vite, com
+`package.json`, `index.html`, `vite.config.js`, `src/` e `public/` na raiz.
+
+Isso evita o erro de "estrutura de projeto invalida" causado pela deteccao da
+Hostinger em repositorios monorepo.
 
 ## Configuracao recomendada
 
@@ -11,7 +13,7 @@ No hPanel, conecte o GitHub ao site temporario e use:
 
 ```text
 Repository: MaiconKevyn/minerva_travel
-Branch: main
+Branch: hostinger-frontend
 Framework: Vite
 Root directory: .
 Install command: npm ci
@@ -23,6 +25,22 @@ Node.js: 22.x
 Use o preset `Vite` se existir. Se nao existir, use `React`. Se o painel ainda
 nao detectar automaticamente, escolha `Other` e preencha os mesmos comandos
 acima.
+
+## Sincronizacao da branch
+
+A branch `hostinger-frontend` e gerada a partir de:
+
+```text
+frontend_atual/apps/web
+```
+
+O workflow `.github/workflows/sync-hostinger-frontend.yml` atualiza essa branch
+automaticamente quando a `main` recebe mudancas no frontend. Se o workflow
+falhar por permissao, habilite em GitHub:
+
+```text
+Settings -> Actions -> General -> Workflow permissions -> Read and write permissions
+```
 
 ## Variaveis de ambiente
 

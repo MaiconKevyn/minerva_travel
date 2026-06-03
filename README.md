@@ -140,10 +140,11 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ## Deploy temporario na Hostinger
 
-Use o repositorio pela raiz. O `package.json` raiz delega o build para
-`frontend_atual/apps/web` e copia os arquivos finais para `dist`.
+Use a branch dedicada `hostinger-frontend`. Ela contem apenas o frontend Vite
+na raiz, o que evita falhas de deteccao de monorepo no painel da Hostinger.
 
 ```text
+Branch: hostinger-frontend
 Framework: Vite
 Root directory: .
 Install command: npm ci
@@ -157,6 +158,6 @@ Configure a variavel antes do build:
 VITE_API_BASE_URL=https://minerva-travel.onrender.com
 ```
 
-Enquanto nao houver dominio definitivo, conecte a Hostinger na branch `main` e
-use o dominio temporario fornecido pelo painel. Quando o dominio final existir,
-adicione-o no backend em `CORS_ALLOW_ORIGINS`.
+Enquanto nao houver dominio definitivo, conecte a Hostinger na branch
+`hostinger-frontend` e use o dominio temporario fornecido pelo painel. Quando o
+dominio final existir, adicione-o no backend em `CORS_ALLOW_ORIGINS`.
