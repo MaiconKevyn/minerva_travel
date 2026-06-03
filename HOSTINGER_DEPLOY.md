@@ -1,19 +1,22 @@
 # Deploy na Hostinger
 
-Este projeto fica em um unico repositorio, mas a Hostinger deve usar a branch
-dedicada `hostinger-frontend`. Essa branch contem somente o app React/Vite, com
-`package.json`, `index.html`, `vite.config.js`, `src/` e `public/` na raiz.
+O deploy da Hostinger deve usar o repositorio dedicado:
 
-Isso evita o erro de "estrutura de projeto invalida" causado pela deteccao da
-Hostinger em repositorios monorepo.
+```text
+MaiconKevyn/minerva_travel_frontend
+```
+
+Esse repo contem somente o app React/Vite, com `package.json`, `index.html`,
+`vite.config.js`, `src/` e `public/` na raiz. Isso evita o erro de "estrutura de
+projeto invalida" causado pela deteccao da Hostinger em repositorios monorepo.
 
 ## Configuracao recomendada
 
 No hPanel, conecte o GitHub ao site temporario e use:
 
 ```text
-Repository: MaiconKevyn/minerva_travel
-Branch: hostinger-frontend
+Repository: MaiconKevyn/minerva_travel_frontend
+Branch: main
 Framework: Vite
 Root directory: .
 Install command: npm ci
@@ -28,18 +31,17 @@ acima.
 
 ## Sincronizacao da branch
 
-A branch `hostinger-frontend` e gerada a partir de:
+O frontend dedicado foi publicado a partir de:
 
 ```text
 frontend_atual/apps/web
 ```
 
-O workflow `.github/workflows/sync-hostinger-frontend.yml` atualiza essa branch
-automaticamente quando a `main` recebe mudancas no frontend. Se o workflow
-falhar por permissao, habilite em GitHub:
+Para sincronizar manualmente depois de alterar o frontend neste monorepo:
 
 ```text
-Settings -> Actions -> General -> Workflow permissions -> Read and write permissions
+git subtree split --prefix=frontend_atual/apps/web -b hostinger-frontend
+git push frontend hostinger-frontend:main
 ```
 
 ## Variaveis de ambiente

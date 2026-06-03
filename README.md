@@ -140,11 +140,13 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ## Deploy temporario na Hostinger
 
-Use a branch dedicada `hostinger-frontend`. Ela contem apenas o frontend Vite
-na raiz, o que evita falhas de deteccao de monorepo no painel da Hostinger.
+Use o repositorio dedicado `MaiconKevyn/minerva_travel_frontend`. Ele contem
+apenas o frontend Vite na raiz, o que evita falhas de deteccao de monorepo no
+painel da Hostinger.
 
 ```text
-Branch: hostinger-frontend
+Repository: MaiconKevyn/minerva_travel_frontend
+Branch: main
 Framework: Vite
 Root directory: .
 Install command: npm ci
@@ -158,6 +160,6 @@ Configure a variavel antes do build:
 VITE_API_BASE_URL=https://minerva-travel.onrender.com
 ```
 
-Enquanto nao houver dominio definitivo, conecte a Hostinger na branch
-`hostinger-frontend` e use o dominio temporario fornecido pelo painel. Quando o
-dominio final existir, adicione-o no backend em `CORS_ALLOW_ORIGINS`.
+Enquanto nao houver dominio definitivo, use o dominio temporario fornecido pelo
+painel. Quando o dominio final existir, adicione-o no backend em
+`CORS_ALLOW_ORIGINS`.
