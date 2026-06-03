@@ -140,12 +140,12 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ## Deploy temporario na Hostinger
 
-Use o repositorio dedicado `MaiconKevyn/minerva_travel_frontend`. Ele contem
+Use o repositorio dedicado `MaiconKevyn/minerva-travel-frontend`. Ele contem
 apenas o frontend Vite na raiz, o que evita falhas de deteccao de monorepo no
 painel da Hostinger.
 
 ```text
-Repository: MaiconKevyn/minerva_travel_frontend
+Repository: MaiconKevyn/minerva-travel-frontend
 Branch: main
 Framework: Vite
 Root directory: .

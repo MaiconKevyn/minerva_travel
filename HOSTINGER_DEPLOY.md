@@ -3,7 +3,7 @@
 O deploy da Hostinger deve usar o repositorio dedicado:
 
 ```text
-MaiconKevyn/minerva_travel_frontend
+MaiconKevyn/minerva-travel-frontend
 ```
 
 Esse repo contem somente o app React/Vite, com `package.json`, `index.html`,
@@ -15,7 +15,7 @@ projeto invalida" causado pela deteccao da Hostinger em repositorios monorepo.
 No hPanel, conecte o GitHub ao site temporario e use:
 
 ```text
-Repository: MaiconKevyn/minerva_travel_frontend
+Repository: MaiconKevyn/minerva-travel-frontend
 Branch: main
 Framework: Vite
 Root directory: .
@@ -41,7 +41,7 @@ Para sincronizar manualmente depois de alterar o frontend neste monorepo:
 
 ```text
 git subtree split --prefix=frontend_atual/apps/web -b hostinger-frontend
-git push frontend hostinger-frontend:main
+git push frontend-hyphen hostinger-frontend:main
 ```
 
 ## Variaveis de ambiente
