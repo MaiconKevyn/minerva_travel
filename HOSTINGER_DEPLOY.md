@@ -1,7 +1,9 @@
-# Deploy do frontend na Hostinger
+# Deploy na Hostinger
 
 Este projeto deve ficar em um unico repositorio. A Hostinger deve publicar
-apenas o frontend React/Vite em `frontend_atual/apps/web`.
+apenas o frontend React/Vite. Para facilitar a deteccao do painel, existe um
+`package.json` na raiz do repositorio que delega o build para
+`frontend_atual/apps/web` e copia o resultado final para `dist`.
 
 ## Configuracao recomendada
 
@@ -10,15 +12,17 @@ No hPanel, conecte o GitHub ao site temporario e use:
 ```text
 Repository: MaiconKevyn/minerva_travel
 Branch: main
-Root directory: frontend_atual/apps/web
+Framework: Vite
+Root directory: .
 Install command: npm ci
 Build command: npm run build
 Output directory: dist
 Node.js: 22.x
 ```
 
-Use o preset `Vite` se existir. Se nao existir, use `React`. Se o painel pedir
-somente arquivos estaticos, publique o conteudo gerado em `dist`.
+Use o preset `Vite` se existir. Se nao existir, use `React`. Se o painel ainda
+nao detectar automaticamente, escolha `Other` e preencha os mesmos comandos
+acima.
 
 ## Variaveis de ambiente
 

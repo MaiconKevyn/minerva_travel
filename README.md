@@ -140,10 +140,12 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ## Deploy temporario na Hostinger
 
-Use o app web como um site React/Vite estatico:
+Use o repositorio pela raiz. O `package.json` raiz delega o build para
+`frontend_atual/apps/web` e copia os arquivos finais para `dist`.
 
 ```text
-Root directory: frontend_atual/apps/web
+Framework: Vite
+Root directory: .
 Install command: npm ci
 Build command: npm run build
 Output directory: dist
