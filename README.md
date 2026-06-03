@@ -9,15 +9,15 @@ MVP local para gerar um guia de viagem infantil personalizado em PDF.
 - Capa e imagens dos pontos turisticos geradas por provider configuravel
   (`placeholder` ou `replicate`).
 - Interpretacao de pontos turisticos em linguagem natural via OpenAI no backend.
+- PDF organizado em momentos da viagem: antes, durante e depois, com dicas de idioma e atividades infantis por destino.
 - PDF final para download no navegador.
 
 ## Instalar
 
 ```bash
 uv sync --extra dev
-cd frontend
+cd frontend_atual/apps/web
 npm install
-cd ..
 ```
 
 ## Gerar assets placeholder
@@ -37,8 +37,8 @@ Backend: `http://localhost:8000`.
 ## Rodar frontend
 
 ```bash
-cd frontend
-cp .env.example .env.local
+cd frontend_atual/apps/web
+cp .env.example .env
 npm install
 npm run dev
 ```
@@ -103,7 +103,7 @@ uv run uvicorn minerva_travel.app:app --reload --host 127.0.0.1 --port 8000
 Terminal 2:
 
 ```bash
-cd frontend
+cd frontend_atual/apps/web
 npm run dev
 ```
 
@@ -132,8 +132,29 @@ e gera uma segunda imagem em line art preto e branco para a secao de colorir.
 `IMAGE_GENERATION_CONCURRENCY` controla quantos pontos turisticos sao
 processados em paralelo; comece com `2` para reduzir risco de rate limit.
 
-Frontend `frontend/.env.local`:
+Frontend `frontend_atual/apps/web/.env`:
 
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
+
+## Deploy temporario na Hostinger
+
+Use o app web como um site React/Vite estatico:
+
+```text
+Root directory: frontend_atual/apps/web
+Install command: npm ci
+Build command: npm run build
+Output directory: dist
+```
+
+Configure a variavel antes do build:
+
+```env
+VITE_API_BASE_URL=https://minerva-travel.onrender.com
+```
+
+Enquanto nao houver dominio definitivo, conecte a Hostinger na branch `main` e
+use o dominio temporario fornecido pelo painel. Quando o dominio final existir,
+adicione-o no backend em `CORS_ALLOW_ORIGINS`.

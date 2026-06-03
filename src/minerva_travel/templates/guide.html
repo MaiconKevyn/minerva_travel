@@ -19,17 +19,22 @@
       </div>
     </section>
 
-    <section class="page letter-page">
-      <div class="page-kicker">antes de embarcar</div>
+    <section class="page letter-page journey-phase-page phase-before">
+      <div class="phase-badge">Antes da viagem</div>
+      <div class="page-kicker">para ler antes de embarcar</div>
       <h2>Nossa grande aventura</h2>
       <div class="letter-card">
         <p>{{ guide.request.children_display }}, este guia foi criado para acompanhar uma viagem cheia de descobertas.</p>
-        <p>Em cada cidade, voces vao encontrar lugares famosos, historias curiosas e espacos para marcar tudo que conheceram.</p>
-        <p class="callout">Quando visitarem um lugar, marquem o quadradinho e guardem a lembranca desta aventura.</p>
+        <p>Antes de chegar, voces podem olhar o mapa, descobrir palavras novas e escolher os lugares que mais dao curiosidade.</p>
+        <p class="callout">Atividade para o aviao: marque no mapa mental da aventura qual cidade voces vao conhecer primeiro.</p>
       </div>
-      <div class="mini-map">
+      <div class="phase-grid">
         {% for item in guide.destinations %}
-          <span>{{ item.destination.city }}</span>
+          <article class="phase-card">
+            <span>{{ loop.index }}</span>
+            <h3>{{ item.destination.city }}</h3>
+            <p>{{ item.destination.phase_activities.before }}</p>
+          </article>
         {% endfor %}
       </div>
     </section>
@@ -59,8 +64,37 @@
         <div class="stamp">diario de viagem</div>
       </section>
 
+      {% if item.destination.language_tips %}
+        <section class="page language-page phase-before">
+          <div class="phase-badge">Antes da viagem</div>
+          <p class="page-kicker">{{ item.destination.city }}</p>
+          <h2>Palavras para usar</h2>
+          <p class="language-intro">
+            Algumas palavras em {{ item.destination.language_name }} para brincar de falar antes de chegar e tentar usar durante o passeio.
+          </p>
+
+          <div class="language-grid">
+            {% for tip in item.destination.language_tips %}
+              <article class="language-tip-card">
+                <strong>{{ tip.phrase }}</strong>
+                <span>{{ tip.pronunciation }}</span>
+                <p>{{ tip.meaning }}</p>
+                <small>{{ tip.use_case }}</small>
+              </article>
+            {% endfor %}
+          </div>
+
+          <div class="airplane-activity">
+            <p class="page-kicker">atividade para o aviao</p>
+            <p>Escolha uma palavra desta pagina e pratique com alguem da familia. Depois, desenhe onde voce acha que poderia usa-la.</p>
+            <div class="drawing-box"></div>
+          </div>
+        </section>
+      {% endif %}
+
       {% for landmark in item.landmarks %}
         <section class="page landmark-page">
+          <div class="phase-badge landmark-phase-badge">Durante a viagem</div>
           <div class="landmark-hero">
             <img class="landmark-image" src="{{ landmark.image }}" alt="">
             <div class="image-number">{{ loop.index }}</div>
@@ -72,6 +106,11 @@
             {% for paragraph in landmark.description %}
               <p>{{ paragraph }}</p>
             {% endfor %}
+            <div class="observation-card">
+              <p class="observation-title">Caca ao detalhe</p>
+              <p>{{ item.destination.phase_activities.during }}</p>
+              <div class="answer-line"></div>
+            </div>
           </div>
 
           <div class="visit-row">
@@ -82,11 +121,24 @@
         </section>
       {% endfor %}
 
-      <section class="page notes-page">
+      <section class="page notes-page phase-after">
+        <div class="phase-badge">Depois da visita</div>
         <p class="page-kicker">{{ item.destination.city }}</p>
         <h2>Lugares favoritos</h2>
         <p>{{ item.destination.favorites_prompt }}</p>
-        <div class="writing-lines"></div>
+
+        <div class="memory-boxes">
+          <article>
+            <h3>Minha lembranca favorita</h3>
+            <div class="writing-lines compact-lines"></div>
+          </article>
+          <article>
+            <h3>O que eu aprendi</h3>
+            <p>{{ item.destination.phase_activities.after }}</p>
+            <div class="writing-lines compact-lines"></div>
+          </article>
+        </div>
+
         <div class="stamp">memorias</div>
       </section>
 
@@ -100,11 +152,13 @@
       </section>
     {% endfor %}
 
-    <section class="page closing-page">
+    <section class="page closing-page phase-after">
+      <div class="phase-badge">Depois da viagem</div>
       <div class="closing-card">
-        <p class="page-kicker">ate a proxima aventura</p>
+        <p class="page-kicker">recordacoes da aventura</p>
         <h2>Nossa Grande Aventura</h2>
         <p>{{ guide.request.children_display }}, nossa viagem chegou ao fim, mas as memorias vao ficar para sempre.</p>
+        <p>Agora este livro guarda os lugares visitados, as palavras novas, os desenhos, as descobertas e as historias que voces viveram juntos.</p>
         <p>Que este livro lembre voces de como e bom explorar o mundo, fazer perguntas e se encantar com as pequenas e grandes coisas da vida.</p>
         <p class="signature">Com todo o amor,<br>{{ guide.request.parents_display }}</p>
       </div>

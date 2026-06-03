@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -7,7 +8,7 @@ from minerva_travel.wikimedia_assets import ImageCredit
 
 class GuideRequest(BaseModel):
     title: str = Field(min_length=1)
-    children_names: list[str] = Field(min_length=1, max_length=3)
+    children_names: list[str] = Field(min_length=1, max_length=10)
     parents_names: list[str] = Field(min_length=1, max_length=2)
     year: int = Field(ge=2024, le=2100)
     selected_landmarks: list[str] = Field(min_length=1, max_length=30)
@@ -33,6 +34,24 @@ class Landmark(BaseModel):
     representative_query: str | None = None
     required_terms: list[str] = Field(default_factory=list)
     rejected_terms: list[str] = Field(default_factory=list)
+    categories: list[str] = Field(default_factory=list)
+    duration_minutes: int = Field(default=60, ge=15, le=240)
+    family_tip: str | None = None
+
+
+class LanguageTip(BaseModel):
+    phrase: str = Field(min_length=1)
+    pronunciation: str = Field(min_length=1)
+    meaning: str = Field(min_length=1)
+    use_case: str = Field(min_length=1)
+
+
+class PhaseActivities(BaseModel):
+    before: str = (
+        "No caminho, procure esta cidade no mapa e imagine o que voces vao encontrar."
+    )
+    during: str = "Durante a visita, escolha um detalhe para observar com calma."
+    after: str = "Depois da visita, desenhe ou escreva uma lembranca importante."
 
 
 class Destination(BaseModel):
@@ -44,6 +63,9 @@ class Destination(BaseModel):
     favorites_prompt: str
     coloring_title: str
     coloring_subtitle: str
+    language_name: str | None = None
+    language_tips: list[LanguageTip] = Field(default_factory=list)
+    phase_activities: PhaseActivities = Field(default_factory=PhaseActivities)
     landmarks: list[Landmark] = Field(min_length=1)
 
     def sorted_landmarks(self) -> list[Landmark]:
@@ -79,6 +101,49 @@ class GuideContext(BaseModel):
     cover_image: Path
     destinations: list[GuideDestination]
     image_credits: list[ImageCredit] = Field(default_factory=list)
+
+
+class ItineraryRecommendationRequest(BaseModel):
+    destination_ids: list[str] = Field(min_length=1, max_length=10)
+    days: int = Field(ge=1, le=14)
+    interests: list[str] = Field(default_factory=list, max_length=12)
+    pace: Literal["light", "balanced", "full"] = "balanced"
+    children_ages: list[int] = Field(default_factory=list, max_length=10)
+    must_see_landmarks: list[str] = Field(default_factory=list, max_length=30)
+
+
+class ItineraryStop(BaseModel):
+    selection_id: str
+    destination_id: str
+    landmark_id: str
+    name: str
+    city: str
+    country: str
+    description: list[str]
+    image: Path
+    categories: list[str] = Field(default_factory=list)
+    duration_minutes: int
+    family_tip: str | None = None
+    match_score: int
+    match_reasons: list[str] = Field(default_factory=list)
+    editable: bool = True
+
+
+class ItineraryDay(BaseModel):
+    day: int
+    title: str
+    theme: str
+    destination_ids: list[str]
+    stops: list[ItineraryStop]
+    family_prompt: str
+
+
+class ItineraryRecommendation(BaseModel):
+    summary: str
+    recommendation_source: str = "curated_catalog"
+    selected_landmarks: list[str]
+    days: list[ItineraryDay]
+    alternatives: list[ItineraryStop] = Field(default_factory=list)
 
 
 def join_pt(values: list[str]) -> str:

@@ -1,3 +1,0 @@
-## Pages
-- [Aventuras em Família - O seu guia de viagem ilustrado](/home): Crie guias de viagem personalizados como livros de histórias para a sua família. Transforme cada viagem em uma aventura mágica.
-- [Crie Seu Guia - Aventuras em Familia](/createguide): Envie uma foto, escolha o roteiro e gere o PDF personalizado da sua familia.

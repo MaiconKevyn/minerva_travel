@@ -26,8 +26,9 @@ from minerva_travel.custom_landmarks import (
 )
 from minerva_travel.guide_builder import build_guide_context
 from minerva_travel.image_generation import get_image_generator
+from minerva_travel.itinerary import recommend_itinerary
 from minerva_travel.landmark_parser import ParsedLandmark, parse_landmarks_from_message
-from minerva_travel.models import Destination, GuideRequest
+from minerva_travel.models import Destination, GuideRequest, ItineraryRecommendationRequest
 from minerva_travel.pdf import render_guide_html, write_pdf
 from minerva_travel.wikimedia_assets import WikimediaAsset, load_wikimedia_manifest
 from minerva_travel.wikimedia_client import (
@@ -90,6 +91,9 @@ def api_catalog() -> dict[str, object]:
                         "name": landmark.name,
                         "description": landmark.description,
                         "sort_order": landmark.sort_order,
+                        "categories": landmark.categories,
+                        "duration_minutes": landmark.duration_minutes,
+                        "family_tip": landmark.family_tip,
                     }
                     for landmark in destination.landmarks
                 ],
@@ -97,6 +101,16 @@ def api_catalog() -> dict[str, object]:
             for destination in catalog.destinations
         ],
     }
+
+
+@app.post("/api/itinerary/recommend")
+def api_recommend_itinerary(payload: ItineraryRecommendationRequest) -> dict[str, object]:
+    catalog = load_catalog()
+    try:
+        recommendation = recommend_itinerary(catalog, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return recommendation.model_dump(mode="json")
 
 
 @app.post("/api/custom-landmarks/resolve")

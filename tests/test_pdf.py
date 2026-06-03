@@ -52,6 +52,38 @@ def test_render_guide_html_contains_image_credits_when_present():
     assert "Jane Doe / Wikimedia Commons" in html
 
 
+def test_render_guide_html_contains_trip_phases_language_tips_and_reflection_prompts():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=[
+            "paris:eiffel-tower",
+            "london:big-ben",
+            "lisbon:oceanario",
+        ],
+    )
+    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+
+    html = render_guide_html(context)
+
+    assert "Antes da viagem" in html
+    assert "Durante a viagem" in html
+    assert "Depois da viagem" in html
+    assert "Palavras para usar" in html
+    assert "Bonjour" in html
+    assert "Thank you" in html
+    assert "Obrigado/obrigada" in html
+    assert "Caca ao detalhe" in html
+    assert "O que eu aprendi" in html
+    assert ".phase-badge" in html
+    assert ".language-tip-card" in html
+    assert ".observation-card" in html
+    assert ".memory-boxes" in html
+
+
 def test_write_pdf_creates_non_empty_file(tmp_path):
     catalog = load_catalog(Path("data/destinations/europe_2026.json"))
     request = GuideRequest(

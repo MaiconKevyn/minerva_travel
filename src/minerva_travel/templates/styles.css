@@ -457,3 +457,237 @@ p {
   display: block;
   margin-top: 0.03in;
 }
+
+h3 {
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16pt;
+  line-height: 1.15;
+}
+
+.phase-badge {
+  background: var(--coral);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-block;
+  font-size: 9pt;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.16in;
+  padding: 0.08in 0.18in;
+  text-transform: uppercase;
+}
+
+.phase-before {
+  background:
+    radial-gradient(circle at 14% 16%, rgba(136, 176, 139, 0.14), transparent 1.25in),
+    radial-gradient(circle at 90% 84%, rgba(55, 111, 145, 0.08), transparent 1.25in),
+    var(--paper);
+}
+
+.phase-after {
+  background:
+    radial-gradient(circle at 14% 16%, rgba(221, 112, 79, 0.1), transparent 1.25in),
+    radial-gradient(circle at 88% 84%, rgba(136, 176, 139, 0.12), transparent 1.25in),
+    var(--paper-warm);
+}
+
+.journey-phase-page .letter-card {
+  margin-top: 0.22in;
+}
+
+.phase-grid {
+  display: grid;
+  gap: 0.12in;
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 0.34in;
+  width: 6.9in;
+}
+
+.phase-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0.16in;
+  box-shadow: 0 8px 18px rgba(47, 41, 37, 0.06);
+  padding: 0.16in;
+  text-align: left;
+}
+
+.phase-card span {
+  align-items: center;
+  background: var(--blue-soft);
+  border-radius: 999px;
+  color: var(--blue);
+  display: flex;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13pt;
+  font-weight: 800;
+  height: 0.34in;
+  justify-content: center;
+  margin-bottom: 0.08in;
+  width: 0.34in;
+}
+
+.phase-card p {
+  color: var(--muted);
+  font-size: 10pt;
+  line-height: 1.35;
+  margin-top: 0.06in;
+}
+
+.language-page h2 {
+  color: var(--blue);
+  margin: 0.08in 0 0.14in;
+}
+
+.language-intro {
+  color: var(--muted);
+  max-width: 6.7in;
+}
+
+.language-grid {
+  display: grid;
+  gap: 0.14in;
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 0.28in;
+}
+
+.language-tip-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 0.1in solid var(--green);
+  border-radius: 0.16in;
+  box-shadow: 0 8px 18px rgba(47, 41, 37, 0.06);
+  min-height: 1.18in;
+  padding: 0.16in 0.18in;
+}
+
+.language-tip-card strong {
+  color: var(--blue);
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18pt;
+  line-height: 1.1;
+}
+
+.language-tip-card span {
+  color: var(--coral);
+  display: block;
+  font-size: 10pt;
+  font-weight: 900;
+  margin-top: 0.04in;
+}
+
+.language-tip-card p {
+  color: var(--ink);
+  font-size: 11pt;
+  font-weight: 800;
+  margin-top: 0.07in;
+}
+
+.language-tip-card small {
+  color: var(--muted);
+  display: block;
+  font-size: 9pt;
+  line-height: 1.35;
+  margin-top: 0.05in;
+}
+
+.airplane-activity {
+  background: #fff;
+  border: 1px dashed rgba(55, 111, 145, 0.45);
+  border-radius: 0.18in;
+  margin-top: 0.32in;
+  padding: 0.18in;
+}
+
+.airplane-activity p:last-of-type {
+  color: var(--ink);
+  font-size: 11.5pt;
+  line-height: 1.4;
+  margin-top: 0.06in;
+}
+
+.drawing-box {
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    repeating-linear-gradient(
+      -45deg,
+      rgba(55, 111, 145, 0.18),
+      rgba(55, 111, 145, 0.18) 0.04in,
+      transparent 0.04in,
+      transparent 0.09in
+    ) border-box;
+  border: 2px solid transparent;
+  border-radius: 0.12in;
+  height: 1.45in;
+  margin-top: 0.14in;
+}
+
+.landmark-phase-badge {
+  left: 0.62in;
+  position: absolute;
+  top: 0.18in;
+  z-index: 3;
+}
+
+.observation-card {
+  background: var(--paper-warm);
+  border: 1px solid rgba(136, 176, 139, 0.55);
+  border-radius: 0.14in;
+  margin-top: 0.12in;
+  padding: 0.12in 0.14in;
+}
+
+.observation-card p {
+  color: var(--ink);
+  font-size: 10.3pt;
+  line-height: 1.32;
+  margin: 0;
+}
+
+.observation-card .observation-title {
+  color: var(--green);
+  font-size: 9pt;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.04in;
+  text-transform: uppercase;
+}
+
+.answer-line {
+  border-bottom: 2px solid rgba(55, 111, 145, 0.28);
+  height: 0.2in;
+  margin-top: 0.06in;
+}
+
+.memory-boxes {
+  display: grid;
+  gap: 0.18in;
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 0.3in;
+}
+
+.memory-boxes article {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0.18in;
+  min-height: 5.4in;
+  padding: 0.2in;
+}
+
+.memory-boxes h3 {
+  color: var(--blue);
+  margin-bottom: 0.12in;
+}
+
+.memory-boxes p {
+  color: var(--muted);
+  font-size: 10.5pt;
+  line-height: 1.4;
+}
+
+.compact-lines {
+  height: 4.35in;
+  margin-top: 0.16in;
+}

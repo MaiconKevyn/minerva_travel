@@ -13,3 +13,14 @@ docs/
 frontendv2/
 node_modules/
 dist/
+*.zip
+*.tar.gz
+
+# Local artifacts from Hostinger/Horizons exports. The production deploy uses
+# frontend_atual/apps/web as a static Vite app.
+frontend_atual/.nvmrc
+frontend_atual/.version
+frontend_atual/package.json
+frontend_atual/package-lock.json
+frontend_atual/apps/api/
+frontend_atual/apps/pocketbase/

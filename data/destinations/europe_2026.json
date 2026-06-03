@@ -16,6 +16,32 @@
       "favorites_prompt": "Meus lugares favoritos em Paris foram...",
       "coloring_title": "DESENHOS PARA COLORIR",
       "coloring_subtitle": "Para colorir e desenhar",
+      "language_name": "frances",
+      "language_tips": [
+        {
+          "phrase": "Bonjour",
+          "pronunciation": "bon-ZHUR",
+          "meaning": "Oi / bom dia",
+          "use_case": "Use ao entrar em uma loja, cafe ou museu."
+        },
+        {
+          "phrase": "Merci",
+          "pronunciation": "mer-SI",
+          "meaning": "Obrigado(a)",
+          "use_case": "Use quando alguem ajudar voce."
+        },
+        {
+          "phrase": "S'il vous plait",
+          "pronunciation": "sil vu PLE",
+          "meaning": "Por favor",
+          "use_case": "Use para pedir algo com educacao."
+        }
+      ],
+      "phase_activities": {
+        "before": "No aviao, encontre Paris no mapa e circule o lugar que voce esta mais curioso para visitar.",
+        "during": "Procure uma torre, um arco ou uma piramide de vidro e desenhe o detalhe que voce encontrou.",
+        "after": "Desenhe sua lembranca favorita de Paris e escreva uma palavra nova que voce aprendeu."
+      },
       "landmarks": [
         {
           "id": "eiffel-tower",
@@ -27,6 +53,13 @@
           "image": "assets/landmarks/paris/eiffel-tower.png",
           "lineart_image": "assets/lineart/paris/eiffel-tower.png",
           "sort_order": 1,
+          "categories": [
+            "icons",
+            "views",
+            "architecture"
+          ],
+          "duration_minutes": 90,
+          "family_tip": "Bom para abrir a viagem com um simbolo que as criancas reconhecem.",
           "representative_query": "Eiffel Tower Paris France landmark",
           "required_terms": [
             "eiffel",
@@ -53,6 +86,13 @@
           "image": "assets/landmarks/paris/arc-de-triomphe.png",
           "lineart_image": "assets/lineart/paris/arc-de-triomphe.png",
           "sort_order": 2,
+          "categories": [
+            "icons",
+            "history",
+            "architecture"
+          ],
+          "duration_minutes": 45,
+          "family_tip": "Funciona bem como parada curta para falar de arcos, avenidas e simbolos.",
           "representative_query": "Arc de Triomphe Paris monument",
           "required_terms": [
             "arc",
@@ -73,6 +113,13 @@
           "image": "assets/landmarks/paris/champs-elysees.png",
           "lineart_image": "assets/lineart/paris/champs-elysees.png",
           "sort_order": 3,
+          "categories": [
+            "shopping",
+            "city-symbols",
+            "slow-walk"
+          ],
+          "duration_minutes": 60,
+          "family_tip": "Boa para caminhar sem pressa, ver vitrines e observar o movimento da cidade.",
           "representative_query": "Avenue des Champs Elysees Paris street",
           "required_terms": [
             "champs",
@@ -94,6 +141,14 @@
           "image": "assets/landmarks/paris/louvre.png",
           "lineart_image": "assets/lineart/paris/louvre.png",
           "sort_order": 4,
+          "categories": [
+            "museums",
+            "art",
+            "history",
+            "architecture"
+          ],
+          "duration_minutes": 120,
+          "family_tip": "Escolha poucas obras ou a piramide para manter a visita leve para criancas.",
           "representative_query": "Louvre Pyramid museum Paris exterior",
           "required_terms": [
             "louvre"
@@ -113,6 +168,13 @@
           "image": "assets/landmarks/paris/orsay.png",
           "lineart_image": "assets/lineart/paris/orsay.png",
           "sort_order": 5,
+          "categories": [
+            "museums",
+            "art",
+            "architecture"
+          ],
+          "duration_minutes": 90,
+          "family_tip": "A antiga estacao de trem ajuda a transformar arte em historia visual.",
           "representative_query": "Musee d'Orsay Paris exterior",
           "required_terms": [
             "orsay"
@@ -136,6 +198,13 @@
           "image": "assets/landmarks/paris/sacre-coeur.png",
           "lineart_image": "assets/lineart/paris/sacre-coeur.png",
           "sort_order": 6,
+          "categories": [
+            "views",
+            "architecture",
+            "history"
+          ],
+          "duration_minutes": 60,
+          "family_tip": "Boa para observar Paris do alto e descansar antes de continuar.",
           "representative_query": "Basilique Sacre Coeur Montmartre Paris exterior",
           "required_terms": [
             "sacre",
@@ -158,6 +227,12 @@
           "image": "assets/landmarks/paris/luxembourg.png",
           "lineart_image": "assets/lineart/paris/luxembourg.png",
           "sort_order": 7,
+          "categories": [
+            "parks",
+            "slow-walk"
+          ],
+          "duration_minutes": 75,
+          "family_tip": "Um respiro verde para brincar, caminhar e desenhar entre visitas mais intensas.",
           "representative_query": "Jardin du Luxembourg Paris palace garden",
           "required_terms": [
             "luxembourg"
@@ -176,6 +251,13 @@
           "image": "assets/landmarks/paris/versailles.png",
           "lineart_image": "assets/lineart/paris/versailles.png",
           "sort_order": 8,
+          "categories": [
+            "history",
+            "architecture",
+            "parks"
+          ],
+          "duration_minutes": 180,
+          "family_tip": "Vale como passeio maior, melhor em dia com energia e tempo para jardins.",
           "representative_query": "Palace of Versailles exterior gardens",
           "required_terms": [
             "versailles"
@@ -194,6 +276,13 @@
           "image": "assets/landmarks/paris/seine.png",
           "lineart_image": "assets/lineart/paris/seine.png",
           "sort_order": 9,
+          "categories": [
+            "river",
+            "views",
+            "slow-walk"
+          ],
+          "duration_minutes": 75,
+          "family_tip": "Bom para descansar as pernas e reconhecer Paris vista da agua.",
           "representative_query": "Seine river Paris Eiffel bridges",
           "required_terms": [
             "seine"
@@ -212,6 +301,13 @@
           "image": "assets/landmarks/paris/palais-garnier.png",
           "lineart_image": "assets/lineart/paris/palais-garnier.png",
           "sort_order": 10,
+          "categories": [
+            "architecture",
+            "art",
+            "history"
+          ],
+          "duration_minutes": 60,
+          "family_tip": "Ajuda a conectar musica, danca e arquitetura em uma visita curta.",
           "representative_query": "Paris Opera full frontal architecture Palais Garnier",
           "required_terms": [
             "paris",
@@ -240,6 +336,38 @@
       "favorites_prompt": "Meus lugares favoritos em Londres foram...",
       "coloring_title": "DESENHOS PARA COLORIR",
       "coloring_subtitle": "Para colorir e desenhar",
+      "language_name": "ingles",
+      "language_tips": [
+        {
+          "phrase": "Hello",
+          "pronunciation": "HEL-oh",
+          "meaning": "Oi",
+          "use_case": "Use para cumprimentar alguem."
+        },
+        {
+          "phrase": "Thank you",
+          "pronunciation": "THENK iu",
+          "meaning": "Obrigado(a)",
+          "use_case": "Use quando alguem ajudar voce."
+        },
+        {
+          "phrase": "Please",
+          "pronunciation": "pliz",
+          "meaning": "Por favor",
+          "use_case": "Use para pedir algo com educacao."
+        },
+        {
+          "phrase": "Excuse me",
+          "pronunciation": "eks-KIUZ mi",
+          "meaning": "Com licenca / desculpe",
+          "use_case": "Use para chamar alguem ou passar com cuidado."
+        }
+      ],
+      "phase_activities": {
+        "before": "No aviao, procure no mapa onde fica Londres e pinte um caminho ate o rio Tamisa.",
+        "during": "Procure uma placa, um onibus vermelho ou um relogio grande e desenhe o detalhe que chamou sua atencao.",
+        "after": "Escreva qual simbolo de Londres voce reconheceria em outro livro ou desenho."
+      },
       "landmarks": [
         {
           "id": "big-ben",
@@ -251,6 +379,13 @@
           "image": "assets/landmarks/london/big-ben.png",
           "lineart_image": "assets/lineart/london/big-ben.png",
           "sort_order": 1,
+          "categories": [
+            "icons",
+            "history",
+            "architecture"
+          ],
+          "duration_minutes": 45,
+          "family_tip": "Uma parada curta e facil de reconhecer para abrir Londres.",
           "representative_query": "Big Ben Elizabeth Tower Westminster London clock tower",
           "required_terms": [
             "big",
@@ -274,6 +409,13 @@
           "image": "assets/landmarks/london/london-eye.png",
           "lineart_image": "assets/lineart/london/london-eye.png",
           "sort_order": 2,
+          "categories": [
+            "views",
+            "icons",
+            "rides"
+          ],
+          "duration_minutes": 60,
+          "family_tip": "Boa para criancas que gostam de ver a cidade do alto.",
           "representative_query": "London Eye ferris wheel London landmark",
           "required_terms": [
             "london",
@@ -293,6 +435,13 @@
           "image": "assets/landmarks/london/buckingham-palace.png",
           "lineart_image": "assets/lineart/london/buckingham-palace.png",
           "sort_order": 3,
+          "categories": [
+            "history",
+            "icons",
+            "city-symbols"
+          ],
+          "duration_minutes": 75,
+          "family_tip": "Combine com a Troca da Guarda se a familia curte cerimonias e musica.",
           "representative_query": "Buckingham Palace London exterior",
           "required_terms": [
             "buckingham"
@@ -311,6 +460,12 @@
           "image": "assets/landmarks/london/westminster-abbey.png",
           "lineart_image": "assets/lineart/london/westminster-abbey.png",
           "sort_order": 4,
+          "categories": [
+            "history",
+            "architecture"
+          ],
+          "duration_minutes": 75,
+          "family_tip": "Boa para familias que gostam de historias de reis, rainhas e predios antigos.",
           "representative_query": "Westminster Abbey London building exterior",
           "required_terms": [
             "westminster",
@@ -336,6 +491,13 @@
           "image": "assets/landmarks/london/tower-bridge.png",
           "lineart_image": "assets/lineart/london/tower-bridge.png",
           "sort_order": 5,
+          "categories": [
+            "river",
+            "architecture",
+            "icons"
+          ],
+          "duration_minutes": 60,
+          "family_tip": "Funciona bem com caminhada perto do Tamisa e fotos da ponte.",
           "representative_query": "Tower Bridge London",
           "required_terms": [
             "tower",
@@ -356,6 +518,13 @@
           "image": "assets/landmarks/london/red-phone-booth.png",
           "lineart_image": "assets/lineart/london/red-phone-booth.png",
           "sort_order": 6,
+          "categories": [
+            "city-symbols",
+            "icons",
+            "photo-stop"
+          ],
+          "duration_minutes": 20,
+          "family_tip": "Parada rapida para foto e para procurar outros simbolos vermelhos na rua.",
           "representative_query": "red telephone box London street",
           "required_terms": [
             "telephone"
@@ -375,6 +544,13 @@
           "image": "assets/landmarks/london/red-bus.png",
           "lineart_image": "assets/lineart/london/red-bus.png",
           "sort_order": 7,
+          "categories": [
+            "city-symbols",
+            "rides",
+            "icons"
+          ],
+          "duration_minutes": 45,
+          "family_tip": "Boa opcao para transformar deslocamento em passeio.",
           "representative_query": "London red double decker bus street",
           "required_terms": [
             "bus"
@@ -399,6 +575,32 @@
       "favorites_prompt": "Meus lugares favoritos em Cambridge foram...",
       "coloring_title": "DESENHOS PARA COLORIR",
       "coloring_subtitle": "Para colorir e desenhar",
+      "language_name": "ingles",
+      "language_tips": [
+        {
+          "phrase": "Hello",
+          "pronunciation": "HEL-oh",
+          "meaning": "Oi",
+          "use_case": "Use para cumprimentar alguem."
+        },
+        {
+          "phrase": "Thank you",
+          "pronunciation": "THENK iu",
+          "meaning": "Obrigado(a)",
+          "use_case": "Use quando alguem ajudar voce."
+        },
+        {
+          "phrase": "Please",
+          "pronunciation": "pliz",
+          "meaning": "Por favor",
+          "use_case": "Use para pedir algo com educacao."
+        }
+      ],
+      "phase_activities": {
+        "before": "Antes de chegar, imagine como seria estudar em uma cidade cheia de livros, pontes e bicicletas.",
+        "during": "Procure uma ponte, um barco ou uma bicicleta e marque o que voce encontrou primeiro.",
+        "after": "Escreva ou desenhe uma coisa que voce aprendeu em Cambridge."
+      },
       "landmarks": [
         {
           "id": "cambridge-university",
@@ -410,6 +612,13 @@
           "image": "assets/landmarks/cambridge/cambridge-university.png",
           "lineart_image": "assets/lineart/cambridge/cambridge-university.png",
           "sort_order": 1,
+          "categories": [
+            "history",
+            "architecture",
+            "education"
+          ],
+          "duration_minutes": 75,
+          "family_tip": "Boa para conversar sobre escolas antigas, livros e descobertas.",
           "representative_query": "King's College Chapel Cambridge",
           "required_terms": [
             "cambridge"
@@ -430,6 +639,13 @@
           "image": "assets/landmarks/cambridge/river-cam.png",
           "lineart_image": "assets/lineart/cambridge/river-cam.png",
           "sort_order": 2,
+          "categories": [
+            "river",
+            "slow-walk",
+            "rides"
+          ],
+          "duration_minutes": 75,
+          "family_tip": "Um passeio mais leve para observar pontes, barcos e a cidade pelo rio.",
           "representative_query": "punting River Cam Cambridge boats",
           "required_terms": [
             "cambridge",
@@ -453,6 +669,44 @@
       "favorites_prompt": "Meus lugares favoritos em Lisboa foram...",
       "coloring_title": "DESENHOS PARA COLORIR",
       "coloring_subtitle": "Para colorir e desenhar",
+      "language_name": "portugues de Portugal",
+      "language_tips": [
+        {
+          "phrase": "Ola",
+          "pronunciation": "oh-LA",
+          "meaning": "Oi",
+          "use_case": "Use para cumprimentar alguem."
+        },
+        {
+          "phrase": "Bom dia",
+          "pronunciation": "bom DI-a",
+          "meaning": "Bom dia",
+          "use_case": "Use pela manha ao chegar em algum lugar."
+        },
+        {
+          "phrase": "Por favor",
+          "pronunciation": "por fa-VOR",
+          "meaning": "Por favor",
+          "use_case": "Use para pedir algo com educacao."
+        },
+        {
+          "phrase": "Obrigado/obrigada",
+          "pronunciation": "oh-bri-GA-do / oh-bri-GA-da",
+          "meaning": "Obrigado(a)",
+          "use_case": "Use quando alguem ajudar voce."
+        },
+        {
+          "phrase": "Autocarro",
+          "pronunciation": "au-to-CAR-ro",
+          "meaning": "Onibus",
+          "use_case": "Palavra comum em Portugal para falar de onibus."
+        }
+      ],
+      "phase_activities": {
+        "before": "No caminho, procure no mapa onde o rio Tejo encontra a cidade.",
+        "during": "Procure um azulejo, um bondinho amarelo ou uma vista para o rio e desenhe o que viu.",
+        "after": "Escreva qual som, cheiro ou comida fez voce lembrar de Lisboa."
+      },
       "landmarks": [
         {
           "id": "oceanario",
@@ -464,6 +718,13 @@
           "image": "assets/landmarks/lisbon/oceanario.png",
           "lineart_image": "assets/lineart/lisbon/oceanario.png",
           "sort_order": 1,
+          "categories": [
+            "animals",
+            "indoor",
+            "education"
+          ],
+          "duration_minutes": 120,
+          "family_tip": "Otimo para criancas curiosas por animais e tambem funciona em dia de chuva.",
           "representative_query": "Oceanario de Lisboa aquarium exterior",
           "required_terms": [
             "oceanario"
@@ -482,6 +743,13 @@
           "image": "assets/landmarks/lisbon/yellow-tram.png",
           "lineart_image": "assets/lineart/lisbon/yellow-tram.png",
           "sort_order": 2,
+          "categories": [
+            "rides",
+            "city-symbols",
+            "icons"
+          ],
+          "duration_minutes": 45,
+          "family_tip": "Transforma o deslocamento em brincadeira de observar ruas e subidas.",
           "representative_query": "Lisbon Tram 28 yellow tram street",
           "required_terms": [
             "tram"
@@ -501,6 +769,12 @@
           "image": "assets/landmarks/lisbon/jeronimos.png",
           "lineart_image": "assets/lineart/lisbon/jeronimos.png",
           "sort_order": 3,
+          "categories": [
+            "history",
+            "architecture"
+          ],
+          "duration_minutes": 75,
+          "family_tip": "Bom para procurar detalhes nas pedras e falar das grandes navegacoes.",
           "representative_query": "Jeronimos Monastery Lisbon exterior",
           "required_terms": [
             "jeronimos"
@@ -519,6 +793,13 @@
           "image": "assets/landmarks/lisbon/descobrimentos.png",
           "lineart_image": "assets/lineart/lisbon/descobrimentos.png",
           "sort_order": 4,
+          "categories": [
+            "history",
+            "river",
+            "architecture"
+          ],
+          "duration_minutes": 45,
+          "family_tip": "Combine com o Tejo para explicar mapas, barcos e viagens antigas.",
           "representative_query": "Padrao dos Descobrimentos Lisboa",
           "required_terms": [
             "padrao"
@@ -537,6 +818,12 @@
           "image": "assets/landmarks/lisbon/santo-antonio.png",
           "lineart_image": "assets/lineart/lisbon/santo-antonio.png",
           "sort_order": 5,
+          "categories": [
+            "history",
+            "architecture"
+          ],
+          "duration_minutes": 40,
+          "family_tip": "Parada curta para familias que gostam de historias locais e lugares pequenos.",
           "representative_query": "Igreja de Santo Antonio Lisboa exterior",
           "required_terms": [
             "antonio"
@@ -556,6 +843,12 @@
           "image": "assets/landmarks/lisbon/pastel-de-belem.png",
           "lineart_image": "assets/lineart/lisbon/pastel-de-belem.png",
           "sort_order": 6,
+          "categories": [
+            "food",
+            "city-symbols"
+          ],
+          "duration_minutes": 45,
+          "family_tip": "Boa pausa para provar um doce local e registrar uma memoria sensorial.",
           "representative_query": "Pastel de Belem Lisboa",
           "required_terms": [
             "belem"
@@ -574,6 +867,13 @@
           "image": "assets/landmarks/lisbon/praca-comercio.png",
           "lineart_image": "assets/lineart/lisbon/praca-comercio.png",
           "sort_order": 7,
+          "categories": [
+            "river",
+            "slow-walk",
+            "architecture"
+          ],
+          "duration_minutes": 60,
+          "family_tip": "Boa para caminhar, ver o Tejo e fechar o dia com espaco aberto.",
           "representative_query": "Praca do Comercio Lisboa",
           "required_terms": [
             "comercio"
