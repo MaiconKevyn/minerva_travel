@@ -10,11 +10,11 @@
     "frontend_atual/apps/web"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace web",
-    "build": "npm run build --workspace web && rm -rf dist && cp -R frontend_atual/apps/web/dist ./dist",
-    "start": "npm run start --workspace web",
-    "lint": "npm run lint --workspace web",
-    "test": "npm run test --workspace web"
+    "dev": "npm run dev --workspace minerva-travel-frontend",
+    "build": "npm run build --workspace minerva-travel-frontend && rm -rf dist && cp -R frontend_atual/apps/web/dist ./dist",
+    "start": "npm run start --workspace minerva-travel-frontend",
+    "lint": "npm run lint --workspace minerva-travel-frontend",
+    "test": "npm run test --workspace minerva-travel-frontend"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.4",
