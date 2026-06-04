@@ -136,28 +136,39 @@ Frontend `frontend_atual/apps/web/.env`:
 
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_sua_chave_aqui
 ```
 
 ## Deploy temporario na Hostinger
 
-Use o repositorio dedicado `MaiconKevyn/minerva-travel-frontend`. Ele contem
-apenas o frontend Vite na raiz, o que evita falhas de deteccao de monorepo no
-painel da Hostinger.
+Use a branch estatica `hostinger-frontend` do repositorio
+`MaiconKevyn/minerva_travel`. Ela contem o build Vite pronto na raiz e tambem
+em `public_html/`, para ficar compativel com as duas configuracoes comuns da
+Hostinger.
 
 ```text
-Repository: MaiconKevyn/minerva-travel-frontend
-Branch: main
-Framework: Vite
-Root directory: .
-Install command: npm ci
-Build command: npm run build
-Output directory: dist
+Repository: MaiconKevyn/minerva_travel
+Branch: hostinger-frontend
+Root directory: public_html
 ```
 
 Configure a variavel antes do build:
 
 ```env
 VITE_API_BASE_URL=https://minerva-travel.onrender.com
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_sua_chave_aqui
+```
+
+Para deploy estatico ja publicado, tambem e possivel configurar Supabase
+editando `public_html/config.js` no gerenciador de arquivos da Hostinger:
+
+```js
+window.__MINERVA_CONFIG__ = {
+  VITE_SUPABASE_URL: 'https://seu-projeto.supabase.co',
+  VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_sua_chave_aqui',
+};
 ```
 
 Enquanto nao houver dominio definitivo, use o dominio temporario fornecido pelo
