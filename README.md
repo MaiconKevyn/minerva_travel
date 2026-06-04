@@ -171,6 +171,14 @@ window.__MINERVA_CONFIG__ = {
 };
 ```
 
+Para recuperacao de senha funcionar, configure no Supabase:
+
+```text
+Authentication > URL Configuration
+Site URL: https://seu-dominio-ou-hostinger-temp
+Redirect URLs: https://seu-dominio-ou-hostinger-temp/reset-password
+```
+
 Enquanto nao houver dominio definitivo, use o dominio temporario fornecido pelo
 painel. Quando o dominio final existir, adicione-o no backend em
 `CORS_ALLOW_ORIGINS`.
