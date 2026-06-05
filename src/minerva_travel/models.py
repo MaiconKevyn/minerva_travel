@@ -112,6 +112,15 @@ class ItineraryRecommendationRequest(BaseModel):
     must_see_landmarks: list[str] = Field(default_factory=list, max_length=30)
 
 
+class DynamicItineraryRequest(BaseModel):
+    destination: str = Field(min_length=2, max_length=500)
+    days: int = Field(ge=1, le=14)
+    interests: list[str] = Field(default_factory=list, max_length=12)
+    pace: Literal["light", "balanced", "full"] = "balanced"
+    children_ages: list[int] = Field(default_factory=list, max_length=10)
+    must_see: list[str] = Field(default_factory=list, max_length=30)
+
+
 class ItineraryStop(BaseModel):
     selection_id: str
     destination_id: str

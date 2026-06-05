@@ -116,3 +116,41 @@ def test_recommend_itinerary_api_rejects_unknown_destination():
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Destino desconhecido: tokyo"
+
+
+def test_discover_itinerary_api_delegates_dynamic_request(monkeypatch):
+    captured = {}
+
+    def fake_discover(payload, *, api_key):
+        captured["destination"] = payload.destination
+        captured["interests"] = payload.interests
+        captured["api_key"] = api_key
+        return {
+            "summary": "Roteiro sugerido para Roma em 1 dia.",
+            "recommendation_source": "google_places",
+            "selected_landmarks": ["google:colosseum"],
+            "days": [],
+            "alternatives": [],
+        }
+
+    monkeypatch.setattr("minerva_travel.app.google_maps_api_key", lambda: "test-key")
+    monkeypatch.setattr("minerva_travel.app.discover_dynamic_itinerary", fake_discover)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/itinerary/discover",
+        json={
+            "destination": "Roma, Italia",
+            "days": 1,
+            "interests": ["historia"],
+            "pace": "light",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["recommendation_source"] == "google_places"
+    assert captured == {
+        "destination": "Roma, Italia",
+        "interests": ["historia"],
+        "api_key": "test-key",
+    }

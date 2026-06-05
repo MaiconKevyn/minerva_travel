@@ -69,6 +69,13 @@ Enquanto o site estiver no dominio temporario da Hostinger, o backend pode usar:
 CORS_ALLOW_ORIGINS=*
 ```
 
+Para a etapa de roteiro dinamico funcionar, configure no backend publicado
+(Render ou equivalente), nao na Hostinger:
+
+```env
+GOOGLE_MAPS_API_KEY=sua_chave_google_maps_aqui
+```
+
 Quando houver dominio definitivo, prefira restringir:
 
 ```env

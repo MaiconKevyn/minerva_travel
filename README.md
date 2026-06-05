@@ -123,6 +123,7 @@ IMAGE_GENERATION_CONCURRENCY=2
 REPLICATE_API_TOKEN=sua_chave_aqui
 OPENAI_API_KEY=sua_chave_openai_aqui
 OPENAI_LANDMARK_MODEL=gpt-4o-2024-08-06
+GOOGLE_MAPS_API_KEY=sua_chave_google_maps_aqui
 CORS_ALLOW_ORIGINS=*
 ```
 
@@ -131,6 +132,10 @@ gera uma imagem colorida em estilo aquarela para cada ponto turistico confirmado
 e gera uma segunda imagem em line art preto e branco para a secao de colorir.
 `IMAGE_GENERATION_CONCURRENCY` controla quantos pontos turisticos sao
 processados em paralelo; comece com `2` para reduzir risco de rate limit.
+
+`GOOGLE_MAPS_API_KEY` e usada apenas pelo backend para montar roteiros dinamicos
+com Geocoding API e Places API. Nao coloque essa chave em variaveis `VITE_` nem
+no frontend publicado, porque isso expoe o segredo no navegador.
 
 Frontend `frontend_atual/apps/web/.env`:
 

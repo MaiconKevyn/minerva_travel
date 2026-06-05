@@ -15,6 +15,7 @@ from minerva_travel import storage
 from minerva_travel.catalog import load_catalog
 from minerva_travel.config import (
     cors_allowed_origins,
+    google_maps_api_key,
     image_generation_concurrency,
     image_provider,
 )
@@ -28,8 +29,14 @@ from minerva_travel.guide_builder import build_guide_context
 from minerva_travel.image_generation import get_image_generator
 from minerva_travel.itinerary import recommend_itinerary
 from minerva_travel.landmark_parser import ParsedLandmark, parse_landmarks_from_message
-from minerva_travel.models import Destination, GuideRequest, ItineraryRecommendationRequest
+from minerva_travel.models import (
+    Destination,
+    DynamicItineraryRequest,
+    GuideRequest,
+    ItineraryRecommendationRequest,
+)
 from minerva_travel.pdf import render_guide_html, write_pdf
+from minerva_travel.place_discovery import discover_dynamic_itinerary
 from minerva_travel.wikimedia_assets import WikimediaAsset, load_wikimedia_manifest
 from minerva_travel.wikimedia_client import (
     USER_AGENT,
@@ -111,6 +118,21 @@ def api_recommend_itinerary(payload: ItineraryRecommendationRequest) -> dict[str
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return recommendation.model_dump(mode="json")
+
+
+@app.post("/api/itinerary/discover")
+def api_discover_itinerary(payload: DynamicItineraryRequest) -> dict[str, object]:
+    try:
+        return discover_dynamic_itinerary(payload, api_key=google_maps_api_key())
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except httpx.HTTPStatusError as error:
+        detail = "Google Places nao conseguiu montar o roteiro."
+        if error.response.status_code in {401, 403}:
+            detail = "Google Places nao esta habilitado ou a chave nao tem permissao suficiente."
+        raise HTTPException(status_code=502, detail=detail) from error
 
 
 @app.post("/api/custom-landmarks/resolve")
