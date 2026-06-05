@@ -76,6 +76,9 @@ Para a etapa de roteiro dinamico funcionar, configure no backend publicado
 GOOGLE_MAPS_API_KEY=sua_chave_google_maps_aqui
 ```
 
+Essa chave tambem e usada pelo backend para retornar fotos do Google Places nos
+cards do roteiro. A chave nao deve ir para o frontend nem para `config.js`.
+
 Quando houver dominio definitivo, prefira restringir:
 
 ```env

@@ -92,6 +92,115 @@ def test_discover_dynamic_itinerary_uses_natural_language_intent_for_child_reque
     assert any("perto de Torre Eiffel" in query for query in search_queries)
 
 
+def test_discover_dynamic_itinerary_adds_google_place_photos_to_visible_cards():
+    photo_requests: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Paris", "Franca", 48.8566, 2.3522)
+        if "places:searchText" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "places": [
+                        _place(
+                            "museum-photo",
+                            "Museu com Foto",
+                            ["museum"],
+                            photos=[
+                                {
+                                    "name": "places/museum-photo/photos/photo-1",
+                                    "authorAttributions": [
+                                        {
+                                            "displayName": "Maria Fotografa",
+                                            "uri": "https://example.com/maria",
+                                        }
+                                    ],
+                                }
+                            ],
+                        )
+                    ]
+                },
+            )
+        if "places/museum-photo/photos/photo-1/media" in url:
+            photo_requests.append(url)
+            assert request.url.params["skipHttpRedirect"] == "true"
+            return httpx.Response(
+                200,
+                json={"photoUri": "https://lh3.googleusercontent.com/photo=w900"},
+            )
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(
+                destination="Paris",
+                days=1,
+                interests=["museus"],
+                pace="light",
+            ),
+            api_key="test-key",
+            client=client,
+        )
+
+    stop = recommendation["days"][0]["stops"][0]
+
+    assert stop["image"] == "https://lh3.googleusercontent.com/photo=w900"
+    assert stop["image_attributions"] == [
+        {
+            "display_name": "Maria Fotografa",
+            "uri": "https://example.com/maria",
+        }
+    ]
+    assert photo_requests
+
+
+def test_discover_dynamic_itinerary_keeps_stop_when_google_photo_fails():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Paris", "Franca", 48.8566, 2.3522)
+        if "places:searchText" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "places": [
+                        _place(
+                            "museum-photo",
+                            "Museu com Foto Instavel",
+                            ["museum"],
+                            photos=[{"name": "places/museum-photo/photos/photo-1"}],
+                        )
+                    ]
+                },
+            )
+        if "places/museum-photo/photos/photo-1/media" in url:
+            return httpx.Response(404, json={"error": {"message": "photo unavailable"}})
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(
+                destination="Paris",
+                days=1,
+                interests=["museus"],
+                pace="light",
+            ),
+            api_key="test-key",
+            client=client,
+        )
+
+    stop = recommendation["days"][0]["stops"][0]
+
+    assert stop["name"] == "Museu com Foto Instavel"
+    assert stop["image"] is None
+
+
 def test_discover_dynamic_itinerary_keeps_one_stop_per_explicit_family_request():
     def handler(request: httpx.Request) -> httpx.Response:
         url = str(request.url)
@@ -287,6 +396,7 @@ def _place(
     *,
     rating: float = 4.5,
     count: int = 1000,
+    photos: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     return {
         "id": place_id,
@@ -296,6 +406,7 @@ def _place(
         "types": types,
         "rating": rating,
         "userRatingCount": count,
+        "photos": photos or [],
         "googleMapsUri": f"https://maps.google.com/?cid={place_id}",
     }
 

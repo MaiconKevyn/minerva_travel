@@ -79,6 +79,7 @@ def fetch_landmark_asset(
         or f"{landmark.name} {destination.city}"
     )
     titles = search_commons_files(client, query)
+    candidates: list[tuple[str, dict[str, str]]] = []
     for title in titles:
         metadata = fetch_file_metadata(client, title)
         if not metadata:
@@ -92,6 +93,14 @@ def fetch_landmark_asset(
             rejected_terms=landmark.rejected_terms,
         ):
             continue
+        candidates.append((title, metadata))
+    best_candidate = choose_best_representative_candidate(
+        candidates,
+        required_terms=landmark.required_terms,
+        rejected_terms=landmark.rejected_terms,
+    )
+    if best_candidate:
+        title, metadata = best_candidate
         local_path = output_dir / destination.id / f"{landmark.id}{metadata['extension']}"
         try:
             download_file(client, metadata["image_url"], local_path)
@@ -123,6 +132,7 @@ def find_landmark_asset_metadata(
         or f"{landmark.name} {destination.city}"
     )
     titles = search_commons_files(client, query)
+    candidates: list[tuple[str, dict[str, str]]] = []
     for title in titles:
         metadata = fetch_file_metadata(client, title)
         if not metadata:
@@ -136,6 +146,14 @@ def find_landmark_asset_metadata(
             rejected_terms=landmark.rejected_terms,
         ):
             continue
+        candidates.append((title, metadata))
+    best_candidate = choose_best_representative_candidate(
+        candidates,
+        required_terms=landmark.required_terms,
+        rejected_terms=landmark.rejected_terms,
+    )
+    if best_candidate:
+        title, metadata = best_candidate
         return {
             "title": title,
             "image_url": metadata["image_url"],
@@ -146,6 +164,27 @@ def find_landmark_asset_metadata(
             "credit": metadata["credit"],
         }
     return None
+
+
+def choose_best_representative_candidate(
+    candidates: list[tuple[str, dict[str, str]]],
+    *,
+    required_terms: list[str],
+    rejected_terms: list[str],
+) -> tuple[str, dict[str, str]] | None:
+    if not candidates:
+        return None
+    ranked = sorted(
+        candidates,
+        key=lambda candidate: _representative_score(
+            candidate[0],
+            candidate[1],
+            required_terms=required_terms,
+            rejected_terms=rejected_terms,
+        ),
+        reverse=True,
+    )
+    return ranked[0]
 
 
 def search_commons_files(client: httpx.Client, query: str) -> list[str]:
@@ -257,6 +296,42 @@ def is_representative_candidate(
     if any(normalize_search_text(term) in haystack for term in rejected_terms):
         return False
     return all(normalize_search_text(term) in haystack for term in required_terms)
+
+
+def _representative_score(
+    title: str,
+    metadata: dict[str, str],
+    *,
+    required_terms: list[str],
+    rejected_terms: list[str],
+) -> int:
+    haystack = normalize_search_text(
+        " ".join(
+            [
+                title,
+                metadata.get("source_url", ""),
+                metadata.get("image_url", ""),
+                metadata.get("author", ""),
+                metadata.get("credit", ""),
+            ]
+        )
+    )
+    score = 0
+    for term in required_terms:
+        normalized_term = normalize_search_text(term)
+        if normalized_term and normalized_term in haystack:
+            score += 50
+    for term in rejected_terms:
+        normalized_term = normalize_search_text(term)
+        if normalized_term and normalized_term in haystack:
+            score -= 200
+    title_text = normalize_search_text(title)
+    score += sum(8 for term in required_terms if normalize_search_text(term) in title_text)
+    if "logo" in haystack or "map" in haystack:
+        score -= 40
+    if "svg" in metadata.get("image_url", "").lower():
+        score -= 30
+    return score
 
 
 def normalize_search_text(value: str) -> str:

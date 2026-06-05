@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from minerva_travel.app import app, custom_destinations_from_form, generate_selected_landmark_art
+from minerva_travel.wikimedia_assets import WikimediaAsset
 
 
 def test_home_page_lists_reference_landmarks():
@@ -317,6 +318,7 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
             return output_path
 
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", lambda *_: {})
     monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
     client = TestClient(app)
 
@@ -359,6 +361,80 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
         "runtime/generated/landmarks" in reference.as_posix()
         for *_, reference in generated_lineart
     )
+
+
+def test_api_generate_uses_wikimedia_image_before_generating_landmark_art(
+    tmp_path,
+    monkeypatch,
+):
+    generated_landmarks = []
+    generated_lineart = []
+    wikimedia_path = tmp_path / "wikimedia" / "rio" / "cristo.jpg"
+    wikimedia_path.parent.mkdir(parents=True)
+    wikimedia_path.write_bytes(b"wikimedia")
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_landmark_image(self, landmark_name, city, country, output_path):
+            generated_landmarks.append((landmark_name, city, country))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"generated")
+            return output_path
+
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            generated_lineart.append((landmark_name, city, country, reference_image))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"lineart")
+            return output_path
+
+    def fake_wikimedia_assets(destinations, request_id):
+        selection_id = f"{destinations[0].id}:{destinations[0].landmarks[0].id}"
+        return {
+            selection_id: WikimediaAsset(
+                selection_id=selection_id,
+                title="File:Cristo.jpg",
+                source_url="https://commons.wikimedia.org/wiki/File:Cristo.jpg",
+                image_url="https://upload.wikimedia.org/cristo.jpg",
+                local_path=wikimedia_path,
+                author="Jane Doe",
+                license_short_name="CC BY-SA 4.0",
+                license_url="https://creativecommons.org/licenses/by-sa/4.0/",
+                credit="Jane Doe / Wikimedia Commons",
+            )
+        }
+
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", fake_wikimedia_assets)
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Guia do Brasil",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "custom_landmarks": "Cristo Redentor, Rio de Janeiro, Brasil",
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert generated_landmarks == []
+    assert generated_lineart == [
+        ("Cristo Redentor", "Rio de Janeiro", "Brasil", wikimedia_path)
+    ]
 
 
 def test_selected_landmark_art_generates_multiple_landmarks_concurrently(monkeypatch):

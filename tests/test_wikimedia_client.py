@@ -1,4 +1,5 @@
 from minerva_travel.wikimedia_client import (
+    choose_best_representative_candidate,
     extension_from_url,
     is_allowed_license,
     is_representative_candidate,
@@ -57,6 +58,33 @@ def test_representative_candidate_rejects_wrong_landmark():
         required_terms=["big", "ben", "clock"],
         rejected_terms=["leiden", "stained glass"],
     )
+
+
+def test_choose_best_representative_candidate_prefers_specific_landmark_terms():
+    generic = (
+        "File:Paris skyline.jpg",
+        {
+            "source_url": "https://commons.wikimedia.org/wiki/File:Paris_skyline.jpg",
+            "image_url": "https://upload.wikimedia.org/paris-skyline.jpg",
+            "author": "Jane",
+            "credit": "Paris skyline",
+        },
+    )
+    specific = (
+        "File:Eiffel Tower Paris at sunset.jpg",
+        {
+            "source_url": "https://commons.wikimedia.org/wiki/File:Eiffel_Tower_Paris.jpg",
+            "image_url": "https://upload.wikimedia.org/eiffel-tower-paris.jpg",
+            "author": "Jane",
+            "credit": "Eiffel Tower Paris",
+        },
+    )
+
+    assert choose_best_representative_candidate(
+        [generic, specific],
+        required_terms=["eiffel", "tower"],
+        rejected_terms=[],
+    ) == specific
 
 
 def test_normalize_search_text_treats_punctuation_as_spaces():

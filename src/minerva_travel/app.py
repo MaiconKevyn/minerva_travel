@@ -353,16 +353,26 @@ async def generate_pdf_from_form(
         destination_names=cover_landmark_names,
     )
 
+    wikimedia_assets = load_wikimedia_manifest()
+    wikimedia_assets.update(fetch_custom_wikimedia_assets(custom_destinations, request_id))
+    landmark_reference_images = {
+        selection_id: asset.local_path
+        for selection_id, asset in wikimedia_assets.items()
+        if selection_id in selected
+    }
+
     landmark_images, landmark_lineart_images = generate_selected_landmark_art(
         catalog.destinations,
         selected,
         request_id,
         generator,
+        reference_images=landmark_reference_images,
     )
     context = build_guide_context(
         request,
         catalog,
         cover_path,
+        wikimedia_assets=wikimedia_assets,
         landmark_images=landmark_images,
         landmark_lineart_images=landmark_lineart_images,
     )
@@ -395,8 +405,10 @@ def generate_selected_landmark_art(
     selected: list[str],
     request_id: str,
     generator,
+    reference_images: dict[str, Path] | None = None,
 ) -> tuple[dict[str, Path], dict[str, Path]]:
     selected_ids = set(selected)
+    reference_images = reference_images or {}
     image_output_dir = Path("runtime/generated/landmarks") / request_id
     lineart_output_dir = Path("runtime/generated/lineart") / request_id
     generation_jobs = []
@@ -415,6 +427,7 @@ def generate_selected_landmark_art(
                     destination.country,
                     image_output_path,
                     lineart_output_path,
+                    reference_images.get(selection_id),
                 )
             )
 
@@ -448,8 +461,9 @@ def _generate_landmark_art_pair(
     country: str,
     image_output_path: Path,
     lineart_output_path: Path,
+    reference_image: Path | None = None,
 ) -> tuple[str, Path, Path]:
-    image_path = generator.generate_landmark_image(
+    image_path = reference_image or generator.generate_landmark_image(
         landmark_name=landmark_name,
         city=city,
         country=country,

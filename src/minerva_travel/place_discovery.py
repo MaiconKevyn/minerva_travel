@@ -10,6 +10,7 @@ from minerva_travel.models import DynamicItineraryRequest
 
 GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 GOOGLE_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
+GOOGLE_PLACES_BASE_URL = "https://places.googleapis.com/v1"
 
 PACE_STOP_LIMITS = {
     "light": 2,
@@ -24,6 +25,7 @@ TEXT_SEARCH_FIELD_MASK = (
     "places.location,"
     "places.types,"
     "places.primaryType,"
+    "places.photos,"
     "places.rating,"
     "places.userRatingCount,"
     "places.googleMapsUri"
@@ -149,6 +151,7 @@ def discover_dynamic_itinerary(
         selected = _select_balanced_stops(ranked, target_count)
         selected_ids = {item["selection_id"] for item in selected}
         alternatives = [item for item in ranked if item["selection_id"] not in selected_ids][:8]
+        _enrich_visible_stops_with_photos(http_client, api_key, [*selected, *alternatives])
         public_selected = [_public_stop(item) for item in selected]
         public_alternatives = [_public_stop(item) for item in alternatives]
 
@@ -303,6 +306,7 @@ def _place_to_stop(
         reasons.append("Boa opcao para apresentar a cidade as criancas.")
 
     primary_category = categories[0] if categories else "icons"
+    photo = _first_place_photo(place)
     return {
         "selection_id": f"google:{place_id}",
         "destination_id": resolved["id"],
@@ -320,8 +324,69 @@ def _place_to_stop(
         "editable": True,
         "google_maps_uri": place.get("googleMapsUri"),
         "formatted_address": place.get("formattedAddress"),
+        "image_attributions": _photo_attributions(photo),
+        "_photo_name": photo.get("name") if photo else "",
         "_search_profile_index": profile_index,
     }
+
+
+def _first_place_photo(place: dict[str, Any]) -> dict[str, Any]:
+    photos = place.get("photos")
+    if not isinstance(photos, list) or not photos:
+        return {}
+    first = photos[0]
+    return first if isinstance(first, dict) else {}
+
+
+def _photo_attributions(photo: dict[str, Any]) -> list[dict[str, str]]:
+    attributions = photo.get("authorAttributions") if photo else []
+    if not isinstance(attributions, list):
+        return []
+    normalized: list[dict[str, str]] = []
+    for attribution in attributions:
+        if not isinstance(attribution, dict):
+            continue
+        display_name = str(attribution.get("displayName") or "").strip()
+        uri = str(attribution.get("uri") or "").strip()
+        if display_name or uri:
+            normalized.append({"display_name": display_name, "uri": uri})
+    return normalized
+
+
+def _enrich_visible_stops_with_photos(
+    client: httpx.Client,
+    api_key: str,
+    stops: list[dict[str, Any]],
+) -> None:
+    photo_uri_cache: dict[str, str | None] = {}
+    for stop in stops:
+        photo_name = str(stop.get("_photo_name") or "")
+        if not photo_name:
+            continue
+        if photo_name not in photo_uri_cache:
+            photo_uri_cache[photo_name] = _fetch_place_photo_uri(client, api_key, photo_name)
+        photo_uri = photo_uri_cache[photo_name]
+        if photo_uri:
+            stop["image"] = photo_uri
+
+
+def _fetch_place_photo_uri(
+    client: httpx.Client,
+    api_key: str,
+    photo_name: str,
+) -> str | None:
+    response = client.get(
+        f"{GOOGLE_PLACES_BASE_URL}/{photo_name}/media",
+        headers={"X-Goog-Api-Key": api_key},
+        params={"maxWidthPx": 900, "skipHttpRedirect": "true"},
+    )
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError:
+        return None
+    payload = response.json()
+    photo_uri = payload.get("photoUri")
+    return str(photo_uri) if photo_uri else None
 
 
 def _select_balanced_stops(

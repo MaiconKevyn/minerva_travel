@@ -7,7 +7,8 @@ MVP local para gerar um guia de viagem infantil personalizado em PDF.
 - Roteiro baseado em `docs/PEQUENOS_EXPLORADORES_EUROPA_2026 - PDF.pdf`.
 - Frontend Vite/React com upload de foto, dados da familia, selecao de roteiro e preview.
 - Capa e imagens dos pontos turisticos geradas por provider configuravel
-  (`placeholder` ou `replicate`).
+  (`placeholder` ou `replicate`), com reaproveitamento de imagens Wikimedia
+  quando houver uma foto representativa do ponto turistico.
 - Interpretacao de pontos turisticos em linguagem natural via OpenAI no backend.
 - PDF organizado em momentos da viagem: antes, durante e depois, com dicas de idioma e atividades infantis por destino.
 - PDF final para download no navegador.
@@ -128,14 +129,17 @@ CORS_ALLOW_ORIGINS=*
 ```
 
 Com `IMAGE_PROVIDER=replicate`, o backend usa a foto enviada para gerar a capa,
-gera uma imagem colorida em estilo aquarela para cada ponto turistico confirmado
-e gera uma segunda imagem em line art preto e branco para a secao de colorir.
+usa imagens Wikimedia como primeira opcao para pontos turisticos quando encontra
+uma foto representativa licenciada, gera uma imagem colorida em estilo aquarela
+quando nao ha Wikimedia e gera uma segunda imagem em line art preto e branco
+para a secao de colorir.
 `IMAGE_GENERATION_CONCURRENCY` controla quantos pontos turisticos sao
 processados em paralelo; comece com `2` para reduzir risco de rate limit.
 
 `GOOGLE_MAPS_API_KEY` e usada apenas pelo backend para montar roteiros dinamicos
-com Geocoding API e Places API. Nao coloque essa chave em variaveis `VITE_` nem
-no frontend publicado, porque isso expoe o segredo no navegador.
+com Geocoding API, Places API e fotos do Google Places nos cards da etapa de
+roteiro. Nao coloque essa chave em variaveis `VITE_` nem no frontend publicado,
+porque isso expoe o segredo no navegador.
 
 Frontend `frontend_atual/apps/web/.env`:
 
