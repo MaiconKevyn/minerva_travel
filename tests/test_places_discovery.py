@@ -4,6 +4,159 @@ from minerva_travel.models import DynamicItineraryRequest
 from minerva_travel.place_discovery import discover_dynamic_itinerary
 
 
+def test_discover_dynamic_itinerary_uses_natural_language_intent_for_child_requests():
+    search_queries: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Paris", "Franca", 48.8566, 2.3522)
+        if "places:searchText" in url:
+            text = request.read().decode()
+            search_queries.append(text)
+            if "almoco" in text or "almoço" in text:
+                return httpx.Response(
+                    200,
+                    json={
+                        "places": [
+                            _place(
+                                "lunch-eiffel",
+                                "Bistro Familiar da Torre",
+                                ["restaurant"],
+                            )
+                        ]
+                    },
+                )
+            if "Torre Eiffel" in text:
+                return httpx.Response(
+                    200,
+                    json={"places": [_place("eiffel", "Torre Eiffel", ["tourist_attraction"])]},
+                )
+            if "arte" in text:
+                return httpx.Response(
+                    200,
+                    json={
+                        "places": [
+                            _place("art-kids", "Atelier Infantil de Arte", ["art_gallery"])
+                        ]
+                    },
+                )
+            return httpx.Response(200, json={"places": []})
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(
+                destination=(
+                    "Vamos para Paris. Ja vamos na Torre Eiffel. Quero lugares onde "
+                    "as criancas aprendam sobre arte e um local para almocar com meus "
+                    "filhos perto da Torre Eiffel."
+                ),
+                days=1,
+                pace="full",
+            ),
+            api_key="test-key",
+            openai_api_key="test-openai-key",
+            client=client,
+            intent_responder=lambda **_: {
+                "output_text": (
+                    "{"
+                    '"destination":"Paris, Franca",'
+                    '"must_see_places":["Torre Eiffel"],'
+                    '"discovery_requests":['
+                    '{"kind":"educational","query":"lugares para criancas aprenderem arte",'
+                    '"topic":"arte","near":"","meal":"","audience":"children"},'
+                    '{"kind":"restaurant","query":"almoco com criancas",'
+                    '"topic":"comida","near":"Torre Eiffel","meal":"lunch",'
+                    '"audience":"children"}'
+                    "],"
+                    '"inferred_interests":["arte","comida"]'
+                    "}"
+                )
+            },
+        )
+
+    stops = [stop for day in recommendation["days"] for stop in day["stops"]]
+    selected_ids = [stop["selection_id"] for stop in stops]
+
+    assert selected_ids[:3] == [
+        "google:eiffel",
+        "google:art-kids",
+        "google:lunch-eiffel",
+    ]
+    assert "Ponto obrigatorio informado pela familia." in stops[0]["match_reasons"]
+    assert "Pedido da familia: educativo para criancas." in stops[1]["match_reasons"]
+    assert "Pedido da familia: refeicao com criancas." in stops[2]["match_reasons"]
+    assert any("perto de Torre Eiffel" in query for query in search_queries)
+
+
+def test_discover_dynamic_itinerary_keeps_one_stop_per_explicit_family_request():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Paris", "Franca", 48.8566, 2.3522)
+        if "places:searchText" in url:
+            text = request.read().decode()
+            if "almoco" in text:
+                return httpx.Response(
+                    200,
+                    json={"places": [_place("lunch", "Almoco Familiar", ["restaurant"])]},
+                )
+            if "Torre Eiffel" in text:
+                return httpx.Response(
+                    200,
+                    json={
+                        "places": [
+                            _place("eiffel", "Torre Eiffel", ["tourist_attraction"]),
+                            _place("eiffel-view", "Vista da Torre Eiffel", ["tourist_attraction"]),
+                        ]
+                    },
+                )
+            if "arte" in text:
+                return httpx.Response(
+                    200,
+                    json={"places": [_place("art-kids", "Atelier Infantil de Arte", ["museum"])]},
+                )
+            return httpx.Response(200, json={"places": []})
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(
+                destination="Paris com Torre Eiffel, arte para criancas e almoco perto da torre",
+                days=1,
+                pace="balanced",
+            ),
+            api_key="test-key",
+            openai_api_key="test-openai-key",
+            client=client,
+            intent_responder=lambda **_: {
+                "output_text": (
+                    "{"
+                    '"destination":"Paris, Franca",'
+                    '"must_see_places":["Torre Eiffel"],'
+                    '"discovery_requests":['
+                    '{"kind":"educational","query":"arte para criancas",'
+                    '"topic":"arte","near":"","meal":"","audience":"children"},'
+                    '{"kind":"restaurant","query":"almoco com criancas",'
+                    '"topic":"comida","near":"Torre Eiffel","meal":"lunch",'
+                    '"audience":"children"}'
+                    "],"
+                    '"inferred_interests":[]'
+                    "}"
+                )
+            },
+        )
+
+    stop_names = [stop["name"] for day in recommendation["days"] for stop in day["stops"]]
+
+    assert stop_names == ["Torre Eiffel", "Atelier Infantil de Arte", "Almoco Familiar"]
+
+
 def test_discover_dynamic_itinerary_prioritizes_requested_interests():
     calls: list[tuple[str, dict[str, object] | None]] = []
 
@@ -145,3 +298,22 @@ def _place(
         "userRatingCount": count,
         "googleMapsUri": f"https://maps.google.com/?cid={place_id}",
     }
+
+
+def _geocode_response(city: str, country: str, lat: float, lng: float) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "status": "OK",
+            "results": [
+                {
+                    "formatted_address": f"{city}, {country}",
+                    "address_components": [
+                        {"long_name": city, "types": ["locality"]},
+                        {"long_name": country, "types": ["country"]},
+                    ],
+                    "geometry": {"location": {"lat": lat, "lng": lng}},
+                }
+            ],
+        },
+    )

@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx
 
+from minerva_travel.itinerary_intent import parse_itinerary_intent, search_profiles_from_intent
 from minerva_travel.models import DynamicItineraryRequest
 
 GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
@@ -62,11 +63,15 @@ INTEREST_LABELS = {
 INTEREST_QUERIES = {
     "animals": "zoologicos aquarios atividades com animais para familia",
     "art": "museus de arte galerias arte para familia",
+    "education": "atividades educativas para criancas",
     "food": "comida local restaurantes familiares doces famosos",
+    "family": "lugares bons para ir com criancas",
     "history": "pontos historicos monumentos castelos centro historico",
     "museums": "museus pontos culturais para criancas",
     "parks": "parques jardins pracas atividades ao ar livre",
+    "play": "atividades divertidas para criancas",
     "river": "passeio de barco rio waterfront familia",
+    "science": "museus de ciencia e descobertas para criancas",
     "shopping": "lojas mercados compras familiares",
     "views": "mirantes vistas panoramicas observatorio",
 }
@@ -84,6 +89,7 @@ GOOGLE_TYPE_CATEGORIES = {
     "bakery": "food",
     "cafe": "food",
     "historical_landmark": "history",
+    "library": "education",
     "market": "shopping",
     "museum": "museums",
     "park": "parks",
@@ -96,12 +102,16 @@ GOOGLE_TYPE_CATEGORIES = {
 CATEGORY_DURATIONS = {
     "animals": 120,
     "art": 90,
+    "education": 90,
+    "family": 75,
     "food": 60,
     "history": 75,
     "icons": 75,
     "museums": 120,
     "parks": 75,
+    "play": 90,
     "river": 90,
+    "science": 120,
     "shopping": 90,
     "views": 60,
 }
@@ -111,7 +121,9 @@ def discover_dynamic_itinerary(
     request: DynamicItineraryRequest,
     *,
     api_key: str | None,
+    openai_api_key: str | None = None,
     client: httpx.Client | None = None,
+    intent_responder=None,
 ) -> dict[str, Any]:
     if not api_key:
         raise RuntimeError("GOOGLE_MAPS_API_KEY nao configurada no backend.")
@@ -119,23 +131,33 @@ def discover_dynamic_itinerary(
     owns_client = client is None
     http_client = client or httpx.Client(timeout=20)
     try:
-        resolved = _geocode_destination(http_client, api_key, request.destination)
-        search_profiles = _search_profiles(request.interests)
+        intent = parse_itinerary_intent(
+            request.destination,
+            api_key=openai_api_key,
+            responder=intent_responder,
+        )
+        destination_query = intent.destination or request.destination
+        resolved = _geocode_destination(http_client, api_key, destination_query)
+        search_profiles = search_profiles_from_intent(intent, explicit_interests=request.interests)
+        if not search_profiles:
+            search_profiles = _search_profiles(request.interests)
         candidates = _discover_places(http_client, api_key, request, resolved, search_profiles)
         if not candidates:
             raise ValueError("Nao encontrei locais suficientes para montar o roteiro.")
         ranked = sorted(candidates.values(), key=lambda item: (-item["match_score"], item["name"]))
         target_count = min(len(ranked), request.days * PACE_STOP_LIMITS[request.pace])
-        selected = ranked[:target_count]
+        selected = _select_balanced_stops(ranked, target_count)
         selected_ids = {item["selection_id"] for item in selected}
         alternatives = [item for item in ranked if item["selection_id"] not in selected_ids][:8]
+        public_selected = [_public_stop(item) for item in selected]
+        public_alternatives = [_public_stop(item) for item in alternatives]
 
         return {
             "summary": _summary(resolved, request.days),
             "recommendation_source": "google_places",
-            "selected_landmarks": [item["selection_id"] for item in selected],
-            "days": _build_days(selected, request.days, request.pace),
-            "alternatives": alternatives,
+            "selected_landmarks": [item["selection_id"] for item in public_selected],
+            "days": _build_days(public_selected, request.days, request.pace),
+            "alternatives": public_alternatives,
             "resolved_destination": resolved,
         }
     finally:
@@ -187,7 +209,8 @@ def _discover_places(
     candidates: dict[str, dict[str, Any]] = {}
     normalized_interests = _normalize_interests(request.interests)
     for profile_index, (profile_category, query) in enumerate(search_profiles):
-        places = _search_places(client, api_key, request, resolved, query)
+        places = _search_places(client, api_key, resolved, query)
+        profile_reason = _profile_reason(profile_category, query)
         for rank, place in enumerate(places, start=1):
             place_id = str(place.get("id") or "")
             if not place_id:
@@ -199,6 +222,7 @@ def _discover_places(
                 rank=rank,
                 profile_index=profile_index,
                 normalized_interests=normalized_interests,
+                profile_reason=profile_reason,
             )
             existing = candidates.get(place_id)
             if not existing or candidate["match_score"] > existing["match_score"]:
@@ -209,12 +233,11 @@ def _discover_places(
 def _search_places(
     client: httpx.Client,
     api_key: str,
-    request: DynamicItineraryRequest,
     resolved: dict[str, Any],
     query: str,
 ) -> list[dict[str, Any]]:
     body = {
-        "textQuery": f"{query} em {request.destination}",
+        "textQuery": query,
         "languageCode": "pt-BR",
         "maxResultCount": 8,
         "locationBias": {
@@ -247,12 +270,17 @@ def _place_to_stop(
     rank: int,
     profile_index: int,
     normalized_interests: set[str],
+    profile_reason: str | None,
 ) -> dict[str, Any]:
     place_id = str(place["id"])
     name = str(place.get("displayName", {}).get("text") or "Local sugerido")
     categories = _place_categories(place, query_category)
     score = max(0, 120 - (profile_index * 10) - rank)
     reasons: list[str] = []
+
+    if profile_reason:
+        score += 500 if query_category == "must_see" else 140
+        reasons.append(profile_reason)
 
     matching_categories = [category for category in categories if category in normalized_interests]
     for category in matching_categories:
@@ -292,7 +320,51 @@ def _place_to_stop(
         "editable": True,
         "google_maps_uri": place.get("googleMapsUri"),
         "formatted_address": place.get("formattedAddress"),
+        "_search_profile_index": profile_index,
     }
+
+
+def _select_balanced_stops(
+    ranked: list[dict[str, Any]],
+    target_count: int,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    selected_ids: set[str] = set()
+    profile_indexes = sorted(
+        {
+            item["_search_profile_index"]
+            for item in ranked
+            if isinstance(item.get("_search_profile_index"), int)
+        }
+    )
+
+    for profile_index in profile_indexes:
+        if len(selected) >= target_count:
+            break
+        profile_candidates = [
+            item
+            for item in ranked
+            if item.get("_search_profile_index") == profile_index
+            and item["selection_id"] not in selected_ids
+        ]
+        if not profile_candidates:
+            continue
+        selected.append(profile_candidates[0])
+        selected_ids.add(profile_candidates[0]["selection_id"])
+
+    for item in ranked:
+        if len(selected) >= target_count:
+            break
+        if item["selection_id"] in selected_ids:
+            continue
+        selected.append(item)
+        selected_ids.add(item["selection_id"])
+
+    return selected
+
+
+def _public_stop(stop: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in stop.items() if not key.startswith("_")}
 
 
 def _place_categories(place: dict[str, Any], query_category: str) -> list[str]:
@@ -301,9 +373,25 @@ def _place_categories(place: dict[str, Any], query_category: str) -> list[str]:
         for place_type in place.get("types", [])
         if place_type in GOOGLE_TYPE_CATEGORIES
     ]
-    if query_category not in categories:
+    if query_category != "must_see" and query_category not in categories:
         categories.append(query_category)
     return list(dict.fromkeys(categories))
+
+
+def _profile_reason(category: str, query: str) -> str | None:
+    normalized_query = _normalize_text(query)
+    if category == "must_see":
+        return "Ponto obrigatorio informado pela familia."
+    if category == "food" and any(
+        token in normalized_query
+        for token in ["almoco", "almocar", "jantar", "restaurante", "comer", "refeicao"]
+    ):
+        return "Pedido da familia: refeicao com criancas."
+    if any(token in normalized_query for token in ["aprender", "educativo", "educativa"]):
+        return "Pedido da familia: educativo para criancas."
+    if "crianca" in normalized_query or "filho" in normalized_query:
+        return "Pedido da familia: bom para criancas."
+    return None
 
 
 def _search_profiles(interests: Iterable[str]) -> list[tuple[str, str]]:
