@@ -149,6 +149,8 @@ def test_discover_dynamic_itinerary_adds_google_place_photos_to_visible_cards():
     stop = recommendation["days"][0]["stops"][0]
 
     assert stop["image"] == "https://lh3.googleusercontent.com/photo=w900"
+    assert stop["latitude"] == 48.8566
+    assert stop["longitude"] == 2.3522
     assert stop["image_attributions"] == [
         {
             "display_name": "Maria Fotografa",

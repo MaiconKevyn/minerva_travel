@@ -147,7 +147,14 @@ Frontend `frontend_atual/apps/web/.env`:
 VITE_API_BASE_URL=http://127.0.0.1:8000
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_sua_chave_aqui
+VITE_GOOGLE_MAPS_BROWSER_KEY=sua_chave_publica_restrita_por_dominio
+VITE_GOOGLE_MAPS_MAP_ID=seu_map_id_opcional
 ```
+
+`VITE_GOOGLE_MAPS_BROWSER_KEY` e usada somente para o mapa embutido do passo 4
+no navegador. Crie uma chave separada da chave do backend, restrinja por HTTP
+referrer e habilite a Maps JavaScript API. `VITE_GOOGLE_MAPS_MAP_ID` e opcional,
+mas recomendado para Advanced Markers.
 
 ## Deploy temporario na Hostinger
 
@@ -168,6 +175,8 @@ Configure a variavel antes do build:
 VITE_API_BASE_URL=https://minerva-travel.onrender.com
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_sua_chave_aqui
+VITE_GOOGLE_MAPS_BROWSER_KEY=sua_chave_publica_restrita_por_dominio
+VITE_GOOGLE_MAPS_MAP_ID=seu_map_id_opcional
 ```
 
 Para deploy estatico ja publicado, tambem e possivel configurar Supabase
@@ -177,6 +186,8 @@ editando `public_html/config.js` no gerenciador de arquivos da Hostinger:
 window.__MINERVA_CONFIG__ = {
   VITE_SUPABASE_URL: 'https://seu-projeto.supabase.co',
   VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_sua_chave_aqui',
+  VITE_GOOGLE_MAPS_BROWSER_KEY: 'sua_chave_publica_restrita_por_dominio',
+  VITE_GOOGLE_MAPS_MAP_ID: 'seu_map_id_opcional',
 };
 ```
 

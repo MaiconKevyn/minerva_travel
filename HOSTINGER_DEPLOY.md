@@ -50,10 +50,30 @@ Adicione antes do build:
 
 ```env
 VITE_API_BASE_URL=https://minerva-travel.onrender.com
+VITE_GOOGLE_MAPS_BROWSER_KEY=sua_chave_publica_restrita_por_dominio
+VITE_GOOGLE_MAPS_MAP_ID=seu_map_id_opcional
 ```
 
 O Vite grava essa variavel dentro dos assets finais. Se ela mudar, faca um novo
 build/redeploy.
+
+`VITE_GOOGLE_MAPS_BROWSER_KEY` e necessaria para o botao "Ver mapa da viagem" no
+passo 4. Use uma chave diferente da chave do backend, restrita por HTTP referrer
+ao dominio temporario/final da Hostinger, com Maps JavaScript API habilitada.
+`VITE_GOOGLE_MAPS_MAP_ID` e opcional, mas recomendado para exibir marcadores com
+foto.
+
+Se o deploy estatico ja estiver publicado, tambem e possivel preencher essas
+variaveis em `public_html/config.js` no gerenciador de arquivos da Hostinger:
+
+```js
+window.__MINERVA_CONFIG__ = {
+  VITE_SUPABASE_URL: 'https://seu-projeto.supabase.co',
+  VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_sua_chave_aqui',
+  VITE_GOOGLE_MAPS_BROWSER_KEY: 'sua_chave_publica_restrita_por_dominio',
+  VITE_GOOGLE_MAPS_MAP_ID: 'seu_map_id_opcional',
+};
+```
 
 ## Rotas internas
 
@@ -77,7 +97,8 @@ GOOGLE_MAPS_API_KEY=sua_chave_google_maps_aqui
 ```
 
 Essa chave tambem e usada pelo backend para retornar fotos do Google Places nos
-cards do roteiro. A chave nao deve ir para o frontend nem para `config.js`.
+cards do roteiro. A chave nao deve ir para o frontend nem para `config.js`; para
+o mapa embutido, use `VITE_GOOGLE_MAPS_BROWSER_KEY`.
 
 Quando houver dominio definitivo, prefira restringir:
 

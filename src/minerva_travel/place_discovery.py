@@ -307,6 +307,7 @@ def _place_to_stop(
 
     primary_category = categories[0] if categories else "icons"
     photo = _first_place_photo(place)
+    location = place.get("location") if isinstance(place.get("location"), dict) else {}
     return {
         "selection_id": f"google:{place_id}",
         "destination_id": resolved["id"],
@@ -324,6 +325,8 @@ def _place_to_stop(
         "editable": True,
         "google_maps_uri": place.get("googleMapsUri"),
         "formatted_address": place.get("formattedAddress"),
+        "latitude": location.get("latitude"),
+        "longitude": location.get("longitude"),
         "image_attributions": _photo_attributions(photo),
         "_photo_name": photo.get("name") if photo else "",
         "_search_profile_index": profile_index,
