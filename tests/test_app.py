@@ -3,9 +3,15 @@ import threading
 import time
 from pathlib import Path
 
+import httpx
 from fastapi.testclient import TestClient
 
-from minerva_travel.app import app, custom_destinations_from_form, generate_selected_landmark_art
+from minerva_travel.app import (
+    app,
+    custom_destinations_from_form,
+    fetch_custom_wikimedia_assets,
+    generate_selected_landmark_art,
+)
 from minerva_travel.wikimedia_assets import WikimediaAsset
 
 
@@ -435,6 +441,17 @@ def test_api_generate_uses_wikimedia_image_before_generating_landmark_art(
     assert generated_lineart == [
         ("Cristo Redentor", "Rio de Janeiro", "Brasil", wikimedia_path)
     ]
+
+
+def test_fetch_custom_wikimedia_assets_ignores_network_failures(monkeypatch):
+    destinations, _selected = custom_destinations_from_form("Cristo Redentor, Rio, Brasil")
+
+    def fake_fetch_landmark_asset(*_args, **_kwargs):
+        raise httpx.ConnectError("network unavailable")
+
+    monkeypatch.setattr("minerva_travel.app.fetch_landmark_asset", fake_fetch_landmark_asset)
+
+    assert fetch_custom_wikimedia_assets(destinations, "request-123") == {}
 
 
 def test_selected_landmark_art_generates_multiple_landmarks_concurrently(monkeypatch):

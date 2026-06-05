@@ -564,7 +564,7 @@ def fetch_custom_wikimedia_assets(
                 selection_id = f"{destination.id}:{landmark.id}"
                 try:
                     asset = fetch_landmark_asset(client, destination, landmark, output_dir)
-                except httpx.HTTPStatusError:
+                except httpx.HTTPError:
                     asset = None
                 if asset:
                     assets[selection_id] = asset
@@ -588,7 +588,7 @@ def fetch_preview_wikimedia_assets(
                 selection_id = f"{destination.id}:{landmark.id}"
                 try:
                     asset = find_landmark_asset_metadata(client, destination, landmark)
-                except httpx.HTTPStatusError:
+                except httpx.HTTPError:
                     asset = None
                 if asset:
                     assets[selection_id] = asset
