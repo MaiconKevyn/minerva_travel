@@ -221,6 +221,46 @@ export const landmarkMapAction = (landmark = {}) => {
   return { mode: 'none', mapsUrl: '' };
 };
 
+export const tripMapExplorerItems = (landmarks = [], selectedLandmarks = []) => {
+  const selectedSet = new Set(selectedLandmarks);
+  return mappableLandmarks(landmarks)
+    .map((landmark) => ({
+      ...landmark,
+      map_status: selectedSet.has(landmark.id) ? 'selected' : 'suggested',
+    }))
+    .sort((a, b) => {
+      const selectedDelta = Number(b.map_status === 'selected') - Number(a.map_status === 'selected');
+      if (selectedDelta !== 0) return selectedDelta;
+      const alternativeDelta = Number(a.is_alternative) - Number(b.is_alternative);
+      if (alternativeDelta !== 0) return alternativeDelta;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+};
+
+export const mergeLandmarkSuggestions = (currentLandmarks = [], nextLandmarks = []) => {
+  const seen = new Set(currentLandmarks.map((landmark) => landmark.id).filter(Boolean));
+  const additions = nextLandmarks.filter((landmark) => {
+    if (!landmark?.id || seen.has(landmark.id)) {
+      return false;
+    }
+    seen.add(landmark.id);
+    return true;
+  });
+  return [...currentLandmarks, ...additions];
+};
+
+export const mergeDestinationSuggestions = (currentDestinations = [], nextDestinations = []) => {
+  const seen = new Set(currentDestinations.map((destination) => destination.id).filter(Boolean));
+  const additions = nextDestinations.filter((destination) => {
+    if (!destination?.id || seen.has(destination.id)) {
+      return false;
+    }
+    seen.add(destination.id);
+    return true;
+  });
+  return [...currentDestinations, ...additions];
+};
+
 export const appendGuideLandmarks = (formData, guideData) => {
   const landmarks = guideData.landmarks || [];
   const catalogLandmarkIds = landmarks

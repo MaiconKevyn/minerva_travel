@@ -277,6 +277,52 @@ test('landmarkMapAction chooses embedded map when coordinates exist and external
   );
 });
 
+test('tripMapExplorerItems orders selected landmarks first and labels status', () => {
+  const items = minervaApi.tripMapExplorerItems(
+    [
+      { id: 'suggested-1', name: 'Jardim', latitude: 1, longitude: 1, is_alternative: true },
+      { id: 'selected-1', name: 'Museu', latitude: 2, longitude: 2 },
+      { id: 'missing-coordinates', name: 'Sem mapa' },
+    ],
+    ['selected-1'],
+  );
+
+  assert.deepEqual(items.map((item) => item.id), ['selected-1', 'suggested-1']);
+  assert.deepEqual(items.map((item) => item.map_status), ['selected', 'suggested']);
+});
+
+test('mergeLandmarkSuggestions keeps existing order and appends only new suggestions', () => {
+  const landmarks = minervaApi.mergeLandmarkSuggestions(
+    [
+      { id: 'selected-1', name: 'Museu' },
+      { id: 'suggested-1', name: 'Jardim antigo' },
+    ],
+    [
+      { id: 'suggested-1', name: 'Jardim novo' },
+      { id: 'suggested-2', name: 'Parque' },
+    ],
+  );
+
+  assert.deepEqual(landmarks.map((item) => item.id), ['selected-1', 'suggested-1', 'suggested-2']);
+  assert.equal(landmarks[1].name, 'Jardim antigo');
+});
+
+test('mergeDestinationSuggestions keeps existing destinations and appends new ones', () => {
+  const destinations = minervaApi.mergeDestinationSuggestions(
+    [
+      { id: 'paris', city: 'Paris' },
+      { id: 'versailles', city: 'Versalhes' },
+    ],
+    [
+      { id: 'paris', city: 'Paris atualizada' },
+      { id: 'giverny', city: 'Giverny' },
+    ],
+  );
+
+  assert.deepEqual(destinations.map((item) => item.id), ['paris', 'versailles', 'giverny']);
+  assert.equal(destinations[0].city, 'Paris');
+});
+
 test('appendGuideLandmarks sends catalog ids and custom fallback separately', () => {
   const formData = new FormData();
 

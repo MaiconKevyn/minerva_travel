@@ -15,6 +15,8 @@ import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.js
 import { Button } from '@/components/ui/button';
 import {
   discoverItinerary,
+  mergeDestinationSuggestions,
+  mergeLandmarkSuggestions,
   mapParsedLandmarksToParsedData,
   mapRecommendationToParsedData,
   parseLandmarks,
@@ -67,6 +69,9 @@ const Step4Attractions = () => {
   const [resultMode, setResultMode] = useState('quick');
   const [showPreferenceSetup, setShowPreferenceSetup] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [isMapExploringMore, setIsMapExploringMore] = useState(false);
+  const [mapExploreError, setMapExploreError] = useState('');
+  const [mapExploreNotice, setMapExploreNotice] = useState('');
   const autoLoadedDestinationRef = useRef('');
 
   const updatePreference = (key, value) => {
@@ -180,6 +185,72 @@ const Step4Attractions = () => {
     itineraryPreferences.pace,
     loadManualMappedLandmarks,
     setIsLoadingLandmarks,
+  ]);
+
+  const exploreMoreMapPlaces = useCallback(async () => {
+    if (!destination.trim() || isMapExploringMore) return;
+
+    setIsMapExploringMore(true);
+    setMapExploreError('');
+    setMapExploreNotice('');
+
+    try {
+      const broaderInterests = [
+        ...new Set([
+          ...itineraryPreferences.interests,
+          'parques',
+          'museus',
+          'arte',
+          'historia',
+          'comida',
+          'animais',
+          'rio',
+          'vistas',
+          'education',
+          'family',
+          'science',
+          'play',
+        ]),
+      ].slice(0, 12);
+
+      const itinerary = await discoverItinerary({
+        destination,
+        days: Math.max(Number(itineraryPreferences.days) || 1, 3),
+        interests: broaderInterests,
+        pace: 'full',
+        children_ages: [],
+        must_see: [],
+      });
+      const mapped = mapRecommendationToParsedData(itinerary, null);
+      const existingIds = new Set(parsedData.landmarks.map((landmark) => landmark.id));
+      const newItemsCount = mapped.landmarks.filter(
+        (landmark) => landmark?.id && !existingIds.has(landmark.id)
+      ).length;
+
+      setParsedData((prev) => ({
+        destinations: mergeDestinationSuggestions(prev.destinations, mapped.destinations),
+        landmarks: mergeLandmarkSuggestions(prev.landmarks, mapped.landmarks),
+      }));
+      setHasSearchedLandmarks(true);
+      setMapExploreNotice(
+        newItemsCount > 0
+          ? `${newItemsCount} ${newItemsCount === 1 ? 'novo ponto encontrado' : 'novos pontos encontrados'} para considerar.`
+          : 'Nao encontramos pontos novos agora. Tente ajustar as preferencias ou detalhar mais o destino.'
+      );
+    } catch (err) {
+      console.error('Error exploring more map places:', err);
+      setMapExploreError(err.message || 'Nao foi possivel buscar mais pontos agora.');
+    } finally {
+      setIsMapExploringMore(false);
+    }
+  }, [
+    destination,
+    isMapExploringMore,
+    itineraryPreferences.days,
+    itineraryPreferences.interests,
+    parsedData.landmarks,
+    setHasSearchedLandmarks,
+    setParsedData,
   ]);
 
   useEffect(() => {
@@ -666,6 +737,10 @@ const Step4Attractions = () => {
         landmarks={parsedData.landmarks}
         selectedLandmarks={selectedLandmarks}
         onToggleLandmark={toggleLandmarkSelection}
+        onExploreMore={exploreMoreMapPlaces}
+        isExploringMore={isMapExploringMore}
+        exploreError={mapExploreError}
+        exploreNotice={mapExploreNotice}
         onClose={() => setIsMapOpen(false)}
       />
     </div>
