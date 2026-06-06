@@ -60,9 +60,11 @@ const Step2CoverPhoto = () => {
             className="w-full text-center space-y-8"
           >
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground leading-tight">
-              Agora, adicione uma foto para a capa do guia
+              Seu roteiro está pronto. Escolha a foto de capa do PDF
             </h2>
-            <p className="text-lg text-muted-foreground">Pode ser uma foto da família ou do último destino de vocês!</p>
+            <p className="text-lg text-muted-foreground">
+              Essa imagem abre o livrinho da família antes das atividades, mapas e memórias da viagem.
+            </p>
 
             <div
               onDragOver={handleDragOver}
@@ -109,7 +111,7 @@ const Step2CoverPhoto = () => {
                 disabled={!coverPhoto}
                 className="rounded-full px-8 py-6 bg-primary hover:bg-primary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all"
               >
-                Ficou Ótimo! <ArrowRight className="ml-2 w-5 h-5" />
+                Continuar para revisão <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </motion.div>
           </motion.div>
@@ -127,7 +129,7 @@ const Step2CoverPhoto = () => {
               </div>
             </div>
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
-              Que foto linda!
+              Capa escolhida!
             </h2>
           </motion.div>
         )}

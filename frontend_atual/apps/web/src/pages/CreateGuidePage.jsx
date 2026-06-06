@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import Header from '@/components/Header.jsx';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
-import Step1FamilyName from '@/components/Step1FamilyName.jsx';
 import Step2CoverPhoto from '@/components/Step2CoverPhoto.jsx';
 import Step3Destination from '@/components/Step3Destination.jsx';
 import Step4Attractions from '@/components/Step4Attractions.jsx';
@@ -18,13 +17,12 @@ const CreateGuidePageContent = () => {
 
   const renderStep = () => {
     switch (currentStep) {
-      case 1: return <Step1FamilyName />;
-      case 2: return <Step2CoverPhoto />;
-      case 3: return <Step3Destination />;
-      case 4: return <Step4Attractions />;
-      case 5: return <EnhancedStep5FamilyDetails />;
-      case 6: return <Step5Review />;
-      default: return <Step1FamilyName />;
+      case 1: return <Step3Destination />;
+      case 2: return <Step4Attractions />;
+      case 3: return <EnhancedStep5FamilyDetails />;
+      case 4: return <Step2CoverPhoto />;
+      case 5: return <Step5Review />;
+      default: return <Step3Destination />;
     }
   };
 
@@ -43,7 +41,7 @@ const CreateGuidePageContent = () => {
           {/* Top Bar with Progress and Back Button */}
           <div className="flex items-center justify-between mb-8 md:mb-16">
             <div className="w-24">
-              {currentStep > 1 && currentStep < 7 && (
+              {currentStep > 1 && currentStep < 6 && (
                 <Button
                   variant="ghost"
                   onClick={goBack}
@@ -57,7 +55,7 @@ const CreateGuidePageContent = () => {
 
             <div className="flex-1 max-w-xs mx-auto text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                {[1, 2, 3, 4, 5, 6].map((s) => (
+                {[1, 2, 3, 4, 5].map((s) => (
                   <div
                     key={s}
                     className={`h-2 rounded-full transition-all duration-500 ${
@@ -67,7 +65,7 @@ const CreateGuidePageContent = () => {
                 ))}
               </div>
               <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-                Passo {currentStep} de 6
+                Passo {currentStep} de 5
               </p>
             </div>
 

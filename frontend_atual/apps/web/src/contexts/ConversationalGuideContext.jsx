@@ -41,7 +41,7 @@ export const ConversationalGuideProvider = ({ children }) => {
   };
 
   const nextStep = () => {
-    setStep(Math.min(currentStep + 1, 6));
+    setStep(Math.min(currentStep + 1, 5));
   };
 
   const goBack = () => {

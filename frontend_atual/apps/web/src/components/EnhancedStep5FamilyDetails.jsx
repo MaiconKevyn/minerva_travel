@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Users, Baby, Calendar, Plus, X } from 'lucide-react';
+import { ArrowRight, Users, Baby, Calendar, Home, Plus, X } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,8 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const EnhancedStep5FamilyDetails = () => {
   const {
+    familyName,
+    updateFamilyName,
     childrenList: contextChildren,
     setChildrenList,
     parentsList: contextParents,
@@ -22,6 +24,7 @@ const EnhancedStep5FamilyDetails = () => {
   } = useConversationalGuide();
 
   const { toast } = useToast();
+  const [localFamilyName, setLocalFamilyName] = useState(familyName || '');
 
   // Initialize local state with context data or defaults
   const [children, setChildren] = useState(
@@ -81,8 +84,18 @@ const EnhancedStep5FamilyDetails = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
+    const normalizedFamilyName = localFamilyName.trim();
     const validChildren = children.filter(c => c.name.trim() !== '');
     const validParents = parents.filter(p => p.name.trim() !== '');
+
+    if (!normalizedFamilyName) {
+      toast({
+        variant: "destructive",
+        title: "Atenção",
+        description: "Adicione o nome da família.",
+      });
+      return;
+    }
 
     if (validChildren.length === 0) {
       toast({
@@ -103,6 +116,7 @@ const EnhancedStep5FamilyDetails = () => {
     }
 
     // Save to context
+    updateFamilyName(normalizedFamilyName);
     setChildrenList(validChildren.map(c => c.name.trim()));
     setParentsList(validParents.map(p => p.name.trim()));
 
@@ -116,11 +130,27 @@ const EnhancedStep5FamilyDetails = () => {
           Detalhes da Família
         </h2>
         <p className="text-xl text-muted-foreground font-medium">
-          Para deixar o guia ainda mais especial, conte-nos quem vai participar dessa aventura.
+          Para deixar o guia ainda mais especial, conte-nos quem vai aparecer nessa aventura.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Family Name Section */}
+        <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-accent/10">
+          <Label htmlFor="familyName" className="text-xl font-bold flex items-center gap-3 text-foreground mb-6">
+            <div className="p-2 bg-accent/10 rounded-xl text-accent">
+              <Home className="w-6 h-6" />
+            </div>
+            Nome da Família
+          </Label>
+          <Input
+            id="familyName"
+            value={localFamilyName}
+            onChange={(e) => setLocalFamilyName(e.target.value)}
+            placeholder="Ex: Silva, Oliveira, The Smiths..."
+            className="text-lg py-6 rounded-xl bg-background border-border focus-visible:ring-accent text-foreground placeholder:text-muted-foreground"
+          />
+        </div>
 
         {/* Children Section */}
         <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-primary/10">
