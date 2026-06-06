@@ -56,6 +56,8 @@ export const buildLandmarkMapsUrl = (landmark = {}) => {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 };
 
+const normalizeSourceType = (value) => (value === 'mentioned' ? 'mentioned' : 'suggested');
+
 const mapStopToLandmark = (stop, day = null, isAlternative = false, isCatalogLandmark = true) => ({
   id: stop.selection_id,
   selection_id: stop.selection_id,
@@ -76,6 +78,7 @@ const mapStopToLandmark = (stop, day = null, isAlternative = false, isCatalogLan
   duration_minutes: stop.duration_minutes,
   family_tip: stop.family_tip,
   match_reasons: stop.match_reasons || [],
+  source_type: normalizeSourceType(stop.source_type),
   categories: stop.categories || [],
   itinerary_day: day?.day || null,
   itinerary_title: day?.title || '',
@@ -152,6 +155,7 @@ const mapManualLandmark = (landmark, destination = {}) => {
     duration_minutes: landmark.duration_minutes || null,
     family_tip: landmark.family_tip || null,
     match_reasons: landmark.match_reasons || [],
+    source_type: normalizeSourceType(landmark.source_type || 'mentioned'),
     categories: landmark.categories || [],
     itinerary_day: null,
     itinerary_title: '',
@@ -191,6 +195,23 @@ export const splitQuickSuggestionLandmarks = (landmarks = []) => ({
   primary: landmarks.filter((landmark) => !landmark.is_alternative),
   alternatives: landmarks.filter((landmark) => landmark.is_alternative),
 });
+
+export const splitLandmarksBySource = (landmarks = []) => ({
+  mentioned: landmarks.filter((landmark) => landmark.source_type === 'mentioned'),
+  suggested: landmarks.filter((landmark) => landmark.source_type !== 'mentioned'),
+});
+
+export const defaultSelectedLandmarksForMode = (mapped = {}, mode = 'quick') => {
+  if (mode === 'quick') {
+    const mentionedIds = splitLandmarksBySource(mapped.landmarks).mentioned
+      .map((landmark) => landmark.id)
+      .filter(Boolean);
+    if (mentionedIds.length > 0) {
+      return mentionedIds;
+    }
+  }
+  return mapped.selectedLandmarks || [];
+};
 
 const normalizedCoordinate = (value) => {
   const coordinate = Number(value);

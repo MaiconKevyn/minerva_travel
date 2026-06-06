@@ -86,6 +86,9 @@ def test_discover_dynamic_itinerary_uses_natural_language_intent_for_child_reque
         "google:art-kids",
         "google:lunch-eiffel",
     ]
+    assert stops[0]["source_type"] == "mentioned"
+    assert stops[1]["source_type"] == "suggested"
+    assert stops[2]["source_type"] == "suggested"
     assert "Ponto obrigatorio informado pela familia." in stops[0]["match_reasons"]
     assert "Pedido da familia: educativo para criancas." in stops[1]["match_reasons"]
     assert "Pedido da familia: refeicao com criancas." in stops[2]["match_reasons"]

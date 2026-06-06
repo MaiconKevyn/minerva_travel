@@ -1,9 +1,8 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Clock3, Map as MapIcon, MapPin, Sparkles } from 'lucide-react';
+import { Check, Map as MapIcon, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { landmarkMapAction } from '@/utils/minerva-api.js';
 import PlaceMapModal from './PlaceMapModal.jsx';
 
@@ -31,7 +30,8 @@ const LandmarkCard = ({
   const mapAction = landmarkMapAction(normalizedLandmark);
   const mapsUrl = mapAction.mapsUrl;
   const canOpenEmbeddedMap = mapAction.mode === 'embedded';
-  const canShowMapAction = mapAction.mode !== 'none';
+  const isMentionedPlace = isSelectionMode && data.source_type === 'mentioned';
+  const sourceTone = !isSelectionMode || isMentionedPlace ? 'primary' : 'secondary';
 
   const openEmbeddedMap = (event) => {
     event.stopPropagation();
@@ -49,9 +49,15 @@ const LandmarkCard = ({
         className={cn(
           "group relative rounded-3xl overflow-hidden transition-all duration-300 border bg-card dark:bg-slate-800 flex flex-col h-full",
           isSelectionMode ? "cursor-pointer" : "cursor-default",
-          isSelected
-            ? "border-primary shadow-[0_8px_30px_rgb(241,97,59,0.15)] scale-[1.02]"
-            : "border-border/60 dark:border-slate-700 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/30"
+          isSelectionMode && isMentionedPlace && !isSelected
+            ? "border-primary/35 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/70"
+            : isSelectionMode && !isMentionedPlace && !isSelected
+              ? "border-secondary/35 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-secondary/70"
+              : isSelected && isMentionedPlace
+                ? "border-primary shadow-[0_8px_30px_rgb(241,97,59,0.15)] scale-[1.02]"
+                : isSelected
+                  ? "border-secondary shadow-[0_8px_30px_rgb(72,156,200,0.15)] scale-[1.02]"
+                  : "border-border/60 dark:border-slate-700 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/30"
         )}
       >
         {/* Top Image Header */}
@@ -127,8 +133,12 @@ const LandmarkCard = ({
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm border-2",
               isSelected
-                ? "bg-primary border-primary text-white scale-110"
-                : "bg-background/80 backdrop-blur-sm border-muted text-transparent group-hover:border-primary/50"
+                ? sourceTone === 'primary'
+                  ? "bg-primary border-primary text-white scale-110"
+                  : "bg-secondary border-secondary text-white scale-110"
+                : sourceTone === 'primary'
+                  ? "bg-background/80 backdrop-blur-sm border-primary/30 text-transparent group-hover:border-primary/70"
+                  : "bg-background/80 backdrop-blur-sm border-secondary/30 text-transparent group-hover:border-secondary/70"
             )}>
               <Check className={cn("w-4 h-4 transition-opacity", isSelected ? "opacity-100" : "opacity-0")} />
             </div>
@@ -139,7 +149,10 @@ const LandmarkCard = ({
         <div className="p-6 flex flex-col flex-1">
           {/* City & Location */}
           <div className="mb-2">
-            <span className="text-primary text-xs font-bold tracking-widest uppercase flex items-center gap-1.5">
+            <span className={cn(
+              "text-xs font-bold tracking-widest uppercase flex items-center gap-1.5",
+              sourceTone === 'primary' ? "text-primary" : "text-secondary"
+            )}>
               <MapPin className="w-3.5 h-3.5" />
               {displayCity}
             </span>
@@ -160,83 +173,9 @@ const LandmarkCard = ({
           )}
 
           {/* Description */}
-          <p className="text-foreground/80 dark:text-gray-300 text-sm leading-relaxed mb-6 flex-1">
+          <p className="text-foreground/80 dark:text-gray-300 text-sm leading-relaxed flex-1">
             {data.description || 'Um ponto turístico imperdível para sua viagem em família.'}
           </p>
-
-        {canShowMapAction && (
-          <div className="mb-5">
-            {canOpenEmbeddedMap ? (
-              <button
-                type="button"
-                onClick={openEmbeddedMap}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-secondary/30 bg-secondary/10 px-4 py-3 text-sm font-bold text-secondary transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-              >
-                <MapIcon className="h-4 w-4" />
-                Mapa
-              </button>
-            ) : (
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(event) => event.stopPropagation()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-secondary/30 bg-secondary/10 px-4 py-3 text-sm font-bold text-secondary transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-              >
-                <MapIcon className="h-4 w-4" />
-                Mapa
-              </a>
-            )}
-          </div>
-        )}
-
-        {isSelectionMode && (data.duration_minutes || data.match_reasons?.length > 0) && (
-          <div className="space-y-3 mb-5">
-            {data.duration_minutes && (
-              <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
-                <Clock3 className="w-4 h-4 text-secondary" />
-                {data.duration_minutes} min
-              </div>
-            )}
-
-            {data.match_reasons?.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {data.match_reasons.slice(0, 2).map((reason) => (
-                  <Badge key={reason} variant="outline" className="rounded-full bg-primary/5 text-primary border-primary/20">
-                    {reason}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {isSelectionMode && data.family_tip && (
-          <div className="mb-5 rounded-2xl bg-accent/10 border border-accent/20 p-3 flex gap-2">
-            <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-            <p className="text-xs leading-relaxed font-medium text-foreground/80">
-              {data.family_tip}
-            </p>
-          </div>
-        )}
-
-        {/* Confidence Score Badge (Selection Mode) */}
-        {isSelectionMode && data.confidence !== undefined && (
-          <div className="mt-auto flex items-center">
-            <div className={cn("px-3 py-1.5 rounded-full text-xs font-bold tracking-wide flex items-center gap-1.5",
-              data.confidence >= 0.8 ? "bg-accent/20 text-accent-foreground" :
-              data.confidence >= 0.5 ? "bg-secondary/20 text-secondary-foreground" :
-              "bg-muted text-muted-foreground"
-            )}>
-              <div className={cn("w-1.5 h-1.5 rounded-full",
-                data.confidence >= 0.8 ? "bg-accent-foreground" :
-                data.confidence >= 0.5 ? "bg-secondary-foreground" : "bg-current"
-              )} />
-              {data.confidence >= 0.8 ? 'Alta Compatibilidade' :
-               data.confidence >= 0.5 ? 'Boa Opção' : 'Sugerido'}
-            </div>
-          </div>
-        )}
         </div>
       </motion.div>
 

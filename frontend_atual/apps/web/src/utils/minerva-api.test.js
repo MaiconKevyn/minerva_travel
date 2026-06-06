@@ -142,6 +142,7 @@ test('mapRecommendationToParsedData treats Google Places stops as custom landmar
               family_tip: 'Procure os arcos gigantes.',
               match_reasons: ['Interesse da familia: historia.'],
               categories: ['history'],
+              source_type: 'mentioned',
             },
           ],
         },
@@ -158,11 +159,41 @@ test('mapRecommendationToParsedData treats Google Places stops as custom landmar
   assert.equal(data.landmarks[0].maps_url, 'https://maps.google.com/?cid=abc123');
   assert.equal(data.landmarks[0].latitude, 41.8902);
   assert.equal(data.landmarks[0].longitude, 12.4922);
+  assert.equal(data.landmarks[0].source_type, 'mentioned');
   assert.deepEqual(data.landmarks[0].image_attributions, [
     {
       display_name: 'Maria Fotografa',
       uri: 'https://example.com/maria',
     },
+  ]);
+});
+
+test('splitLandmarksBySource separates user-mentioned places from suggestions', () => {
+  const sections = minervaApi.splitLandmarksBySource([
+    { id: 'eiffel', source_type: 'mentioned' },
+    { id: 'park', source_type: 'suggested' },
+    { id: 'museum', is_alternative: true },
+  ]);
+
+  assert.deepEqual(sections.mentioned.map((item) => item.id), ['eiffel']);
+  assert.deepEqual(sections.suggested.map((item) => item.id), ['park', 'museum']);
+});
+
+test('defaultSelectedLandmarksForMode selects only mentioned places in quick mode when available', () => {
+  const mapped = {
+    selectedLandmarks: ['eiffel', 'park', 'museum'],
+    landmarks: [
+      { id: 'eiffel', source_type: 'mentioned' },
+      { id: 'park', source_type: 'suggested' },
+      { id: 'museum', source_type: 'suggested' },
+    ],
+  };
+
+  assert.deepEqual(minervaApi.defaultSelectedLandmarksForMode(mapped, 'quick'), ['eiffel']);
+  assert.deepEqual(minervaApi.defaultSelectedLandmarksForMode(mapped, 'itinerary'), [
+    'eiffel',
+    'park',
+    'museum',
   ]);
 });
 

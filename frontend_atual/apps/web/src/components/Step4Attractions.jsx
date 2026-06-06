@@ -14,12 +14,14 @@ import {
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import {
+  defaultSelectedLandmarksForMode,
   discoverItinerary,
   mergeDestinationSuggestions,
   mergeLandmarkSuggestions,
   mapParsedLandmarksToParsedData,
   mapRecommendationToParsedData,
   parseLandmarks,
+  splitLandmarksBySource,
   splitQuickSuggestionLandmarks,
 } from '@/utils/minerva-api.js';
 import LandmarkCard from './LandmarkCard.jsx';
@@ -92,7 +94,7 @@ const Step4Attractions = () => {
       destinations: mapped.destinations,
       landmarks: mapped.landmarks,
     });
-    setSelectedLandmarks(mapped.selectedLandmarks);
+    setSelectedLandmarks(defaultSelectedLandmarksForMode(mapped, mode));
     setRecommendedItinerary(itinerary);
     setResultMode(mode);
     setHasSearchedLandmarks(true);
@@ -281,8 +283,9 @@ const Step4Attractions = () => {
   const selectedCount = selectedLandmarks.length;
   const itineraryMode = Boolean(recommendedItinerary?.days?.length && resultMode === 'itinerary');
   const manualMode = resultMode === 'manual';
-  const quickSections = splitQuickSuggestionLandmarks(parsedData.landmarks);
-  const alternatives = quickSections.alternatives;
+  const quickSections = splitLandmarksBySource(parsedData.landmarks);
+  const itinerarySections = splitQuickSuggestionLandmarks(parsedData.landmarks);
+  const alternatives = itinerarySections.alternatives;
 
   const renderPreferenceSetup = () => (
     <motion.div
@@ -472,24 +475,24 @@ const Step4Attractions = () => {
 
   const renderQuickSuggestionCards = () => (
     <div className="space-y-12">
-      {quickSections.primary.length > 0 && (
+      {quickSections.mentioned.length > 0 && (
         <section className="space-y-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.2em] text-primary">
-                Primeira selecao
+                Locais citados por voce
               </p>
               <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
-                Locais citados e sugestoes alinhadas
+                Pontos que ja estavam no seu roteiro
               </h3>
             </div>
             <div className="rounded-full bg-muted px-4 py-2 text-sm font-bold text-muted-foreground w-fit">
-              {quickSections.primary.filter((landmark) => selectedLandmarks.includes(landmark.id)).length} selecionados
+              {quickSections.mentioned.filter((landmark) => selectedLandmarks.includes(landmark.id)).length} selecionados
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {quickSections.primary.map((landmark, lIdx) => (
+            {quickSections.mentioned.map((landmark, lIdx) => (
               <LandmarkCard
                 key={landmark.id}
                 landmark={landmark}
@@ -503,18 +506,18 @@ const Step4Attractions = () => {
         </section>
       )}
 
-      {quickSections.alternatives.length > 0 && (
+      {quickSections.suggested.length > 0 && (
         <section className="pt-6 space-y-5 border-t border-border/60">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
-              Mais possibilidades
+              Sugestoes para a familia
             </p>
             <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
-              Extras para considerar
+              Locais que podem combinar com a viagem
             </h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {quickSections.alternatives.slice(0, 8).map((landmark, lIdx) => (
+            {quickSections.suggested.slice(0, 12).map((landmark, lIdx) => (
               <LandmarkCard
                 key={landmark.id}
                 landmark={landmark}

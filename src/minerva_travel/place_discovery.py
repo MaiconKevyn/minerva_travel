@@ -320,6 +320,7 @@ def _place_to_stop(
         "categories": categories,
         "duration_minutes": CATEGORY_DURATIONS.get(primary_category, 75),
         "family_tip": _family_tip(primary_category),
+        "source_type": "mentioned" if query_category == "must_see" else "suggested",
         "match_score": score,
         "match_reasons": list(dict.fromkeys(reasons))[:3],
         "editable": True,
