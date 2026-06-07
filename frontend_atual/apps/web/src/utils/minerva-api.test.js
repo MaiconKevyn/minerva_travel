@@ -339,6 +339,58 @@ test('tripMapVisibleItems hides suggested map points by default and can include 
   );
 });
 
+test('missingSelectedMapLandmarks reports selected places without coordinates', () => {
+  const landmarks = [
+    { id: 'with-map', name: 'Com mapa', latitude: 1, longitude: 2 },
+    { id: 'missing-map', name: 'Sem mapa' },
+    { id: 'suggested-missing', name: 'Sugestao sem mapa' },
+  ];
+
+  assert.deepEqual(
+    minervaApi.missingSelectedMapLandmarks(landmarks, ['with-map', 'missing-map'])
+      .map((item) => item.id),
+    ['missing-map'],
+  );
+});
+
+test('mergeResolvedLandmarkLocations enriches current cards without dropping suggestions', () => {
+  const currentLandmarks = [
+    {
+      id: 'custom-paris:torre-eiffel',
+      name: 'Torre Eiffel',
+      city: 'Paris',
+      country: 'Franca',
+    },
+    {
+      id: 'google:park',
+      name: 'Parque sugerido',
+      source_type: 'suggested',
+      latitude: 48.86,
+      longitude: 2.33,
+    },
+  ];
+  const resolvedLandmarks = [
+    {
+      id: 'custom-paris:torre-eiffel',
+      name: 'Torre Eiffel',
+      city: 'Paris',
+      country: 'Franca',
+      latitude: 48.8584,
+      longitude: 2.2945,
+      google_maps_uri: 'https://maps.google.com/?cid=eiffel',
+      formatted_address: 'Paris',
+    },
+  ];
+
+  const merged = minervaApi.mergeResolvedLandmarkLocations(currentLandmarks, resolvedLandmarks);
+
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0].latitude, 48.8584);
+  assert.equal(merged[0].longitude, 2.2945);
+  assert.equal(merged[0].maps_url, 'https://maps.google.com/?cid=eiffel');
+  assert.equal(merged[1].id, 'google:park');
+});
+
 test('mergeLandmarkSuggestions keeps existing order and appends only new suggestions', () => {
   const landmarks = minervaApi.mergeLandmarkSuggestions(
     [

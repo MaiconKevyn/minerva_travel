@@ -1,7 +1,8 @@
 import httpx
 
+from minerva_travel.custom_landmarks import build_custom_destinations, parse_custom_landmarks
 from minerva_travel.models import DynamicItineraryRequest
-from minerva_travel.place_discovery import discover_dynamic_itinerary
+from minerva_travel.place_discovery import discover_dynamic_itinerary, resolve_landmark_locations
 
 
 def test_discover_dynamic_itinerary_uses_natural_language_intent_for_child_requests():
@@ -93,6 +94,46 @@ def test_discover_dynamic_itinerary_uses_natural_language_intent_for_child_reque
     assert "Pedido da familia: educativo para criancas." in stops[1]["match_reasons"]
     assert "Pedido da familia: refeicao com criancas." in stops[2]["match_reasons"]
     assert any("perto de Torre Eiffel" in query for query in search_queries)
+
+
+def test_resolve_landmark_locations_retries_until_google_places_returns_coordinates():
+    search_queries: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "places:searchText" in url:
+            text = request.read().decode()
+            search_queries.append(text)
+            if "ponto turistico" not in text:
+                return httpx.Response(200, json={"places": []})
+            return httpx.Response(
+                200,
+                json={
+                    "places": [
+                        _place("eiffel", "Torre Eiffel", ["tourist_attraction"])
+                    ]
+                },
+            )
+        raise AssertionError(f"Unexpected request: {url}")
+
+    destinations, _selected = build_custom_destinations(
+        parse_custom_landmarks("Torre Eiffel, Paris, Franca")
+    )
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        metadata = resolve_landmark_locations(
+            destinations,
+            api_key="test-key",
+            client=client,
+        )
+
+    assert metadata["custom-paris:torre-eiffel"]["latitude"] == 48.8566
+    assert metadata["custom-paris:torre-eiffel"]["longitude"] == 2.3522
+    assert metadata["custom-paris:torre-eiffel"]["google_maps_uri"] == (
+        "https://maps.google.com/?cid=eiffel"
+    )
+    assert len(search_queries) == 2
 
 
 def test_discover_dynamic_itinerary_adds_google_place_photos_to_visible_cards():

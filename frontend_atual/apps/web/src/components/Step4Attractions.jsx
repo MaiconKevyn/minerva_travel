@@ -18,8 +18,10 @@ import {
   discoverItinerary,
   mergeDestinationSuggestions,
   mergeLandmarkSuggestions,
+  mergeResolvedLandmarkLocations,
   mapParsedLandmarksToParsedData,
   mapRecommendationToParsedData,
+  missingSelectedMapLandmarks,
   parseLandmarks,
   splitLandmarksBySource,
   splitQuickSuggestionLandmarks,
@@ -74,6 +76,9 @@ const Step4Attractions = () => {
   const [isMapExploringMore, setIsMapExploringMore] = useState(false);
   const [mapExploreError, setMapExploreError] = useState('');
   const [mapExploreNotice, setMapExploreNotice] = useState('');
+  const [isResolvingMapLocations, setIsResolvingMapLocations] = useState(false);
+  const [mapLocationError, setMapLocationError] = useState('');
+  const [mapLocationNotice, setMapLocationNotice] = useState('');
   const autoLoadedDestinationRef = useRef('');
 
   const updatePreference = (key, value) => {
@@ -255,6 +260,47 @@ const Step4Attractions = () => {
     setParsedData,
   ]);
 
+  const retryResolveMapLocations = useCallback(async () => {
+    if (!destination.trim() || isResolvingMapLocations) return;
+
+    setIsResolvingMapLocations(true);
+    setMapLocationError('');
+    setMapLocationNotice('');
+
+    try {
+      const mapped = await loadManualMappedLandmarks();
+      const mergedLandmarks = mergeResolvedLandmarkLocations(
+        parsedData.landmarks,
+        mapped.landmarks
+      );
+      const missingBefore = missingSelectedMapLandmarks(parsedData.landmarks, selectedLandmarks);
+      const missingAfter = missingSelectedMapLandmarks(mergedLandmarks, selectedLandmarks);
+      const resolvedCount = Math.max(0, missingBefore.length - missingAfter.length);
+
+      setParsedData((prev) => ({
+        destinations: mergeDestinationSuggestions(prev.destinations, mapped.destinations),
+        landmarks: mergeResolvedLandmarkLocations(prev.landmarks, mapped.landmarks),
+      }));
+      setMapLocationNotice(
+        resolvedCount > 0
+          ? `${resolvedCount} ${resolvedCount === 1 ? 'local confirmado foi localizado' : 'locais confirmados foram localizados'} no mapa.`
+          : 'Tentamos novamente, mas alguns locais ainda nao retornaram coordenadas.'
+      );
+    } catch (err) {
+      console.error('Error resolving confirmed map locations:', err);
+      setMapLocationError(err.message || 'Nao foi possivel validar os locais no mapa agora.');
+    } finally {
+      setIsResolvingMapLocations(false);
+    }
+  }, [
+    destination,
+    isResolvingMapLocations,
+    loadManualMappedLandmarks,
+    parsedData.landmarks,
+    selectedLandmarks,
+    setParsedData,
+  ]);
+
   useEffect(() => {
     const trimmedDestination = destination.trim();
 
@@ -281,6 +327,9 @@ const Step4Attractions = () => {
   ]);
 
   const selectedCount = selectedLandmarks.length;
+  const missingMapLandmarks = missingSelectedMapLandmarks(parsedData.landmarks, selectedLandmarks);
+  const hasMissingMapLocations = missingMapLandmarks.length > 0;
+  const confirmedWithMapCount = Math.max(0, selectedCount - missingMapLandmarks.length);
   const itineraryMode = Boolean(recommendedItinerary?.days?.length && resultMode === 'itinerary');
   const manualMode = resultMode === 'manual';
   const quickSections = splitLandmarksBySource(parsedData.landmarks);
@@ -683,8 +732,14 @@ const Step4Attractions = () => {
                 </Button>
                 <Button
                   onClick={() => setIsMapOpen(true)}
+                  disabled={hasMissingMapLocations || isResolvingMapLocations}
                   variant="outline"
                   className="rounded-full px-6 py-3 font-bold"
+                  title={
+                    hasMissingMapLocations
+                      ? 'Resolva os locais confirmados sem coordenadas antes de abrir o mapa.'
+                      : 'Ver mapa da viagem'
+                  }
                 >
                   <MapIcon className="mr-2 h-4 w-4" />
                   Ver mapa da viagem
@@ -699,6 +754,56 @@ const Step4Attractions = () => {
                   Sugerir roteiro com dias e categorias
                 </Button>
               </div>
+              {selectedCount > 0 && (
+                <div className="mx-auto mt-5 max-w-2xl rounded-2xl border border-border/70 bg-card/80 px-4 py-3 text-left shadow-sm">
+                  {!hasMissingMapLocations ? (
+                    <div className="flex items-center gap-3 text-sm font-bold text-secondary">
+                      <MapIcon className="h-4 w-4 shrink-0" />
+                      <span>
+                        Mapa validado para {confirmedWithMapCount}{' '}
+                        {confirmedWithMapCount === 1 ? 'local confirmado' : 'locais confirmados'}.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-start gap-3 text-sm">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <div>
+                          <p className="font-bold text-foreground">
+                            {missingMapLandmarks.length}{' '}
+                            {missingMapLandmarks.length === 1
+                              ? 'local confirmado ainda esta sem mapa'
+                              : 'locais confirmados ainda estao sem mapa'}
+                          </p>
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Vou tentar resolver novamente pelo Google Places antes de fechar o roteiro.
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={retryResolveMapLocations}
+                        disabled={isResolvingMapLocations}
+                        variant="outline"
+                        className="rounded-full px-4 py-2 text-sm font-bold"
+                      >
+                        {isResolvingMapLocations ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCcw className="mr-2 h-4 w-4" />
+                        )}
+                        Tentar localizar no mapa
+                      </Button>
+                    </div>
+                  )}
+                  {mapLocationNotice && (
+                    <p className="mt-2 text-xs font-bold text-secondary">{mapLocationNotice}</p>
+                  )}
+                  {mapLocationError && (
+                    <p className="mt-2 text-xs font-bold text-destructive">{mapLocationError}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {itineraryMode

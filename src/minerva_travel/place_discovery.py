@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from minerva_travel.itinerary_intent import parse_itinerary_intent, search_profiles_from_intent
-from minerva_travel.models import DynamicItineraryRequest
+from minerva_travel.models import Destination, DynamicItineraryRequest
 
 GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 GOOGLE_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
@@ -30,6 +30,8 @@ TEXT_SEARCH_FIELD_MASK = (
     "places.userRatingCount,"
     "places.googleMapsUri"
 )
+
+LOCATION_SEARCH_RESULT_LIMIT = 3
 
 INTEREST_ALIASES = {
     "animais": "animals",
@@ -263,6 +265,146 @@ def _search_places(
     )
     response.raise_for_status()
     return response.json().get("places", [])
+
+
+def resolve_landmark_locations(
+    destinations: list[Destination],
+    *,
+    api_key: str | None,
+    client: httpx.Client | None = None,
+) -> dict[str, dict[str, Any]]:
+    if not api_key or not destinations:
+        return {}
+
+    owns_client = client is None
+    http_client = client or httpx.Client(timeout=20)
+    try:
+        resolved: dict[str, dict[str, Any]] = {}
+        for destination in destinations:
+            for landmark in destination.landmarks:
+                selection_id = f"{destination.id}:{landmark.id}"
+                place = _resolve_landmark_place(http_client, api_key, destination, landmark.name)
+                if place:
+                    resolved[selection_id] = _location_metadata(place)
+        return resolved
+    finally:
+        if owns_client:
+            http_client.close()
+
+
+def _resolve_landmark_place(
+    client: httpx.Client,
+    api_key: str,
+    destination: Destination,
+    landmark_name: str,
+) -> dict[str, Any] | None:
+    for query in _landmark_location_queries(destination, landmark_name):
+        places = _search_landmark_location(client, api_key, query)
+        place = _best_landmark_place(places, landmark_name)
+        if place:
+            return place
+    return None
+
+
+def _landmark_location_queries(destination: Destination, landmark_name: str) -> list[str]:
+    base_parts = [landmark_name, destination.city, destination.country]
+    base_query = " ".join(part.strip() for part in base_parts if part and part.strip())
+    discovery_query = " ".join(
+        part.strip()
+        for part in [
+            landmark_name,
+            "ponto turistico",
+            destination.city,
+            destination.country,
+        ]
+        if part and part.strip()
+    )
+    return list(dict.fromkeys([base_query, discovery_query, landmark_name]))
+
+
+def _search_landmark_location(
+    client: httpx.Client,
+    api_key: str,
+    query: str,
+) -> list[dict[str, Any]]:
+    if not query:
+        return []
+    body = {
+        "textQuery": query,
+        "languageCode": "pt-BR",
+        "maxResultCount": LOCATION_SEARCH_RESULT_LIMIT,
+    }
+    try:
+        response = client.post(
+            GOOGLE_TEXT_SEARCH_URL,
+            headers={
+                "X-Goog-Api-Key": api_key,
+                "X-Goog-FieldMask": TEXT_SEARCH_FIELD_MASK,
+            },
+            json=body,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError:
+        return []
+    return response.json().get("places", [])
+
+
+def _best_landmark_place(
+    places: list[dict[str, Any]],
+    landmark_name: str,
+) -> dict[str, Any] | None:
+    candidates = [place for place in places if _place_has_location(place)]
+    if not candidates:
+        return None
+    normalized_requested = _normalize_text(landmark_name)
+    requested_terms = {
+        term
+        for term in normalized_requested.split()
+        if len(term) > 2
+    }
+    return max(
+        candidates,
+        key=lambda place: _place_name_score(place, normalized_requested, requested_terms),
+    )
+
+
+def _place_name_score(
+    place: dict[str, Any],
+    normalized_requested: str,
+    requested_terms: set[str],
+) -> float:
+    candidate_name = str(place.get("displayName", {}).get("text") or "")
+    normalized_candidate = _normalize_text(candidate_name)
+    if normalized_requested and normalized_requested in normalized_candidate:
+        return 2.0
+    if normalized_candidate and normalized_candidate in normalized_requested:
+        return 1.75
+    if not requested_terms:
+        return 0.0
+    candidate_terms = set(normalized_candidate.split())
+    return len(requested_terms & candidate_terms) / len(requested_terms)
+
+
+def _place_has_location(place: dict[str, Any]) -> bool:
+    location = place.get("location")
+    if not isinstance(location, dict):
+        return False
+    return isinstance(location.get("latitude"), int | float) and isinstance(
+        location.get("longitude"),
+        int | float,
+    )
+
+
+def _location_metadata(place: dict[str, Any]) -> dict[str, Any]:
+    location = place["location"]
+    return {
+        "place_id": str(place.get("id") or ""),
+        "google_maps_uri": str(place.get("googleMapsUri") or ""),
+        "formatted_address": str(place.get("formattedAddress") or ""),
+        "latitude": location.get("latitude"),
+        "longitude": location.get("longitude"),
+        "location_status": "resolved",
+    }
 
 
 def _place_to_stop(

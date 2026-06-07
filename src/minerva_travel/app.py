@@ -37,7 +37,7 @@ from minerva_travel.models import (
     ItineraryRecommendationRequest,
 )
 from minerva_travel.pdf import render_guide_html, write_pdf
-from minerva_travel.place_discovery import discover_dynamic_itinerary
+from minerva_travel.place_discovery import discover_dynamic_itinerary, resolve_landmark_locations
 from minerva_travel.supabase_storage import sync_wikimedia_assets_to_storage
 from minerva_travel.wikimedia_assets import WikimediaAsset, load_wikimedia_manifest
 from minerva_travel.wikimedia_client import (
@@ -194,6 +194,10 @@ def parse_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
         for item in parsed_landmarks
     ]
     custom_destinations, selected_landmarks = build_custom_destinations(custom_inputs)
+    location_metadata = {}
+    api_key = google_maps_api_key()
+    if api_key:
+        location_metadata = resolve_landmark_locations(custom_destinations, api_key=api_key)
     return {
         "custom_landmarks": json.dumps(
             [
@@ -212,6 +216,7 @@ def parse_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
             custom_destinations,
             parsed_landmarks,
             {},
+            location_metadata,
         ),
     }
 
@@ -610,7 +615,9 @@ def serialize_preview_destinations(
     destinations: list[Destination],
     parsed_landmarks: list[ParsedLandmark] | list[dict[str, object]],
     images: dict[str, object],
+    location_metadata: dict[str, dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
+    locations = location_metadata or {}
     confidence_by_name = {
         (item["name"] if isinstance(item, dict) else item.name): (
             item["confidence"] if isinstance(item, dict) else item.confidence
@@ -632,12 +639,35 @@ def serialize_preview_destinations(
                     "representative_query": landmark.representative_query,
                     "confidence": confidence_by_name.get(landmark.name, 0),
                     "image": serialize_preview_image(images.get(f"{destination.id}:{landmark.id}")),
+                    **_preview_location_metadata(
+                        locations.get(f"{destination.id}:{landmark.id}"),
+                    ),
                 }
                 for landmark in destination.landmarks
             ],
         }
         for destination in destinations
     ]
+
+
+def _preview_location_metadata(location: dict[str, object] | None) -> dict[str, object]:
+    if not location:
+        return {
+            "location_status": "missing",
+            "place_id": "",
+            "google_maps_uri": "",
+            "formatted_address": "",
+            "latitude": None,
+            "longitude": None,
+        }
+    return {
+        "location_status": str(location.get("location_status") or "resolved"),
+        "place_id": str(location.get("place_id") or ""),
+        "google_maps_uri": str(location.get("google_maps_uri") or ""),
+        "formatted_address": str(location.get("formatted_address") or ""),
+        "latitude": location.get("latitude"),
+        "longitude": location.get("longitude"),
+    }
 
 
 def serialize_preview_image(image: object) -> dict[str, str] | None:

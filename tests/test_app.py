@@ -150,6 +150,7 @@ def test_parse_landmarks_returns_structured_landmarks(monkeypatch):
         ]
 
     monkeypatch.setattr("minerva_travel.app.parse_landmarks_from_message", fake_parse)
+    monkeypatch.setattr("minerva_travel.app.google_maps_api_key", lambda: None)
     client = TestClient(app)
 
     response = client.post(
@@ -177,6 +178,56 @@ def test_parse_landmarks_returns_structured_landmarks(monkeypatch):
     ]
     assert payload["destinations"][0]["landmarks"][0]["image"] is None
     assert payload["destinations"][0]["landmarks"][1]["image"] is None
+
+
+def test_parse_landmarks_enriches_confirmed_places_with_map_location(monkeypatch):
+    def fake_parse(message: str):
+        assert "Paris" in message
+        return [
+            {
+                "name": "Torre Eiffel",
+                "city": "Paris",
+                "country": "Franca",
+                "description": ["A Torre Eiffel ajuda a reconhecer Paris no mapa."],
+                "confidence": 0.98,
+            }
+        ]
+
+    def fake_resolve(destinations, api_key: str):
+        assert api_key == "test-google-key"
+        assert destinations[0].city == "Paris"
+        return {
+            "custom-paris:torre-eiffel": {
+                "place_id": "eiffel",
+                "google_maps_uri": "https://maps.google.com/?cid=eiffel",
+                "formatted_address": "Champ de Mars, 5 Av. Anatole France, Paris",
+                "latitude": 48.8584,
+                "longitude": 2.2945,
+                "location_status": "resolved",
+            }
+        }
+
+    monkeypatch.setattr("minerva_travel.app.parse_landmarks_from_message", fake_parse)
+    monkeypatch.setattr("minerva_travel.app.google_maps_api_key", lambda: "test-google-key")
+    monkeypatch.setattr(
+        "minerva_travel.app.resolve_landmark_locations",
+        fake_resolve,
+        raising=False,
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/landmarks/parse",
+        json={"message": "Em Paris vamos visitar a Torre Eiffel."},
+    )
+
+    assert response.status_code == 200
+    landmark = response.json()["destinations"][0]["landmarks"][0]
+    assert landmark["latitude"] == 48.8584
+    assert landmark["longitude"] == 2.2945
+    assert landmark["google_maps_uri"] == "https://maps.google.com/?cid=eiffel"
+    assert landmark["formatted_address"] == "Champ de Mars, 5 Av. Anatole France, Paris"
+    assert landmark["location_status"] == "resolved"
 
 
 def test_sample_preview_renders_pdf_layout_html():

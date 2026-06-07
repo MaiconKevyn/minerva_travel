@@ -231,6 +231,86 @@ export const mappableLandmarks = (landmarks = []) =>
 
 export const hasMappableCoordinates = (landmark = {}) => mappableLandmarks([landmark]).length === 1;
 
+const landmarkLocationKey = (landmark = {}) =>
+  [
+    normalizeTextForMatching(landmark.name),
+    normalizeTextForMatching(landmark.city),
+    normalizeTextForMatching(landmark.country),
+  ].join('|');
+
+const uniqueNameIndex = (landmarks = []) => {
+  const counts = landmarks.reduce((acc, landmark) => {
+    const name = normalizeTextForMatching(landmark.name);
+    if (name) {
+      acc[name] = (acc[name] || 0) + 1;
+    }
+    return acc;
+  }, {});
+  return landmarks.reduce((acc, landmark) => {
+    const name = normalizeTextForMatching(landmark.name);
+    if (name && counts[name] === 1) {
+      acc[name] = landmark;
+    }
+    return acc;
+  }, {});
+};
+
+export const missingSelectedMapLandmarks = (landmarks = [], selectedLandmarks = []) => {
+  const selectedSet = new Set(selectedLandmarks);
+  return landmarks.filter(
+    (landmark) => selectedSet.has(landmark.id) && !hasMappableCoordinates(landmark)
+  );
+};
+
+export const mergeResolvedLandmarkLocations = (currentLandmarks = [], resolvedLandmarks = []) => {
+  const resolvedById = resolvedLandmarks.reduce((acc, landmark) => {
+    if (landmark?.id) {
+      acc[landmark.id] = landmark;
+    }
+    return acc;
+  }, {});
+  const resolvedByLocationKey = resolvedLandmarks.reduce((acc, landmark) => {
+    const key = landmarkLocationKey(landmark);
+    if (key && key !== '||') {
+      acc[key] = landmark;
+    }
+    return acc;
+  }, {});
+  const resolvedByName = uniqueNameIndex(resolvedLandmarks);
+
+  return currentLandmarks.map((landmark) => {
+    const resolved = resolvedById[landmark.id]
+      || resolvedByLocationKey[landmarkLocationKey(landmark)]
+      || resolvedByName[normalizeTextForMatching(landmark.name)];
+
+    if (!resolved || !hasMappableCoordinates(resolved)) {
+      return landmark;
+    }
+
+    const merged = {
+      ...landmark,
+      latitude: resolved.latitude,
+      longitude: resolved.longitude,
+      google_maps_uri: resolved.google_maps_uri || landmark.google_maps_uri || '',
+      formatted_address: resolved.formatted_address || landmark.formatted_address || '',
+      location_status: resolved.location_status || 'resolved',
+    };
+
+    if (!merged.image && resolved.image) {
+      merged.image = resolved.image;
+    }
+    if ((!merged.image_attributions || merged.image_attributions.length === 0)
+      && resolved.image_attributions?.length > 0) {
+      merged.image_attributions = resolved.image_attributions;
+    }
+
+    return {
+      ...merged,
+      maps_url: resolved.maps_url || buildLandmarkMapsUrl(merged),
+    };
+  });
+};
+
 export const landmarkMapAction = (landmark = {}) => {
   const mapsUrl = landmark.maps_url || buildLandmarkMapsUrl(landmark);
   if (hasMappableCoordinates(landmark)) {
