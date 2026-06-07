@@ -20,7 +20,7 @@ import {
   googleMapsMapId,
   loadGoogleMaps,
 } from '@/utils/google-maps.js';
-import { tripMapExplorerItems } from '@/utils/minerva-api.js';
+import { tripMapExplorerItems, tripMapVisibleItems } from '@/utils/minerva-api.js';
 
 const createMarkerContent = (landmark, { isSelected, isHighlighted }) => {
   const wrapper = document.createElement('button');
@@ -89,39 +89,48 @@ const MapOverviewModal = ({
   const [activeLandmarkId, setActiveLandmarkId] = useState('');
   const [hoveredLandmarkId, setHoveredLandmarkId] = useState('');
   const [viewFilter, setViewFilter] = useState('all');
+  const [showSuggestedOnMap, setShowSuggestedOnMap] = useState(false);
 
   const selectedSet = useMemo(() => new Set(selectedLandmarks), [selectedLandmarks]);
   const mapLandmarks = useMemo(
     () => tripMapExplorerItems(landmarks, selectedLandmarks),
     [landmarks, selectedLandmarks]
   );
+  const visibleMapLandmarks = useMemo(
+    () => tripMapVisibleItems(landmarks, selectedLandmarks, showSuggestedOnMap),
+    [landmarks, selectedLandmarks, showSuggestedOnMap]
+  );
   const filteredLandmarks = useMemo(() => {
     if (viewFilter === 'selected') {
       return mapLandmarks.filter((landmark) => landmark.map_status === 'selected');
     }
     if (viewFilter === 'suggested') {
-      return mapLandmarks.filter((landmark) => landmark.map_status === 'suggested');
+      return showSuggestedOnMap
+        ? mapLandmarks.filter((landmark) => landmark.map_status === 'suggested')
+        : [];
     }
-    return mapLandmarks;
-  }, [mapLandmarks, viewFilter]);
+    return visibleMapLandmarks;
+  }, [mapLandmarks, showSuggestedOnMap, viewFilter, visibleMapLandmarks]);
   const selectedCount = mapLandmarks.filter((landmark) => landmark.map_status === 'selected').length;
   const suggestedCount = mapLandmarks.length - selectedCount;
   const highlightedLandmarkId = hoveredLandmarkId || activeLandmarkId;
   const activeLandmark = (
-    mapLandmarks.find((landmark) => landmark.id === highlightedLandmarkId) ||
-    mapLandmarks.find((landmark) => landmark.id === activeLandmarkId) ||
-    mapLandmarks[0]
+    visibleMapLandmarks.find((landmark) => landmark.id === highlightedLandmarkId) ||
+    visibleMapLandmarks.find((landmark) => landmark.id === activeLandmarkId) ||
+    visibleMapLandmarks[0]
   );
 
   useEffect(() => {
-    if (!open || mapLandmarks.length === 0) {
+    if (!open || visibleMapLandmarks.length === 0) {
       return;
     }
-    const activeStillExists = mapLandmarks.some((landmark) => landmark.id === activeLandmarkId);
+    const activeStillExists = visibleMapLandmarks.some(
+      (landmark) => landmark.id === activeLandmarkId
+    );
     if (!activeLandmarkId || !activeStillExists) {
-      setActiveLandmarkId(mapLandmarks[0].id);
+      setActiveLandmarkId(visibleMapLandmarks[0].id);
     }
-  }, [activeLandmarkId, mapLandmarks, open]);
+  }, [activeLandmarkId, open, visibleMapLandmarks]);
 
   useEffect(() => {
     if (!open) {
@@ -131,6 +140,7 @@ const MapOverviewModal = ({
       boundsSignatureRef.current = '';
       setHoveredLandmarkId('');
       setActiveLandmarkId('');
+      setShowSuggestedOnMap(false);
       return;
     }
 
@@ -142,7 +152,7 @@ const MapOverviewModal = ({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !apiKey || mapLandmarks.length === 0 || !mapElementRef.current) {
+    if (!open || !apiKey || visibleMapLandmarks.length === 0 || !mapElementRef.current) {
       return undefined;
     }
 
@@ -156,7 +166,7 @@ const MapOverviewModal = ({
         const markerLibrary = mapId
           ? await google.maps.importLibrary('marker').catch(() => ({}))
           : {};
-        const first = mapLandmarks[0];
+        const first = visibleMapLandmarks[0];
         const map = mapRef.current || new Map(mapElementRef.current, {
           center: { lat: first.latitude, lng: first.longitude },
           zoom: 12,
@@ -175,7 +185,7 @@ const MapOverviewModal = ({
         clearGoogleMarkers(markersRef.current);
 
         const bounds = new google.maps.LatLngBounds();
-        const nextMarkers = mapLandmarks.map((landmark) => {
+        const nextMarkers = visibleMapLandmarks.map((landmark) => {
           const isHighlighted = landmark.id === highlightedLandmarkId;
           const isSelected = selectedSet.has(landmark.id);
           const position = { lat: landmark.latitude, lng: landmark.longitude };
@@ -204,7 +214,7 @@ const MapOverviewModal = ({
           return marker;
         });
 
-        const boundsSignature = mapLandmarks
+        const boundsSignature = visibleMapLandmarks
           .map((landmark) => `${landmark.id}:${landmark.latitude}:${landmark.longitude}`)
           .join('|');
         markersRef.current = nextMarkers;
@@ -230,7 +240,15 @@ const MapOverviewModal = ({
       clearGoogleMarkers(markersRef.current);
       markersRef.current = [];
     };
-  }, [activeLandmark, apiKey, highlightedLandmarkId, mapId, mapLandmarks, open, selectedSet]);
+  }, [
+    activeLandmark,
+    apiKey,
+    highlightedLandmarkId,
+    mapId,
+    open,
+    selectedSet,
+    visibleMapLandmarks,
+  ]);
 
   if (!open) {
     return null;
@@ -289,7 +307,7 @@ const MapOverviewModal = ({
                     ? selectedCount
                     : option.value === 'suggested'
                       ? suggestedCount
-                      : mapLandmarks.length;
+                      : visibleMapLandmarks.length;
                   const active = viewFilter === option.value;
                   return (
                     <button
@@ -308,6 +326,39 @@ const MapOverviewModal = ({
                   );
                 })}
               </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSuggestedOnMap((current) => !current)}
+                className={cn(
+                  'flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition-colors',
+                  showSuggestedOnMap
+                    ? 'border-secondary/40 bg-secondary/10 text-secondary'
+                    : 'border-border bg-card text-muted-foreground hover:border-secondary/40 hover:text-foreground'
+                )}
+              >
+                <span>
+                  <span className="block text-sm font-bold text-foreground">Mostrar sugeridos</span>
+                  <span className="block text-xs font-medium">
+                    {showSuggestedOnMap
+                      ? 'Confirmados e sugestoes aparecem no mapa.'
+                      : 'Mapa focado apenas nos locais confirmados.'}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    'relative h-7 w-12 rounded-full transition-colors',
+                    showSuggestedOnMap ? 'bg-secondary' : 'bg-muted'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'absolute top-1 h-5 w-5 rounded-full bg-background shadow-sm transition-transform',
+                      showSuggestedOnMap ? 'translate-x-6' : 'translate-x-1'
+                    )}
+                  />
+                </span>
+              </button>
 
               {onExploreMore && (
                 <Button
@@ -445,7 +496,9 @@ const MapOverviewModal = ({
                   <MapPin className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
                   <p className="font-bold">Nenhum ponto neste filtro.</p>
                   <p className="text-sm text-muted-foreground">
-                    Troque o filtro ou busque mais pontos para ampliar a selecao.
+                    {viewFilter === 'suggested' && !showSuggestedOnMap
+                      ? 'Ative "Mostrar sugeridos" para ver sugestoes no mapa.'
+                      : 'Troque o filtro ou busque mais pontos para ampliar a selecao.'}
                   </p>
                 </div>
               )}
@@ -453,7 +506,7 @@ const MapOverviewModal = ({
           </aside>
 
           <section className="relative order-1 min-h-[420px] bg-muted lg:order-2">
-            {apiKey && mapLandmarks.length > 0 && !loadError && (
+            {apiKey && visibleMapLandmarks.length > 0 && !loadError && (
               <div ref={mapElementRef} className="h-full min-h-[420px] w-full" />
             )}
 
@@ -469,13 +522,13 @@ const MapOverviewModal = ({
               </div>
             )}
 
-            {apiKey && mapLandmarks.length === 0 && (
+            {apiKey && visibleMapLandmarks.length === 0 && (
               <div className="flex h-full min-h-[420px] items-center justify-center p-8 text-center">
                 <div className="max-w-md rounded-2xl border border-border bg-background p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-secondary" />
-                  <h3 className="mb-2 text-xl font-serif font-bold">Sem coordenadas ainda</h3>
+                  <h3 className="mb-2 text-xl font-serif font-bold">Sem locais confirmados no mapa</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    O mapa aparece quando os locais retornam com latitude e longitude.
+                    Confirme um local com coordenadas ou ative as sugestoes para ampliar a visao.
                   </p>
                 </div>
               </div>
@@ -492,7 +545,7 @@ const MapOverviewModal = ({
             )}
 
             <div className="absolute left-4 top-4 rounded-full bg-background/90 px-4 py-2 text-sm font-bold shadow-sm backdrop-blur">
-              {mapLandmarks.length} pontos no mapa
+              {visibleMapLandmarks.length} pontos no mapa
             </div>
 
             {activeLandmark && (

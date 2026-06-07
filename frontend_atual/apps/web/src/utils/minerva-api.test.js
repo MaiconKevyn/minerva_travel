@@ -322,6 +322,23 @@ test('tripMapExplorerItems orders selected landmarks first and labels status', (
   assert.deepEqual(items.map((item) => item.map_status), ['selected', 'suggested']);
 });
 
+test('tripMapVisibleItems hides suggested map points by default and can include them', () => {
+  const landmarks = [
+    { id: 'selected-1', name: 'Museu', latitude: 2, longitude: 2 },
+    { id: 'suggested-1', name: 'Jardim', latitude: 1, longitude: 1 },
+    { id: 'missing-coordinates', name: 'Sem mapa' },
+  ];
+
+  assert.deepEqual(
+    minervaApi.tripMapVisibleItems(landmarks, ['selected-1']).map((item) => item.id),
+    ['selected-1'],
+  );
+  assert.deepEqual(
+    minervaApi.tripMapVisibleItems(landmarks, ['selected-1'], true).map((item) => item.id),
+    ['selected-1', 'suggested-1'],
+  );
+});
+
 test('mergeLandmarkSuggestions keeps existing order and appends only new suggestions', () => {
   const landmarks = minervaApi.mergeLandmarkSuggestions(
     [

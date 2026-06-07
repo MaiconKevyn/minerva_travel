@@ -258,6 +258,18 @@ export const tripMapExplorerItems = (landmarks = [], selectedLandmarks = []) => 
     });
 };
 
+export const tripMapVisibleItems = (
+  landmarks = [],
+  selectedLandmarks = [],
+  includeSuggested = false,
+) => {
+  const items = tripMapExplorerItems(landmarks, selectedLandmarks);
+  if (includeSuggested) {
+    return items;
+  }
+  return items.filter((landmark) => landmark.map_status === 'selected');
+};
+
 export const mergeLandmarkSuggestions = (currentLandmarks = [], nextLandmarks = []) => {
   const seen = new Set(currentLandmarks.map((landmark) => landmark.id).filter(Boolean));
   const additions = nextLandmarks.filter((landmark) => {
