@@ -32,6 +32,7 @@ STOPWORDS = {
     "the",
 }
 
+
 class CustomLandmarkInput(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     city: str = Field(default=DEFAULT_CITY, max_length=80)

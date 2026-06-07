@@ -34,6 +34,9 @@ def build_guide_context(
             asset = wikimedia_assets.get(selection_id)
             generated_image = landmark_images.get(selection_id)
             generated_lineart = landmark_lineart_images.get(selection_id)
+            asset_image = None
+            if asset:
+                asset_image = asset.public_url or asset.local_path
             if generated_image:
                 landmarks.append(
                     landmark.model_copy(
@@ -43,8 +46,8 @@ def build_guide_context(
                         }
                     )
                 )
-            elif asset:
-                landmarks.append(landmark.model_copy(update={"image": asset.local_path}))
+            elif asset_image:
+                landmarks.append(landmark.model_copy(update={"image": asset_image}))
             else:
                 landmarks.append(landmark)
         if landmarks:

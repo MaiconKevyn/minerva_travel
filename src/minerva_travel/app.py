@@ -18,6 +18,7 @@ from minerva_travel.config import (
     google_maps_api_key,
     image_generation_concurrency,
     image_provider,
+    landmark_art_generation_enabled,
 )
 from minerva_travel.custom_landmarks import (
     CustomLandmarkInput,
@@ -37,6 +38,7 @@ from minerva_travel.models import (
 )
 from minerva_travel.pdf import render_guide_html, write_pdf
 from minerva_travel.place_discovery import discover_dynamic_itinerary
+from minerva_travel.supabase_storage import sync_wikimedia_assets_to_storage
 from minerva_travel.wikimedia_assets import WikimediaAsset, load_wikimedia_manifest
 from minerva_travel.wikimedia_client import (
     USER_AGENT,
@@ -355,19 +357,28 @@ async def generate_pdf_from_form(
 
     wikimedia_assets = load_wikimedia_manifest()
     wikimedia_assets.update(fetch_custom_wikimedia_assets(custom_destinations, request_id))
-    landmark_reference_images = {
-        selection_id: asset.local_path
+    selected_wikimedia_assets = {
+        selection_id: asset
         for selection_id, asset in wikimedia_assets.items()
         if selection_id in selected
     }
+    wikimedia_assets.update(sync_wikimedia_assets_to_storage(selected_wikimedia_assets))
 
-    landmark_images, landmark_lineart_images = generate_selected_landmark_art(
-        catalog.destinations,
-        selected,
-        request_id,
-        generator,
-        reference_images=landmark_reference_images,
-    )
+    landmark_images: dict[str, Path] = {}
+    landmark_lineart_images: dict[str, Path] = {}
+    if landmark_art_generation_enabled():
+        landmark_reference_images = {
+            selection_id: asset.local_path
+            for selection_id, asset in wikimedia_assets.items()
+            if selection_id in selected
+        }
+        landmark_images, landmark_lineart_images = generate_selected_landmark_art(
+            catalog.destinations,
+            selected,
+            request_id,
+            generator,
+            reference_images=landmark_reference_images,
+        )
     context = build_guide_context(
         request,
         catalog,

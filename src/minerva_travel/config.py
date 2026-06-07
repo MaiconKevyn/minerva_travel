@@ -23,6 +23,12 @@ def image_generation_concurrency() -> int:
     return max(1, value)
 
 
+def landmark_art_generation_enabled() -> bool:
+    load_project_env()
+    raw_value = os.getenv("LANDMARK_ART_GENERATION", "false")
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def cors_allowed_origins() -> list[str]:
     load_project_env()
     raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")
@@ -33,3 +39,24 @@ def cors_allowed_origins() -> list[str]:
 def google_maps_api_key() -> str | None:
     load_project_env()
     return os.getenv("GOOGLE_MAPS_API_KEY")
+
+
+def supabase_url() -> str | None:
+    load_project_env()
+    return os.getenv("SUPABASE_URL")
+
+
+def supabase_service_role_key() -> str | None:
+    load_project_env()
+    return os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+
+def supabase_bucket_landmark_assets() -> str:
+    load_project_env()
+    return os.getenv("SUPABASE_BUCKET_LANDMARK_ASSETS", "landmark-assets")
+
+
+def supabase_storage_enabled() -> bool:
+    load_project_env()
+    raw_value = os.getenv("SUPABASE_STORAGE_ENABLED", "true")
+    return raw_value.strip().lower() not in {"0", "false", "no", "off"}

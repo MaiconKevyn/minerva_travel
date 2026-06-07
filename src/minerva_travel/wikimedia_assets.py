@@ -12,6 +12,8 @@ class WikimediaAsset(BaseModel):
     source_url: str
     image_url: str
     local_path: Path
+    public_url: str | None = None
+    storage_path: str | None = None
     author: str
     license_short_name: str
     license_url: str

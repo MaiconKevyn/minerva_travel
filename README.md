@@ -120,21 +120,34 @@ Backend `.env`:
 
 ```env
 IMAGE_PROVIDER=replicate
+LANDMARK_ART_GENERATION=false
 IMAGE_GENERATION_CONCURRENCY=2
 REPLICATE_API_TOKEN=sua_chave_aqui
 OPENAI_API_KEY=sua_chave_openai_aqui
 OPENAI_LANDMARK_MODEL=gpt-4o-2024-08-06
 GOOGLE_MAPS_API_KEY=sua_chave_google_maps_aqui
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_sua_chave_aqui
+SUPABASE_STORAGE_ENABLED=true
+SUPABASE_BUCKET_LANDMARK_ASSETS=landmark-assets
+SUPABASE_BUCKET_FAMILY_UPLOADS=family-uploads
+SUPABASE_BUCKET_GENERATED_GUIDES=generated-guides
+SUPABASE_BUCKET_GENERATED_COVERS=generated-covers
 CORS_ALLOW_ORIGINS=*
 ```
 
-Com `IMAGE_PROVIDER=replicate`, o backend usa a foto enviada para gerar a capa,
-usa imagens Wikimedia como primeira opcao para pontos turisticos quando encontra
-uma foto representativa licenciada, gera uma imagem colorida em estilo aquarela
-quando nao ha Wikimedia e gera uma segunda imagem em line art preto e branco
-para a secao de colorir.
+Com `IMAGE_PROVIDER=replicate`, o backend usa a foto enviada para gerar a capa.
+Por padrao, pontos turisticos nao geram imagem por IA: o PDF usa imagens
+Wikimedia/licenciadas e sincroniza esses assets no bucket
+`landmark-assets` quando o Supabase Storage esta configurado. Mantenha
+`LANDMARK_ART_GENERATION=false` para reduzir custo e latencia. Se precisar
+reativar o comportamento legado de gerar arte/lineart para cada ponto,
+configure `LANDMARK_ART_GENERATION=true`; nesse caso,
 `IMAGE_GENERATION_CONCURRENCY` controla quantos pontos turisticos sao
-processados em paralelo; comece com `2` para reduzir risco de rate limit.
+processados em paralelo.
+
+`SUPABASE_SERVICE_ROLE_KEY` e usada somente no backend. Nunca coloque essa chave
+em variaveis `VITE_`, no frontend publicado ou em `public_html/config.js`.
 
 `GOOGLE_MAPS_API_KEY` e usada apenas pelo backend para montar roteiros dinamicos
 com Geocoding API, Places API e fotos do Google Places nos cards da etapa de

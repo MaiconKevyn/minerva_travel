@@ -28,7 +28,7 @@ class Landmark(BaseModel):
     id: str
     name: str
     description: list[str] = Field(min_length=1)
-    image: Path
+    image: Path | str
     lineart_image: Path
     sort_order: int
     representative_query: str | None = None

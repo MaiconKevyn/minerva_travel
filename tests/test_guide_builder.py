@@ -80,6 +80,41 @@ def test_build_guide_context_uses_wikimedia_images_and_credits():
     assert context.image_credits[0].landmark_name == "Torre Eiffel"
 
 
+def test_build_guide_context_prefers_wikimedia_public_url_when_available():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower"],
+    )
+    assets = {
+        "paris:eiffel-tower": WikimediaAsset(
+            selection_id="paris:eiffel-tower",
+            title="File:Eiffel Tower.jpg",
+            source_url="https://commons.wikimedia.org/wiki/File:Eiffel_Tower.jpg",
+            image_url="https://upload.wikimedia.org/example.jpg",
+            local_path=Path("runtime/wikimedia/paris/eiffel-tower.jpg"),
+            public_url="https://project.supabase.co/storage/v1/object/public/landmark-assets/paris/eiffel-tower.jpg",
+            storage_path="paris/eiffel-tower.jpg",
+            author="Jane Doe",
+            license_short_name="CC BY-SA 4.0",
+            license_url="https://creativecommons.org/licenses/by-sa/4.0/",
+            credit="Jane Doe / Wikimedia Commons",
+        )
+    }
+
+    context = build_guide_context(
+        request,
+        catalog,
+        Path("runtime/generated/cover.png"),
+        wikimedia_assets=assets,
+    )
+
+    assert context.destinations[0].landmarks[0].image == assets["paris:eiffel-tower"].public_url
+
+
 def test_build_guide_context_prefers_generated_landmark_images():
     catalog = load_catalog(Path("data/destinations/europe_2026.json"))
     request = GuideRequest(

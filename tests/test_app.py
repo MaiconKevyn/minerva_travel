@@ -326,6 +326,7 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
     monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", lambda *_: {})
     monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setenv("LANDMARK_ART_GENERATION", "true")
     client = TestClient(app)
 
     response = client.post(
@@ -438,8 +439,95 @@ def test_api_generate_uses_wikimedia_image_before_generating_landmark_art(
 
     assert response.status_code == 200
     assert generated_landmarks == []
-    assert generated_lineart == [
-        ("Cristo Redentor", "Rio de Janeiro", "Brasil", wikimedia_path)
+    assert generated_lineart == []
+
+
+def test_api_generate_uses_supabase_landmark_asset_url_in_pdf(
+    tmp_path,
+    monkeypatch,
+):
+    captured_images = []
+    wikimedia_path = tmp_path / "wikimedia" / "rio" / "cristo.jpg"
+    wikimedia_path.parent.mkdir(parents=True)
+    wikimedia_path.write_bytes(b"wikimedia")
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_landmark_image(self, landmark_name, city, country, output_path):
+            raise AssertionError("landmark image generation should stay disabled by default")
+
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            raise AssertionError("landmark lineart generation should stay disabled by default")
+
+    def fake_wikimedia_assets(destinations, request_id):
+        selection_id = f"{destinations[0].id}:{destinations[0].landmarks[0].id}"
+        return {
+            selection_id: WikimediaAsset(
+                selection_id=selection_id,
+                title="File:Cristo.jpg",
+                source_url="https://commons.wikimedia.org/wiki/File:Cristo.jpg",
+                image_url="https://upload.wikimedia.org/cristo.jpg",
+                local_path=wikimedia_path,
+                author="Jane Doe",
+                license_short_name="CC BY-SA 4.0",
+                license_url="https://creativecommons.org/licenses/by-sa/4.0/",
+                credit="Jane Doe / Wikimedia Commons",
+            )
+        }
+
+    def fake_sync(assets):
+        return {
+            selection_id: asset.model_copy(
+                update={
+                    "public_url": (
+                        "https://project.supabase.co/storage/v1/object/public/"
+                        f"landmark-assets/{selection_id}.jpg"
+                    ),
+                    "storage_path": f"{selection_id}.jpg",
+                }
+            )
+            for selection_id, asset in assets.items()
+        }
+
+    def fake_write_pdf(context, output_path):
+        captured_images.append(context.destinations[0].landmarks[0].image)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"pdf")
+        return output_path
+
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", fake_wikimedia_assets)
+    monkeypatch.setattr("minerva_travel.app.sync_wikimedia_assets_to_storage", fake_sync)
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setattr("minerva_travel.app.write_pdf", fake_write_pdf)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Guia do Brasil",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "custom_landmarks": "Cristo Redentor, Rio de Janeiro, Brasil",
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert captured_images == [
+        "https://project.supabase.co/storage/v1/object/public/"
+        "landmark-assets/custom-rio-de-janeiro:cristo-redentor.jpg"
     ]
 
 
