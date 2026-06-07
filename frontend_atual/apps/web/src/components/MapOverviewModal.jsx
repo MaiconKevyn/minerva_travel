@@ -68,6 +68,96 @@ const filterOptions = [
   { label: 'Sugeridos', value: 'suggested' },
 ];
 
+const createLegacyTripMapMarker = ({
+  google,
+  map,
+  landmark,
+  position,
+  isSelected,
+  isHighlighted,
+  onSelect,
+}) => {
+  const marker = new google.maps.Marker({
+    map,
+    position,
+    title: landmark.name,
+    label: isSelected ? 'OK' : '+',
+    zIndex: isHighlighted ? 1000 : isSelected ? 500 : 100,
+  });
+  marker.addListener('click', onSelect);
+  return marker;
+};
+
+const createTripMapMarker = ({
+  google,
+  markerLibrary,
+  map,
+  landmark,
+  position,
+  isSelected,
+  isHighlighted,
+  onSelect,
+}) => {
+  if (markerLibrary.AdvancedMarkerElement) {
+    try {
+      const marker = new markerLibrary.AdvancedMarkerElement({
+        map,
+        position,
+        title: landmark.name,
+        content: createMarkerContent(landmark, { isSelected, isHighlighted }),
+        zIndex: isHighlighted ? 1000 : isSelected ? 500 : 100,
+      });
+      marker.addListener('click', onSelect);
+      return marker;
+    } catch (error) {
+      console.warn('Advanced marker unavailable; using default marker.', error);
+    }
+  }
+
+  return createLegacyTripMapMarker({
+    google,
+    map,
+    landmark,
+    position,
+    isSelected,
+    isHighlighted,
+    onSelect,
+  });
+};
+
+const fitTripMapView = ({
+  map,
+  bounds,
+  landmarks,
+  activeLandmark,
+  shouldFitBounds,
+}) => {
+  const focus = activeLandmark || landmarks[0];
+  if (!focus) {
+    return;
+  }
+  const focusPosition = { lat: focus.latitude, lng: focus.longitude };
+
+  if (landmarks.length === 1) {
+    map.setCenter(focusPosition);
+    map.setZoom(15);
+    return;
+  }
+
+  if (!shouldFitBounds) {
+    map.panTo(focusPosition);
+    return;
+  }
+
+  try {
+    map.fitBounds(bounds, 80);
+  } catch (error) {
+    console.warn('Trip map bounds failed; using centered fallback.', error);
+    map.setCenter(focusPosition);
+    map.setZoom(12);
+  }
+};
+
 const MapOverviewModal = ({
   open,
   landmarks,
@@ -191,27 +281,16 @@ const MapOverviewModal = ({
           const position = { lat: landmark.latitude, lng: landmark.longitude };
           bounds.extend(position);
 
-          if (markerLibrary.AdvancedMarkerElement) {
-            const marker = new markerLibrary.AdvancedMarkerElement({
-              map,
-              position,
-              title: landmark.name,
-              content: createMarkerContent(landmark, { isSelected, isHighlighted }),
-              zIndex: isHighlighted ? 1000 : isSelected ? 500 : 100,
-            });
-            marker.addListener('click', () => setActiveLandmarkId(landmark.id));
-            return marker;
-          }
-
-          const marker = new google.maps.Marker({
+          return createTripMapMarker({
+            google,
+            markerLibrary,
             map,
+            landmark,
             position,
-            title: landmark.name,
-            label: isSelected ? 'OK' : '+',
-            zIndex: isHighlighted ? 1000 : isSelected ? 500 : 100,
+            isSelected,
+            isHighlighted,
+            onSelect: () => setActiveLandmarkId(landmark.id),
           });
-          marker.addListener('click', () => setActiveLandmarkId(landmark.id));
-          return marker;
         });
 
         const boundsSignature = visibleMapLandmarks
@@ -220,10 +299,22 @@ const MapOverviewModal = ({
         markersRef.current = nextMarkers;
 
         if (shouldFitBounds || boundsSignatureRef.current !== boundsSignature) {
-          map.fitBounds(bounds, 80);
+          fitTripMapView({
+            map,
+            bounds,
+            landmarks: visibleMapLandmarks,
+            activeLandmark,
+            shouldFitBounds: true,
+          });
           boundsSignatureRef.current = boundsSignature;
         } else if (activeLandmark) {
-          map.panTo({ lat: activeLandmark.latitude, lng: activeLandmark.longitude });
+          fitTripMapView({
+            map,
+            bounds,
+            landmarks: visibleMapLandmarks,
+            activeLandmark,
+            shouldFitBounds: false,
+          });
         }
       } catch (error) {
         console.error('Google Maps load error:', error);

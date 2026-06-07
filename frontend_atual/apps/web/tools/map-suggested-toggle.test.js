@@ -11,3 +11,12 @@ test('trip map starts with confirmed points and exposes suggested toggle', () =>
   assert.match(modal, /Mostrar sugeridos/);
   assert.match(modal, /tripMapVisibleItems/);
 });
+
+test('trip map falls back when advanced markers or bounds fail', () => {
+  const modal = readProjectFile('src/components/MapOverviewModal.jsx');
+
+  assert.match(modal, /createTripMapMarker/);
+  assert.match(modal, /fitTripMapView/);
+  assert.match(modal, /Advanced marker unavailable/);
+  assert.match(modal, /landmarks\.length === 1/);
+});
