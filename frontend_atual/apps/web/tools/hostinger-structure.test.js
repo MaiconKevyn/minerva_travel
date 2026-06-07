@@ -51,15 +51,21 @@ test('runtime config loads before the React entrypoint', () => {
   const head = index.match(/<head>([\s\S]*?)<\/head>/)?.[1] || '';
 
   assert.match(head, /<script src="\/config\.js\?v=[^"]+"><\/script>/);
+  assert.match(head, /Cache-Control/);
+  assert.match(head, /no-store/);
   assert.equal(index.indexOf('/config.js') < index.indexOf('/src/main.jsx'), true);
 });
 
 test('runtime config and HTML are not cached by Hostinger CDN', () => {
   const htaccess = readProjectFile('public/.htaccess');
+  const config = readProjectFile('public/config.js');
 
   assert.match(htaccess, /Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"/);
   assert.doesNotMatch(htaccess, /s-maxage=604800/);
   assert.match(htaccess, /REQUEST_URI.+\^\/assets\/\.\*/);
+  assert.match(config, /MINERVA_APP_VERSION/);
+  assert.match(config, /minerva_cache_check/);
+  assert.match(config, /location\.reload/);
 });
 
 test('password recovery route is wired to real auth flow', () => {
