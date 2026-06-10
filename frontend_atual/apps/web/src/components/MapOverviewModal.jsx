@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   clearGoogleMarkers,
+  googleMapsLibraries,
   googleMapsBrowserKey,
   googleMapsMapId,
   loadGoogleMaps,
@@ -252,10 +253,10 @@ const MapOverviewModal = ({
       try {
         setLoadError('');
         const google = await loadGoogleMaps(apiKey);
-        const { Map } = await google.maps.importLibrary('maps');
-        const markerLibrary = mapId
-          ? await google.maps.importLibrary('marker').catch(() => ({}))
-          : {};
+        const { Map, markerLibrary } = await googleMapsLibraries(google, { includeMarker: Boolean(mapId) });
+        if (!Map) {
+          throw new Error('Google Maps Map library unavailable.');
+        }
         const first = visibleMapLandmarks[0];
         const map = mapRef.current || new Map(mapElementRef.current, {
           center: { lat: first.latitude, lng: first.longitude },
