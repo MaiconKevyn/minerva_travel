@@ -428,21 +428,21 @@ const Step4Attractions = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr] gap-4 pt-2">
-          <Button onClick={goBack} variant="outline" className="rounded-full py-6 px-8 text-lg">
+          <Button onClick={goBack} variant="outline" className="rounded-full px-6 py-6 text-base sm:px-8 sm:text-lg">
             <ArrowLeft className="w-5 h-5 mr-2" /> Editar destino
           </Button>
           {parsedData.landmarks.length > 0 && (
             <Button
               onClick={() => setShowPreferenceSetup(false)}
               variant="outline"
-              className="rounded-full py-6 px-8 text-lg font-bold"
+              className="rounded-full px-6 py-6 text-base font-bold sm:px-8 sm:text-lg"
             >
               Voltar aos cards
             </Button>
           )}
           <Button
             onClick={() => processAttractions({ mode: 'itinerary' })}
-            className="flex-1 rounded-full py-6 px-8 text-lg bg-primary hover:bg-primary/90 text-white font-bold"
+            className="flex-1 rounded-full bg-primary px-6 py-6 text-base font-bold text-white hover:bg-primary/90 sm:px-8 sm:text-lg"
           >
             Atualizar sugestao <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
@@ -812,11 +812,11 @@ const Step4Attractions = () => {
                 ? renderManualGroups()
                 : renderQuickSuggestionCards()}
 
-            <div className="flex justify-center pt-16 pb-8 sticky bottom-0 bg-gradient-to-t from-background via-background to-transparent z-10">
+            <div className="sticky bottom-0 z-10 flex justify-center bg-gradient-to-t from-background via-background to-transparent px-4 pb-8 pt-16">
               <Button
                 onClick={nextStep}
                 disabled={selectedLandmarks.length === 0}
-                className="rounded-full px-12 py-8 bg-primary hover:bg-primary/90 text-white font-bold text-xl shadow-xl hover:-translate-y-1 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
+                className="w-full max-w-md rounded-full bg-primary px-6 py-6 text-base font-bold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-primary/90 disabled:opacity-50 disabled:hover:translate-y-0 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
               >
                 Confirmar {selectedCount} {selectedCount === 1 ? 'local' : 'locais'} <ArrowRight className="ml-3 w-6 h-6" />
               </Button>

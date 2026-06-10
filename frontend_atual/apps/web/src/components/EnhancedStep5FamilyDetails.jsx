@@ -126,10 +126,10 @@ const EnhancedStep5FamilyDetails = () => {
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col min-h-[60vh] justify-center py-4">
       <div className="text-center space-y-4 mb-12">
-        <h2 className="text-4xl md:text-5xl font-serif font-bold text-foreground">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-foreground">
           Detalhes da Família
         </h2>
-        <p className="text-xl text-muted-foreground font-medium">
+        <p className="text-lg sm:text-xl text-muted-foreground font-medium">
           Para deixar o guia ainda mais especial, conte-nos quem vai aparecer nessa aventura.
         </p>
       </div>
@@ -137,7 +137,7 @@ const EnhancedStep5FamilyDetails = () => {
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Family Name Section */}
         <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-accent/10">
-          <Label htmlFor="familyName" className="text-xl font-bold flex items-center gap-3 text-foreground mb-6">
+          <Label htmlFor="familyName" className="mb-6 flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
             <div className="p-2 bg-accent/10 rounded-xl text-accent">
               <Home className="w-6 h-6" />
             </div>
@@ -148,14 +148,14 @@ const EnhancedStep5FamilyDetails = () => {
             value={localFamilyName}
             onChange={(e) => setLocalFamilyName(e.target.value)}
             placeholder="Ex: Silva, Oliveira, The Smiths..."
-            className="text-lg py-6 rounded-xl bg-background border-border focus-visible:ring-accent text-foreground placeholder:text-muted-foreground"
+            className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-accent sm:text-lg"
           />
         </div>
 
         {/* Children Section */}
         <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-primary/10">
           <div className="flex items-center justify-between mb-6">
-            <Label className="text-xl font-bold flex items-center gap-3 text-foreground">
+            <Label className="flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
               <div className="p-2 bg-primary/10 rounded-xl text-primary">
                 <Baby className="w-6 h-6" />
               </div>
@@ -181,7 +181,7 @@ const EnhancedStep5FamilyDetails = () => {
                     value={child.name}
                     onChange={(e) => handleChildChange(child.id, e.target.value)}
                     placeholder={`Nome da criança ${index + 1}`}
-                    className="text-lg py-6 rounded-xl bg-background border-border focus-visible:ring-primary text-foreground placeholder:text-muted-foreground"
+                    className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-primary sm:text-lg"
                   />
                   {children.length > 1 && (
                     <Button
@@ -215,7 +215,7 @@ const EnhancedStep5FamilyDetails = () => {
         {/* Parents Section */}
         <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-secondary/10">
           <div className="flex items-center justify-between mb-6">
-            <Label className="text-xl font-bold flex items-center gap-3 text-foreground">
+            <Label className="flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
               <div className="p-2 bg-secondary/10 rounded-xl text-secondary">
                 <Users className="w-6 h-6" />
               </div>
@@ -241,7 +241,7 @@ const EnhancedStep5FamilyDetails = () => {
                     value={parent.name}
                     onChange={(e) => handleParentChange(parent.id, e.target.value)}
                     placeholder={`Nome do responsável ${index + 1}`}
-                    className="text-lg py-6 rounded-xl bg-background border-border focus-visible:ring-secondary text-foreground placeholder:text-muted-foreground"
+                    className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-secondary sm:text-lg"
                   />
                   {parents.length > 1 && (
                     <Button
@@ -274,7 +274,7 @@ const EnhancedStep5FamilyDetails = () => {
 
         {/* Year Section */}
         <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-accent/10">
-          <Label htmlFor="year" className="text-xl font-bold flex items-center gap-3 text-foreground mb-6">
+          <Label htmlFor="year" className="mb-6 flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
             <div className="p-2 bg-accent/10 rounded-xl text-accent">
               <Calendar className="w-6 h-6" />
             </div>
@@ -286,14 +286,14 @@ const EnhancedStep5FamilyDetails = () => {
             value={year}
             onChange={(e) => setYear(parseInt(e.target.value) || new Date().getFullYear())}
             placeholder="Ex: 2026"
-            className="text-lg py-6 rounded-xl bg-background border-border focus-visible:ring-accent text-foreground placeholder:text-muted-foreground"
+            className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-accent sm:text-lg"
           />
         </div>
 
         <div className="pt-8 flex justify-center">
           <Button
             type="submit"
-            className="rounded-full px-12 py-8 bg-primary hover:bg-primary/90 text-white font-bold text-xl shadow-xl hover:-translate-y-1 transition-all"
+            className="w-full max-w-md rounded-full bg-primary px-6 py-6 text-base font-bold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-primary/90 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
           >
             Continuar <ArrowRight className="ml-3 w-6 h-6" />
           </Button>

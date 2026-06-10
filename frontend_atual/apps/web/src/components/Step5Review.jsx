@@ -132,7 +132,7 @@ const Step5Review = () => {
         <p className="text-lg text-muted-foreground font-medium">Revise as informações antes de gerarmos o PDF oficial.</p>
       </div>
 
-      <div className="bg-card dark:bg-slate-800 rounded-[40px] p-8 md:p-12 shadow-storybook border-2 border-border/50 dark:border-slate-700">
+      <div className="rounded-[2rem] border-2 border-border/50 bg-card p-5 shadow-storybook dark:border-slate-700 dark:bg-slate-800 sm:p-8 md:rounded-[40px] md:p-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
 
           <div className="space-y-4">
@@ -175,7 +175,7 @@ const Step5Review = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-border/50">
-          <h3 className="text-2xl font-serif font-bold flex items-center gap-2 text-primary mb-8">
+          <h3 className="mb-8 flex items-center gap-2 text-xl font-serif font-bold text-primary sm:text-2xl">
             <Star className="w-6 h-6" /> O Roteiro Mágico ({finalLandmarks.length} locais selecionados)
           </h3>
 
@@ -248,7 +248,7 @@ const Step5Review = () => {
         <Button
           onClick={handleGenerate}
           disabled={isGenerating}
-          className="rounded-full px-12 py-8 bg-primary hover:bg-primary/90 text-white font-bold text-xl shadow-[0_8px_30px_rgb(241,97,59,0.3)] hover:-translate-y-1 transition-all disabled:opacity-70 disabled:hover:translate-y-0"
+          className="w-full max-w-md rounded-full bg-primary px-6 py-6 text-base font-bold text-white shadow-[0_8px_30px_rgb(241,97,59,0.3)] transition-all hover:-translate-y-1 hover:bg-primary/90 disabled:opacity-70 disabled:hover:translate-y-0 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
         >
           {isGenerating ? (
             <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Criando a Magia...</>

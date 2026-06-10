@@ -41,7 +41,7 @@ const Step3Destination = () => {
             className="w-full text-center space-y-8"
             onSubmit={handleSubmit}
           >
-            <label htmlFor="destination" className="block text-3xl md:text-4xl font-serif font-bold text-foreground leading-tight">
+            <label htmlFor="destination" className="block text-2xl sm:text-3xl md:text-4xl font-serif font-bold text-foreground leading-tight">
               Me conte onde está pretendendo ir, quais cidades, países, o que vocês querem fazer lá... Fale livremente!
             </label>
 
@@ -52,7 +52,7 @@ const Step3Destination = () => {
                 value={localDest}
                 onChange={(e) => setLocalDest(e.target.value)}
                 placeholder="Ex: Estamos pensando em visitar Paris, depois ir para Londres... Queremos ver museus, comer em restaurantes locais, fazer compras..."
-                className="w-full min-h-[180px] p-6 rounded-3xl border-2 border-border bg-card dark:bg-slate-800 focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-lg font-medium resize-none shadow-sm text-foreground placeholder:text-muted-foreground/60"
+                className="w-full min-h-[180px] rounded-3xl border-2 border-border bg-card p-5 text-base font-medium text-foreground shadow-sm outline-none transition-all resize-none placeholder:text-muted-foreground/60 focus:border-secondary focus:ring-4 focus:ring-secondary/20 dark:bg-slate-800 sm:p-6 sm:text-lg"
               />
               <div className="flex justify-between items-center mt-3 px-2">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
@@ -72,7 +72,7 @@ const Step3Destination = () => {
               <Button
                 type="submit"
                 disabled={!localDest.trim()}
-                className="rounded-full px-10 py-6 bg-secondary hover:bg-secondary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all"
+                className="w-full rounded-full bg-secondary px-8 py-6 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-secondary/90 sm:w-auto sm:px-10"
               >
                 Próximo <ArrowRight className="ml-2 w-5 h-5" />
               </Button>

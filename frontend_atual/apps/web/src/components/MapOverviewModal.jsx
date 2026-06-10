@@ -370,7 +370,7 @@ const MapOverviewModal = ({
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
               Mapa da viagem
             </p>
-            <h2 className="text-xl font-serif font-bold md:text-2xl">
+            <h2 className="text-lg font-serif font-bold sm:text-xl md:text-2xl">
               Explore os pontos e a distancia entre eles
             </h2>
           </div>
@@ -379,7 +379,7 @@ const MapOverviewModal = ({
           </Button>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[430px_1fr]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(320px,45dvh)_minmax(0,1fr)] lg:grid-cols-[430px_1fr] lg:grid-rows-none">
           <aside className="order-2 min-h-0 overflow-y-auto border-t border-border bg-background lg:order-1 lg:border-r lg:border-t-0">
             <div className="sticky top-0 z-10 space-y-4 border-b border-border bg-background/95 p-4 backdrop-blur">
               <div className="flex items-center justify-between gap-3">
@@ -596,13 +596,13 @@ const MapOverviewModal = ({
             </div>
           </aside>
 
-          <section className="relative order-1 min-h-[420px] bg-muted lg:order-2">
+          <section className="relative order-1 min-h-[320px] bg-muted lg:order-2 lg:min-h-[420px]">
             {apiKey && visibleMapLandmarks.length > 0 && !loadError && (
-              <div ref={mapElementRef} className="h-full min-h-[420px] w-full" />
+              <div ref={mapElementRef} className="h-full min-h-[320px] w-full lg:min-h-[420px]" />
             )}
 
             {!apiKey && (
-              <div className="flex h-full min-h-[420px] items-center justify-center p-8 text-center">
+              <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center lg:min-h-[420px] lg:p-8">
                 <div className="max-w-md rounded-2xl border border-border bg-background p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-primary" />
                   <h3 className="mb-2 text-xl font-serif font-bold">Mapa nao configurado</h3>
@@ -614,7 +614,7 @@ const MapOverviewModal = ({
             )}
 
             {apiKey && visibleMapLandmarks.length === 0 && (
-              <div className="flex h-full min-h-[420px] items-center justify-center p-8 text-center">
+              <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center lg:min-h-[420px] lg:p-8">
                 <div className="max-w-md rounded-2xl border border-border bg-background p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-secondary" />
                   <h3 className="mb-2 text-xl font-serif font-bold">Sem locais confirmados no mapa</h3>
@@ -626,7 +626,7 @@ const MapOverviewModal = ({
             )}
 
             {loadError && (
-              <div className="flex h-full min-h-[420px] items-center justify-center p-8 text-center">
+              <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center lg:min-h-[420px] lg:p-8">
                 <div className="max-w-md rounded-2xl border border-border bg-background p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-destructive" />
                   <h3 className="mb-2 text-xl font-serif font-bold">Erro ao carregar mapa</h3>

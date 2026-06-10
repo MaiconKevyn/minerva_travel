@@ -109,8 +109,8 @@ const Step2CoverPhoto = () => {
               <Button
                 onClick={handleConfirm}
                 disabled={!coverPhoto}
-                className="rounded-full px-8 py-6 bg-primary hover:bg-primary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all"
-              >
+              className="w-full rounded-full bg-primary px-8 py-6 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-primary/90 sm:w-auto"
+            >
                 Continuar para revisão <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </motion.div>

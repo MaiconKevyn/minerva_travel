@@ -39,16 +39,16 @@ const CreateGuidePageContent = () => {
         <main className="flex-1 flex flex-col relative py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
 
           {/* Top Bar with Progress and Back Button */}
-          <div className="flex items-center justify-between mb-8 md:mb-16">
-            <div className="w-24">
+          <div className="flex items-center justify-between gap-2 mb-8 md:mb-16">
+            <div className="w-14 sm:w-24">
               {currentStep > 1 && currentStep < 6 && (
                 <Button
                   variant="ghost"
                   onClick={goBack}
-                  className="rounded-full font-bold text-muted-foreground hover:text-foreground hover:bg-muted"
+                  className="rounded-full px-3 font-bold text-muted-foreground hover:text-foreground hover:bg-muted sm:px-4"
                 >
-                  <ArrowLeft className="w-5 h-5 mr-2" />
-                  Voltar
+                  <ArrowLeft className="h-5 w-5 sm:mr-2" />
+                  <span className="hidden sm:inline">Voltar</span>
                 </Button>
               )}
             </div>
@@ -69,7 +69,7 @@ const CreateGuidePageContent = () => {
               </p>
             </div>
 
-            <div className="w-24" /> {/* Spacer to balance flex-between */}
+            <div className="w-14 sm:w-24" /> {/* Spacer to balance flex-between */}
           </div>
 
           {/* Form Area */}
@@ -77,9 +77,9 @@ const CreateGuidePageContent = () => {
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
