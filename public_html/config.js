@@ -1,5 +1,5 @@
 window.__MINERVA_CONFIG__ = {
-  MINERVA_APP_VERSION: '20260607-cache-guard',
+  MINERVA_APP_VERSION: '20260611-chrome-cache-guard',
   VITE_SUPABASE_URL: 'https://khxltgyqmaypdnfjjtak.supabase.co',
   VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_knCWQ4yFRkz2tlRwjNT-Mw_E_syLVVZ',
   VITE_GOOGLE_MAPS_BROWSER_KEY: 'AIzaSyA4SCkhVq_NZ_6juuFtk3TW2isVws_thzM',
@@ -28,16 +28,18 @@ window.__MINERVA_CONFIG__ = {
     try {
       const current = currentModuleEntry();
       const latest = await latestModuleEntry();
-      if (!current || !latest || current === latest) {
+      if (!latest || current === latest) {
         return;
       }
 
       const reloadKey = 'minerva_cache_guard_reloaded_for';
-      if (sessionStorage.getItem(reloadKey) === latest) {
+      const runtimeVersion = window.__MINERVA_CONFIG__?.MINERVA_APP_VERSION || 'unknown';
+      const reloadToken = `${runtimeVersion}:${latest}`;
+      if (sessionStorage.getItem(reloadKey) === reloadToken) {
         return;
       }
 
-      sessionStorage.setItem(reloadKey, latest);
+      sessionStorage.setItem(reloadKey, reloadToken);
       window.location.reload();
     } catch (error) {
       console.warn('Minerva cache check skipped:', error);
