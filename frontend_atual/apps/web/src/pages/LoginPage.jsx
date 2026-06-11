@@ -12,7 +12,6 @@ import { Loader2, Key } from 'lucide-react';
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
@@ -115,19 +114,6 @@ const LoginPage = () => {
                   className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
                   placeholder="••••••••"
                 />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="remember"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-border text-secondary focus:ring-secondary"
-                />
-                <label htmlFor="remember" className="text-sm font-medium text-foreground cursor-pointer">
-                  Lembrar de mim
-                </label>
               </div>
 
               <Button

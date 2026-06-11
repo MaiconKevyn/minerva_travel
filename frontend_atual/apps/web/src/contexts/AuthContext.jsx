@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import authClient from '@/lib/authClient.js';
 import { toast } from 'sonner';
 
@@ -30,30 +30,44 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     return authClient.login(email, password);
-  };
+  }, []);
 
-  const signup = async (email, password, name) => {
+  const signup = useCallback(async (email, password, name) => {
     return authClient.signup(email, password, name);
-  };
+  }, []);
 
-  const requestPasswordReset = async (email, redirectTo) => {
+  const requestPasswordReset = useCallback(async (email, redirectTo) => {
     return authClient.requestPasswordReset(email, redirectTo);
-  };
+  }, []);
 
-  const updatePassword = async (password) => {
+  const preparePasswordRecovery = useCallback(async (currentUrl) => {
+    return authClient.preparePasswordRecovery(currentUrl);
+  }, []);
+
+  const updatePassword = useCallback(async (password) => {
     return authClient.updatePassword(password);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await authClient.logout();
     toast.success('Desconectado com sucesso!');
-  };
+  }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, isLoading, login, signup, requestPasswordReset, updatePassword, logout }}
+      value={{
+        user,
+        isAuthenticated,
+        isLoading,
+        login,
+        signup,
+        requestPasswordReset,
+        preparePasswordRecovery,
+        updatePassword,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>

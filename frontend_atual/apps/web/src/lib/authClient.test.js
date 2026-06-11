@@ -221,6 +221,117 @@ test('Supabase auth updates password after recovery redirect', async () => {
   assert.deepEqual(calls, [{ password: 'NovaSenha123' }]);
 });
 
+test('Supabase auth prepares password recovery from a code redirect', async () => {
+  const calls = [];
+  const signedInUser = {
+    id: 'user-123',
+    email: 'mae@example.com',
+    user_metadata: { name: 'Mae' },
+  };
+  const recoverySession = { user: signedInUser };
+  const authClient = createAuthClient({
+    supabaseUrl: 'https://project.supabase.co',
+    supabasePublishableKey: 'sb_publishable_test',
+    createSupabaseClient: () => ({
+      auth: {
+        getSession: async () => {
+          calls.push(['getSession']);
+          return { data: { session: null }, error: null };
+        },
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+        exchangeCodeForSession: async (code) => {
+          calls.push(['exchangeCodeForSession', code]);
+          return { data: { session: recoverySession, user: signedInUser }, error: null };
+        },
+      },
+    }),
+  });
+
+  const result = await authClient.preparePasswordRecovery(
+    'https://app.example.com/reset-password?code=recovery-code',
+  );
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.session, recoverySession);
+  assert.equal(authClient.isValid, true);
+  assert.equal(authClient.model.email, 'mae@example.com');
+  assert.deepEqual(calls, [['exchangeCodeForSession', 'recovery-code']]);
+});
+
+test('Supabase auth prepares password recovery from an existing recovery session', async () => {
+  const signedInUser = {
+    id: 'user-123',
+    email: 'mae@example.com',
+    user_metadata: { name: 'Mae' },
+  };
+  const recoverySession = { user: signedInUser };
+  const authClient = createAuthClient({
+    supabaseUrl: 'https://project.supabase.co',
+    supabasePublishableKey: 'sb_publishable_test',
+    createSupabaseClient: () => ({
+      auth: {
+        getSession: async () => ({ data: { session: recoverySession }, error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      },
+    }),
+  });
+
+  const result = await authClient.preparePasswordRecovery('https://app.example.com/reset-password');
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.session, recoverySession);
+  assert.equal(authClient.isValid, true);
+});
+
+test('Supabase auth rejects password recovery when the redirect has an error', async () => {
+  let getSessionCalled = false;
+  const authClient = createAuthClient({
+    supabaseUrl: 'https://project.supabase.co',
+    supabasePublishableKey: 'sb_publishable_test',
+    createSupabaseClient: () => ({
+      auth: {
+        getSession: async () => {
+          getSessionCalled = true;
+          return { data: { session: null }, error: null };
+        },
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      },
+    }),
+  });
+
+  const result = await authClient.preparePasswordRecovery(
+    'https://app.example.com/reset-password#error=access_denied&error_description=Link%20expired',
+  );
+
+  assert.equal(result.success, false);
+  assert.match(result.error, /Link expired/);
+  assert.equal(getSessionCalled, false);
+});
+
+test('Supabase auth rejects password update without an active recovery session', async () => {
+  let updateUserCalled = false;
+  const authClient = createAuthClient({
+    supabaseUrl: 'https://project.supabase.co',
+    supabasePublishableKey: 'sb_publishable_test',
+    createSupabaseClient: () => ({
+      auth: {
+        getSession: async () => ({ data: { session: null }, error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+        updateUser: async () => {
+          updateUserCalled = true;
+          return { data: {}, error: null };
+        },
+      },
+    }),
+  });
+
+  const result = await authClient.updatePassword('NovaSenha123');
+
+  assert.equal(result.success, false);
+  assert.match(result.error, /link de recuperacao/i);
+  assert.equal(updateUserCalled, false);
+});
+
 test('Supabase auth returns a clear message when email is not confirmed', async () => {
   const authClient = createAuthClient({
     supabaseUrl: 'https://project.supabase.co',

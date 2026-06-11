@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import { Airplane, Flower } from '@/components/DecorativeElements.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import { KeyRound, Loader2 } from 'lucide-react';
+import { AlertCircle, KeyRound, Loader2 } from 'lucide-react';
 
 const calculateStrength = (password) => {
   let score = 0;
@@ -19,11 +19,44 @@ const calculateStrength = (password) => {
 const ResetPasswordPage = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [recoveryStatus, setRecoveryStatus] = useState('checking');
+  const [recoveryError, setRecoveryError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { updatePassword } = useAuth();
+  const { preparePasswordRecovery, updatePassword } = useAuth();
   const navigate = useNavigate();
 
   const strength = calculateStrength(password);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const prepareRecovery = async () => {
+      setRecoveryStatus('checking');
+      const result = await preparePasswordRecovery(window.location.href);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (result.success) {
+        setRecoveryStatus('ready');
+        setRecoveryError('');
+
+        if (window.location.search || window.location.hash) {
+          window.history.replaceState(window.history.state, '', '/reset-password');
+        }
+      } else {
+        setRecoveryStatus('invalid');
+        setRecoveryError(result.error || 'Link de recuperação inválido ou expirado.');
+      }
+    };
+
+    prepareRecovery();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [preparePasswordRecovery]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -74,51 +107,81 @@ const ResetPasswordPage = () => {
               <p className="text-muted-foreground font-medium">Use uma senha forte para proteger sua conta.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="block text-sm font-bold text-foreground mb-1">Nova Senha</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
-                  placeholder="Mínimo 8 caracteres"
-                />
-
-                {password && (
-                  <div className="mt-2 flex gap-1 h-2">
-                    <div className={`flex-1 rounded-full ${strength >= 1 ? 'bg-destructive' : 'bg-muted'}`} />
-                    <div className={`flex-1 rounded-full ${strength >= 2 ? 'bg-secondary' : 'bg-muted'}`} />
-                    <div className={`flex-1 rounded-full ${strength >= 3 ? 'bg-accent' : 'bg-muted'}`} />
-                  </div>
-                )}
+            {recoveryStatus === 'checking' && (
+              <div className="rounded-3xl border border-border bg-background/70 p-6 text-center">
+                <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-secondary" />
+                <p className="font-bold text-foreground">Validando seu link de recuperação...</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Isso leva só alguns segundos.
+                </p>
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm font-bold text-foreground mb-1">Confirme a Nova Senha</label>
-                <input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
-                  placeholder="Repita sua nova senha"
-                />
+            {recoveryStatus === 'invalid' && (
+              <div className="space-y-5">
+                <div className="rounded-3xl border border-destructive/20 bg-destructive/10 p-5 text-center">
+                  <AlertCircle className="mx-auto mb-3 h-9 w-9 text-destructive" />
+                  <p className="font-bold text-foreground">Link inválido ou expirado</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {recoveryError}
+                  </p>
+                </div>
+                <Button
+                  asChild
+                  className="w-full rounded-2xl py-6 bg-secondary hover:bg-secondary/90 text-white font-bold text-lg shadow-lg"
+                >
+                  <Link to="/login">Solicitar novo link</Link>
+                </Button>
               </div>
+            )}
 
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full rounded-2xl py-6 bg-secondary hover:bg-secondary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all mt-4"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  'Salvar Nova Senha'
-                )}
-              </Button>
-            </form>
+            {recoveryStatus === 'ready' && (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-foreground mb-1">Nova Senha</label>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
+                    placeholder="Mínimo 8 caracteres"
+                  />
+
+                  {password && (
+                    <div className="mt-2 flex gap-1 h-2">
+                      <div className={`flex-1 rounded-full ${strength >= 1 ? 'bg-destructive' : 'bg-muted'}`} />
+                      <div className={`flex-1 rounded-full ${strength >= 2 ? 'bg-secondary' : 'bg-muted'}`} />
+                      <div className={`flex-1 rounded-full ${strength >= 3 ? 'bg-accent' : 'bg-muted'}`} />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-foreground mb-1">Confirme a Nova Senha</label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
+                    placeholder="Repita sua nova senha"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full rounded-2xl py-6 bg-secondary hover:bg-secondary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all mt-4"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    'Salvar Nova Senha'
+                  )}
+                </Button>
+              </form>
+            )}
 
             <div className="mt-8 text-center">
               <Link to="/login" className="text-secondary hover:underline font-bold">

@@ -76,5 +76,8 @@ test('password recovery route is wired to real auth flow', () => {
   assert.match(app, /path="\/reset-password"/);
   assert.match(loginPage, /requestPasswordReset/);
   assert.doesNotMatch(loginPage, /Recupera..o de senha em breve/);
+  assert.match(resetPage, /preparePasswordRecovery/);
+  assert.match(resetPage, /recoveryStatus === 'ready'/);
+  assert.match(resetPage, /Link inv.lido ou expirado/);
   assert.match(resetPage, /updatePassword/);
 });

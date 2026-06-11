@@ -3,6 +3,9 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 const LOCAL_USERS_KEY = 'minerva_local_users';
 const LOCAL_SESSION_KEY = 'minerva_local_session';
+const PASSWORD_RECOVERY_REQUIRED_MESSAGE = (
+  'Link de recuperacao invalido ou expirado. Solicite um novo email de recuperacao de senha.'
+);
 
 const runtimeConfig = () => globalThis.__MINERVA_CONFIG__ || {};
 
@@ -33,6 +36,29 @@ export const createMemoryStorage = () => {
 };
 
 const normalizeEmail = (email) => email.trim().toLowerCase();
+
+const authParamsFromUrl = (currentUrl) => {
+  if (!currentUrl) {
+    return new URLSearchParams();
+  }
+
+  try {
+    const url = new URL(currentUrl, globalThis.location?.origin || 'https://minerva.local');
+    const params = new URLSearchParams(url.search);
+    const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+    const hashParams = new URLSearchParams(hash);
+
+    hashParams.forEach((value, key) => {
+      if (!params.has(key)) {
+        params.set(key, value);
+      }
+    });
+
+    return params;
+  } catch {
+    return new URLSearchParams();
+  }
+};
 
 const createUserModel = ({ email, name }) => ({
   id: `local:${email}`,
@@ -163,6 +189,13 @@ export const createLocalAuthClient = (storage = globalThis.localStorage || creat
       };
     },
 
+    async preparePasswordRecovery() {
+      return {
+        success: false,
+        error: 'Recuperacao de senha exige Supabase configurado.',
+      };
+    },
+
     async updatePassword() {
       return {
         success: false,
@@ -271,7 +304,65 @@ export const createSupabaseAuthClient = ({
       return { success: true, data };
     },
 
+    async preparePasswordRecovery(currentUrl = globalThis.location?.href || '') {
+      const params = authParamsFromUrl(currentUrl);
+      const redirectError = params.get('error_description') || params.get('error');
+
+      if (redirectError) {
+        return { success: false, error: redirectError };
+      }
+
+      const code = params.get('code');
+
+      if (code && typeof supabase.auth.exchangeCodeForSession === 'function') {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (error) {
+          console.error('Password recovery code exchange error:', error);
+          return { success: false, error: formatAuthError(error, PASSWORD_RECOVERY_REQUIRED_MESSAGE) };
+        }
+
+        if (data?.session) {
+          setSession(data.session);
+          return { success: true, data };
+        }
+      }
+
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error('Password recovery session error:', error);
+        setSession(null);
+        return { success: false, error: formatAuthError(error, PASSWORD_RECOVERY_REQUIRED_MESSAGE) };
+      }
+
+      if (!data?.session) {
+        setSession(null);
+        return { success: false, error: PASSWORD_RECOVERY_REQUIRED_MESSAGE };
+      }
+
+      setSession(data.session);
+      return { success: true, data };
+    },
+
     async updatePassword(password) {
+      const sessionResult = await supabase.auth.getSession();
+
+      if (sessionResult.error) {
+        console.error('Password recovery session error:', sessionResult.error);
+        return {
+          success: false,
+          error: formatAuthError(sessionResult.error, PASSWORD_RECOVERY_REQUIRED_MESSAGE),
+        };
+      }
+
+      if (!sessionResult.data?.session) {
+        return {
+          success: false,
+          error: PASSWORD_RECOVERY_REQUIRED_MESSAGE,
+        };
+      }
+
       const { data, error } = await supabase.auth.updateUser({ password });
 
       if (error) {
@@ -345,6 +436,13 @@ export const createPocketBaseAuthClient = (pocketBaseUrl) => {
     },
 
     async requestPasswordReset() {
+      return {
+        success: false,
+        error: 'Recuperacao de senha exige Supabase configurado.',
+      };
+    },
+
+    async preparePasswordRecovery() {
       return {
         success: false,
         error: 'Recuperacao de senha exige Supabase configurado.',
