@@ -56,6 +56,20 @@ test('runtime config loads before the React entrypoint', () => {
   assert.equal(index.indexOf('/config.js') < index.indexOf('/src/main.jsx'), true);
 });
 
+test('runtime cache guard refreshes stale Chrome app shells', () => {
+  const index = readProjectFile('index.html');
+  const config = readProjectFile('public/config.js');
+  const indexVersion = index.match(/\/config\.js\?v=([^"]+)/)?.[1];
+  const configVersion = config.match(/MINERVA_APP_VERSION:\s*'([^']+)'/)?.[1];
+
+  assert.equal(indexVersion, configVersion);
+  assert.notEqual(configVersion, '20260607-cache-guard');
+  assert.match(config, /if \(!latest \|\| current === latest\)/);
+  assert.doesNotMatch(config, /!current \|\| !latest \|\| current === latest/);
+  assert.match(config, /const reloadToken = `\$\{runtimeVersion\}:\$\{latest\}`/);
+  assert.match(config, /sessionStorage\.setItem\(reloadKey, reloadToken\)/);
+});
+
 test('runtime config and HTML are not cached by Hostinger CDN', () => {
   const htaccess = readProjectFile('public/.htaccess');
   const config = readProjectFile('public/config.js');
