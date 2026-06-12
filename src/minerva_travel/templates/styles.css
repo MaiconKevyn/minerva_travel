@@ -222,37 +222,34 @@ p {
 
 .summary-map-panel {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 250, 241, 0.75)),
-    radial-gradient(circle at 18% 68%, rgba(55, 111, 145, 0.28), transparent 0.5in),
-    radial-gradient(circle at 70% 24%, rgba(136, 176, 139, 0.3), transparent 0.72in),
-    repeating-linear-gradient(
-      32deg,
-      rgba(124, 109, 98, 0.1),
-      rgba(124, 109, 98, 0.1) 0.015in,
-      transparent 0.015in,
-      transparent 0.34in
-    ),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 250, 241, 0.42)),
     #fff8e9;
   border: 1px solid rgba(124, 109, 98, 0.28);
   border-radius: 0.22in;
   box-shadow: inset 0 0 0 7px rgba(255, 255, 255, 0.4);
-  height: 4.25in;
+  height: 5.18in;
   margin-top: 0.22in;
   overflow: hidden;
   position: relative;
 }
 
+.summary-density-compact .summary-map-panel {
+  height: 4.78in;
+}
+
+.summary-density-dense .summary-map-panel {
+  height: 4.12in;
+}
+
 .summary-map-panel::before {
   background:
-    radial-gradient(circle, rgba(136, 176, 139, 0.62) 0.035in, transparent 0.04in),
-    radial-gradient(circle, rgba(55, 111, 145, 0.48) 0.032in, transparent 0.037in);
-  background-position: 0 0, 0.16in 0.13in;
-  background-size: 0.42in 0.38in, 0.5in 0.44in;
+    linear-gradient(180deg, rgba(255, 248, 233, 0.02), rgba(255, 248, 233, 0.3)),
+    radial-gradient(circle at 14% 20%, rgba(255, 255, 255, 0.26), transparent 1.3in);
   content: "";
-  inset: 0.24in;
-  opacity: 0.26;
+  inset: 0;
+  pointer-events: none;
   position: absolute;
-  z-index: 0;
+  z-index: 1;
 }
 
 .summary-map-panel::after {
@@ -260,13 +257,13 @@ p {
 }
 
 .summary-route-svg {
-  height: 3.2in;
-  left: 0.38in;
-  opacity: 0.86;
+  height: 3.88in;
+  left: 0.36in;
+  opacity: 0.68;
   position: absolute;
-  top: 0.66in;
-  width: 6.42in;
-  z-index: 1;
+  top: 0.86in;
+  width: 6.48in;
+  z-index: 2;
 }
 
 .summary-route-svg path {
@@ -275,6 +272,16 @@ p {
   stroke-dasharray: 3 3;
   stroke-linecap: round;
   stroke-width: 2.8;
+}
+
+.summary-illustration-image {
+  display: block;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+  z-index: 0;
 }
 
 .summary-map-label {
@@ -315,24 +322,24 @@ p {
   left: 0.32in;
   position: absolute;
   table-layout: fixed;
-  top: 0.98in;
+  top: 1.14in;
   width: 6.36in;
-  height: 2.99in;
-  z-index: 3;
+  height: 3.36in;
+  z-index: 4;
 }
 
 .summary-density-airy .summary-route-grid {
   left: 0.44in;
-  top: 1in;
+  top: 1.26in;
   width: 6.12in;
-  height: 2.9in;
+  height: 3.18in;
 }
 
 .summary-density-dense .summary-route-grid {
   left: 0.26in;
-  top: 0.94in;
+  top: 0.98in;
   width: 6.48in;
-  height: 3.11in;
+  height: 3.45in;
 }
 
 .summary-route-row {
@@ -346,71 +353,54 @@ p {
 }
 
 .summary-route-pin {
-  display: inline-block;
-  height: 0.76in;
+  align-items: center;
+  background: var(--green);
+  border: 4px solid #fff;
+  border-radius: 999px;
+  box-shadow:
+    0 8px 17px rgba(47, 41, 37, 0.18),
+    0 0 0 3px rgba(15, 118, 110, 0.24);
+  display: inline-flex;
+  height: 0.44in;
+  justify-content: center;
   margin: 0;
   min-width: 0;
   position: relative;
-  width: 0.76in;
+  width: 0.44in;
 }
 
 .summary-density-airy .summary-route-pin {
-  height: 0.9in;
-  width: 0.9in;
+  height: 0.5in;
+  width: 0.5in;
 }
 
 .summary-density-dense .summary-route-pin {
-  height: 0.5in;
-  width: 0.5in;
-}
-
-.summary-route-pin img {
-  background: #fff;
-  border: 4px solid #fff;
-  border-radius: 999px;
-  box-shadow: 0 8px 16px rgba(47, 41, 37, 0.14);
-  display: block;
-  height: 0.76in;
-  object-fit: cover;
-  width: 0.76in;
-}
-
-.summary-density-airy .summary-route-pin img {
-  height: 0.9in;
-  width: 0.9in;
-}
-
-.summary-density-dense .summary-route-pin img {
   border-width: 3px;
-  height: 0.5in;
-  width: 0.5in;
+  height: 0.34in;
+  width: 0.34in;
 }
 
 .summary-route-pin span {
   align-items: center;
-  background: var(--green);
-  border: 2px solid #fff;
-  border-radius: 999px;
-  box-shadow: 0 4px 10px rgba(47, 41, 37, 0.16);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   color: #fff;
   display: flex;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 11pt;
+  font-size: 13pt;
   font-weight: 900;
-  height: 0.28in;
+  height: auto;
   justify-content: center;
-  left: -0.06in;
   line-height: 1;
-  position: absolute;
-  top: -0.05in;
+  position: static;
   width: 0.28in;
   z-index: 3;
 }
 
 .summary-density-dense .summary-route-pin span {
-  font-size: 8pt;
-  height: 0.22in;
-  width: 0.22in;
+  font-size: 8.4pt;
+  width: 0.2in;
 }
 
 .summary-legend {
@@ -472,36 +462,6 @@ p {
   font-size: 8pt;
   height: 0.24in;
   width: 0.24in;
-}
-
-.summary-legend-photo {
-  border-radius: 0.09in;
-  display: block;
-  flex: 0 0 0.72in;
-  height: 0.58in;
-  overflow: hidden;
-  width: 0.72in;
-}
-
-.summary-legend-photo img {
-  border-radius: 0.08in;
-  display: block;
-  height: 100%;
-  object-fit: cover;
-  width: 100%;
-}
-
-.summary-density-airy .summary-legend-photo {
-  flex-basis: 0.94in;
-  height: 0.72in;
-  width: 0.94in;
-}
-
-.summary-density-dense .summary-legend-photo {
-  border-radius: 0.06in;
-  flex-basis: 0.36in;
-  height: 0.34in;
-  width: 0.36in;
 }
 
 .summary-legend-copy {

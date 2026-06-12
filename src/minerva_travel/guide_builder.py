@@ -9,6 +9,7 @@ def build_guide_context(
     request: GuideRequest,
     catalog: Catalog,
     cover_image: Path,
+    summary_image: Path | None = None,
     wikimedia_assets: dict[str, WikimediaAsset] | None = None,
     landmark_images: dict[str, Path] | None = None,
     landmark_lineart_images: dict[str, Path] | None = None,
@@ -58,6 +59,7 @@ def build_guide_context(
     return GuideContext(
         request=request,
         cover_image=cover_image,
+        summary_image=summary_image,
         destinations=guide_destinations,
         image_credits=_collect_credits(request, catalog, wikimedia_assets),
     )

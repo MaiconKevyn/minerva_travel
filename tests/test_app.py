@@ -304,6 +304,10 @@ def test_api_generate_uses_custom_landmark_image_url_when_wikimedia_is_missing(
             output_path.write_bytes(b"cover")
             return output_path
 
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
+            return output_path
+
         def generate_landmark_image(self, landmark_name, city, country, output_path):
             raise AssertionError("landmark image generation should stay disabled")
 
@@ -386,6 +390,10 @@ def test_api_generate_creates_local_lineart_from_custom_landmark_image_by_defaul
     class FakeGenerator:
         def generate_cover(self, family_photo, output_path, title, destination_names):
             output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
             return output_path
 
         def generate_landmark_image(self, landmark_name, city, country, output_path):
@@ -485,11 +493,17 @@ def test_api_generate_uses_confirmed_landmarks_for_cover_prompt(
     monkeypatch,
 ):
     captured_cover_landmarks = []
+    captured_summary_landmarks = []
 
     class FakeGenerator:
         def generate_cover(self, family_photo, output_path, title, destination_names):
             captured_cover_landmarks.extend(destination_names)
             output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            captured_summary_landmarks.extend(destination_names)
+            output_path.write_bytes(b"summary")
             return output_path
 
         def generate_landmark_image(self, landmark_name, city, country, output_path):
@@ -533,6 +547,64 @@ def test_api_generate_uses_confirmed_landmarks_for_cover_prompt(
 
     assert response.status_code == 200
     assert captured_cover_landmarks == ["Cristo Redentor", "Usina do Gasometro"]
+    assert captured_summary_landmarks == ["Cristo Redentor", "Usina do Gasometro"]
+
+
+def test_api_generate_passes_trip_summary_image_to_pdf(
+    tmp_path,
+    monkeypatch,
+):
+    captured_summary_image = []
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
+            return output_path
+
+        def generate_landmark_image(self, landmark_name, city, country, output_path):
+            raise AssertionError("landmark image generation should stay disabled")
+
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            raise AssertionError("landmark lineart generation should stay disabled")
+
+    def fake_write_pdf(context, output_path):
+        captured_summary_image.append(context.summary_image)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"pdf")
+        return output_path
+
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", lambda *_: {})
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setattr("minerva_travel.app.write_pdf", fake_write_pdf)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Guia do Brasil",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "custom_landmarks": "Cristo Redentor, Rio de Janeiro, Brasil",
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert captured_summary_image
+    assert captured_summary_image[0].name.endswith("-summary.png")
 
 
 def test_api_generate_creates_images_for_confirmed_landmarks(
@@ -545,6 +617,10 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
     class FakeGenerator:
         def generate_cover(self, family_photo, output_path, title, destination_names):
             output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
             return output_path
 
         def generate_landmark_image(self, landmark_name, city, country, output_path):
@@ -628,6 +704,10 @@ def test_api_generate_uses_wikimedia_image_before_generating_landmark_art(
             output_path.write_bytes(b"cover")
             return output_path
 
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
+            return output_path
+
         def generate_landmark_image(self, landmark_name, city, country, output_path):
             generated_landmarks.append((landmark_name, city, country))
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -697,6 +777,10 @@ def test_api_generate_uses_supabase_landmark_asset_url_in_pdf(
     class FakeGenerator:
         def generate_cover(self, family_photo, output_path, title, destination_names):
             output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
             return output_path
 
         def generate_landmark_image(self, landmark_name, city, country, output_path):

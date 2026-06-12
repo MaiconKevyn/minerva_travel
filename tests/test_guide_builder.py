@@ -44,6 +44,27 @@ def test_build_guide_context_preserves_catalog_order_inside_destination():
     ]
 
 
+def test_build_guide_context_includes_summary_image():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower"],
+    )
+    summary_image = Path("runtime/generated/summary.png")
+
+    context = build_guide_context(
+        request,
+        catalog,
+        Path("runtime/generated/cover.png"),
+        summary_image=summary_image,
+    )
+
+    assert context.summary_image == summary_image
+
+
 def test_build_guide_context_uses_wikimedia_images_and_credits():
     catalog = load_catalog(Path("data/destinations/europe_2026.json"))
     request = GuideRequest(

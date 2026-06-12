@@ -33,6 +33,9 @@
       </div>
 
       <div class="summary-map-panel">
+        {% if guide.summary_image %}
+          <img class="summary-illustration-image" src="{{ guide.summary_image }}" alt="">
+        {% endif %}
         <div class="summary-map-label">Mapa da aventura</div>
         <div class="summary-map-compass">N</div>
         <svg class="summary-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -52,8 +55,7 @@
               {% for summary in row %}
                 <td class="summary-route-cell">
                   {% if summary %}
-                    <article class="summary-route-pin">
-                      <img src="{{ summary.landmark.image }}" alt="">
+                    <article class="summary-route-pin summary-route-marker">
                       <span>{{ summary.number }}</span>
                     </article>
                   {% endif %}
@@ -69,9 +71,6 @@
         {% for summary in summary_items %}
           <li class="summary-legend-item">
             <span class="summary-legend-number">{{ summary.number }}</span>
-            <span class="summary-legend-photo">
-              <img src="{{ summary.landmark.image }}" alt="">
-            </span>
             <div class="summary-legend-copy">
               <strong>{{ summary.landmark.name }}</strong>
               <small>{{ summary.destination.city }}, {{ summary.destination.country }}</small>

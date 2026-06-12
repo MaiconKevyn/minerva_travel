@@ -15,6 +15,14 @@ class ImageGenerator(Protocol):
     ) -> Path:
         """Generate a cover image and return its local path."""
 
+    def generate_trip_summary(
+        self,
+        output_path: Path,
+        title: str,
+        destination_names: list[str],
+    ) -> Path:
+        """Generate an illustrated route-map summary and return its local path."""
+
     def generate_landmark_image(
         self,
         landmark_name: str,
@@ -88,6 +96,70 @@ class PlaceholderImageGenerator:
             fill="#7d6549",
             font=font_small,
         )
+        image.save(output_path)
+        return output_path
+
+    def generate_trip_summary(
+        self,
+        output_path: Path,
+        title: str,
+        destination_names: list[str],
+    ) -> Path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        image = Image.new("RGB", (1600, 1200), "#fff3df")
+        draw = ImageDraw.Draw(image)
+
+        draw.rounded_rectangle(
+            (70, 70, 1530, 1130),
+            radius=78,
+            fill="#fff8ea",
+            outline="#2d7588",
+            width=8,
+        )
+        draw.rectangle((88, 88, 1512, 380), fill="#cfe9f3")
+        draw.polygon(
+            [
+                (82, 780),
+                (360, 660),
+                (640, 720),
+                (930, 610),
+                (1260, 680),
+                (1518, 570),
+                (1518, 1130),
+                (82, 1130),
+            ],
+            fill="#cbe3b7",
+        )
+        draw.line(
+            [(78, 920), (350, 820), (620, 890), (890, 790), (1190, 865), (1522, 760)],
+            fill="#82c4d3",
+            width=110,
+        )
+        draw.line(
+            [(78, 920), (350, 820), (620, 890), (890, 790), (1190, 865), (1522, 760)],
+            fill="#4d9db3",
+            width=24,
+        )
+
+        for x, y, scale in [
+            (270, 505, 1.0),
+            (575, 450, 0.72),
+            (900, 500, 0.88),
+            (1245, 445, 0.76),
+        ]:
+            _draw_placeholder_landmark(draw, x, y, scale)
+        for x, y in [
+            (160, 650),
+            (335, 615),
+            (715, 610),
+            (1085, 615),
+            (1395, 660),
+            (470, 980),
+            (1020, 980),
+            (1320, 930),
+        ]:
+            _draw_tree(draw, x, y)
+
         image.save(output_path)
         return output_path
 
@@ -191,6 +263,31 @@ class ReplicateImageGenerator:
         _write_replicate_output(output, output_path)
         return output_path
 
+    def generate_trip_summary(
+        self,
+        output_path: Path,
+        title: str,
+        destination_names: list[str],
+    ) -> Path:
+        import replicate
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output = _run_replicate_with_retry(
+            replicate,
+            self.landmark_model,
+            input={
+                "prompt": trip_summary_prompt(
+                    title=title,
+                    destination_names=destination_names,
+                ),
+                "aspect_ratio": "4:3",
+                "output_format": "png",
+                "num_outputs": 1,
+            },
+        )
+        _write_replicate_output(output, output_path)
+        return output_path
+
     def generate_landmark_image(
         self,
         landmark_name: str,
@@ -278,6 +375,20 @@ def landmark_prompt(landmark_name: str, city: str, country: str) -> str:
     )
 
 
+def trip_summary_prompt(title: str, destination_names: list[str]) -> str:
+    landmarks = ", ".join(destination_names)
+    return (
+        "Create a premium children's travel diary illustrated route-map background "
+        f"for the trip '{title}'. Use a warm watercolor and gouache style, like a "
+        "storybook travel planner page inspired by the confirmed places: "
+        f"{landmarks}. Include recognizable simplified silhouettes of the landmarks, "
+        "parks, streets, rivers, boats, and family-friendly details. Leave generous "
+        "open areas for the app to overlay a dotted route and numbered markers later. "
+        "Do not include readable text, labels, numbers, route markers, logos, "
+        "watermarks, signatures, prices, clocks, or UI elements inside the image."
+    )
+
+
 def landmark_lineart_prompt(landmark_name: str, city: str, country: str) -> str:
     return (
         "Transform the reference landmark illustration into a black and white "
@@ -350,6 +461,41 @@ def _run_replicate_with_retry(replicate_module, model: str, **kwargs: object) ->
             sleep(10 * (attempt + 1))
     assert last_error is not None
     raise last_error
+
+
+def _draw_placeholder_landmark(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    scale: float,
+) -> None:
+    width = int(90 * scale)
+    height = int(210 * scale)
+    draw.rectangle(
+        (x - width, y + height // 3, x + width, y + height),
+        fill="#efd9b5",
+        outline="#7d6549",
+        width=4,
+    )
+    draw.polygon(
+        (x, y, x - width, y + height // 3, x + width, y + height // 3),
+        fill="#d77a61",
+        outline="#7d6549",
+    )
+    for offset in (-45, 0, 45):
+        window_x = x + int(offset * scale)
+        draw.rectangle(
+            (window_x - 16, y + height // 2, window_x + 16, y + height - 26),
+            fill="#92bed1",
+            outline="#7d6549",
+            width=2,
+        )
+
+
+def _draw_tree(draw: ImageDraw.ImageDraw, x: int, y: int) -> None:
+    draw.rectangle((x - 10, y + 28, x + 10, y + 85), fill="#8a5f3d")
+    draw.ellipse((x - 50, y - 20, x + 50, y + 65), fill="#6fa15f", outline="#497f47", width=3)
+    draw.ellipse((x - 26, y - 50, x + 36, y + 35), fill="#88b08b", outline="#497f47", width=3)
 
 
 def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:

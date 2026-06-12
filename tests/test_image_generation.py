@@ -9,6 +9,7 @@ from minerva_travel.image_generation import (
     _write_replicate_output,
     cover_prompt,
     landmark_lineart_prompt,
+    trip_summary_prompt,
 )
 
 
@@ -38,6 +39,32 @@ def test_cover_prompt_avoids_text_inside_image():
 
     assert "Do not include any readable text" in prompt
     assert "Paris, Londres" in prompt
+
+
+def test_placeholder_image_generator_creates_trip_summary(tmp_path):
+    output = tmp_path / "summary.png"
+
+    generator = PlaceholderImageGenerator()
+    result = generator.generate_trip_summary(
+        output_path=output,
+        title="Pequenos Exploradores pela Europa",
+        destination_names=["Museu do Louvre", "Gallery of Evolution", "Torre Eiffel"],
+    )
+
+    assert result == output
+    assert output.exists()
+    assert output.stat().st_size > 1000
+
+
+def test_trip_summary_prompt_asks_for_illustrated_route_without_text():
+    prompt = trip_summary_prompt(
+        title="Pequenos Exploradores pela Europa",
+        destination_names=["Museu do Louvre", "Gallery of Evolution"],
+    )
+
+    assert "illustrated route-map" in prompt
+    assert "Museu do Louvre, Gallery of Evolution" in prompt
+    assert "Do not include readable text" in prompt
 
 
 def test_replicate_image_generator_writes_file_output(tmp_path, monkeypatch):

@@ -106,6 +106,7 @@ class GuideSummaryLandmark(BaseModel):
 class GuideContext(BaseModel):
     request: GuideRequest
     cover_image: Path
+    summary_image: Path | None = None
     destinations: list[GuideDestination]
     image_credits: list[ImageCredit] = Field(default_factory=list)
 

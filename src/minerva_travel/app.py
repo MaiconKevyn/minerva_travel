@@ -369,6 +369,12 @@ async def generate_pdf_from_form(
         title=request.title,
         destination_names=cover_landmark_names,
     )
+    summary_path = storage.generated_path(f"{request_id}-summary.png")
+    generator.generate_trip_summary(
+        output_path=summary_path,
+        title=request.title,
+        destination_names=cover_landmark_names,
+    )
 
     wikimedia_assets = load_wikimedia_manifest()
     wikimedia_assets.update(fetch_custom_wikimedia_assets(custom_destinations, request_id))
@@ -415,6 +421,7 @@ async def generate_pdf_from_form(
         request,
         catalog,
         cover_path,
+        summary_image=summary_path,
         wikimedia_assets=wikimedia_assets,
         landmark_images=landmark_images,
         landmark_lineart_images=landmark_lineart_images,

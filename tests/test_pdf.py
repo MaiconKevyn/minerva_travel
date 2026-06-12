@@ -16,7 +16,12 @@ def test_render_guide_html_contains_selected_content():
         year=2026,
         selected_landmarks=["paris:eiffel-tower"],
     )
-    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+    context = build_guide_context(
+        request,
+        catalog,
+        Path("runtime/generated/cover.png"),
+        summary_image=Path("runtime/generated/summary.png"),
+    )
 
     html = render_guide_html(context)
 
@@ -104,6 +109,7 @@ def test_render_guide_html_adds_trip_summary_after_cover():
     assert "Resumo da viagem" in html
     assert ">2</strong>" in html
     assert "paradas confirmadas" in html
+    assert "summary-illustration-image" in html
 
 
 def test_render_guide_html_trip_summary_lists_all_confirmed_landmarks():
@@ -119,7 +125,12 @@ def test_render_guide_html_trip_summary_lists_all_confirmed_landmarks():
         year=2026,
         selected_landmarks=paris_landmarks,
     )
-    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+    context = build_guide_context(
+        request,
+        catalog,
+        Path("runtime/generated/cover.png"),
+        summary_image=Path("runtime/generated/summary.png"),
+    )
 
     html = render_guide_html(context)
     summary = html.split('<section class="page trip-summary-page', maxsplit=1)[1].split(
@@ -129,7 +140,9 @@ def test_render_guide_html_trip_summary_lists_all_confirmed_landmarks():
     assert 'data-summary-count="10"' in summary
     assert "summary-density-compact" in summary
     assert summary.count("summary-legend-item") == 10
-    assert summary.count("summary-legend-photo") == 10
+    assert summary.count("summary-route-marker") == 10
+    assert "summary-legend-photo" not in summary
+    assert "runtime/generated/summary.png" in summary
     readable_summary = unescape(summary)
     for landmark in catalog.find_destination("paris").landmarks:
         assert landmark.name in readable_summary
@@ -148,7 +161,12 @@ def test_render_guide_html_trip_summary_uses_dense_layout_for_many_landmarks():
         year=2026,
         selected_landmarks=selected_landmarks,
     )
-    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+    context = build_guide_context(
+        request,
+        catalog,
+        Path("runtime/generated/cover.png"),
+        summary_image=Path("runtime/generated/summary.png"),
+    )
 
     html = render_guide_html(context)
     summary = html.split('<section class="page trip-summary-page', maxsplit=1)[1].split(
@@ -158,6 +176,7 @@ def test_render_guide_html_trip_summary_uses_dense_layout_for_many_landmarks():
     assert 'data-summary-count="17"' in summary
     assert "summary-density-dense" in summary
     assert summary.count("summary-legend-item") == 17
+    assert summary.count("summary-route-marker") == 17
     assert "Torre Eiffel" in summary
     assert "Big Ben" in summary
 
