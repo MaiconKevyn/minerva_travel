@@ -103,6 +103,14 @@ GOOGLE_TYPE_CATEGORIES = {
     "zoo": "animals",
 }
 
+FOOD_PLACE_TYPES = {"bakery", "cafe", "restaurant"}
+ADULT_OR_NIGHTLIFE_PLACE_TYPES = {
+    "bar",
+    "casino",
+    "liquor_store",
+    "night_club",
+}
+
 CATEGORY_DURATIONS = {
     "animals": 120,
     "art": 90,
@@ -220,6 +228,8 @@ def _discover_places(
             place_id = str(place.get("id") or "")
             if not place_id:
                 continue
+            if not _is_family_compatible_place(place, profile_category):
+                continue
             candidate = _place_to_stop(
                 place,
                 resolved=resolved,
@@ -233,6 +243,15 @@ def _discover_places(
             if not existing or candidate["match_score"] > existing["match_score"]:
                 candidates[place_id] = candidate
     return candidates
+
+
+def _is_family_compatible_place(place: dict[str, Any], query_category: str) -> bool:
+    place_types = set(place.get("types", []))
+    if place_types & ADULT_OR_NIGHTLIFE_PLACE_TYPES:
+        return False
+    if query_category != "food" and place_types & FOOD_PLACE_TYPES:
+        return False
+    return True
 
 
 def _search_places(

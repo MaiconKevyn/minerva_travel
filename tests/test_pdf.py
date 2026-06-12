@@ -1,5 +1,5 @@
-from pathlib import Path
 from html import unescape
+from pathlib import Path
 
 from minerva_travel.catalog import load_catalog
 from minerva_travel.guide_builder import build_guide_context
@@ -108,7 +108,10 @@ def test_render_guide_html_adds_trip_summary_after_cover():
 
 def test_render_guide_html_trip_summary_lists_all_confirmed_landmarks():
     catalog = load_catalog(Path("data/destinations/europe_2026.json"))
-    paris_landmarks = [f"paris:{landmark.id}" for landmark in catalog.find_destination("paris").landmarks]
+    paris_landmarks = [
+        f"paris:{landmark.id}"
+        for landmark in catalog.find_destination("paris").landmarks
+    ]
     request = GuideRequest(
         title="Pequenos Exploradores pela Europa",
         children_names=["Alice"],

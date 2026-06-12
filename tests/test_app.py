@@ -677,6 +677,29 @@ def test_fetch_custom_wikimedia_assets_ignores_network_failures(monkeypatch):
     assert fetch_custom_wikimedia_assets(destinations, "request-123") == {}
 
 
+def test_fetch_custom_wikimedia_assets_skips_landmarks_with_provided_image(monkeypatch):
+    destinations, _selected = custom_destinations_from_form(
+        json.dumps(
+            [
+                {
+                    "name": "Torre Eiffel",
+                    "city": "Paris",
+                    "country": "Franca",
+                    "description": ["A torre foi escolhida no roteiro."],
+                    "image": "https://lh3.googleusercontent.com/place-photo=w900",
+                }
+            ]
+        )
+    )
+
+    def fake_fetch_landmark_asset(*_args, **_kwargs):
+        raise AssertionError("Wikimedia should not run when the card image is already available")
+
+    monkeypatch.setattr("minerva_travel.app.fetch_landmark_asset", fake_fetch_landmark_asset)
+
+    assert fetch_custom_wikimedia_assets(destinations, "request-123") == {}
+
+
 def test_selected_landmark_art_generates_multiple_landmarks_concurrently(monkeypatch):
     destinations, selected = custom_destinations_from_form(
         "Cristo Redentor, Rio de Janeiro, Brasil\n"

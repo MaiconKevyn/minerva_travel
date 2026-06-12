@@ -669,6 +669,8 @@ def fetch_custom_wikimedia_assets(
     ) as client:
         for destination in destinations:
             for landmark in destination.landmarks:
+                if _is_allowed_custom_image_url(str(landmark.image or "").strip()):
+                    continue
                 selection_id = f"{destination.id}:{landmark.id}"
                 try:
                     asset = fetch_landmark_asset(client, destination, landmark, output_dir)

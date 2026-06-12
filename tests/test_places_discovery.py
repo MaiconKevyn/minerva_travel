@@ -355,6 +355,46 @@ def test_discover_dynamic_itinerary_keeps_one_stop_per_explicit_family_request()
     assert stop_names == ["Torre Eiffel", "Atelier Infantil de Arte", "Almoco Familiar"]
 
 
+def test_discover_dynamic_itinerary_skips_restaurants_for_non_food_requests():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Lisboa", "Portugal", 38.7223, -9.1393)
+        if "places:searchText" in url:
+            text = request.read().decode()
+            if "rio" in text or "barco" in text:
+                return httpx.Response(
+                    200,
+                    json={
+                        "places": [
+                            _place("restaurant-rio", "Feel Rio", ["restaurant"]),
+                            _place("tejo-boat", "Passeio de Barco no Tejo", ["tourist_attraction"]),
+                        ]
+                    },
+                )
+            return httpx.Response(200, json={"places": []})
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(
+                destination="Lisboa",
+                days=1,
+                interests=["rio"],
+                pace="light",
+            ),
+            api_key="test-key",
+            client=client,
+        )
+
+    stop_names = [stop["name"] for day in recommendation["days"] for stop in day["stops"]]
+
+    assert "Feel Rio" not in stop_names
+    assert stop_names[0] == "Passeio de Barco no Tejo"
+
+
 def test_discover_dynamic_itinerary_prioritizes_requested_interests():
     calls: list[tuple[str, dict[str, object] | None]] = []
 
