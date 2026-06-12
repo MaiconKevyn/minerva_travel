@@ -110,6 +110,12 @@ def test_render_guide_html_adds_trip_summary_after_cover():
     assert ">2</strong>" in html
     assert "paradas confirmadas" in html
     assert "summary-illustration-image" in html
+    assert "summary-infographic-layout" in html
+    assert "summary-map-card" in html
+    assert "summary-details-panel" in html
+    assert "summary-terminal-start" in html
+    assert "summary-terminal-finish" in html
+    assert "Torre Eiffel + Museu do Louvre" in html
 
 
 def test_render_guide_html_trip_summary_lists_all_confirmed_landmarks():
@@ -139,8 +145,9 @@ def test_render_guide_html_trip_summary_lists_all_confirmed_landmarks():
 
     assert 'data-summary-count="10"' in summary
     assert "summary-density-compact" in summary
-    assert summary.count("summary-legend-item") == 10
-    assert summary.count("summary-route-marker") == 10
+    assert summary.count("summary-stop-card") == 10
+    assert summary.count('class="summary-map-marker summary-route-marker"') == 10
+    assert '<img src="assets/landmarks' not in summary
     assert "summary-legend-photo" not in summary
     assert "runtime/generated/summary.png" in summary
     readable_summary = unescape(summary)
@@ -175,8 +182,8 @@ def test_render_guide_html_trip_summary_uses_dense_layout_for_many_landmarks():
 
     assert 'data-summary-count="17"' in summary
     assert "summary-density-dense" in summary
-    assert summary.count("summary-legend-item") == 17
-    assert summary.count("summary-route-marker") == 17
+    assert summary.count("summary-stop-card") == 17
+    assert summary.count('class="summary-map-marker summary-route-marker"') == 17
     assert "Torre Eiffel" in summary
     assert "Big Ben" in summary
 

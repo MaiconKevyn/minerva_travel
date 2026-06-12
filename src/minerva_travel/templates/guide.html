@@ -21,63 +21,64 @@
 
     {% set summary_items = guide.summary_landmarks %}
     <section class="page trip-summary-page summary-density-{{ guide.summary_density }}" data-summary-count="{{ summary_items|length }}">
-      <div class="trip-summary-header">
-        <div>
+      <div class="summary-infographic-layout">
+        <div class="summary-map-card">
+          {% if guide.summary_image %}
+            <img class="summary-illustration-image" src="{{ guide.summary_image }}" alt="">
+          {% endif %}
+          <div class="summary-terminal summary-terminal-start">Inicio</div>
+          <svg class="summary-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path
+              class="summary-route-shell"
+              d="M 45 7 C 28 18 31 30 52 39 S 74 57 49 66 S 28 81 54 93"
+              fill="none"
+              stroke="#ffffff"
+              stroke-linecap="round"
+              stroke-width="7"
+            />
+            <path
+              class="summary-route-core"
+              d="M 45 7 C 28 18 31 30 52 39 S 74 57 49 66 S 28 81 54 93"
+              fill="none"
+              stroke="#0f766e"
+              stroke-dasharray="1.2 2"
+              stroke-linecap="round"
+              stroke-width="1.35"
+            />
+          </svg>
+          <div class="summary-map-markers">
+            {% for summary in summary_items %}
+              <div class="summary-map-marker summary-route-marker">
+                <span>{{ summary.number }}</span>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="summary-terminal summary-terminal-finish">Fim</div>
+        </div>
+
+        <div class="summary-details-panel">
+          <div class="summary-ribbon">Roteiro</div>
           <p class="page-kicker">Resumo da viagem</p>
-          <h2>Roteiro da familia</h2>
-        </div>
-        <div class="summary-count-badge">
-          <strong>{{ summary_items|length }}</strong>
-          <span>{% if summary_items|length == 1 %}parada confirmada{% else %}paradas confirmadas{% endif %}</span>
+          <h2 class="summary-headline">{{ guide.summary_headline }}</h2>
+          <p class="summary-subtitle">Comece sua aventura em {{ guide.summary_primary_city }}</p>
+          <div class="summary-count-badge">
+            <strong>{{ summary_items|length }}</strong>
+            <span>{% if summary_items|length == 1 %}parada confirmada{% else %}paradas confirmadas{% endif %}</span>
+          </div>
+
+          <ol class="summary-itinerary-list">
+            {% for summary in summary_items %}
+              <li class="summary-stop-card">
+                <span class="summary-stop-number">{{ summary.number }}</span>
+                <div class="summary-stop-copy">
+                  <strong>{{ summary.landmark.name }}</strong>
+                  <small>{{ summary.destination.city }}, {{ summary.destination.country }}</small>
+                </div>
+              </li>
+            {% endfor %}
+          </ol>
         </div>
       </div>
-
-      <div class="summary-map-panel">
-        {% if guide.summary_image %}
-          <img class="summary-illustration-image" src="{{ guide.summary_image }}" alt="">
-        {% endif %}
-        <div class="summary-map-label">Mapa da aventura</div>
-        <div class="summary-map-compass">N</div>
-        <svg class="summary-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <path
-            d="M 10 22 C 23 10 42 21 57 13 S 83 18 91 29 C 83 45 63 43 49 41 S 20 50 12 68 C 28 78 44 68 59 78 S 82 72 91 84"
-            fill="none"
-            stroke="#1a6f71"
-            stroke-dasharray="2 2.4"
-            stroke-linecap="round"
-            stroke-width="1.15"
-          />
-        </svg>
-        <table class="summary-route-grid">
-          <tbody>
-          {% for row in guide.summary_map_rows %}
-            <tr class="summary-route-row">
-              {% for summary in row %}
-                <td class="summary-route-cell">
-                  {% if summary %}
-                    <article class="summary-route-pin summary-route-marker">
-                      <span>{{ summary.number }}</span>
-                    </article>
-                  {% endif %}
-                </td>
-              {% endfor %}
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <ol class="summary-legend">
-        {% for summary in summary_items %}
-          <li class="summary-legend-item">
-            <span class="summary-legend-number">{{ summary.number }}</span>
-            <div class="summary-legend-copy">
-              <strong>{{ summary.landmark.name }}</strong>
-              <small>{{ summary.destination.city }}, {{ summary.destination.country }}</small>
-            </div>
-          </li>
-        {% endfor %}
-      </ol>
     </section>
 
     <section class="page letter-page journey-phase-page phase-before">

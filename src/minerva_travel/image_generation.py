@@ -106,57 +106,56 @@ class PlaceholderImageGenerator:
         destination_names: list[str],
     ) -> Path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        image = Image.new("RGB", (1600, 1200), "#fff3df")
+        image = Image.new("RGB", (900, 1600), "#fff3df")
         draw = ImageDraw.Draw(image)
 
         draw.rounded_rectangle(
-            (70, 70, 1530, 1130),
-            radius=78,
+            (40, 40, 860, 1560),
+            radius=70,
             fill="#fff8ea",
             outline="#2d7588",
             width=8,
         )
-        draw.rectangle((88, 88, 1512, 380), fill="#cfe9f3")
+        draw.rectangle((58, 58, 842, 470), fill="#cfe9f3")
         draw.polygon(
             [
-                (82, 780),
-                (360, 660),
-                (640, 720),
-                (930, 610),
-                (1260, 680),
-                (1518, 570),
-                (1518, 1130),
-                (82, 1130),
+                (48, 820),
+                (210, 720),
+                (390, 790),
+                (535, 710),
+                (700, 790),
+                (852, 690),
+                (852, 1560),
+                (48, 1560),
             ],
             fill="#cbe3b7",
         )
         draw.line(
-            [(78, 920), (350, 820), (620, 890), (890, 790), (1190, 865), (1522, 760)],
+            [(55, 1160), (260, 1050), (470, 1165), (660, 1040), (850, 1115)],
             fill="#82c4d3",
-            width=110,
+            width=120,
         )
         draw.line(
-            [(78, 920), (350, 820), (620, 890), (890, 790), (1190, 865), (1522, 760)],
+            [(55, 1160), (260, 1050), (470, 1165), (660, 1040), (850, 1115)],
             fill="#4d9db3",
             width=24,
         )
 
         for x, y, scale in [
-            (270, 505, 1.0),
-            (575, 450, 0.72),
-            (900, 500, 0.88),
-            (1245, 445, 0.76),
+            (250, 610, 0.86),
+            (585, 560, 0.78),
+            (390, 920, 0.68),
+            (680, 895, 0.74),
         ]:
             _draw_placeholder_landmark(draw, x, y, scale)
         for x, y in [
-            (160, 650),
-            (335, 615),
-            (715, 610),
-            (1085, 615),
-            (1395, 660),
-            (470, 980),
-            (1020, 980),
-            (1320, 930),
+            (125, 770),
+            (745, 760),
+            (190, 1015),
+            (585, 1040),
+            (785, 1260),
+            (250, 1370),
+            (510, 1360),
         ]:
             _draw_tree(draw, x, y)
 
@@ -280,7 +279,7 @@ class ReplicateImageGenerator:
                     title=title,
                     destination_names=destination_names,
                 ),
-                "aspect_ratio": "4:3",
+                "aspect_ratio": "9:16",
                 "output_format": "png",
                 "num_outputs": 1,
             },
@@ -378,14 +377,19 @@ def landmark_prompt(landmark_name: str, city: str, country: str) -> str:
 def trip_summary_prompt(title: str, destination_names: list[str]) -> str:
     landmarks = ", ".join(destination_names)
     return (
-        "Create a premium children's travel diary illustrated route-map background "
-        f"for the trip '{title}'. Use a warm watercolor and gouache style, like a "
-        "storybook travel planner page inspired by the confirmed places: "
-        f"{landmarks}. Include recognizable simplified silhouettes of the landmarks, "
-        "parks, streets, rivers, boats, and family-friendly details. Leave generous "
-        "open areas for the app to overlay a dotted route and numbered markers later. "
-        "Do not include readable text, labels, numbers, route markers, logos, "
-        "watermarks, signatures, prices, clocks, or UI elements inside the image."
+        "Create a vertical text-free children's book travel illustration for the "
+        "left map panel of a printed itinerary page. It should feel like the scenic "
+        "illustration side of a premium family travel planner, with lush watercolor "
+        "and gouache detail, playful city scenery, recognizable landmark silhouettes, "
+        "parks, streets, river, small boats, carousels or family-friendly details, "
+        f"and warm daylight. The trip title is '{title}' and the scenery is inspired "
+        f"by these confirmed places: {landmarks}. Draw only the scenery. The app will "
+        "add all title text, stop names, route numbers, start/end pins, and route "
+        "graphics separately. Leave clear visual space for those overlays. Do not "
+        "include readable text, labels, or numbers. Do not include landmark names "
+        "as text. Do not include handwriting, map labels, street names, signs, "
+        "posters, banners, tickets, route markers, logos, watermarks, signatures, "
+        "prices, clocks, UI elements, or any typography inside the image."
     )
 
 

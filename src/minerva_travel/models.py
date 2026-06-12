@@ -135,6 +135,23 @@ class GuideContext(BaseModel):
         return "dense"
 
     @property
+    def summary_headline(self) -> str:
+        items = self.summary_landmarks
+        if not items:
+            return self.request.title
+        if len(items) == 1:
+            return items[0].landmark.name
+        return f"{items[0].landmark.name} + {items[1].landmark.name}"
+
+    @property
+    def summary_primary_city(self) -> str:
+        items = self.summary_landmarks
+        if not items:
+            return "sua viagem"
+        first = items[0]
+        return f"{first.destination.city}, {first.destination.country}"
+
+    @property
     def summary_map_columns(self) -> int:
         if self.summary_density == "airy":
             return 3

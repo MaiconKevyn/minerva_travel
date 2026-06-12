@@ -62,9 +62,10 @@ def test_trip_summary_prompt_asks_for_illustrated_route_without_text():
         destination_names=["Museu do Louvre", "Gallery of Evolution"],
     )
 
-    assert "illustrated route-map" in prompt
+    assert "vertical text-free children's book travel illustration" in prompt
     assert "Museu do Louvre, Gallery of Evolution" in prompt
     assert "Do not include readable text" in prompt
+    assert "Do not include landmark names" in prompt
 
 
 def test_replicate_image_generator_writes_file_output(tmp_path, monkeypatch):
