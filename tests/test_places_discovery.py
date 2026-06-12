@@ -136,6 +136,49 @@ def test_resolve_landmark_locations_retries_until_google_places_returns_coordina
     assert len(search_queries) == 2
 
 
+def test_resolve_landmark_locations_does_not_fall_back_to_bare_query_for_known_destination():
+    search_queries: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "places:searchText" in url:
+            text = request.read().decode()
+            search_queries.append(text)
+            if "ponto turistico" in text or "Espanha" in text:
+                return httpx.Response(200, json={"places": []})
+            return httpx.Response(
+                200,
+                json={
+                    "places": [
+                        _place(
+                            "wrong-country",
+                            "Santiago de Compostela",
+                            ["tourist_attraction"],
+                            address="Santiago de Compostela, Brasil",
+                            lat=-15.7797,
+                            lng=-47.9297,
+                        )
+                    ]
+                },
+            )
+        raise AssertionError(f"Unexpected request: {url}")
+
+    destinations, _selected = build_custom_destinations(
+        parse_custom_landmarks("Santiago de Compostela, Santiago de Compostela, Espanha")
+    )
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        metadata = resolve_landmark_locations(
+            destinations,
+            api_key="test-key",
+            client=client,
+        )
+
+    assert metadata == {}
+    assert len(search_queries) == 2
+
+
 def test_discover_dynamic_itinerary_adds_google_place_photos_to_visible_cards():
     photo_requests: list[str] = []
 
@@ -443,12 +486,15 @@ def _place(
     rating: float = 4.5,
     count: int = 1000,
     photos: list[dict[str, object]] | None = None,
+    address: str = "Endereco",
+    lat: float = 48.8566,
+    lng: float = 2.3522,
 ) -> dict[str, object]:
     return {
         "id": place_id,
         "displayName": {"text": name},
-        "formattedAddress": "Endereco",
-        "location": {"latitude": 48.8566, "longitude": 2.3522},
+        "formattedAddress": address,
+        "location": {"latitude": lat, "longitude": lng},
         "types": types,
         "rating": rating,
         "userRatingCount": count,

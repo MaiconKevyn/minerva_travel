@@ -307,19 +307,32 @@ def _resolve_landmark_place(
 
 
 def _landmark_location_queries(destination: Destination, landmark_name: str) -> list[str]:
-    base_parts = [landmark_name, destination.city, destination.country]
+    destination_terms = _destination_location_terms(destination)
+    base_parts = [landmark_name, *destination_terms]
     base_query = " ".join(part.strip() for part in base_parts if part and part.strip())
     discovery_query = " ".join(
         part.strip()
         for part in [
             landmark_name,
             "ponto turistico",
-            destination.city,
-            destination.country,
+            *destination_terms,
         ]
         if part and part.strip()
     )
-    return list(dict.fromkeys([base_query, discovery_query, landmark_name]))
+    queries = [base_query, discovery_query]
+    if not destination_terms:
+        queries.append(landmark_name)
+    return list(dict.fromkeys([query for query in queries if query]))
+
+
+def _destination_location_terms(destination: Destination) -> list[str]:
+    generic_terms = {"", "roteiro personalizado", "personalizado"}
+    terms = []
+    for value in [destination.city, destination.country]:
+        normalized = _normalize_text(value)
+        if normalized not in generic_terms:
+            terms.append(value)
+    return terms
 
 
 def _search_landmark_location(
