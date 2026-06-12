@@ -289,7 +289,7 @@ p {
   position: absolute;
   text-transform: uppercase;
   top: 0;
-  z-index: 2;
+  z-index: 6;
 }
 
 .summary-map-compass {
@@ -312,22 +312,25 @@ p {
 
 .summary-route-grid {
   border-collapse: collapse;
-  inset: 0.98in 0.32in 0.24in;
+  left: 0.32in;
   position: absolute;
   table-layout: fixed;
+  top: 0.98in;
   width: 6.36in;
   height: 2.99in;
   z-index: 3;
 }
 
 .summary-density-airy .summary-route-grid {
-  inset: 1in 0.44in 0.32in;
+  left: 0.44in;
+  top: 1in;
   width: 6.12in;
   height: 2.9in;
 }
 
 .summary-density-dense .summary-route-grid {
-  inset: 0.94in 0.26in 0.2in;
+  left: 0.26in;
+  top: 0.94in;
   width: 6.48in;
   height: 3.11in;
 }
@@ -344,21 +347,21 @@ p {
 
 .summary-route-pin {
   display: inline-block;
-  height: 0.72in;
+  height: 0.76in;
   margin: 0;
   min-width: 0;
   position: relative;
-  width: 0.72in;
+  width: 0.76in;
 }
 
 .summary-density-airy .summary-route-pin {
-  height: 0.88in;
-  width: 0.88in;
+  height: 0.9in;
+  width: 0.9in;
 }
 
 .summary-density-dense .summary-route-pin {
-  height: 0.48in;
-  width: 0.48in;
+  height: 0.5in;
+  width: 0.5in;
 }
 
 .summary-route-pin img {
@@ -367,20 +370,20 @@ p {
   border-radius: 999px;
   box-shadow: 0 8px 16px rgba(47, 41, 37, 0.14);
   display: block;
-  height: 0.72in;
+  height: 0.76in;
   object-fit: cover;
-  width: 0.72in;
+  width: 0.76in;
 }
 
 .summary-density-airy .summary-route-pin img {
-  height: 0.88in;
-  width: 0.88in;
+  height: 0.9in;
+  width: 0.9in;
 }
 
 .summary-density-dense .summary-route-pin img {
   border-width: 3px;
-  height: 0.48in;
-  width: 0.48in;
+  height: 0.5in;
+  width: 0.5in;
 }
 
 .summary-route-pin span {
@@ -432,14 +435,14 @@ p {
   border: 1px solid rgba(124, 109, 98, 0.24);
   border-radius: 0.14in;
   display: flex;
-  gap: 0.08in;
-  min-height: 0.62in;
+  gap: 0.1in;
+  min-height: 0.78in;
   overflow: hidden;
-  padding: 0.06in 0.08in;
+  padding: 0.07in 0.09in;
 }
 
 .summary-density-airy .summary-legend-item {
-  min-height: 0.78in;
+  min-height: 0.9in;
 }
 
 .summary-density-dense .summary-legend-item {
@@ -471,26 +474,34 @@ p {
   width: 0.24in;
 }
 
-.summary-legend-item img {
-  border-radius: 0.08in;
+.summary-legend-photo {
+  border-radius: 0.09in;
   display: block;
-  flex: 0 0 0.54in;
-  height: 0.48in;
-  object-fit: cover;
-  width: 0.54in;
-}
-
-.summary-density-airy .summary-legend-item img {
-  flex-basis: 0.72in;
-  height: 0.62in;
+  flex: 0 0 0.72in;
+  height: 0.58in;
+  overflow: hidden;
   width: 0.72in;
 }
 
-.summary-density-dense .summary-legend-item img {
+.summary-legend-photo img {
+  border-radius: 0.08in;
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.summary-density-airy .summary-legend-photo {
+  flex-basis: 0.94in;
+  height: 0.72in;
+  width: 0.94in;
+}
+
+.summary-density-dense .summary-legend-photo {
   border-radius: 0.06in;
-  flex-basis: 0.34in;
-  height: 0.32in;
-  width: 0.34in;
+  flex-basis: 0.36in;
+  height: 0.34in;
+  width: 0.36in;
 }
 
 .summary-legend-copy {

@@ -10,6 +10,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
 from minerva_travel import storage
@@ -55,6 +56,7 @@ CUSTOM_LANDMARK_IMAGE_HOSTS = {
     "plus.unsplash.com",
 }
 CUSTOM_LANDMARK_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+LINEART_CANVAS_SIZE = (1200, 850)
 
 app = FastAPI(title="Minerva Travel MVP")
 app.add_middleware(
@@ -383,7 +385,17 @@ async def generate_pdf_from_form(
         request_id,
         skip_selection_ids=set(selected_wikimedia_assets),
     )
-    landmark_lineart_images: dict[str, Path] = {}
+    custom_reference_images = {
+        selection_id: asset.local_path
+        for selection_id, asset in selected_wikimedia_assets.items()
+    }
+    custom_reference_images.update(landmark_images)
+    landmark_lineart_images: dict[str, Path] = create_local_lineart_fallbacks(
+        custom_destinations,
+        selected,
+        request_id,
+        reference_images=custom_reference_images,
+    )
     if landmark_art_generation_enabled():
         landmark_reference_images = {
             selection_id: asset.local_path
@@ -506,6 +518,96 @@ def _custom_image_extension(url: str, content_type: str) -> str:
         "image/jpeg": ".jpg",
         "image/jpg": ".jpg",
     }.get(content_type, ".jpg")
+
+
+def create_local_lineart_fallbacks(
+    destinations: list[Destination],
+    selected: list[str],
+    request_id: str,
+    reference_images: dict[str, Path] | None = None,
+) -> dict[str, Path]:
+    if not destinations:
+        return {}
+    selected_ids = set(selected)
+    reference_images = reference_images or {}
+    output_dir = storage.RUNTIME_DIR / "generated" / "lineart-local" / request_id
+    lineart_images: dict[str, Path] = {}
+    for destination in destinations:
+        for landmark in destination.landmarks:
+            selection_id = f"{destination.id}:{landmark.id}"
+            if selection_id not in selected_ids:
+                continue
+            output_path = output_dir / destination.id / f"{landmark.id}.png"
+            reference_image = reference_images.get(selection_id)
+            if not reference_image or not _write_reference_lineart(reference_image, output_path):
+                _write_named_lineart_placeholder(
+                    landmark.name,
+                    destination.city,
+                    destination.country,
+                    output_path,
+                )
+            lineart_images[selection_id] = output_path
+    return lineart_images
+
+
+def _write_reference_lineart(reference_image: Path, output_path: Path) -> bool:
+    try:
+        with Image.open(reference_image) as source:
+            image = ImageOps.exif_transpose(source).convert("L")
+    except (OSError, UnidentifiedImageError):
+        return False
+
+    image.thumbnail((1080, 720), Image.Resampling.LANCZOS)
+    edges = image.filter(ImageFilter.FIND_EDGES)
+    edges = ImageOps.autocontrast(edges, cutoff=2)
+    lineart = ImageOps.invert(edges)
+    lineart = lineart.point(lambda pixel: 255 if pixel > 210 else 0).convert("L")
+
+    canvas = Image.new("L", LINEART_CANVAS_SIZE, "white")
+    x = (LINEART_CANVAS_SIZE[0] - lineart.width) // 2
+    y = (LINEART_CANVAS_SIZE[1] - lineart.height) // 2
+    canvas.paste(lineart, (x, y))
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.convert("RGB").save(output_path, "PNG")
+    return True
+
+
+def _write_named_lineart_placeholder(
+    landmark_name: str,
+    city: str,
+    country: str,
+    output_path: Path,
+) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", LINEART_CANVAS_SIZE, "white")
+    draw = ImageDraw.Draw(image)
+    font_large = _lineart_font(54)
+    font_medium = _lineart_font(31)
+    font_small = _lineart_font(25)
+
+    draw.rounded_rectangle((90, 80, 1110, 770), radius=38, outline="black", width=5)
+    draw.rounded_rectangle((165, 155, 1035, 600), radius=28, outline="black", width=3)
+    draw.line((250, 665, 950, 665), fill="black", width=3)
+    draw.line((250, 715, 950, 715), fill="black", width=3)
+    draw.text((600, 335), landmark_name, anchor="mm", fill="black", font=font_large)
+    draw.text((600, 405), f"{city}, {country}", anchor="mm", fill="black", font=font_medium)
+    draw.text(
+        (600, 535),
+        "Desenhe este lugar do seu jeito.",
+        anchor="mm",
+        fill="black",
+        font=font_small,
+    )
+    image.save(output_path)
+    return output_path
+
+
+def _lineart_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    try:
+        return ImageFont.truetype("DejaVuSans.ttf", size)
+    except OSError:
+        return ImageFont.load_default()
 
 
 def generate_selected_landmark_art(

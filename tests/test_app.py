@@ -5,9 +5,11 @@ from pathlib import Path
 
 import httpx
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from minerva_travel.app import (
     app,
+    create_local_lineart_fallbacks,
     custom_destinations_from_form,
     fetch_custom_wikimedia_assets,
     generate_selected_landmark_art,
@@ -370,6 +372,112 @@ def test_api_generate_uses_custom_landmark_image_url_when_wikimedia_is_missing(
 
     assert response.status_code == 200
     assert captured_images == [downloaded_image]
+
+
+def test_api_generate_creates_local_lineart_from_custom_landmark_image_by_default(
+    tmp_path,
+    monkeypatch,
+):
+    captured_lineart_images = []
+    downloaded_image = tmp_path / "custom-images" / "speyer.jpg"
+    downloaded_image.parent.mkdir(parents=True)
+    Image.new("RGB", (320, 220), "#4f86b7").save(downloaded_image)
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_landmark_image(self, landmark_name, city, country, output_path):
+            raise AssertionError("landmark image generation should stay disabled")
+
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            raise AssertionError("landmark lineart generation should stay disabled")
+
+    def fake_write_pdf(context, output_path):
+        captured_lineart_images.extend(
+            landmark.lineart_image
+            for destination in context.destinations
+            for landmark in destination.landmarks
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"pdf")
+        return output_path
+
+    def fake_download_custom_images(destinations, selected, request_id, *, skip_selection_ids):
+        selection_id = f"{destinations[0].id}:{destinations[0].landmarks[0].id}"
+        return {selection_id: downloaded_image}
+
+    custom_landmarks = json.dumps(
+        [
+            {
+                "name": "Museu da Tecnologia de Speyer",
+                "city": "Speyer",
+                "country": "Alemanha",
+                "description": ["Um museu cheio de maquinas e descobertas."],
+                "image": "https://lh3.googleusercontent.com/place-photo=w900",
+            }
+        ]
+    )
+
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", lambda *_: {})
+    monkeypatch.setattr(
+        "minerva_travel.app.download_custom_landmark_images",
+        fake_download_custom_images,
+    )
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setattr("minerva_travel.app.write_pdf", fake_write_pdf)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Guia da Alemanha",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "custom_landmarks": custom_landmarks,
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert len(captured_lineart_images) == 1
+    assert captured_lineart_images[0] != Path("assets/lineart/paris/eiffel-tower.png")
+    assert captured_lineart_images[0].exists()
+
+
+def test_create_local_lineart_fallbacks_writes_named_placeholder_without_reference(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    destinations, selected = custom_destinations_from_form(
+        "Les Pavillons de Bercy, Paris, Franca"
+    )
+
+    lineart_images = create_local_lineart_fallbacks(
+        destinations,
+        selected,
+        "request-123",
+        reference_images={},
+    )
+
+    assert sorted(lineart_images) == selected
+    output_path = lineart_images[selected[0]]
+    assert output_path.exists()
+    assert output_path != Path("assets/lineart/paris/eiffel-tower.png")
+    assert output_path.as_posix().endswith(
+        "generated/lineart-local/request-123/custom-paris/les-pavillons-de-bercy.png"
+    )
 
 
 def test_api_generate_uses_confirmed_landmarks_for_cover_prompt(

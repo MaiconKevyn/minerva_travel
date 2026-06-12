@@ -129,6 +129,7 @@ def test_render_guide_html_trip_summary_lists_all_confirmed_landmarks():
     assert 'data-summary-count="10"' in summary
     assert "summary-density-compact" in summary
     assert summary.count("summary-legend-item") == 10
+    assert summary.count("summary-legend-photo") == 10
     readable_summary = unescape(summary)
     for landmark in catalog.find_destination("paris").landmarks:
         assert landmark.name in readable_summary

@@ -69,7 +69,9 @@
         {% for summary in summary_items %}
           <li class="summary-legend-item">
             <span class="summary-legend-number">{{ summary.number }}</span>
-            <img src="{{ summary.landmark.image }}" alt="">
+            <span class="summary-legend-photo">
+              <img src="{{ summary.landmark.image }}" alt="">
+            </span>
             <div class="summary-legend-copy">
               <strong>{{ summary.landmark.name }}</strong>
               <small>{{ summary.destination.city }}, {{ summary.destination.country }}</small>
