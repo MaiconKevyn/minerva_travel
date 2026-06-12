@@ -19,6 +19,66 @@
       </div>
     </section>
 
+    {% set summary_items = guide.summary_landmarks %}
+    <section class="page trip-summary-page summary-density-{{ guide.summary_density }}" data-summary-count="{{ summary_items|length }}">
+      <div class="trip-summary-header">
+        <div>
+          <p class="page-kicker">Resumo da viagem</p>
+          <h2>Roteiro da familia</h2>
+        </div>
+        <div class="summary-count-badge">
+          <strong>{{ summary_items|length }}</strong>
+          <span>{% if summary_items|length == 1 %}parada confirmada{% else %}paradas confirmadas{% endif %}</span>
+        </div>
+      </div>
+
+      <div class="summary-map-panel">
+        <div class="summary-map-label">Mapa da aventura</div>
+        <div class="summary-map-compass">N</div>
+        <svg class="summary-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <path
+            d="M 10 22 C 23 10 42 21 57 13 S 83 18 91 29 C 83 45 63 43 49 41 S 20 50 12 68 C 28 78 44 68 59 78 S 82 72 91 84"
+            fill="none"
+            stroke="#1a6f71"
+            stroke-dasharray="2 2.4"
+            stroke-linecap="round"
+            stroke-width="1.15"
+          />
+        </svg>
+        <table class="summary-route-grid">
+          <tbody>
+          {% for row in guide.summary_map_rows %}
+            <tr class="summary-route-row">
+              {% for summary in row %}
+                <td class="summary-route-cell">
+                  {% if summary %}
+                    <article class="summary-route-pin">
+                      <img src="{{ summary.landmark.image }}" alt="">
+                      <span>{{ summary.number }}</span>
+                    </article>
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <ol class="summary-legend">
+        {% for summary in summary_items %}
+          <li class="summary-legend-item">
+            <span class="summary-legend-number">{{ summary.number }}</span>
+            <img src="{{ summary.landmark.image }}" alt="">
+            <div class="summary-legend-copy">
+              <strong>{{ summary.landmark.name }}</strong>
+              <small>{{ summary.destination.city }}, {{ summary.destination.country }}</small>
+            </div>
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+
     <section class="page letter-page journey-phase-page phase-before">
       <div class="phase-badge">Antes da viagem</div>
       <div class="page-kicker">para ler antes de embarcar</div>

@@ -96,11 +96,64 @@ class GuideDestination(BaseModel):
     landmarks: list[Landmark]
 
 
+class GuideSummaryLandmark(BaseModel):
+    number: int
+    selection_id: str
+    destination: Destination
+    landmark: Landmark
+
+
 class GuideContext(BaseModel):
     request: GuideRequest
     cover_image: Path
     destinations: list[GuideDestination]
     image_credits: list[ImageCredit] = Field(default_factory=list)
+
+    @property
+    def summary_landmarks(self) -> list[GuideSummaryLandmark]:
+        items: list[GuideSummaryLandmark] = []
+        for item in self.destinations:
+            for landmark in item.landmarks:
+                items.append(
+                    GuideSummaryLandmark(
+                        number=len(items) + 1,
+                        selection_id=f"{item.destination.id}:{landmark.id}",
+                        destination=item.destination,
+                        landmark=landmark,
+                    )
+                )
+        return items
+
+    @property
+    def summary_density(self) -> Literal["airy", "compact", "dense"]:
+        count = len(self.summary_landmarks)
+        if count <= 6:
+            return "airy"
+        if count <= 12:
+            return "compact"
+        return "dense"
+
+    @property
+    def summary_map_columns(self) -> int:
+        if self.summary_density == "airy":
+            return 3
+        if self.summary_density == "compact":
+            return 4
+        return 6
+
+    @property
+    def summary_map_rows(self) -> list[list[GuideSummaryLandmark | None]]:
+        columns = self.summary_map_columns
+        items = self.summary_landmarks
+        rows: list[list[GuideSummaryLandmark | None]] = []
+        for index in range(0, len(items), columns):
+            row: list[GuideSummaryLandmark | None] = items[index : index + columns]
+            missing = columns - len(row)
+            leading_empty = missing // 2
+            trailing_empty = missing - leading_empty
+            rows.append([None] * leading_empty + row + [None] * trailing_empty)
+        return rows
+
 
 
 class ItineraryRecommendationRequest(BaseModel):
