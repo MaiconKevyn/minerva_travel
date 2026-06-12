@@ -242,6 +242,8 @@ def _discover_places(
             existing = candidates.get(place_id)
             if not existing or candidate["match_score"] > existing["match_score"]:
                 candidates[place_id] = candidate
+            if profile_category == "must_see":
+                break
     return candidates
 
 

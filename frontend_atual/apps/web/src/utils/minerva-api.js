@@ -56,7 +56,14 @@ export const buildLandmarkMapsUrl = (landmark = {}) => {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 };
 
-const normalizeSourceType = (value) => (value === 'mentioned' ? 'mentioned' : 'suggested');
+const hasMandatoryMentionReason = (item = {}) =>
+  (item.match_reasons || []).some((reason) => {
+    const normalized = normalizeTextForMatching(reason);
+    return normalized.includes('ponto obrigatorio') || normalized.includes('informado pela familia');
+  });
+
+const normalizeSourceType = (value, item = {}) =>
+  value === 'mentioned' || hasMandatoryMentionReason(item) ? 'mentioned' : 'suggested';
 
 const mapStopToLandmark = (stop, day = null, isAlternative = false, isCatalogLandmark = true) => ({
   id: stop.selection_id,
@@ -78,7 +85,7 @@ const mapStopToLandmark = (stop, day = null, isAlternative = false, isCatalogLan
   duration_minutes: stop.duration_minutes,
   family_tip: stop.family_tip,
   match_reasons: stop.match_reasons || [],
-  source_type: normalizeSourceType(stop.source_type),
+  source_type: normalizeSourceType(stop.source_type, stop),
   categories: stop.categories || [],
   itinerary_day: day?.day || null,
   itinerary_title: day?.title || '',
@@ -155,7 +162,7 @@ const mapManualLandmark = (landmark, destination = {}) => {
     duration_minutes: landmark.duration_minutes || null,
     family_tip: landmark.family_tip || null,
     match_reasons: landmark.match_reasons || [],
-    source_type: normalizeSourceType(landmark.source_type || 'mentioned'),
+    source_type: normalizeSourceType(landmark.source_type || 'mentioned', landmark),
     categories: landmark.categories || [],
     itinerary_day: null,
     itinerary_title: '',

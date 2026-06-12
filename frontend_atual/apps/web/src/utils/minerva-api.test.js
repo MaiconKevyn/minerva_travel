@@ -168,6 +168,51 @@ test('mapRecommendationToParsedData treats Google Places stops as custom landmar
   ]);
 });
 
+test('mapRecommendationToParsedData infers mentioned source from mandatory reason', () => {
+  const data = mapRecommendationToParsedData(
+    {
+      recommendation_source: 'google_places',
+      selected_landmarks: ['google:louvre'],
+      days: [
+        {
+          day: 1,
+          title: 'Dia 1 em Paris',
+          destination_ids: ['google-paris'],
+          stops: [
+            {
+              selection_id: 'google:louvre',
+              destination_id: 'google-paris',
+              name: 'Museu do Louvre',
+              city: 'Paris',
+              country: 'Franca',
+              description: ['Ponto citado pela familia.'],
+              match_reasons: ['Ponto obrigatorio informado pela familia.'],
+              categories: ['museums'],
+            },
+            {
+              selection_id: 'google:palais-decouverte',
+              destination_id: 'google-paris',
+              name: 'Palacio da descoberta',
+              city: 'Paris',
+              country: 'Franca',
+              description: ['Sugestao educativa.'],
+              match_reasons: ['Pedido da familia: educativo para criancas.'],
+              categories: ['education'],
+            },
+          ],
+        },
+      ],
+      alternatives: [],
+    },
+    catalog,
+  );
+
+  const sections = minervaApi.splitLandmarksBySource(data.landmarks);
+
+  assert.deepEqual(sections.mentioned.map((item) => item.name), ['Museu do Louvre']);
+  assert.deepEqual(sections.suggested.map((item) => item.name), ['Palacio da descoberta']);
+});
+
 test('splitLandmarksBySource separates user-mentioned places from suggestions', () => {
   const sections = minervaApi.splitLandmarksBySource([
     { id: 'eiffel', source_type: 'mentioned' },

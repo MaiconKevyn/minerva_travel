@@ -355,6 +355,84 @@ def test_discover_dynamic_itinerary_keeps_one_stop_per_explicit_family_request()
     assert stop_names == ["Torre Eiffel", "Atelier Infantil de Arte", "Almoco Familiar"]
 
 
+def test_discover_dynamic_itinerary_keeps_only_best_google_result_for_mentioned_place():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Paris", "Franca", 48.8566, 2.3522)
+        if "places:searchText" in url:
+            text = request.read().decode()
+            if "Louvre" in text:
+                return httpx.Response(
+                    200,
+                    json={
+                        "places": [
+                            _place("louvre", "Museu do Louvre", ["museum", "tourist_attraction"]),
+                            _place(
+                                "louvre-pyramid",
+                                "Piramide do Louvre",
+                                ["tourist_attraction"],
+                            ),
+                        ]
+                    },
+                )
+            if "educativo" in text:
+                return httpx.Response(
+                    200,
+                    json={
+                        "places": [
+                            _place(
+                                "science-museum",
+                                "Palacio da descoberta",
+                                ["museum", "tourist_attraction"],
+                            )
+                        ]
+                    },
+                )
+            return httpx.Response(200, json={"places": []})
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(
+                destination="Quero ir no Louvre e depois em um museu educativo em Paris",
+                days=1,
+                pace="full",
+            ),
+            api_key="test-key",
+            openai_api_key="test-openai-key",
+            client=client,
+            intent_responder=lambda **_: {
+                "output_text": (
+                    "{"
+                    '"destination":"Paris, Franca",'
+                    '"must_see_places":["Louvre"],'
+                    '"discovery_requests":['
+                    '{"kind":"educational","query":"museu educativo",'
+                    '"topic":"educativo","near":"","meal":"","audience":"children"}'
+                    "],"
+                    '"inferred_interests":[]'
+                    "}"
+                )
+            },
+        )
+
+    visible_stops = [
+        *[stop for day in recommendation["days"] for stop in day["stops"]],
+        *recommendation["alternatives"],
+    ]
+    stop_names = [stop["name"] for stop in visible_stops]
+    mentioned_names = [
+        stop["name"] for stop in visible_stops if stop["source_type"] == "mentioned"
+    ]
+
+    assert "Museu do Louvre" in stop_names
+    assert "Piramide do Louvre" not in stop_names
+    assert mentioned_names == ["Museu do Louvre"]
+
+
 def test_discover_dynamic_itinerary_skips_restaurants_for_non_food_requests():
     def handler(request: httpx.Request) -> httpx.Response:
         url = str(request.url)
