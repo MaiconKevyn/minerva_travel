@@ -288,6 +288,90 @@ def test_api_generate_accepts_custom_landmarks_without_catalog_selection(
     assert payload["download_url"].startswith("/download/")
 
 
+def test_api_generate_uses_custom_landmark_image_url_when_wikimedia_is_missing(
+    tmp_path,
+    monkeypatch,
+):
+    captured_images = []
+    downloaded_image = tmp_path / "custom-images" / "speyer.jpg"
+    downloaded_image.parent.mkdir(parents=True)
+    downloaded_image.write_bytes(b"image")
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_landmark_image(self, landmark_name, city, country, output_path):
+            raise AssertionError("landmark image generation should stay disabled")
+
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            raise AssertionError("landmark lineart generation should stay disabled")
+
+    def fake_write_pdf(context, output_path):
+        captured_images.extend(
+            landmark.image
+            for destination in context.destinations
+            for landmark in destination.landmarks
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"pdf")
+        return output_path
+
+    def fake_download_custom_images(destinations, selected, request_id, *, skip_selection_ids):
+        selection_id = f"{destinations[0].id}:{destinations[0].landmarks[0].id}"
+        assert destinations[0].landmarks[0].image == (
+            "https://lh3.googleusercontent.com/place-photo=w900"
+        )
+        assert selection_id in selected
+        assert skip_selection_ids == set()
+        return {selection_id: downloaded_image}
+
+    custom_landmarks = json.dumps(
+        [
+            {
+                "name": "Museu da Tecnologia de Speyer",
+                "city": "Speyer",
+                "country": "Alemanha",
+                "description": ["Um museu cheio de maquinas e descobertas."],
+                "image": "https://lh3.googleusercontent.com/place-photo=w900",
+            }
+        ]
+    )
+
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", lambda *_: {})
+    monkeypatch.setattr(
+        "minerva_travel.app.download_custom_landmark_images",
+        fake_download_custom_images,
+    )
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setattr("minerva_travel.app.write_pdf", fake_write_pdf)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Guia da Alemanha",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "custom_landmarks": custom_landmarks,
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert captured_images == [downloaded_image]
+
+
 def test_api_generate_uses_confirmed_landmarks_for_cover_prompt(
     tmp_path,
     monkeypatch,

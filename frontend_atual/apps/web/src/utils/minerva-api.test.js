@@ -441,6 +441,10 @@ test('appendGuideLandmarks sends catalog ids and custom fallback separately', ()
         name: 'Colosseum',
         city: 'Rome',
         country: 'Italy',
+        image: 'https://lh3.googleusercontent.com/colosseum=w900',
+        image_attributions: [
+          { display_name: 'Google Photographer', uri: 'https://maps.google.com/contrib' },
+        ],
       },
     ],
   });
@@ -454,6 +458,10 @@ test('appendGuideLandmarks sends catalog ids and custom fallback separately', ()
         city: 'Rome',
         country: 'Italy',
         description: [],
+        image: 'https://lh3.googleusercontent.com/colosseum=w900',
+        image_attributions: [
+          { display_name: 'Google Photographer', uri: 'https://maps.google.com/contrib' },
+        ],
       },
     ]),
   );

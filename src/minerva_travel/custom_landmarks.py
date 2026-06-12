@@ -38,6 +38,8 @@ class CustomLandmarkInput(BaseModel):
     city: str = Field(default=DEFAULT_CITY, max_length=80)
     country: str = Field(default=DEFAULT_COUNTRY, max_length=80)
     description: list[str] = Field(default_factory=list, max_length=3)
+    image: str | None = Field(default=None, max_length=1000)
+    image_attributions: list[dict[str, str]] = Field(default_factory=list, max_length=8)
 
 
 def parse_custom_landmarks(raw: str | None) -> list[CustomLandmarkInput]:
@@ -69,12 +71,13 @@ def build_custom_destinations(
             landmark_id = unique_slug(custom.name, used_landmark_ids)
             selection_id = f"{destination_id}:{landmark_id}"
             selected_landmarks.append(selection_id)
+            image = custom.image.strip() if custom.image else ""
             destination_landmarks.append(
                 Landmark(
                     id=landmark_id,
                     name=custom.name.strip(),
                     description=custom.description or default_description(custom.name),
-                    image=PLACEHOLDER_IMAGE,
+                    image=image or PLACEHOLDER_IMAGE,
                     lineart_image=PLACEHOLDER_LINEART,
                     sort_order=landmark_index,
                     representative_query=representative_query(custom),

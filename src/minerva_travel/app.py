@@ -2,6 +2,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlparse
 from uuid import uuid4
 
 import httpx
@@ -47,6 +48,13 @@ from minerva_travel.wikimedia_client import (
 )
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
+CUSTOM_LANDMARK_IMAGE_HOSTS = {
+    "lh3.googleusercontent.com",
+    "upload.wikimedia.org",
+    "images.unsplash.com",
+    "plus.unsplash.com",
+}
+CUSTOM_LANDMARK_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
 app = FastAPI(title="Minerva Travel MVP")
 app.add_middleware(
@@ -369,7 +377,12 @@ async def generate_pdf_from_form(
     }
     wikimedia_assets.update(sync_wikimedia_assets_to_storage(selected_wikimedia_assets))
 
-    landmark_images: dict[str, Path] = {}
+    landmark_images: dict[str, Path] = download_custom_landmark_images(
+        custom_destinations,
+        selected,
+        request_id,
+        skip_selection_ids=set(selected_wikimedia_assets),
+    )
     landmark_lineart_images: dict[str, Path] = {}
     if landmark_art_generation_enabled():
         landmark_reference_images = {
@@ -377,13 +390,15 @@ async def generate_pdf_from_form(
             for selection_id, asset in wikimedia_assets.items()
             if selection_id in selected
         }
-        landmark_images, landmark_lineart_images = generate_selected_landmark_art(
+        landmark_reference_images.update(landmark_images)
+        generated_landmark_images, landmark_lineart_images = generate_selected_landmark_art(
             catalog.destinations,
             selected,
             request_id,
             generator,
             reference_images=landmark_reference_images,
         )
+        landmark_images.update(generated_landmark_images)
     context = build_guide_context(
         request,
         catalog,
@@ -414,6 +429,83 @@ def selected_landmark_names(destinations: list[Destination], selected: list[str]
             if f"{destination.id}:{landmark.id}" in selected_ids:
                 names.append(landmark.name)
     return names
+
+
+def download_custom_landmark_images(
+    destinations: list[Destination],
+    selected: list[str],
+    request_id: str,
+    *,
+    skip_selection_ids: set[str] | None = None,
+) -> dict[str, Path]:
+    if not destinations:
+        return {}
+    selected_ids = set(selected)
+    skipped = skip_selection_ids or set()
+    output_dir = storage.RUNTIME_DIR / "custom-images" / request_id
+    downloaded: dict[str, Path] = {}
+    with httpx.Client(
+        timeout=30,
+        follow_redirects=True,
+        headers={"User-Agent": USER_AGENT},
+    ) as client:
+        for destination in destinations:
+            for landmark in destination.landmarks:
+                selection_id = f"{destination.id}:{landmark.id}"
+                if selection_id not in selected_ids or selection_id in skipped:
+                    continue
+                image_url = str(landmark.image or "").strip()
+                if not _is_allowed_custom_image_url(image_url):
+                    continue
+                output_base = output_dir / destination.id / landmark.id
+                try:
+                    image_path = _download_custom_landmark_image(client, image_url, output_base)
+                except httpx.HTTPError:
+                    continue
+                if image_path:
+                    downloaded[selection_id] = image_path
+    return downloaded
+
+
+def _is_allowed_custom_image_url(url: str) -> bool:
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    return parsed.scheme == "https" and host in CUSTOM_LANDMARK_IMAGE_HOSTS
+
+
+def _download_custom_landmark_image(
+    client: httpx.Client,
+    url: str,
+    output_base: Path,
+) -> Path | None:
+    response = client.get(
+        url,
+        headers={
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        },
+    )
+    response.raise_for_status()
+    content_type = response.headers.get("content-type", "").split(";", maxsplit=1)[0].lower()
+    if not content_type.startswith("image/"):
+        return None
+    if len(response.content) > CUSTOM_LANDMARK_IMAGE_MAX_BYTES:
+        return None
+    output_path = output_base.with_suffix(_custom_image_extension(url, content_type))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(response.content)
+    return output_path
+
+
+def _custom_image_extension(url: str, content_type: str) -> str:
+    path_suffix = Path(urlparse(url).path).suffix.lower()
+    if path_suffix in {".jpg", ".jpeg", ".png", ".webp"}:
+        return path_suffix
+    return {
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/jpeg": ".jpg",
+        "image/jpg": ".jpg",
+    }.get(content_type, ".jpg")
 
 
 def generate_selected_landmark_art(

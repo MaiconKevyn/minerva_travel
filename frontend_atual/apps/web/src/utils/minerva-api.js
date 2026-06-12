@@ -394,14 +394,23 @@ export const appendGuideLandmarks = (formData, guideData) => {
 
   if (customLandmarks.length > 0) {
     const customLandmarksPayload = JSON.stringify(
-      customLandmarks.map((landmark) => ({
-        name: landmark.name,
-        city: landmark.city,
-        country: landmark.country,
-        description: Array.isArray(landmark.description_paragraphs)
-          ? landmark.description_paragraphs.slice(0, 3)
-          : [landmark.description].filter(Boolean).slice(0, 3),
-      }))
+      customLandmarks.map((landmark) => {
+        const payload = {
+          name: landmark.name,
+          city: landmark.city,
+          country: landmark.country,
+          description: Array.isArray(landmark.description_paragraphs)
+            ? landmark.description_paragraphs.slice(0, 3)
+            : [landmark.description].filter(Boolean).slice(0, 3),
+        };
+        if (landmark.image) {
+          payload.image = landmark.image;
+        }
+        if (landmark.image_attributions?.length > 0) {
+          payload.image_attributions = landmark.image_attributions;
+        }
+        return payload;
+      })
     );
     formData.append('custom_landmarks', customLandmarksPayload);
   }
