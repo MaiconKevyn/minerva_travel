@@ -29,7 +29,7 @@ from minerva_travel.custom_landmarks import (
     parse_custom_landmarks,
 )
 from minerva_travel.guide_builder import build_guide_context
-from minerva_travel.image_generation import get_image_generator
+from minerva_travel.image_generation import get_image_generator, simplify_child_coloring_lineart
 from minerva_travel.itinerary import recommend_itinerary
 from minerva_travel.landmark_parser import ParsedLandmark, parse_landmarks_from_message
 from minerva_travel.models import (
@@ -565,10 +565,11 @@ def _write_reference_lineart(reference_image: Path, output_path: Path) -> bool:
         return False
 
     image.thumbnail((1080, 720), Image.Resampling.LANCZOS)
+    image = image.filter(ImageFilter.GaussianBlur(radius=1.2))
     edges = image.filter(ImageFilter.FIND_EDGES)
-    edges = ImageOps.autocontrast(edges, cutoff=2)
+    edges = ImageOps.autocontrast(edges, cutoff=8)
     lineart = ImageOps.invert(edges)
-    lineart = lineart.point(lambda pixel: 255 if pixel > 210 else 0).convert("L")
+    lineart = lineart.point(lambda pixel: 0 if pixel < 185 else 255).convert("L")
 
     canvas = Image.new("L", LINEART_CANVAS_SIZE, "white")
     x = (LINEART_CANVAS_SIZE[0] - lineart.width) // 2
@@ -577,6 +578,7 @@ def _write_reference_lineart(reference_image: Path, output_path: Path) -> bool:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.convert("RGB").save(output_path, "PNG")
+    simplify_child_coloring_lineart(output_path)
     return True
 
 

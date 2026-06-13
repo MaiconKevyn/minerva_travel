@@ -141,10 +141,12 @@ Por padrao, pontos turisticos nao geram imagem por IA: o PDF usa imagens
 Wikimedia/licenciadas e sincroniza esses assets no bucket
 `landmark-assets` quando o Supabase Storage esta configurado. Mantenha
 `LANDMARK_ART_GENERATION=false` para reduzir custo e latencia. Se precisar
-reativar o comportamento legado de gerar arte/lineart para cada ponto,
-configure `LANDMARK_ART_GENERATION=true`; nesse caso,
+gerar arte/lineart premium para cada ponto, configure
+`LANDMARK_ART_GENERATION=true`; nesse caso,
 `IMAGE_GENERATION_CONCURRENCY` controla quantos pontos turisticos sao
-processados em paralelo.
+processados em paralelo. A lineart premium e gerada como desenho simples a
+partir do nome/local do ponto turistico, sem tracar a foto de referencia, para
+evitar excesso de janelas, texturas e linhas pequenas na pagina de colorir.
 
 `SUPABASE_SERVICE_ROLE_KEY` e usada somente no backend. Nunca coloque essa chave
 em variaveis `VITE_`, no frontend publicado ou em `public_html/config.js`.

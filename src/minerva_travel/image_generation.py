@@ -2,7 +2,7 @@ from pathlib import Path
 from time import sleep
 from typing import Protocol
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 
 class ImageGenerator(Protocol):
@@ -331,19 +331,18 @@ class ReplicateImageGenerator:
             city=city,
             country=country,
         )
-        with reference_image.open("rb") as image_file:
-            output = _run_replicate_with_retry(
-                replicate,
-                self.model,
-                input={
-                    "prompt": prompt,
-                    "input_image": image_file,
-                    "aspect_ratio": "4:3",
-                    "output_format": "png",
-                },
-                wait=60,
-            )
+        output = _run_replicate_with_retry(
+            replicate,
+            self.landmark_model,
+            input={
+                "prompt": prompt,
+                "aspect_ratio": "4:3",
+                "output_format": "png",
+                "num_outputs": 1,
+            },
+        )
         _write_replicate_output(output, output_path)
+        simplify_child_coloring_lineart(output_path)
         return output_path
 
 
@@ -395,14 +394,118 @@ def trip_summary_prompt(title: str, destination_names: list[str]) -> str:
 
 def landmark_lineart_prompt(landmark_name: str, city: str, country: str) -> str:
     return (
-        "Transform the reference landmark illustration into a black and white "
-        "children's coloring book page. Preserve the same composition, viewpoint, "
-        f"main shapes, and recognizable silhouette of {landmark_name} in {city}, {country}. "
-        "Use clean outline drawing only on a white background, bold smooth contour "
-        "lines, simple shapes, and clear empty areas for a child to color. No color, "
-        "no grayscale shading, no filled areas, no gradients, no text, no labels, "
-        "no watermark, no logo, no signature."
+        "Create an ultra simple black and white kindergarten coloring page for "
+        f"children ages 4 to 8 showing {landmark_name} in {city}, {country}. "
+        "Use a clean icon-like drawing, not a realistic architectural drawing. "
+        "Do not trace a photo. Keep only the main recognizable silhouette and "
+        "one or two signature features of the landmark. Draw one central landmark "
+        "symbol, not the full facade or full city scene. For museums, castles, "
+        "palaces, churches, and historic buildings, use only a simple silhouette, "
+        "main roof shape, main dome, tower, arch, entrance, or other iconic shape. "
+        "Use thick smooth black marker outlines, rounded friendly shapes, large "
+        "open white areas for crayons, and only 2 to 4 major interior lines. If "
+        "the landmark has many repeated details, simplify them into one broad "
+        "shape. Do not draw windows, bricks, tiles, glass grids, columns, railings, "
+        "reflections, water ripples, shadows, hatching, stippling, tiny repeated "
+        "patterns, texture, photo noise, dotted lines, or speckles. No color, "
+        "no grayscale shading, no filled areas, no gradients, no background scenery, "
+        "no people, no text, no labels, no watermark, no logo, no signature."
     )
+
+
+def simplify_child_coloring_lineart(image_path: Path, output_path: Path | None = None) -> Path:
+    """Normalize generated lineart into a simpler page children can actually color."""
+    target_path = output_path or image_path
+    with Image.open(image_path) as source:
+        image = ImageOps.exif_transpose(source).convert("L")
+
+    image = _to_binary_lineart(image)
+    image = _normalize_lineart_scale(image)
+    image = _remove_fine_lineart_texture(image)
+    image = _remove_small_lineart_components(image)
+    image = image.point(lambda pixel: 0 if pixel < 128 else 255).convert("RGB")
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(target_path, "PNG")
+    return target_path
+
+
+def _to_binary_lineart(image: Image.Image) -> Image.Image:
+    image = ImageOps.autocontrast(image, cutoff=1)
+    return image.point(lambda pixel: 0 if pixel < 190 else 255).convert("L")
+
+
+def _normalize_lineart_scale(image: Image.Image) -> Image.Image:
+    black_mask = image.point(lambda pixel: 255 if pixel < 128 else 0).convert("L")
+    bbox = black_mask.getbbox()
+    if not bbox:
+        return image
+
+    padding = max(12, int(min(image.size) * 0.04))
+    left = max(0, bbox[0] - padding)
+    top = max(0, bbox[1] - padding)
+    right = min(image.width, bbox[2] + padding)
+    bottom = min(image.height, bbox[3] + padding)
+    cropped = image.crop((left, top, right, bottom))
+    cropped.thumbnail(
+        (int(image.width * 0.9), int(image.height * 0.86)),
+        Image.Resampling.LANCZOS,
+    )
+
+    canvas = Image.new("L", image.size, 255)
+    x = (canvas.width - cropped.width) // 2
+    y = (canvas.height - cropped.height) // 2
+    canvas.paste(cropped, (x, y))
+    return canvas.point(lambda pixel: 0 if pixel < 190 else 255).convert("L")
+
+
+def _remove_fine_lineart_texture(image: Image.Image) -> Image.Image:
+    return image.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MinFilter(3))
+
+
+def _remove_small_lineart_components(
+    image: Image.Image,
+    min_pixels: int = 40,
+) -> Image.Image:
+    grayscale = image.convert("L")
+    width, height = grayscale.size
+    total_pixels = width * height
+    black_pixels = bytearray(1 if pixel < 128 else 0 for pixel in grayscale.getdata())
+    visited = bytearray(total_pixels)
+    keep = bytearray(total_pixels)
+
+    for start in range(total_pixels):
+        if not black_pixels[start] or visited[start]:
+            continue
+
+        stack = [start]
+        visited[start] = 1
+        component: list[int] = []
+        while stack:
+            index = stack.pop()
+            component.append(index)
+            x = index % width
+            y = index // width
+            for next_x, next_y in (
+                (x - 1, y),
+                (x + 1, y),
+                (x, y - 1),
+                (x, y + 1),
+            ):
+                if next_x < 0 or next_x >= width or next_y < 0 or next_y >= height:
+                    continue
+                next_index = next_y * width + next_x
+                if black_pixels[next_index] and not visited[next_index]:
+                    visited[next_index] = 1
+                    stack.append(next_index)
+
+        if len(component) >= min_pixels:
+            for index in component:
+                keep[index] = 1
+
+    cleaned = Image.new("L", grayscale.size, 255)
+    cleaned.putdata([0 if pixel else 255 for pixel in keep])
+    return cleaned
 
 
 def _write_replicate_output(output: object, output_path: Path) -> None:

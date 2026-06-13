@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 from fastapi.testclient import TestClient
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from minerva_travel.app import (
     app,
@@ -488,6 +488,34 @@ def test_create_local_lineart_fallbacks_writes_named_placeholder_without_referen
     )
 
 
+def test_create_local_lineart_fallbacks_simplifies_busy_reference_image(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    destinations, selected = custom_destinations_from_form("Museu do Louvre, Paris, Franca")
+    selection_id = selected[0]
+    reference = tmp_path / "louvre-reference.png"
+    reference_image = Image.new("RGB", (360, 240), "#dfe8f1")
+    draw = ImageDraw.Draw(reference_image)
+    draw.polygon((40, 210, 180, 42, 320, 210), outline="#111111", fill="#f2f5f7", width=4)
+    for x in range(64, 300, 8):
+        draw.line((x, 70, x + 35, 210), fill="#26323a", width=1)
+    for y in range(80, 205, 8):
+        draw.line((55, y, 305, y), fill="#26323a", width=1)
+    reference_image.save(reference)
+
+    lineart_images = create_local_lineart_fallbacks(
+        destinations,
+        selected,
+        "request-123",
+        reference_images={selection_id: reference},
+    )
+
+    black_pixels = _count_black_pixels(lineart_images[selection_id])
+    assert black_pixels < 35_000
+
+
 def test_api_generate_uses_confirmed_landmarks_for_cover_prompt(
     tmp_path,
     monkeypatch,
@@ -856,6 +884,12 @@ def test_api_generate_uses_supabase_landmark_asset_url_in_pdf(
         "https://project.supabase.co/storage/v1/object/public/"
         "landmark-assets/custom-rio-de-janeiro:cristo-redentor.jpg"
     ]
+
+
+def _count_black_pixels(path: Path) -> int:
+    with Image.open(path) as image:
+        grayscale = image.convert("L")
+        return sum(1 for pixel in grayscale.getdata() if pixel < 128)
 
 
 def test_fetch_custom_wikimedia_assets_ignores_network_failures(monkeypatch):
