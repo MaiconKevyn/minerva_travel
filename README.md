@@ -121,6 +121,7 @@ Backend `.env`:
 ```env
 IMAGE_PROVIDER=replicate
 LANDMARK_ART_GENERATION=false
+COLORING_LINEART_GENERATION=true
 IMAGE_GENERATION_CONCURRENCY=2
 REPLICATE_API_TOKEN=sua_chave_aqui
 OPENAI_API_KEY=sua_chave_openai_aqui
@@ -148,6 +149,11 @@ processados em paralelo. A lineart premium e gerada como desenho editorial
 limpo a partir do nome/local do ponto turistico, sem tracar a foto de
 referencia, para evitar ruido fotografico e manter uma pagina realmente boa
 para criancas colorirem.
+
+`COLORING_LINEART_GENERATION=true` mantem a lineart premium ativa para pontos
+personalizados/dinamicos mesmo quando `LANDMARK_ART_GENERATION=false`. Isso evita
+o fallback de bordas fotograficas em lugares como castelos, museus e igrejas,
+onde a foto costuma virar um desenho pontilhado dificil de identificar.
 
 `SUPABASE_SERVICE_ROLE_KEY` e usada somente no backend. Nunca coloque essa chave
 em variaveis `VITE_`, no frontend publicado ou em `public_html/config.js`.

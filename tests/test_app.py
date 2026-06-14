@@ -378,11 +378,12 @@ def test_api_generate_uses_custom_landmark_image_url_when_wikimedia_is_missing(
     assert captured_images == [downloaded_image]
 
 
-def test_api_generate_creates_local_lineart_from_custom_landmark_image_by_default(
+def test_api_generate_creates_ai_lineart_from_custom_landmark_image_by_default(
     tmp_path,
     monkeypatch,
 ):
     captured_lineart_images = []
+    generated_lineart = []
     downloaded_image = tmp_path / "custom-images" / "speyer.jpg"
     downloaded_image.parent.mkdir(parents=True)
     Image.new("RGB", (320, 220), "#4f86b7").save(downloaded_image)
@@ -407,7 +408,10 @@ def test_api_generate_creates_local_lineart_from_custom_landmark_image_by_defaul
             reference_image,
             output_path,
         ):
-            raise AssertionError("landmark lineart generation should stay disabled")
+            generated_lineart.append((landmark_name, city, country, reference_image))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"premium-lineart")
+            return output_path
 
     def fake_write_pdf(context, output_path):
         captured_lineart_images.extend(
@@ -443,6 +447,9 @@ def test_api_generate_creates_local_lineart_from_custom_landmark_image_by_defaul
     )
     monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
     monkeypatch.setattr("minerva_travel.app.write_pdf", fake_write_pdf)
+    monkeypatch.setenv("IMAGE_PROVIDER", "replicate")
+    monkeypatch.setenv("LANDMARK_ART_GENERATION", "false")
+    monkeypatch.delenv("COLORING_LINEART_GENERATION", raising=False)
     client = TestClient(app)
 
     response = client.post(
@@ -458,9 +465,18 @@ def test_api_generate_creates_local_lineart_from_custom_landmark_image_by_defaul
     )
 
     assert response.status_code == 200
+    assert generated_lineart == [
+        (
+            "Museu da Tecnologia de Speyer",
+            "Speyer",
+            "Alemanha",
+            downloaded_image,
+        )
+    ]
     assert len(captured_lineart_images) == 1
     assert captured_lineart_images[0] != Path("assets/lineart/paris/eiffel-tower.png")
     assert captured_lineart_images[0].exists()
+    assert captured_lineart_images[0].read_bytes() == b"premium-lineart"
 
 
 def test_create_local_lineart_fallbacks_writes_named_placeholder_without_reference(
@@ -790,7 +806,9 @@ def test_api_generate_uses_wikimedia_image_before_generating_landmark_art(
 
     assert response.status_code == 200
     assert generated_landmarks == []
-    assert generated_lineart == []
+    assert generated_lineart == [
+        ("Cristo Redentor", "Rio de Janeiro", "Brasil", wikimedia_path)
+    ]
 
 
 def test_api_generate_uses_supabase_landmark_asset_url_in_pdf(

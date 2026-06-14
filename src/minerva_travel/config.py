@@ -29,6 +29,12 @@ def landmark_art_generation_enabled() -> bool:
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def coloring_lineart_generation_enabled() -> bool:
+    load_project_env()
+    raw_value = os.getenv("COLORING_LINEART_GENERATION", "true")
+    return raw_value.strip().lower() not in {"0", "false", "no", "off"}
+
+
 def cors_allowed_origins() -> list[str]:
     load_project_env()
     raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")

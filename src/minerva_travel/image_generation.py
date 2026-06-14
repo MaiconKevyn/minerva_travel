@@ -1,6 +1,7 @@
 from pathlib import Path
 from time import sleep
 from typing import Protocol
+from unicodedata import normalize
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
@@ -392,19 +393,22 @@ def trip_summary_prompt(title: str, destination_names: list[str]) -> str:
 
 
 def landmark_lineart_prompt(landmark_name: str, city: str, country: str) -> str:
+    feature_guidance = _landmark_lineart_feature_guidance(landmark_name)
     return (
         "Create a premium children's coloring book line art page for children "
         f"ages 4 to 8 showing {landmark_name} in {city}, {country}. Use a clean "
         "front-facing editorial composition like a printed travel coloring page. "
         "Do not trace a photo. Do not make a sparse icon. Draw the landmark "
         "large and recognizable, with its main silhouette, recognizable facade, "
-        "and signature feature centered on the page. If the landmark has a famous "
-        "foreground element such as a pyramid, tower, dome, arch, bridge, or gate, "
-        "make it prominent. For Louvre-style glass pyramids, use large pyramid "
-        "glass panels that are easy to color, not a dense grid. Architectural "
+        "and signature feature centered on the page. "
+        f"{feature_guidance}"
+        "Architectural "
         "detail is allowed only when simplified: simplified rows of windows, "
         "large arches, broad doors, clean rooflines, and a few evenly spaced "
-        "decorative shapes. Add a few small simple people only as friendly scale "
+        "decorative shapes. "
+        "Do not add pyramids, domes, glass roofs, flags, bridges, or modern "
+        "structures unless they are actually part of the named landmark. "
+        "Add a few small simple people only as friendly scale "
         "figures, drawn with very simple outlines. Use clean medium-weight black "
         "outlines, large open white areas, and clear closed shapes for crayons. "
         "Avoid realism and visual noise. Do not include tiny repeated patterns, "
@@ -412,6 +416,31 @@ def landmark_lineart_prompt(landmark_name: str, city: str, country: str) -> str:
         "speckles, messy sketch lines, grayscale, filled black areas, gradients, "
         "readable text, labels, signs, logos, watermarks, or signatures. No color."
     )
+
+
+def _landmark_lineart_feature_guidance(landmark_name: str) -> str:
+    normalized_name = _normalize_ascii(landmark_name)
+    if any(term in normalized_name for term in ("castelo", "castle", "fortress", "fort")):
+        return (
+            "For castles and fortresses, draw a hilltop medieval castle with "
+            "medieval fortress walls, "
+            "crenellated battlements, square stone towers, an arched entrance gate, "
+            "flat crenellated tops, and a simple hill or path shape. This is a medieval fortress, "
+            "not a palace, cathedral, basilica, church, monastery, or museum. "
+            "Do not draw domes, curved roofs, glass pyramids, palace roofs, "
+            "or church facades. Do not draw cone roofs, pointed roofs, fairy-tale towers, a "
+            "fantasy castle, or museum-style buildings. "
+        )
+    return (
+        "If the landmark has a famous foreground element such as a pyramid, tower, "
+        "dome, arch, bridge, or gate, make it prominent. For Louvre-style glass "
+        "pyramids, use large pyramid glass panels that are easy to color, not a "
+        "dense grid. "
+    )
+
+
+def _normalize_ascii(value: str) -> str:
+    return normalize("NFKD", value).encode("ascii", "ignore").decode("ascii").lower()
 
 
 def simplify_child_coloring_lineart(image_path: Path, output_path: Path | None = None) -> Path:

@@ -134,9 +134,29 @@ def test_landmark_lineart_prompt_requests_premium_clean_coloring_page():
     assert "large open white areas" in prompt
     assert "Do not trace a photo" in prompt
     assert "Do not make a sparse icon" in prompt
+    assert "Do not add pyramids, domes, glass roofs" in prompt
     assert "tiny repeated patterns" in prompt
     assert "Museu do Louvre" in prompt
     assert "No color" in prompt
+
+
+def test_landmark_lineart_prompt_adds_castle_specific_guidance():
+    prompt = landmark_lineart_prompt(
+        landmark_name="Castelo de S. Jorge",
+        city="Lisboa",
+        country="Portugal",
+    )
+
+    assert "medieval fortress walls" in prompt
+    assert "crenellated battlements" in prompt
+    assert "square stone towers" in prompt
+    assert "arched entrance gate" in prompt
+    assert "hilltop medieval castle" in prompt
+    assert "flat crenellated tops" in prompt
+    assert "not a palace, cathedral, basilica, church, monastery, or museum" in prompt
+    assert "Do not draw domes" in prompt
+    assert "Do not draw cone roofs" in prompt
+    assert "fantasy castle" in prompt
 
 
 def test_simplify_child_coloring_lineart_removes_tiny_texture(tmp_path):

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from minerva_travel import storage
 from minerva_travel.catalog import load_catalog
 from minerva_travel.config import (
+    coloring_lineart_generation_enabled,
     cors_allowed_origins,
     google_maps_api_key,
     image_generation_concurrency,
@@ -37,6 +38,7 @@ from minerva_travel.models import (
     DynamicItineraryRequest,
     GuideRequest,
     ItineraryRecommendationRequest,
+    Landmark,
 )
 from minerva_travel.pdf import render_guide_html, write_pdf
 from minerva_travel.place_discovery import discover_dynamic_itinerary, resolve_landmark_locations
@@ -396,12 +398,6 @@ async def generate_pdf_from_form(
         for selection_id, asset in selected_wikimedia_assets.items()
     }
     custom_reference_images.update(landmark_images)
-    landmark_lineart_images: dict[str, Path] = create_local_lineart_fallbacks(
-        custom_destinations,
-        selected,
-        request_id,
-        reference_images=custom_reference_images,
-    )
     if landmark_art_generation_enabled():
         landmark_reference_images = {
             selection_id: asset.local_path
@@ -417,6 +413,31 @@ async def generate_pdf_from_form(
             reference_images=landmark_reference_images,
         )
         landmark_images.update(generated_landmark_images)
+    elif coloring_lineart_generation_enabled():
+        landmark_lineart_images = generate_selected_landmark_lineart(
+            custom_destinations,
+            custom_selected,
+            request_id,
+            generator,
+            reference_images=custom_reference_images,
+        )
+        missing_lineart_ids = set(custom_selected) - set(landmark_lineart_images)
+        if missing_lineart_ids:
+            landmark_lineart_images.update(
+                create_local_lineart_fallbacks(
+                    custom_destinations,
+                    list(missing_lineart_ids),
+                    request_id,
+                    reference_images=custom_reference_images,
+                )
+            )
+    else:
+        landmark_lineart_images = create_local_lineart_fallbacks(
+            custom_destinations,
+            selected,
+            request_id,
+            reference_images=custom_reference_images,
+        )
     context = build_guide_context(
         request,
         catalog,
@@ -696,6 +717,81 @@ def _generate_landmark_art_pair(
         output_path=lineart_output_path,
     )
     return selection_id, image_path, lineart_path
+
+
+def generate_selected_landmark_lineart(
+    destinations: list[Destination],
+    selected: list[str],
+    request_id: str,
+    generator,
+    reference_images: dict[str, Path] | None = None,
+) -> dict[str, Path]:
+    selected_ids = set(selected)
+    reference_images = reference_images or {}
+    lineart_output_dir = Path("runtime/generated/lineart") / request_id
+    generation_jobs = []
+    for destination in destinations:
+        for landmark in destination.landmarks:
+            selection_id = f"{destination.id}:{landmark.id}"
+            if selection_id not in selected_ids:
+                continue
+            generation_jobs.append(
+                (
+                    selection_id,
+                    landmark.name,
+                    destination.city,
+                    destination.country,
+                    _lineart_reference_for_landmark(landmark, reference_images.get(selection_id)),
+                    lineart_output_dir / destination.id / f"{landmark.id}.png",
+                )
+            )
+
+    if not generation_jobs:
+        return {}
+
+    max_workers = min(image_generation_concurrency(), len(generation_jobs))
+    lineart_images: dict[str, Path] = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_generate_landmark_lineart, generator, *generation_job): (
+                generation_job[0]
+            )
+            for generation_job in generation_jobs
+        }
+        for future in as_completed(futures):
+            try:
+                selection_id, lineart_path = future.result()
+            except Exception:
+                continue
+            lineart_images[selection_id] = lineart_path
+    return lineart_images
+
+
+def _generate_landmark_lineart(
+    generator,
+    selection_id: str,
+    landmark_name: str,
+    city: str,
+    country: str,
+    reference_image: Path,
+    lineart_output_path: Path,
+) -> tuple[str, Path]:
+    lineart_path = generator.generate_landmark_lineart(
+        landmark_name=landmark_name,
+        city=city,
+        country=country,
+        reference_image=reference_image,
+        output_path=lineart_output_path,
+    )
+    return selection_id, lineart_path
+
+
+def _lineart_reference_for_landmark(landmark: Landmark, reference_image: Path | None) -> Path:
+    if reference_image:
+        return reference_image
+    if isinstance(landmark.image, Path):
+        return landmark.image
+    return Path("README.md")
 
 
 def custom_destinations_from_form(raw: str | None) -> tuple[list[Destination], list[str]]:
