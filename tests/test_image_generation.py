@@ -117,21 +117,25 @@ def test_replicate_output_download_retries_transient_read_errors(tmp_path, monke
     assert output.read_bytes() == b"generated-after-retry"
 
 
-def test_landmark_lineart_prompt_requests_simple_child_coloring_page():
+def test_landmark_lineart_prompt_requests_premium_clean_coloring_page():
     prompt = landmark_lineart_prompt(
-        landmark_name="Cristo Redentor",
-        city="Rio de Janeiro",
-        country="Brasil",
+        landmark_name="Museu do Louvre",
+        city="Paris",
+        country="Franca",
     )
 
-    assert "Create an ultra simple black and white kindergarten coloring page" in prompt
+    assert "premium children's coloring book line art page" in prompt
     assert "children ages 4 to 8" in prompt
+    assert "front-facing editorial composition" in prompt
+    assert "recognizable facade" in prompt
+    assert "simplified rows of windows" in prompt
+    assert "large pyramid glass panels" in prompt
+    assert "small simple people" in prompt
     assert "large open white areas" in prompt
-    assert "2 to 4 major interior lines" in prompt
     assert "Do not trace a photo" in prompt
-    assert "Do not draw windows" in prompt
+    assert "Do not make a sparse icon" in prompt
     assert "tiny repeated patterns" in prompt
-    assert "Cristo Redentor" in prompt
+    assert "Museu do Louvre" in prompt
     assert "No color" in prompt
 
 
@@ -167,7 +171,8 @@ def test_replicate_lineart_generates_simple_drawing_without_tracing_reference(
         def read(self):
             image = Image.new("RGB", (40, 30), "white")
             draw = ImageDraw.Draw(image)
-            draw.rectangle((4, 4, 36, 26), outline="black", width=4)
+            draw.rectangle((4, 4, 36, 26), outline="black", width=3)
+            draw.line((10, 15, 30, 15), fill=(172, 172, 172), width=1)
             png = tmp_path / "generated-lineart.png"
             image.save(png)
             return png.read_bytes()
@@ -192,6 +197,8 @@ def test_replicate_lineart_generates_simple_drawing_without_tracing_reference(
 
     assert result == output
     assert output.exists()
+    with Image.open(output) as image:
+        assert image.convert("RGB").getpixel((20, 15)) == (172, 172, 172)
 
 
 def _count_black_pixels(path):

@@ -144,9 +144,10 @@ Wikimedia/licenciadas e sincroniza esses assets no bucket
 gerar arte/lineart premium para cada ponto, configure
 `LANDMARK_ART_GENERATION=true`; nesse caso,
 `IMAGE_GENERATION_CONCURRENCY` controla quantos pontos turisticos sao
-processados em paralelo. A lineart premium e gerada como desenho simples a
-partir do nome/local do ponto turistico, sem tracar a foto de referencia, para
-evitar excesso de janelas, texturas e linhas pequenas na pagina de colorir.
+processados em paralelo. A lineart premium e gerada como desenho editorial
+limpo a partir do nome/local do ponto turistico, sem tracar a foto de
+referencia, para evitar ruido fotografico e manter uma pagina realmente boa
+para criancas colorirem.
 
 `SUPABASE_SERVICE_ROLE_KEY` e usada somente no backend. Nunca coloque essa chave
 em variaveis `VITE_`, no frontend publicado ou em `public_html/config.js`.

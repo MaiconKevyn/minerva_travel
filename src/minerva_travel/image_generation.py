@@ -342,7 +342,6 @@ class ReplicateImageGenerator:
             },
         )
         _write_replicate_output(output, output_path)
-        simplify_child_coloring_lineart(output_path)
         return output_path
 
 
@@ -394,22 +393,24 @@ def trip_summary_prompt(title: str, destination_names: list[str]) -> str:
 
 def landmark_lineart_prompt(landmark_name: str, city: str, country: str) -> str:
     return (
-        "Create an ultra simple black and white kindergarten coloring page for "
-        f"children ages 4 to 8 showing {landmark_name} in {city}, {country}. "
-        "Use a clean icon-like drawing, not a realistic architectural drawing. "
-        "Do not trace a photo. Keep only the main recognizable silhouette and "
-        "one or two signature features of the landmark. Draw one central landmark "
-        "symbol, not the full facade or full city scene. For museums, castles, "
-        "palaces, churches, and historic buildings, use only a simple silhouette, "
-        "main roof shape, main dome, tower, arch, entrance, or other iconic shape. "
-        "Use thick smooth black marker outlines, rounded friendly shapes, large "
-        "open white areas for crayons, and only 2 to 4 major interior lines. If "
-        "the landmark has many repeated details, simplify them into one broad "
-        "shape. Do not draw windows, bricks, tiles, glass grids, columns, railings, "
-        "reflections, water ripples, shadows, hatching, stippling, tiny repeated "
-        "patterns, texture, photo noise, dotted lines, or speckles. No color, "
-        "no grayscale shading, no filled areas, no gradients, no background scenery, "
-        "no people, no text, no labels, no watermark, no logo, no signature."
+        "Create a premium children's coloring book line art page for children "
+        f"ages 4 to 8 showing {landmark_name} in {city}, {country}. Use a clean "
+        "front-facing editorial composition like a printed travel coloring page. "
+        "Do not trace a photo. Do not make a sparse icon. Draw the landmark "
+        "large and recognizable, with its main silhouette, recognizable facade, "
+        "and signature feature centered on the page. If the landmark has a famous "
+        "foreground element such as a pyramid, tower, dome, arch, bridge, or gate, "
+        "make it prominent. For Louvre-style glass pyramids, use large pyramid "
+        "glass panels that are easy to color, not a dense grid. Architectural "
+        "detail is allowed only when simplified: simplified rows of windows, "
+        "large arches, broad doors, clean rooflines, and a few evenly spaced "
+        "decorative shapes. Add a few small simple people only as friendly scale "
+        "figures, drawn with very simple outlines. Use clean medium-weight black "
+        "outlines, large open white areas, and clear closed shapes for crayons. "
+        "Avoid realism and visual noise. Do not include tiny repeated patterns, "
+        "photo texture, brick texture, shadows, reflections, hatching, stippling, "
+        "speckles, messy sketch lines, grayscale, filled black areas, gradients, "
+        "readable text, labels, signs, logos, watermarks, or signatures. No color."
     )
 
 
