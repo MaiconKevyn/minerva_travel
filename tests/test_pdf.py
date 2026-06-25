@@ -3,7 +3,13 @@ from pathlib import Path
 
 from minerva_travel.catalog import load_catalog
 from minerva_travel.guide_builder import build_guide_context
-from minerva_travel.models import GuideRequest
+from minerva_travel.models import (
+    Catalog,
+    Destination,
+    GuideRequest,
+    Landmark,
+    RestaurantRecommendation,
+)
 from minerva_travel.pdf import render_guide_html, write_pdf
 
 
@@ -88,6 +94,140 @@ def test_render_guide_html_contains_trip_phases_language_tips_and_reflection_pro
     assert ".language-tip-card" in html
     assert ".observation-card" in html
     assert ".memory-boxes" in html
+
+
+def test_render_guide_html_places_structured_language_activity_before_trip():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        children_ages=[6],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower"],
+    )
+    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+
+    html = render_guide_html(context)
+    language_section = html.split('class="page language-page phase-before"', maxsplit=1)[1].split(
+        '<section class="page landmark-page"', maxsplit=1
+    )[0]
+
+    assert "Palavras para usar" in language_section
+    assert "Bonjour" in language_section
+    assert "Leia a palavra" in language_section
+    assert "language-learning-activity" in language_section
+
+
+def test_render_guide_html_omits_uncertain_language_content_and_pdf_still_builds(tmp_path):
+    catalog = Catalog(
+        id="custom",
+        title="Custom",
+        destinations=[
+            Destination(
+                id="custom-atlantida",
+                country="Atlantida",
+                city="Cidade Misteriosa",
+                display_title="Atlantida - Cidade Misteriosa",
+                intro=["Um destino inventado pela familia."],
+                favorites_prompt="Minha lembranca favorita foi...",
+                coloring_title="Desenho da viagem",
+                coloring_subtitle="Para colorir depois.",
+                landmarks=[
+                    Landmark(
+                        id="portal",
+                        name="Portal",
+                        description=["Um lugar especial para imaginar."],
+                        image=Path("assets/landmarks/sample.png"),
+                        lineart_image=Path("assets/lineart/sample.png"),
+                        sort_order=1,
+                    )
+                ],
+            )
+        ],
+    )
+    request = GuideRequest(
+        title="Guia Misterioso",
+        children_names=["Alice"],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["custom-atlantida:portal"],
+    )
+    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+    output = tmp_path / "guide-without-language.pdf"
+
+    html = render_guide_html(context)
+    pdf = write_pdf(context, output)
+
+    assert 'class="page language-page' not in html
+    assert "language-learning-activity" not in html
+    assert "Palavras para usar" not in html
+    assert pdf.exists()
+    assert pdf.stat().st_size > 1000
+
+
+def test_render_guide_html_omits_restaurants_without_entitlement():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower"],
+    )
+    context = build_guide_context(
+        request,
+        catalog,
+        Path("runtime/generated/cover.png"),
+        restaurant_recommendations=[
+            RestaurantRecommendation(
+                destination_id="paris",
+                name="Bistro Familiar",
+                nearby_context="perto de Torre Eiffel",
+                reason="Boa pausa para familia entre passeios.",
+            )
+        ],
+    )
+
+    html = render_guide_html(context)
+
+    assert "Onde comer perto do roteiro" not in html
+    assert "Bistro Familiar" not in html
+
+
+def test_render_guide_html_includes_optional_restaurants_with_freshness_note():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower"],
+        restaurant_recommendations_extra=True,
+    )
+    context = build_guide_context(
+        request,
+        catalog,
+        Path("runtime/generated/cover.png"),
+        restaurant_recommendations=[
+            RestaurantRecommendation(
+                destination_id="paris",
+                name="Bistro Familiar",
+                nearby_context="perto de Torre Eiffel",
+                reason="Boa pausa para familia entre passeios.",
+                cuisine="francesa",
+                suitability_notes=["Cardapio simples para criancas"],
+            )
+        ],
+    )
+
+    html = render_guide_html(context)
+
+    assert "Onde comer perto do roteiro" in html
+    assert "Bistro Familiar" in html
+    assert "perto de Torre Eiffel" in html
+    assert "Cardapio simples para criancas" in html
+    assert "Confira horarios, reservas e funcionamento antes de visitar" in html
 
 
 def test_render_guide_html_adds_trip_summary_after_cover():

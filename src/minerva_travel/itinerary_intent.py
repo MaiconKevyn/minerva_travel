@@ -31,17 +31,47 @@ INTEREST_ALIASES = {
     "educativo": "education",
     "educacao": "education",
     "educação": "education",
-    "lojas": "shopping",
+    "lojas": "local_stores",
+    "lojas locais": "local_stores",
+    "mercados": "local_stores",
     "compras": "shopping",
     "museu": "museums",
     "museus": "museums",
+    "outdoor": "outdoor",
+    "ar livre": "outdoor",
+    "atividade ao ar livre": "outdoor",
+    "atividades ao ar livre": "outdoor",
     "parque": "parks",
     "parques": "parks",
-    "praca": "parks",
-    "praça": "parks",
+    "praca": "squares",
+    "praça": "squares",
+    "pracas": "squares",
+    "praças": "squares",
     "brincar": "play",
     "rio": "river",
+    "teatro": "theaters",
+    "teatros": "theaters",
     "vistas": "views",
+}
+
+KNOWN_INTERESTS = {
+    "animals",
+    "art",
+    "education",
+    "family",
+    "food",
+    "history",
+    "local_stores",
+    "museums",
+    "outdoor",
+    "parks",
+    "play",
+    "river",
+    "science",
+    "shopping",
+    "squares",
+    "theaters",
+    "views",
 }
 
 DISCOVERY_KIND_TO_CATEGORY = {
@@ -291,7 +321,8 @@ def _request_category(request: DiscoveryRequest) -> str:
 
 def _normalize_interest(value: str) -> str:
     key = _normalize_text(value)
-    return INTEREST_ALIASES.get(key, key or "unknown")
+    candidate = INTEREST_ALIASES.get(key, key)
+    return candidate if candidate in KNOWN_INTERESTS else "unknown"
 
 
 def _interest_query(interest: str, destination: str) -> str:
@@ -302,11 +333,15 @@ def _interest_query(interest: str, destination: str) -> str:
         "family": "lugares bons para ir com criancas",
         "food": "restaurantes familiares para comer com criancas",
         "history": "lugares historicos interessantes para criancas",
+        "local_stores": "lojas locais mercados livrarias brinquedos para familias",
         "museums": "museus interativos e educativos para criancas",
+        "outdoor": "atividades ao ar livre trilhas jardins para familias",
         "parks": "parques pracas e atividades ao ar livre para criancas",
         "play": "atividades divertidas para criancas",
         "science": "museus de ciencia e descobertas para criancas",
         "shopping": "lojas e mercados legais para familias",
+        "squares": "pracas largos espacos publicos para familias",
+        "theaters": "teatros infantis espetaculos e centros culturais para familias",
         "river": "passeios de barco e rio para familias",
         "views": "mirantes e vistas bonitas para familias",
     }

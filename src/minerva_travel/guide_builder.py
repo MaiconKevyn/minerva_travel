@@ -1,7 +1,17 @@
 from collections import defaultdict
 from pathlib import Path
 
-from minerva_travel.models import Catalog, GuideContext, GuideDestination, GuideRequest, Landmark
+from minerva_travel.models import (
+    Catalog,
+    Destination,
+    GuideActivity,
+    GuideContext,
+    GuideDestination,
+    GuideRequest,
+    Landmark,
+    RestaurantRecommendation,
+)
+from minerva_travel.destination_languages import preferred_language_tip, lookup_destination_language
 from minerva_travel.wikimedia_assets import ImageCredit, WikimediaAsset
 
 
@@ -13,6 +23,7 @@ def build_guide_context(
     wikimedia_assets: dict[str, WikimediaAsset] | None = None,
     landmark_images: dict[str, Path] | None = None,
     landmark_lineart_images: dict[str, Path] | None = None,
+    restaurant_recommendations: list[RestaurantRecommendation] | None = None,
 ) -> GuideContext:
     wikimedia_assets = wikimedia_assets or {}
     landmark_images = landmark_images or {}
@@ -56,13 +67,248 @@ def build_guide_context(
                 GuideDestination(destination=destination, landmarks=landmarks)
             )
 
+    enabled_restaurant_recommendations = (
+        restaurant_recommendations or []
+        if request.restaurant_recommendations_extra
+        else []
+    )
+
     return GuideContext(
         request=request,
         cover_image=cover_image,
         summary_image=summary_image,
         destinations=guide_destinations,
+        activity_plan=_build_activity_plan(request, guide_destinations),
         image_credits=_collect_credits(request, catalog, wikimedia_assets),
+        restaurant_recommendations=enabled_restaurant_recommendations,
     )
+
+
+ACTIVITY_ROTATION_BY_COMPLEXITY = {
+    "preschool": ["coloring", "detail_hunt", "drawing", "checklist"],
+    "early_reader": ["word_search", "coloring", "detail_hunt", "checklist"],
+    "older_child": ["spot_the_difference", "word_search", "short_prompt", "checklist"],
+    "family": ["coloring", "detail_hunt", "drawing", "checklist"],
+}
+
+
+def _build_activity_plan(
+    request: GuideRequest,
+    guide_destinations: list[GuideDestination],
+) -> list[GuideActivity]:
+    if not guide_destinations:
+        return []
+
+    complexity = _activity_complexity(request.children_ages)
+    rotation = ACTIVITY_ROTATION_BY_COMPLEXITY[complexity]
+    mixed_age_extension = _mixed_age_extension_needed(request.children_ages)
+    activities: list[GuideActivity] = []
+
+    for destination_index, item in enumerate(guide_destinations):
+        activity_count = 2 if len(guide_destinations) == 1 else 1
+        for offset in range(activity_count):
+            landmark = item.landmarks[offset % len(item.landmarks)]
+            activity_type = rotation[(len(activities)) % len(rotation)]
+            activities.append(
+                _activity_for_type(
+                    activity_type,
+                    item.destination.id,
+                    item.destination.city,
+                    landmark,
+                    complexity,
+                    mixed_age_extension,
+                    destination_index + 1,
+                )
+            )
+        language_activity = _language_activity_for_destination(
+            item.destination,
+            complexity,
+            mixed_age_extension,
+        )
+        if language_activity:
+            activities.append(language_activity)
+
+    return activities
+
+
+def _activity_complexity(children_ages: list[int]) -> str:
+    valid_ages = [age for age in children_ages if age > 0]
+    if not valid_ages:
+        return "family"
+    youngest = min(valid_ages)
+    if youngest <= 5:
+        return "preschool"
+    if youngest <= 8:
+        return "early_reader"
+    return "older_child"
+
+
+def _mixed_age_extension_needed(children_ages: list[int]) -> bool:
+    valid_ages = [age for age in children_ages if age > 0]
+    return bool(valid_ages and min(valid_ages) <= 5 and max(valid_ages) >= 9)
+
+
+def _activity_for_type(
+    activity_type: str,
+    destination_id: str,
+    city: str,
+    landmark: Landmark,
+    complexity: str,
+    include_extension: bool,
+    destination_number: int,
+) -> GuideActivity:
+    title, prompt = _activity_copy(activity_type, city, landmark.name, complexity)
+    extension_prompt = None
+    if include_extension:
+        extension_prompt = (
+            "Desafio extra: escreva uma pista para outra pessoa descobrir este lugar."
+        )
+    return GuideActivity(
+        destination_id=destination_id,
+        type=activity_type,
+        title=title,
+        prompt=prompt,
+        complexity=complexity,
+        landmark_name=landmark.name,
+        lineart_image=landmark.lineart_image,
+        words=_activity_words(city, landmark.name, destination_number),
+        checklist_items=_activity_checklist(city, landmark.name),
+        extension_prompt=extension_prompt,
+    )
+
+
+def _language_activity_for_destination(
+    destination: Destination,
+    complexity: str,
+    include_extension: bool,
+) -> GuideActivity | None:
+    language = lookup_destination_language(destination)
+    if not language:
+        return None
+    tip = preferred_language_tip(language)
+    title, prompt = _language_activity_copy(
+        destination.city,
+        language.name,
+        tip.phrase,
+        complexity,
+    )
+    extension_prompt = None
+    if include_extension:
+        extension_prompt = (
+            "Desafio extra para a crianca maior: escreva onde essa palavra apareceu "
+            "e compare com uma palavra parecida em portugues."
+        )
+
+    return GuideActivity(
+        destination_id=destination.id,
+        type="language_learning",
+        title=title,
+        prompt=prompt,
+        complexity=complexity,
+        phase="before",
+        language_name=language.name,
+        language_phrase=tip.phrase,
+        language_pronunciation=tip.pronunciation,
+        language_meaning=tip.meaning,
+        checklist_items=[tip.use_case],
+        extension_prompt=extension_prompt,
+    )
+
+
+def _language_activity_copy(
+    city: str,
+    language_name: str,
+    phrase: str,
+    complexity: str,
+) -> tuple[str, str]:
+    if complexity == "preschool":
+        return (
+            f"Palavra em {language_name}",
+            (
+                f"Escute a palavra {phrase}, repita bem devagar e desenhe uma "
+                f"coisa de {city} que combine com essa palavra."
+            ),
+        )
+    if complexity == "early_reader":
+        return (
+            f"Frase para reconhecer em {language_name}",
+            (
+                f"Leia a palavra {phrase} com alguem da familia e procure uma "
+                f"placa, bilhete ou lugar em {city} onde ela poderia aparecer."
+            ),
+        )
+    if complexity == "older_child":
+        return (
+            f"Desafio de idioma em {language_name}",
+            (
+                f"Desafio: compare {phrase} com uma palavra em portugues e "
+                f"escreva quando voce usaria essa expressao em {city}."
+            ),
+        )
+    return (
+        f"Idioma da viagem: {language_name}",
+        (
+            f"Em familia, pratiquem {phrase} antes de sair e combinem uma "
+            f"situacao em {city} para tentar lembrar dessa palavra."
+        ),
+    )
+
+def _activity_copy(
+    activity_type: str,
+    city: str,
+    landmark_name: str,
+    complexity: str,
+) -> tuple[str, str]:
+    if activity_type == "coloring":
+        return (
+            "Colorir a lembranca",
+            f"Use as cores que voce imagina para lembrar de {landmark_name}.",
+        )
+    if activity_type == "word_search":
+        return (
+            "Caca-palavras da viagem",
+            f"Encontre palavras ligadas a {city} e ao passeio em {landmark_name}.",
+        )
+    if activity_type == "spot_the_difference":
+        return (
+            "Jogo dos 7 erros",
+            f"Observe {landmark_name} com atencao e crie diferencas para outra pessoa encontrar.",
+        )
+    if activity_type == "detail_hunt":
+        return (
+            "Caca ao detalhe",
+            f"Procure uma forma, cor ou som especial em {landmark_name}.",
+        )
+    if activity_type == "short_prompt":
+        return (
+            "Pergunta de explorador",
+            f"Escreva uma descoberta sobre {landmark_name} que voce contaria para um amigo.",
+        )
+    if activity_type == "checklist":
+        return (
+            "Checklist do destino",
+            f"Marque o que voce viu, ouviu ou provou em {city}.",
+        )
+    title = "Desenho da aventura"
+    prompt = f"Desenhe uma cena de {city} que voce quer guardar na memoria."
+    if complexity == "preschool":
+        prompt = f"Desenhe uma coisa que chamou sua atencao em {landmark_name}."
+    return title, prompt
+
+
+def _activity_words(city: str, landmark_name: str, destination_number: int) -> list[str]:
+    words = [city, landmark_name, "familia", f"dia{destination_number}"]
+    return [word.split()[0].upper() for word in words if word]
+
+
+def _activity_checklist(city: str, landmark_name: str) -> list[str]:
+    return [
+        f"Encontrei um detalhe em {landmark_name}",
+        f"Vi algo que lembra {city}",
+        "Escolhi uma lembranca favorita",
+    ]
+
+
 
 
 def _collect_credits(

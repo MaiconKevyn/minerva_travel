@@ -4,7 +4,17 @@ import { motion } from 'framer-motion';
 import { MapPin, Users, Camera, Sparkles, Star, Loader2, Navigation, Download } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
-import { generatePDF } from '@/utils/minerva-api.js';
+import {
+  categoryLabelForAttraction,
+  generatePDF,
+  RESTAURANT_RECOMMENDATIONS_EXTRA,
+  selectGuideLandmarks,
+} from '@/utils/minerva-api.js';
+import {
+  deriveChildAges,
+  deriveChildNames,
+  serializeGuideDestinations,
+} from '@/utils/guide-form.js';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
@@ -14,23 +24,30 @@ const Step5Review = () => {
     coverPhoto,
     coverPhotoUrl,
     destination,
+    destinationsList,
     parsedData,
     selectedLandmarks,
     childrenList,
     parentsList,
+    expectedCoverFamilyMemberCount,
+    itineraryPreferences,
     recommendedItinerary,
+    restaurantRecommendationsExtra,
+    setRestaurantRecommendationsExtra,
     year
   } = useConversationalGuide();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
+  const [coverStatus, setCoverStatus] = useState(null);
 
   // Derive the rich data from the IDs
-  const finalLandmarks = selectedLandmarks.map(id =>
-    parsedData.landmarks.find(l => l.id === id)
-  ).filter(Boolean);
-  const childrenNames = childrenList.join(', ');
+  const finalLandmarks = selectGuideLandmarks(parsedData.landmarks, selectedLandmarks);
+  const childNamesList = deriveChildNames(childrenList);
+  const childrenNames = childNamesList.join(', ');
+  const childrenAges = deriveChildAges(childrenList);
+  const destinationSummary = serializeGuideDestinations(destinationsList) || destination;
   const parentsNames = parentsList.join(', ');
   const recommendedDays = (recommendedItinerary?.days || [])
     .map((day) => ({
@@ -46,11 +63,14 @@ const Step5Review = () => {
       const guideData = {
         title: `Família ${familyName}`,
         childrenNames,
+        childrenAges,
         parentsNames,
         year,
         familyPhoto: coverPhoto, // Pass the actual File object
+        expectedVisibleFamilyMemberCount: expectedCoverFamilyMemberCount,
         landmarks: finalLandmarks,
-        selectedLandmarks
+        selectedLandmarks,
+        restaurantRecommendationsExtra,
       };
 
       const result = await generatePDF(guideData);
@@ -58,8 +78,12 @@ const Step5Review = () => {
       if (result.download_url) {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://minerva-travel.onrender.com';
         setPdfUrl(`${baseUrl}${result.download_url}`);
+        setCoverStatus(result.cover_status || null);
         setIsSuccess(true);
         toast.success('Guia de viagem gerado com sucesso!');
+        if (result.cover_status?.fallback_used) {
+          toast.info('Usamos uma capa segura com a foto original para preservar todos na imagem.');
+        }
 
         confetti({
           particleCount: 100,
@@ -95,6 +119,11 @@ const Step5Review = () => {
         <p className="text-xl text-muted-foreground font-medium">
           O Livro de Aventuras da Família {familyName} está pronto para ser vivido!
         </p>
+        {coverStatus?.fallback_used && (
+          <p className="rounded-2xl border border-border/70 bg-card px-5 py-4 text-sm text-muted-foreground">
+            A capa foi protegida com a foto original porque a ilustração não pôde ser validada com segurança.
+          </p>
+        )}
         <div className="pt-8 flex flex-col sm:flex-row gap-4 justify-center">
           <Button
             onClick={() => window.open(pdfUrl, '_blank')}
@@ -140,9 +169,16 @@ const Step5Review = () => {
               <Camera className="w-5 h-5" /> A Capa
             </h3>
             {coverPhotoUrl ? (
-              <div className="aspect-[4/3] rounded-3xl overflow-hidden shadow-md">
-                <img src={coverPhotoUrl} alt="Capa do Guia" className="w-full h-full object-cover" />
-              </div>
+              <>
+                <div className="aspect-[4/3] rounded-3xl overflow-hidden shadow-md">
+                  <img src={coverPhotoUrl} alt="Capa do Guia" className="w-full h-full object-cover" />
+                </div>
+                {expectedCoverFamilyMemberCount > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Pessoas esperadas na capa: {expectedCoverFamilyMemberCount}
+                  </p>
+                )}
+              </>
             ) : (
               <div className="aspect-[4/3] rounded-3xl bg-muted flex items-center justify-center border-2 border-dashed border-border">
                 <p className="text-muted-foreground font-medium">Sem foto de capa</p>
@@ -159,7 +195,13 @@ const Step5Review = () => {
               {(childrenNames || parentsNames) && (
                 <div className="mt-2 text-sm text-muted-foreground space-y-1">
                   {parentsNames && <p>Pais: {parentsNames}</p>}
-                  {childrenNames && <p>Crianças: {childrenNames}</p>}
+                  {childrenNames && (
+                    <p>
+                      Crianças: {childNamesList.map((name, index) => (
+                        `${name}${childrenAges[index] ? ` (${childrenAges[index]} anos)` : ''}`
+                      )).join(', ')}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -168,8 +210,11 @@ const Step5Review = () => {
               <h3 className="text-xl font-serif font-bold flex items-center gap-2 text-accent mb-3">
                 <MapPin className="w-5 h-5" /> Resumo do Destino
               </h3>
-              <p className="font-medium text-base text-muted-foreground line-clamp-3 italic">"{destination}"</p>
+              <p className="whitespace-pre-line font-medium text-base text-muted-foreground line-clamp-5 italic">"{destinationSummary}"</p>
               <p className="text-sm text-muted-foreground mt-2">Ano: {year}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Ritmo: {itineraryPreferences.pace} · Programas: {itineraryPreferences.interests.length > 0 ? itineraryPreferences.interests.join(', ') : 'sem categorias específicas'}
+              </p>
             </div>
           </div>
         </div>
@@ -190,7 +235,12 @@ const Step5Review = () => {
                 <ul className="space-y-4">
                   {day.landmarks.map(landmark => (
                     <li key={landmark.id} className="flex flex-col border-l-2 border-accent/30 pl-4 py-1">
-                      <strong className="text-foreground font-bold">{landmark.name}</strong>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong className="text-foreground font-bold">{landmark.name}</strong>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
+                          {categoryLabelForAttraction(landmark)}
+                        </span>
+                      </div>
                       <span className="text-muted-foreground text-sm leading-relaxed mt-1 line-clamp-2">
                         {landmark.description}
                       </span>
@@ -212,7 +262,12 @@ const Step5Review = () => {
                   <ul className="space-y-4">
                     {items.map(landmark => (
                       <li key={landmark.id} className="flex flex-col border-l-2 border-accent/30 pl-4 py-1">
-                        <strong className="text-foreground font-bold">{landmark.name}</strong>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <strong className="text-foreground font-bold">{landmark.name}</strong>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
+                            {categoryLabelForAttraction(landmark)}
+                          </span>
+                        </div>
                         <span className="text-muted-foreground text-sm leading-relaxed mt-1 line-clamp-2">
                           {landmark.description}
                         </span>
@@ -231,7 +286,12 @@ const Step5Review = () => {
                 <ul className="space-y-4">
                   {extraLandmarks.map(landmark => (
                     <li key={landmark.id} className="flex flex-col border-l-2 border-accent/30 pl-4 py-1">
-                      <strong className="text-foreground font-bold">{landmark.name}</strong>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong className="text-foreground font-bold">{landmark.name}</strong>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
+                          {categoryLabelForAttraction(landmark)}
+                        </span>
+                      </div>
                       <span className="text-muted-foreground text-sm leading-relaxed mt-1 line-clamp-2">
                         {landmark.description}
                       </span>
@@ -242,6 +302,30 @@ const Step5Review = () => {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="rounded-[2rem] border-2 border-border/50 bg-card p-5 shadow-storybook dark:border-slate-700 dark:bg-slate-800 sm:p-8">
+        <label className="flex cursor-pointer flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <input
+              type="checkbox"
+              checked={restaurantRecommendationsExtra}
+              onChange={(event) => setRestaurantRecommendationsExtra(event.target.checked)}
+              className="mt-1 h-5 w-5 accent-primary"
+            />
+            <div>
+              <h3 className="text-xl font-serif font-bold text-secondary">
+                {RESTAURANT_RECOMMENDATIONS_EXTRA.label}
+              </h3>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
+                {RESTAURANT_RECOMMENDATIONS_EXTRA.description}
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full bg-secondary/10 px-4 py-2 text-sm font-bold text-secondary">
+            {RESTAURANT_RECOMMENDATIONS_EXTRA.price_label}
+          </span>
+        </label>
       </div>
 
       <div className="flex justify-center pt-8">

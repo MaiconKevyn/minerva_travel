@@ -14,6 +14,7 @@ from minerva_travel.app import (
     fetch_custom_wikimedia_assets,
     generate_selected_landmark_art,
 )
+from minerva_travel.models import RestaurantRecommendation
 from minerva_travel.wikimedia_assets import WikimediaAsset
 
 
@@ -57,6 +58,71 @@ def test_api_catalog_returns_destinations_and_landmarks():
     assert payload["title"] == "Pequenos Exploradores pela Europa"
     assert payload["destinations"][0]["city"] == "Paris"
     assert payload["destinations"][0]["landmarks"][0]["selection_id"] == "paris:eiffel-tower"
+
+
+def test_route_suggestion_endpoint_returns_editable_structured_destinations():
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/itinerary/routes/suggest",
+        json={
+            "trip_idea": "Queremos visitar Paris e Londres com parques e museus.",
+            "days": 5,
+            "pace": "light",
+            "interests": ["parques", "museus"],
+            "children_ages": [6],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["options"][0]["id"] == "suggested-route-1"
+    assert payload["options"][0]["structured_destinations"] == [
+        {
+            "id": "suggested-1",
+            "place": "Paris",
+            "timing": "defina a data ou período",
+            "days": 3,
+        },
+        {
+            "id": "suggested-2",
+            "place": "Londres",
+            "timing": "depois de Paris",
+            "days": 2,
+        },
+    ]
+    assert "parques" in payload["options"][0]["summary"]
+
+
+def test_route_suggestion_endpoint_preserves_current_structured_destinations():
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/itinerary/routes/suggest",
+        json={
+            "trip_idea": "Queremos ajuda com atividades.",
+            "days": 4,
+            "structured_destinations": [
+                {
+                    "id": "manual-paris",
+                    "place": "Paris, França",
+                    "timing": "Julho de 2026",
+                    "days": 4,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["options"][0]["structured_destinations"] == [
+        {
+            "id": "suggested-1",
+            "place": "Paris, França",
+            "timing": "Julho de 2026",
+            "days": 4,
+        }
+    ]
 
 
 def test_landmarks_parse_allows_browser_preflight_from_frontend_origin():
@@ -241,6 +307,8 @@ def test_sample_preview_renders_pdf_layout_html():
     assert "Pequenos Exploradores pela Europa" in response.text
     assert "guide-shell" in response.text
     assert "page cover-page" in response.text
+    assert "activity-page" in response.text
+    assert "Checklist da aventura" in response.text
 
 
 def test_api_generate_returns_download_url(tmp_path, monkeypatch):
@@ -263,6 +331,248 @@ def test_api_generate_returns_download_url(tmp_path, monkeypatch):
     payload = response.json()
     assert payload["download_url"].startswith("/download/")
     assert payload["request_id"]
+
+
+def test_api_generate_passes_expected_family_member_count_to_cover_generation(tmp_path, monkeypatch):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    captured_counts = []
+
+    class FakeGenerator:
+        def generate_cover(
+            self,
+            family_photo,
+            output_path,
+            title,
+            destination_names,
+            *,
+            expected_visible_family_member_count=None,
+        ):
+            captured_counts.append(expected_visible_family_member_count)
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
+            return output_path
+
+        def generate_landmark_image(self, landmark_name, city, country, output_path):
+            raise AssertionError("landmark image generation should stay disabled")
+
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            raise AssertionError("landmark lineart generation should stay disabled")
+
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Pequenos Exploradores pela Europa",
+            "children_names": "Alice, Antonio",
+            "parents_names": "Ana, Otavio",
+            "year": "2026",
+            "expected_visible_family_member_count": "4",
+            "selected_landmarks": ["paris:eiffel-tower"],
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert captured_counts == [4]
+    assert payload["cover_status"]["expected_visible_family_member_count"] == 4
+
+
+def test_api_generate_without_expected_family_member_count_keeps_existing_flow(tmp_path, monkeypatch):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    captured_counts = []
+
+    class FakeGenerator:
+        def generate_cover(
+            self,
+            family_photo,
+            output_path,
+            title,
+            destination_names,
+            *,
+            expected_visible_family_member_count=None,
+        ):
+            captured_counts.append(expected_visible_family_member_count)
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
+            return output_path
+
+        def generate_landmark_image(self, landmark_name, city, country, output_path):
+            raise AssertionError("landmark image generation should stay disabled")
+
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            raise AssertionError("landmark lineart generation should stay disabled")
+
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Pequenos Exploradores pela Europa",
+            "children_names": "Alice, Antonio",
+            "parents_names": "Ana, Otavio",
+            "year": "2026",
+            "selected_landmarks": ["paris:eiffel-tower"],
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert captured_counts == [None]
+    assert payload["download_url"].startswith("/download/")
+    assert payload["cover_status"]["expected_visible_family_member_count"] is None
+
+
+def test_api_generate_accepts_child_ages(tmp_path, monkeypatch):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Pequenos Exploradores pela Europa",
+            "children_names": "Alice, Antonio",
+            "children_ages": ["5", "9"],
+            "parents_names": "Ana, Otavio",
+            "year": "2026",
+            "selected_landmarks": ["paris:eiffel-tower"],
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["download_url"].startswith("/download/")
+
+
+def test_api_generate_omits_restaurant_discovery_without_extra(tmp_path, monkeypatch):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+
+    def fail_restaurant_discovery(*_args, **_kwargs):
+        raise AssertionError("restaurant discovery should require explicit entitlement")
+
+    monkeypatch.setattr(
+        "minerva_travel.app.discover_restaurants_for_guide",
+        fail_restaurant_discovery,
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Pequenos Exploradores pela Europa",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "selected_landmarks": ["paris:eiffel-tower"],
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+
+
+def test_api_generate_runs_restaurant_discovery_with_extra(tmp_path, monkeypatch):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    captured_anchors = []
+    captured_restaurants = []
+
+    class FakeGenerator:
+        def generate_cover(
+            self,
+            family_photo,
+            output_path,
+            title,
+            destination_names,
+            *,
+            expected_visible_family_member_count=None,
+        ):
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
+            return output_path
+
+        def generate_landmark_image(self, landmark_name, city, country, output_path):
+            raise AssertionError("landmark image generation should stay disabled")
+
+        def generate_landmark_lineart(
+            self,
+            landmark_name,
+            city,
+            country,
+            reference_image,
+            output_path,
+        ):
+            raise AssertionError("landmark lineart generation should stay disabled")
+
+    def fake_restaurant_discovery(guide_destinations, *, api_key=None):
+        captured_anchors.extend(
+            landmark.name
+            for item in guide_destinations
+            for landmark in item.landmarks
+        )
+        return [
+            RestaurantRecommendation(
+                destination_id=guide_destinations[0].destination.id,
+                name="Bistro Familiar",
+                nearby_context="perto de Torre Eiffel",
+                reason="Boa pausa para familia entre passeios.",
+            )
+        ]
+
+    def fake_write_pdf(context, output_path):
+        captured_restaurants.extend(context.restaurant_recommendations)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"pdf")
+        return output_path
+
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setattr("minerva_travel.app.discover_restaurants_for_guide", fake_restaurant_discovery)
+    monkeypatch.setattr("minerva_travel.app.write_pdf", fake_write_pdf)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Pequenos Exploradores pela Europa",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "selected_landmarks": ["paris:eiffel-tower"],
+            "restaurant_recommendations_extra": "true",
+        },
+        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert captured_anchors == ["Torre Eiffel"]
+    assert [restaurant.name for restaurant in captured_restaurants] == ["Bistro Familiar"]
 
 
 def test_api_generate_accepts_custom_landmarks_without_catalog_selection(

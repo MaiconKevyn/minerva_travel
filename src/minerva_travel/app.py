@@ -30,7 +30,13 @@ from minerva_travel.custom_landmarks import (
     parse_custom_landmarks,
 )
 from minerva_travel.guide_builder import build_guide_context
-from minerva_travel.image_generation import get_image_generator, simplify_child_coloring_lineart
+from minerva_travel.image_generation import (
+    CoverGenerationResult,
+    generate_cover_with_guardrails,
+    get_cover_image_validator,
+    get_image_generator,
+    simplify_child_coloring_lineart,
+)
 from minerva_travel.itinerary import recommend_itinerary
 from minerva_travel.landmark_parser import ParsedLandmark, parse_landmarks_from_message
 from minerva_travel.models import (
@@ -39,9 +45,12 @@ from minerva_travel.models import (
     GuideRequest,
     ItineraryRecommendationRequest,
     Landmark,
+    RouteSuggestionRequest,
 )
 from minerva_travel.pdf import render_guide_html, write_pdf
 from minerva_travel.place_discovery import discover_dynamic_itinerary, resolve_landmark_locations
+from minerva_travel.restaurant_recommendations import discover_restaurants_for_guide
+from minerva_travel.itinerary_routes import suggest_itinerary_routes
 from minerva_travel.supabase_storage import sync_wikimedia_assets_to_storage
 from minerva_travel.wikimedia_assets import WikimediaAsset, load_wikimedia_manifest
 from minerva_travel.wikimedia_client import (
@@ -147,6 +156,12 @@ def api_discover_itinerary(payload: DynamicItineraryRequest) -> dict[str, object
         if error.response.status_code in {401, 403}:
             detail = "Google Places nao esta habilitado ou a chave nao tem permissao suficiente."
         raise HTTPException(status_code=502, detail=detail) from error
+
+
+@app.post("/api/itinerary/routes/suggest")
+def api_suggest_itinerary_routes(payload: RouteSuggestionRequest) -> dict[str, object]:
+    catalog = load_catalog()
+    return suggest_itinerary_routes(payload, catalog).model_dump(mode="json")
 
 
 @app.post("/api/custom-landmarks/resolve")
@@ -256,6 +271,7 @@ def preview_sample() -> str:
     request = GuideRequest(
         title=catalog.title,
         children_names=["Alice", "Antonio"],
+        children_ages=[6, 9],
         parents_names=["Ana", "Otavio"],
         year=2026,
         selected_landmarks=selected,
@@ -276,16 +292,22 @@ async def generate(
     parents_names: Annotated[str, Form()],
     year: Annotated[int, Form()],
     family_photo: Annotated[UploadFile, File()],
+    children_ages: Annotated[list[int] | None, Form()] = None,
+    expected_visible_family_member_count: Annotated[int | None, Form()] = None,
     selected_landmarks: Annotated[list[str] | None, Form()] = None,
     custom_landmarks: Annotated[str | None, Form()] = None,
+    restaurant_recommendations_extra: Annotated[bool | None, Form()] = None,
 ) -> str:
     result = await generate_pdf_from_form(
         title=title,
         children_names=children_names,
+        children_ages=children_ages or [],
+        expected_visible_family_member_count=expected_visible_family_member_count,
         parents_names=parents_names,
         year=year,
         selected_landmarks=selected_landmarks or [],
         custom_landmarks=custom_landmarks,
+        restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
         family_photo=family_photo,
     )
 
@@ -300,22 +322,29 @@ async def api_generate(
     parents_names: Annotated[str, Form()],
     year: Annotated[int, Form()],
     family_photo: Annotated[UploadFile, File()],
+    children_ages: Annotated[list[int] | None, Form()] = None,
+    expected_visible_family_member_count: Annotated[int | None, Form()] = None,
     selected_landmarks: Annotated[list[str] | None, Form()] = None,
     custom_landmarks: Annotated[str | None, Form()] = None,
-) -> dict[str, str]:
+    restaurant_recommendations_extra: Annotated[bool | None, Form()] = None,
+) -> dict[str, object]:
     result = await generate_pdf_from_form(
         title=title,
         children_names=children_names,
+        children_ages=children_ages or [],
+        expected_visible_family_member_count=expected_visible_family_member_count,
         parents_names=parents_names,
         year=year,
         selected_landmarks=selected_landmarks or [],
         custom_landmarks=custom_landmarks,
+        restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
         family_photo=family_photo,
     )
     return {
         "request_id": result["request_id"],
         "download_url": result["download_url"],
         "filename": result["filename"],
+        "cover_status": result["cover_status"],
     }
 
 
@@ -330,11 +359,14 @@ def download(filename: str) -> FileResponse:
 async def generate_pdf_from_form(
     title: str,
     children_names: str,
+    children_ages: list[int],
+    expected_visible_family_member_count: int | None,
     parents_names: str,
     year: int,
     selected_landmarks: list[str],
     family_photo: UploadFile,
     custom_landmarks: str | None = None,
+    restaurant_recommendations_extra: bool = False,
 ) -> dict[str, object]:
     catalog = load_catalog()
     custom_destinations, custom_selected = custom_destinations_from_form(custom_landmarks)
@@ -356,20 +388,26 @@ async def generate_pdf_from_form(
     request = GuideRequest(
         title=title,
         children_names=_split_names(children_names),
+        children_ages=[age for age in children_ages if age > 0],
         parents_names=_split_names(parents_names),
         year=year,
         selected_landmarks=selected,
+        expected_visible_family_member_count=expected_visible_family_member_count,
+        restaurant_recommendations_extra=restaurant_recommendations_extra,
     )
     request_id = uuid4().hex
     photo_path = await storage.save_upload(family_photo)
     cover_landmark_names = selected_landmark_names(catalog.destinations, selected)
     cover_path = storage.generated_path(f"{request_id}-cover.png")
     generator = get_image_generator(image_provider())
-    generator.generate_cover(
+    cover_result = generate_cover_with_guardrails(
+        generator=generator,
         family_photo=photo_path,
         output_path=cover_path,
         title=request.title,
         destination_names=cover_landmark_names,
+        expected_visible_family_member_count=request.expected_visible_family_member_count,
+        validator=get_cover_image_validator(),
     )
     summary_path = storage.generated_path(f"{request_id}-summary.png")
     generator.generate_trip_summary(
@@ -447,6 +485,15 @@ async def generate_pdf_from_form(
         landmark_images=landmark_images,
         landmark_lineart_images=landmark_lineart_images,
     )
+    if request.restaurant_recommendations_extra:
+        context = context.model_copy(
+            update={
+                "restaurant_recommendations": discover_restaurants_for_guide(
+                    context.destinations,
+                    api_key=google_maps_api_key(),
+                )
+            }
+        )
     pdf_output = storage.pdf_path(f"{request_id}.pdf")
     write_pdf(context, pdf_output)
     return {
@@ -454,6 +501,22 @@ async def generate_pdf_from_form(
         "request_id": request_id,
         "filename": pdf_output.name,
         "download_url": f"/download/{pdf_output.name}",
+        "cover_status": cover_status_payload(cover_result, request),
+    }
+
+
+def cover_status_payload(
+    cover_result: CoverGenerationResult,
+    request: GuideRequest,
+) -> dict[str, object]:
+    validation = cover_result.validation
+    return {
+        "fallback_used": cover_result.fallback_used,
+        "validation_status": validation.status if validation else None,
+        "visible_people_count": validation.visible_people_count if validation else None,
+        "validation_message": validation.message if validation else "",
+        "expected_visible_family_member_count": request.expected_visible_family_member_count,
+        "attempts": cover_result.attempts,
     }
 
 

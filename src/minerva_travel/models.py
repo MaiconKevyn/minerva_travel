@@ -9,9 +9,12 @@ from minerva_travel.wikimedia_assets import ImageCredit
 class GuideRequest(BaseModel):
     title: str = Field(min_length=1)
     children_names: list[str] = Field(min_length=1, max_length=10)
+    children_ages: list[int] = Field(default_factory=list, max_length=10)
     parents_names: list[str] = Field(min_length=1, max_length=2)
     year: int = Field(ge=2024, le=2100)
     selected_landmarks: list[str] = Field(min_length=1, max_length=30)
+    expected_visible_family_member_count: int | None = Field(default=None, ge=1, le=20)
+    restaurant_recommendations_extra: bool = False
 
     @property
     def children_display(self) -> str:
@@ -103,12 +106,52 @@ class GuideSummaryLandmark(BaseModel):
     landmark: Landmark
 
 
+class RestaurantRecommendation(BaseModel):
+    destination_id: str
+    name: str = Field(min_length=1)
+    nearby_context: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    cuisine: str | None = None
+    suitability_notes: list[str] = Field(default_factory=list)
+    google_maps_uri: str | None = None
+    formatted_address: str | None = None
+
+
+class GuideActivity(BaseModel):
+    destination_id: str
+    type: Literal[
+        "coloring",
+        "word_search",
+        "spot_the_difference",
+        "detail_hunt",
+        "drawing",
+        "short_prompt",
+        "checklist",
+        "language_learning",
+    ]
+    title: str
+    prompt: str
+    complexity: Literal["preschool", "early_reader", "older_child", "family"]
+    phase: Literal["before", "during", "after"] = "during"
+    landmark_name: str | None = None
+    lineart_image: Path | str | None = None
+    words: list[str] = Field(default_factory=list)
+    checklist_items: list[str] = Field(default_factory=list)
+    extension_prompt: str | None = None
+    language_name: str | None = None
+    language_phrase: str | None = None
+    language_pronunciation: str | None = None
+    language_meaning: str | None = None
+
+
 class GuideContext(BaseModel):
     request: GuideRequest
     cover_image: Path
     summary_image: Path | None = None
     destinations: list[GuideDestination]
+    activity_plan: list[GuideActivity] = Field(default_factory=list)
     image_credits: list[ImageCredit] = Field(default_factory=list)
+    restaurant_recommendations: list[RestaurantRecommendation] = Field(default_factory=list)
 
     @property
     def summary_landmarks(self) -> list[GuideSummaryLandmark]:
@@ -192,6 +235,33 @@ class DynamicItineraryRequest(BaseModel):
     must_see: list[str] = Field(default_factory=list, max_length=30)
 
 
+class StructuredDestinationInput(BaseModel):
+    id: str | None = None
+    place: str = Field(min_length=1, max_length=160)
+    timing: str = Field(default="", max_length=160)
+    days: int = Field(default=0, ge=0, le=30)
+
+
+class RouteSuggestionRequest(BaseModel):
+    trip_idea: str = Field(default="", max_length=1000)
+    days: int = Field(default=3, ge=1, le=30)
+    interests: list[str] = Field(default_factory=list, max_length=12)
+    pace: Literal["light", "balanced", "full"] = "balanced"
+    children_ages: list[int] = Field(default_factory=list, max_length=10)
+    structured_destinations: list[StructuredDestinationInput] = Field(default_factory=list, max_length=10)
+
+
+class RouteSuggestionOption(BaseModel):
+    id: str
+    title: str
+    summary: str
+    structured_destinations: list[StructuredDestinationInput]
+
+
+class RouteSuggestionResponse(BaseModel):
+    options: list[RouteSuggestionOption]
+
+
 class ItineraryStop(BaseModel):
     selection_id: str
     destination_id: str
@@ -201,6 +271,7 @@ class ItineraryStop(BaseModel):
     country: str
     description: list[str]
     image: Path
+    category: str | None = None
     categories: list[str] = Field(default_factory=list)
     duration_minutes: int
     family_tip: str | None = None

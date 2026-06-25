@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { validGuideChildren } from '@/utils/guide-form.js';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -29,8 +30,12 @@ const EnhancedStep5FamilyDetails = () => {
   // Initialize local state with context data or defaults
   const [children, setChildren] = useState(
     contextChildren.length > 0
-      ? contextChildren.map(name => ({ id: generateId(), name }))
-      : [{ id: generateId(), name: '' }]
+      ? contextChildren.map(child =>
+          typeof child === 'string'
+            ? { id: generateId(), name: child, age: '' }
+            : { id: child.id || generateId(), name: child.name || '', age: child.age || '' }
+        )
+      : [{ id: generateId(), name: '', age: '' }]
   );
 
   const [parents, setParents] = useState(
@@ -41,7 +46,7 @@ const EnhancedStep5FamilyDetails = () => {
 
   const handleAddChild = () => {
     if (children.length < 10) {
-      setChildren([...children, { id: generateId(), name: '' }]);
+      setChildren([...children, { id: generateId(), name: '', age: '' }]);
     }
   };
 
@@ -56,8 +61,8 @@ const EnhancedStep5FamilyDetails = () => {
     }
   };
 
-  const handleChildChange = (id, value) => {
-    setChildren(children.map(c => c.id === id ? { ...c, name: value } : c));
+  const handleChildChange = (id, field, value) => {
+    setChildren(children.map(c => c.id === id ? { ...c, [field]: value } : c));
   };
 
   const handleAddParent = () => {
@@ -85,7 +90,8 @@ const EnhancedStep5FamilyDetails = () => {
     e.preventDefault();
 
     const normalizedFamilyName = localFamilyName.trim();
-    const validChildren = children.filter(c => c.name.trim() !== '');
+    const touchedChildren = children.filter(c => c.name.trim() !== '' || String(c.age || '').trim() !== '');
+    const validChildren = validGuideChildren(children);
     const validParents = parents.filter(p => p.name.trim() !== '');
 
     if (!normalizedFamilyName) {
@@ -101,7 +107,16 @@ const EnhancedStep5FamilyDetails = () => {
       toast({
         variant: "destructive",
         title: "Atenção",
-        description: "Adicione pelo menos uma criança.",
+        description: "Adicione pelo menos uma criança com nome e idade.",
+      });
+      return;
+    }
+
+    if (touchedChildren.length !== validChildren.length) {
+      toast({
+        variant: "destructive",
+        title: "Atenção",
+        description: "Informe nome e idade de cada criança adicionada.",
       });
       return;
     }
@@ -117,7 +132,7 @@ const EnhancedStep5FamilyDetails = () => {
 
     // Save to context
     updateFamilyName(normalizedFamilyName);
-    setChildrenList(validChildren.map(c => c.name.trim()));
+    setChildrenList(validChildren);
     setParentsList(validParents.map(p => p.name.trim()));
 
     nextStep();
@@ -175,12 +190,22 @@ const EnhancedStep5FamilyDetails = () => {
                   animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
                   exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="flex items-center gap-3"
+                  className="grid grid-cols-[1fr_110px_auto] items-center gap-3"
                 >
                   <Input
                     value={child.name}
-                    onChange={(e) => handleChildChange(child.id, e.target.value)}
+                    onChange={(e) => handleChildChange(child.id, 'name', e.target.value)}
                     placeholder={`Nome da criança ${index + 1}`}
+                    className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-primary sm:text-lg"
+                  />
+                  <Input
+                    type="number"
+                    min="1"
+                    max="17"
+                    value={child.age}
+                    onChange={(e) => handleChildChange(child.id, 'age', e.target.value)}
+                    placeholder="Idade"
+                    aria-label={`Idade da criança ${index + 1}`}
                     className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-primary sm:text-lg"
                   />
                   {children.length > 1 && (

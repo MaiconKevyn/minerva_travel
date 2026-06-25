@@ -1,5 +1,11 @@
 
 import React, { createContext, useContext, useState } from 'react';
+import {
+  createGuideDestination,
+  normalizeFamilyMemberCount,
+  normalizeGuideDestinations,
+  serializeGuideDestinations,
+} from '@/utils/guide-form.js';
 
 const ConversationalGuideContext = createContext();
 
@@ -16,7 +22,10 @@ export const ConversationalGuideProvider = ({ children }) => {
   const [familyName, setFamilyName] = useState('');
   const [coverPhoto, setCoverPhoto] = useState(null);
   const [coverPhotoUrl, setCoverPhotoUrl] = useState('');
+  const [expectedCoverFamilyMemberCount, setExpectedCoverFamilyMemberCount] = useState(0);
   const [destination, setDestination] = useState('');
+  const [destinationsList, setDestinationsListState] = useState([createGuideDestination()]);
+  const [itineraryMode, setItineraryMode] = useState('known');
 
   // Family Details State
   const [childrenList, setChildrenList] = useState([]);
@@ -27,6 +36,7 @@ export const ConversationalGuideProvider = ({ children }) => {
   const [parsedData, setParsedData] = useState({ destinations: [], landmarks: [] });
   const [selectedLandmarks, setSelectedLandmarks] = useState([]); // Array of IDs
   const [recommendedItinerary, setRecommendedItinerary] = useState(null);
+  const [restaurantRecommendationsExtra, setRestaurantRecommendationsExtra] = useState(false);
   const [itineraryPreferences, setItineraryPreferences] = useState({
     days: 3,
     interests: [],
@@ -41,7 +51,7 @@ export const ConversationalGuideProvider = ({ children }) => {
   };
 
   const nextStep = () => {
-    setStep(Math.min(currentStep + 1, 5));
+    setStep(Math.min(currentStep + 1, 6));
   };
 
   const goBack = () => {
@@ -59,12 +69,31 @@ export const ConversationalGuideProvider = ({ children }) => {
     }
   };
 
-  const updateDestination = (dest) => {
-    setDestination(dest);
+  const updateExpectedCoverFamilyMemberCount = (count) => {
+    setExpectedCoverFamilyMemberCount(normalizeFamilyMemberCount(count));
+  };
+
+  const resetRouteData = (nextDestination = '') => {
+    setDestination(nextDestination);
     setHasSearchedLandmarks(false);
     setParsedData({ destinations: [], landmarks: [] });
     setSelectedLandmarks([]);
     setRecommendedItinerary(null);
+  };
+
+  const updateDestination = (dest) => {
+    resetRouteData(dest);
+  };
+
+  const updateDestinationsList = (destinations) => {
+    const normalized = normalizeGuideDestinations(destinations);
+    const summary = serializeGuideDestinations(normalized);
+    setDestinationsListState(normalized);
+    if (summary !== destination) {
+      resetRouteData(summary);
+    } else {
+      setDestination(summary);
+    }
   };
 
   const setParsedDataState = (data) => {
@@ -92,8 +121,14 @@ export const ConversationalGuideProvider = ({ children }) => {
         coverPhoto,
         coverPhotoUrl,
         updateCoverPhoto,
+        expectedCoverFamilyMemberCount,
+        updateExpectedCoverFamilyMemberCount,
         destination,
         updateDestination,
+        destinationsList,
+        updateDestinationsList,
+        itineraryMode,
+        setItineraryMode,
 
         // Family Details
         childrenList,
@@ -111,6 +146,8 @@ export const ConversationalGuideProvider = ({ children }) => {
         toggleLandmarkSelection,
         recommendedItinerary,
         setRecommendedItinerary,
+        restaurantRecommendationsExtra,
+        setRestaurantRecommendationsExtra,
         itineraryPreferences,
         setItineraryPreferences,
         isLoadingLandmarks,

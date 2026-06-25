@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Map as MapIcon, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { landmarkMapAction } from '@/utils/minerva-api.js';
+import { categoryLabelForAttraction, landmarkMapAction } from '@/utils/minerva-api.js';
 import PlaceMapModal from './PlaceMapModal.jsx';
 
 const LandmarkCard = ({
@@ -32,6 +32,7 @@ const LandmarkCard = ({
   const canOpenEmbeddedMap = mapAction.mode === 'embedded';
   const isMentionedPlace = isSelectionMode && data.source_type === 'mentioned';
   const sourceTone = !isSelectionMode || isMentionedPlace ? 'primary' : 'secondary';
+  const categoryLabel = isSelectionMode ? categoryLabelForAttraction(data) : '';
 
   const openEmbeddedMap = (event) => {
     event.stopPropagation();
@@ -148,7 +149,7 @@ const LandmarkCard = ({
 
         <div className="p-6 flex flex-col flex-1">
           {/* City & Location */}
-          <div className="mb-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className={cn(
               "text-xs font-bold tracking-widest uppercase flex items-center gap-1.5",
               sourceTone === 'primary' ? "text-primary" : "text-secondary"
@@ -156,6 +157,11 @@ const LandmarkCard = ({
               <MapPin className="w-3.5 h-3.5" />
               {displayCity}
             </span>
+            {categoryLabel && (
+              <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground">
+                {categoryLabel}
+              </span>
+            )}
           </div>
 
           {/* Title */}

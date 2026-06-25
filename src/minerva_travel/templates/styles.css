@@ -968,6 +968,62 @@ h3 {
   margin-top: 0.06in;
 }
 
+.restaurant-page h2 {
+  color: var(--green);
+  margin: 0.08in 0 0.14in;
+}
+
+.restaurant-freshness-note {
+  background: rgba(253, 193, 107, 0.2);
+  border: 1px solid rgba(253, 193, 107, 0.45);
+  border-radius: 0.14in;
+  color: var(--ink);
+  font-size: 10pt;
+  font-weight: 800;
+  margin: 0.16in 0 0.22in;
+  padding: 0.12in 0.14in;
+}
+
+.restaurant-list {
+  display: grid;
+  gap: 0.14in;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.restaurant-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 0.1in solid var(--coral);
+  border-radius: 0.16in;
+  box-shadow: 0 8px 18px rgba(47, 41, 37, 0.06);
+  padding: 0.16in 0.18in;
+}
+
+.restaurant-card h3 {
+  color: var(--blue);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16pt;
+  line-height: 1.15;
+}
+
+.restaurant-card p {
+  color: var(--ink);
+  font-size: 10.5pt;
+  line-height: 1.35;
+  margin-top: 0.08in;
+}
+
+.restaurant-context,
+.restaurant-card small,
+.restaurant-card li {
+  color: var(--muted);
+  font-size: 9pt;
+}
+
+.restaurant-card ul {
+  margin: 0.08in 0 0 0.16in;
+}
+
 .drawing-box {
   background:
     linear-gradient(#fff, #fff) padding-box,
@@ -1050,4 +1106,125 @@ h3 {
 .compact-lines {
   height: 4.35in;
   margin-top: 0.16in;
+}
+
+.activity-page,
+.final-checklist-page {
+  background: linear-gradient(180deg, #fff 0%, var(--paper-warm) 100%);
+  padding: 0.62in;
+}
+
+.activity-page h2,
+.final-checklist-page h2 {
+  color: var(--blue);
+  font-size: 31pt;
+  line-height: 1;
+  margin-bottom: 0.14in;
+}
+
+.activity-page > p,
+.final-checklist-page > p {
+  color: var(--ink);
+  font-size: 14pt;
+  font-weight: 700;
+  line-height: 1.38;
+}
+
+.activity-coloring-frame {
+  align-items: center;
+  background: #fff;
+  border: 2px dashed rgba(55, 111, 145, 0.42);
+  border-radius: 0.22in;
+  display: flex;
+  height: 5.7in;
+  justify-content: center;
+  margin-top: 0.26in;
+  padding: 0.18in;
+}
+
+.activity-coloring-frame .lineart-image {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.word-search-box {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0.18in;
+  display: grid;
+  gap: 0.12in;
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 0.26in;
+  padding: 0.22in;
+}
+
+.word-search-box span {
+  border: 1px dashed rgba(241, 97, 59, 0.45);
+  border-radius: 999px;
+  color: var(--coral);
+  font-size: 15pt;
+  font-weight: 900;
+  padding: 0.08in 0.14in;
+  text-align: center;
+}
+
+.difference-grid {
+  display: grid;
+  gap: 0.18in;
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 0.26in;
+}
+
+.difference-grid div {
+  background: #fff;
+  border: 2px dashed rgba(55, 111, 145, 0.4);
+  border-radius: 0.18in;
+  height: 3.2in;
+}
+
+.activity-checklist {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0.18in;
+  list-style: none;
+  margin-top: 0.28in;
+  padding: 0.22in;
+}
+
+.activity-checklist li {
+  align-items: center;
+  color: var(--ink);
+  display: flex;
+  font-size: 13pt;
+  font-weight: 800;
+  gap: 0.12in;
+  margin-bottom: 0.16in;
+}
+
+.activity-checklist li:last-child {
+  margin-bottom: 0;
+}
+
+.activity-extension {
+  background: rgba(136, 176, 139, 0.16);
+  border: 1px solid rgba(136, 176, 139, 0.5);
+  border-radius: 0.16in;
+  margin-top: 0.2in;
+  padding: 0.14in;
+}
+
+.activity-extension strong {
+  color: var(--green);
+  display: block;
+  font-size: 10pt;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.05in;
+  text-transform: uppercase;
+}
+
+.activity-extension p {
+  color: var(--ink);
+  font-size: 11pt;
+  font-weight: 700;
 }

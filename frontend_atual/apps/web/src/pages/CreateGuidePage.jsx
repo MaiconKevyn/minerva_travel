@@ -7,6 +7,7 @@ import Header from '@/components/Header.jsx';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import Step2CoverPhoto from '@/components/Step2CoverPhoto.jsx';
 import Step3Destination from '@/components/Step3Destination.jsx';
+import StepTripPreferences from '@/components/StepTripPreferences.jsx';
 import Step4Attractions from '@/components/Step4Attractions.jsx';
 import EnhancedStep5FamilyDetails from '@/components/EnhancedStep5FamilyDetails.jsx';
 import Step5Review from '@/components/Step5Review.jsx';
@@ -18,10 +19,11 @@ const CreateGuidePageContent = () => {
   const renderStep = () => {
     switch (currentStep) {
       case 1: return <Step3Destination />;
-      case 2: return <Step4Attractions />;
-      case 3: return <EnhancedStep5FamilyDetails />;
-      case 4: return <Step2CoverPhoto />;
-      case 5: return <Step5Review />;
+      case 2: return <StepTripPreferences />;
+      case 3: return <Step4Attractions />;
+      case 4: return <EnhancedStep5FamilyDetails />;
+      case 5: return <Step2CoverPhoto />;
+      case 6: return <Step5Review />;
       default: return <Step3Destination />;
     }
   };
@@ -41,7 +43,7 @@ const CreateGuidePageContent = () => {
           {/* Top Bar with Progress and Back Button */}
           <div className="flex items-center justify-between gap-2 mb-8 md:mb-16">
             <div className="w-14 sm:w-24">
-              {currentStep > 1 && currentStep < 6 && (
+              {currentStep > 1 && currentStep < 7 && (
                 <Button
                   variant="ghost"
                   onClick={goBack}
@@ -55,7 +57,7 @@ const CreateGuidePageContent = () => {
 
             <div className="flex-1 max-w-xs mx-auto text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                {[1, 2, 3, 4, 5].map((s) => (
+                {[1, 2, 3, 4, 5, 6].map((s) => (
                   <div
                     key={s}
                     className={`h-2 rounded-full transition-all duration-500 ${
@@ -65,7 +67,7 @@ const CreateGuidePageContent = () => {
                 ))}
               </div>
               <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-                Passo {currentStep} de 5
+                Passo {currentStep} de 6
               </p>
             </div>
 

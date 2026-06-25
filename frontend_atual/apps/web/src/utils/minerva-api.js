@@ -1,7 +1,46 @@
 
+import {
+  deriveChildAges,
+  normalizeGuideDestinations,
+  serializeGuideDestinations,
+  totalTripDays,
+} from './guide-form.js';
+
 const DEFAULT_API_BASE_URL = 'https://minerva-travel.onrender.com';
 
 export const apiBaseUrl = () => import.meta.env?.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+
+export const RESTAURANT_RECOMMENDATIONS_EXTRA = {
+  id: 'restaurant_recommendations_extra',
+  label: 'Recomendacoes de restaurantes para a familia',
+  description: 'Sugestoes de restaurantes proximos aos locais selecionados.',
+  price_cents: 2990,
+  currency: 'BRL',
+  price_label: 'R$ 29,90',
+};
+
+export const ATTRACTION_CATEGORY_LABELS = {
+  animals: 'Animais',
+  architecture: 'Arquitetura',
+  art: 'Arte',
+  education: 'Educativo',
+  family: 'Família',
+  food: 'Comida',
+  history: 'História',
+  icons: 'Ícones',
+  local_stores: 'Lojas locais',
+  museums: 'Museus',
+  outdoor: 'Ao ar livre',
+  parks: 'Parques',
+  play: 'Brincadeiras',
+  rides: 'Passeios',
+  river: 'Rio e passeios',
+  science: 'Ciência',
+  shopping: 'Compras',
+  squares: 'Praças',
+  theaters: 'Teatros',
+  views: 'Vistas',
+};
 
 export const normalizeTextForMatching = (value) =>
   String(value || '')
@@ -65,6 +104,26 @@ const hasMandatoryMentionReason = (item = {}) =>
 const normalizeSourceType = (value, item = {}) =>
   value === 'mentioned' || hasMandatoryMentionReason(item) ? 'mentioned' : 'suggested';
 
+export const primaryAttractionCategory = (item = {}) =>
+  item.category || item.categories?.[0] || 'family';
+
+export const categoryLabelForAttraction = (item = {}) => {
+  const category = typeof item === 'string' ? item : primaryAttractionCategory(item);
+  return ATTRACTION_CATEGORY_LABELS[category] || category;
+};
+
+export const filterAttractionsByCategory = (landmarks = [], category = 'all') => {
+  if (!category || category === 'all') {
+    return landmarks;
+  }
+  return landmarks.filter((landmark) => {
+    const categories = landmark.categories?.length
+      ? landmark.categories
+      : [primaryAttractionCategory(landmark)];
+    return categories.includes(category);
+  });
+};
+
 const mapStopToLandmark = (stop, day = null, isAlternative = false, isCatalogLandmark = true) => ({
   id: stop.selection_id,
   selection_id: stop.selection_id,
@@ -86,6 +145,7 @@ const mapStopToLandmark = (stop, day = null, isAlternative = false, isCatalogLan
   family_tip: stop.family_tip,
   match_reasons: stop.match_reasons || [],
   source_type: normalizeSourceType(stop.source_type, stop),
+  category: primaryAttractionCategory(stop),
   categories: stop.categories || [],
   itinerary_day: day?.day || null,
   itinerary_title: day?.title || '',
@@ -163,6 +223,7 @@ const mapManualLandmark = (landmark, destination = {}) => {
     family_tip: landmark.family_tip || null,
     match_reasons: landmark.match_reasons || [],
     source_type: normalizeSourceType(landmark.source_type || 'mentioned', landmark),
+    category: primaryAttractionCategory(landmark),
     categories: landmark.categories || [],
     itinerary_day: null,
     itinerary_title: '',
@@ -381,8 +442,22 @@ export const mergeDestinationSuggestions = (currentDestinations = [], nextDestin
   return [...currentDestinations, ...additions];
 };
 
+export const selectGuideLandmarks = (landmarks = [], selectedLandmarks = []) => {
+  if (!selectedLandmarks?.length) {
+    return landmarks;
+  }
+  const byId = landmarks.reduce((acc, landmark) => {
+    const selectionId = landmark.selection_id || landmark.id;
+    if (selectionId) {
+      acc[selectionId] = landmark;
+    }
+    return acc;
+  }, {});
+  return selectedLandmarks.map((selectionId) => byId[selectionId]).filter(Boolean);
+};
+
 export const appendGuideLandmarks = (formData, guideData) => {
-  const landmarks = guideData.landmarks || [];
+  const landmarks = selectGuideLandmarks(guideData.landmarks || [], guideData.selectedLandmarks || []);
   const catalogLandmarkIds = landmarks
     .filter((landmark) => landmark.is_catalog_landmark)
     .map((landmark) => landmark.selection_id || landmark.id)
@@ -423,6 +498,78 @@ export const appendGuideLandmarks = (formData, guideData) => {
   }
 };
 
+export const appendGuideMetadata = (formData, guideData = {}) => {
+  formData.append('title', guideData.title || 'Guia de Viagem');
+  if (guideData.childrenNames) formData.append('children_names', guideData.childrenNames);
+  if (Array.isArray(guideData.childrenAges)) {
+    guideData.childrenAges
+      .map((age) => Number.parseInt(age, 10))
+      .filter((age) => Number.isFinite(age) && age > 0)
+      .forEach((age) => formData.append('children_ages', String(age)));
+  }
+  if (guideData.parentsNames) formData.append('parents_names', guideData.parentsNames);
+  if (guideData.year) formData.append('year', guideData.year.toString());
+  const expectedFamilyMemberCount = Number.parseInt(
+    guideData.expectedVisibleFamilyMemberCount,
+    10,
+  );
+  if (Number.isFinite(expectedFamilyMemberCount) && expectedFamilyMemberCount > 0) {
+    formData.append(
+      'expected_visible_family_member_count',
+      String(Math.min(expectedFamilyMemberCount, 20)),
+    );
+  }
+  if (guideData.restaurantRecommendationsExtra) {
+    formData.append('restaurant_recommendations_extra', 'true');
+  }
+};
+
+export const buildDiscoverItineraryPayload = ({
+  destination = '',
+  destinationsList = [],
+  itineraryPreferences = {},
+  childrenList = [],
+} = {}) => {
+  const structuredDestinations = normalizeGuideDestinations(destinationsList)
+    .filter((item) => item.place && item.timing && item.days > 0);
+  const destinationSummary = structuredDestinations.length > 0
+    ? serializeGuideDestinations(structuredDestinations)
+    : String(destination || '').trim();
+  const days = totalTripDays(structuredDestinations) || Number(itineraryPreferences.days) || 3;
+
+  return {
+    destination: destinationSummary,
+    days,
+    interests: itineraryPreferences.interests || [],
+    pace: itineraryPreferences.pace || 'balanced',
+    children_ages: deriveChildAges(childrenList),
+    must_see: [],
+    structured_destinations: structuredDestinations,
+  };
+};
+
+export const buildRouteSuggestionPayload = ({
+  tripIdea = '',
+  destinationsList = [],
+  itineraryPreferences = {},
+  childrenList = [],
+} = {}) => {
+  const structuredDestinations = normalizeGuideDestinations(destinationsList)
+    .filter((item) => item.place && item.timing && item.days > 0);
+  const explicitDays = Number.parseInt(itineraryPreferences.days, 10);
+
+  return {
+    trip_idea: String(tripIdea || '').trim(),
+    days: Number.isFinite(explicitDays) && explicitDays > 0
+      ? explicitDays
+      : totalTripDays(structuredDestinations) || 3,
+    pace: itineraryPreferences.pace || 'balanced',
+    interests: itineraryPreferences.interests || [],
+    children_ages: deriveChildAges(childrenList),
+    structured_destinations: structuredDestinations,
+  };
+};
+
 export const fetchCatalog = async () => {
   const baseUrl = apiBaseUrl();
 
@@ -461,6 +608,26 @@ export const discoverItinerary = async (payload) => {
   const baseUrl = apiBaseUrl();
 
   const response = await fetch(`${baseUrl}/api/itinerary/discover`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Erro do servidor: ${response.status}`);
+  }
+
+  return response.json();
+};
+
+export const suggestItineraryRoutes = async (payload) => {
+  const baseUrl = apiBaseUrl();
+
+  const response = await fetch(`${baseUrl}/api/itinerary/routes/suggest`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -520,10 +687,7 @@ export const generatePDF = async (guideData) => {
     const formData = new FormData();
 
     // Append basic fields
-    formData.append('title', guideData.title || 'Guia de Viagem');
-    if (guideData.childrenNames) formData.append('children_names', guideData.childrenNames);
-    if (guideData.parentsNames) formData.append('parents_names', guideData.parentsNames);
-    if (guideData.year) formData.append('year', guideData.year.toString());
+    appendGuideMetadata(formData, guideData);
 
     // Append file if exists
     if (guideData.familyPhoto) {

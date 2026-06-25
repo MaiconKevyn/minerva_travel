@@ -78,3 +78,26 @@ def test_search_profiles_from_intent_prioritizes_child_and_contextual_requests()
         "food",
         "almoco com criancas perto de Torre Eiffel em Paris, Franca",
     )
+
+
+def test_search_profiles_from_intent_falls_back_to_kind_for_unknown_topic():
+    intent = ItineraryIntent(
+        destination="Porto, Portugal",
+        discovery_requests=[
+            {
+                "kind": "general",
+                "query": "viajar com a familia",
+                "topic": "viajar com a familia",
+                "near": "",
+                "meal": "",
+                "audience": "children",
+            },
+        ],
+    )
+
+    profiles = search_profiles_from_intent(intent, explicit_interests=[])
+
+    assert profiles[0] == (
+        "family",
+        "viajar com a familia para criancas em Porto, Portugal",
+    )

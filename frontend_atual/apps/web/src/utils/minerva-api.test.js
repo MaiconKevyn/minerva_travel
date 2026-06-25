@@ -4,6 +4,8 @@ import test from 'node:test';
 import * as minervaApi from './minerva-api.js';
 import {
   appendGuideLandmarks,
+  appendGuideMetadata,
+  buildDiscoverItineraryPayload,
   buildLandmarkMapsUrl,
   inferCatalogDestinationIds,
   mapParsedLandmarksToParsedData,
@@ -103,9 +105,12 @@ test('mapRecommendationToParsedData keeps day metadata and alternatives editable
   assert.deepEqual(data.selectedLandmarks, ['lisbon:oceanario']);
   assert.deepEqual(data.destinations, [{ id: 'lisbon', city: 'Lisboa', country: 'Portugal' }]);
   assert.equal(data.landmarks[0].id, 'lisbon:oceanario');
+  assert.equal(data.landmarks[0].category, 'animals');
+  assert.equal(minervaApi.categoryLabelForAttraction(data.landmarks[0]), 'Animais');
   assert.equal(data.landmarks[0].itinerary_day, 1);
   assert.equal(data.landmarks[0].is_catalog_landmark, true);
   assert.equal(data.landmarks[1].id, 'lisbon:yellow-tram');
+  assert.equal(data.landmarks[1].category, 'rides');
   assert.equal(data.landmarks[1].is_alternative, true);
 });
 
@@ -160,6 +165,7 @@ test('mapRecommendationToParsedData treats Google Places stops as custom landmar
   assert.equal(data.landmarks[0].latitude, 41.8902);
   assert.equal(data.landmarks[0].longitude, 12.4922);
   assert.equal(data.landmarks[0].source_type, 'mentioned');
+  assert.equal(data.landmarks[0].category, 'history');
   assert.deepEqual(data.landmarks[0].image_attributions, [
     {
       display_name: 'Maria Fotografa',
@@ -510,4 +516,174 @@ test('appendGuideLandmarks sends catalog ids and custom fallback separately', ()
       },
     ]),
   );
+});
+
+test('selectGuideLandmarks preserves only selected attractions in guide order', () => {
+  const landmarks = [
+    { id: 'suggested-park', name: 'Parque sugerido' },
+    { id: 'selected-museum', name: 'Museu selecionado' },
+    { id: 'selected-square', name: 'Praca selecionada' },
+  ];
+
+  assert.deepEqual(
+    minervaApi.selectGuideLandmarks(landmarks, ['selected-square', 'selected-museum'])
+      .map((item) => item.id),
+    ['selected-square', 'selected-museum'],
+  );
+});
+
+test('appendGuideLandmarks filters unselected attraction suggestions from payload', () => {
+  const formData = new FormData();
+
+  appendGuideLandmarks(formData, {
+    selectedLandmarks: ['selected-catalog', 'selected-custom'],
+    landmarks: [
+      {
+        id: 'selected-catalog',
+        is_catalog_landmark: true,
+        name: 'Museu selecionado',
+        city: 'Lisboa',
+        country: 'Portugal',
+      },
+      {
+        id: 'unselected-catalog',
+        is_catalog_landmark: true,
+        name: 'Parque sugerido',
+        city: 'Lisboa',
+        country: 'Portugal',
+      },
+      {
+        id: 'selected-custom',
+        is_catalog_landmark: false,
+        name: 'Loja local selecionada',
+        city: 'Lisboa',
+        country: 'Portugal',
+      },
+      {
+        id: 'unselected-custom',
+        is_catalog_landmark: false,
+        name: 'Teatro sugerido',
+        city: 'Lisboa',
+        country: 'Portugal',
+      },
+    ],
+  });
+
+  assert.deepEqual(formData.getAll('selected_landmarks'), ['selected-catalog']);
+  assert.equal(
+    formData.get('custom_landmarks'),
+    JSON.stringify([
+      {
+        name: 'Loja local selecionada',
+        city: 'Lisboa',
+        country: 'Portugal',
+        description: [],
+      },
+    ]),
+  );
+});
+
+test('buildDiscoverItineraryPayload includes structured destinations preferences and child ages', () => {
+  const payload = buildDiscoverItineraryPayload({
+    destinationsList: [
+      { id: 'paris', place: 'Paris, França', timing: 'Julho de 2026', days: 3 },
+      { id: 'london', place: 'Londres', timing: 'depois de Paris', days: 2 },
+    ],
+    itineraryPreferences: {
+      pace: 'light',
+      interests: ['museus', 'parques'],
+    },
+    childrenList: [
+      { name: 'Alice', age: 5 },
+      { name: 'Antonio', age: 9 },
+    ],
+  });
+
+  assert.equal(
+    payload.destination,
+    'Destino 1: Paris, França; quando: Julho de 2026; duração: 3 dias.\nDestino 2: Londres; quando: depois de Paris; duração: 2 dias.',
+  );
+  assert.equal(payload.days, 5);
+  assert.equal(payload.pace, 'light');
+  assert.deepEqual(payload.interests, ['museus', 'parques']);
+  assert.deepEqual(payload.children_ages, [5, 9]);
+  assert.deepEqual(payload.structured_destinations, [
+    { id: 'paris', place: 'Paris, França', timing: 'Julho de 2026', days: 3 },
+    { id: 'london', place: 'Londres', timing: 'depois de Paris', days: 2 },
+  ]);
+});
+
+test('buildRouteSuggestionPayload sends freeform constraints and current structured destinations', () => {
+  assert.equal(typeof minervaApi.buildRouteSuggestionPayload, 'function');
+  const payload = minervaApi.buildRouteSuggestionPayload({
+    tripIdea: 'Queremos Paris e Londres com parques.',
+    destinationsList: [
+      { id: 'paris', place: 'Paris, França', timing: 'Julho de 2026', days: 3 },
+    ],
+    itineraryPreferences: {
+      days: 5,
+      pace: 'light',
+      interests: ['parques', 'museus'],
+    },
+    childrenList: [{ name: 'Alice', age: 6 }],
+  });
+
+  assert.deepEqual(payload, {
+    trip_idea: 'Queremos Paris e Londres com parques.',
+    days: 5,
+    pace: 'light',
+    interests: ['parques', 'museus'],
+    children_ages: [6],
+    structured_destinations: [
+      { id: 'paris', place: 'Paris, França', timing: 'Julho de 2026', days: 3 },
+    ],
+  });
+});
+
+test('appendGuideMetadata preserves family cover count with child ages for PDF generation', () => {
+  const formData = new FormData();
+
+  appendGuideMetadata(formData, {
+    title: 'Família Silva',
+    childrenNames: 'Alice, Antonio',
+    childrenAges: [5, 9],
+    parentsNames: 'Ana, Otavio',
+    year: 2026,
+    expectedVisibleFamilyMemberCount: 4,
+  });
+
+  assert.equal(formData.get('title'), 'Família Silva');
+  assert.equal(formData.get('children_names'), 'Alice, Antonio');
+  assert.deepEqual(formData.getAll('children_ages'), ['5', '9']);
+  assert.equal(formData.get('parents_names'), 'Ana, Otavio');
+  assert.equal(formData.get('year'), '2026');
+  assert.equal(formData.get('expected_visible_family_member_count'), '4');
+});
+
+test('restaurant recommendations extra exposes initial price contract', () => {
+  assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.id, 'restaurant_recommendations_extra');
+  assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.price_cents, 2990);
+  assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.price_label, 'R$ 29,90');
+});
+
+test('appendGuideMetadata sends restaurant extra entitlement only when selected', () => {
+  const baseFormData = new FormData();
+  appendGuideMetadata(baseFormData, {
+    title: 'Família Silva',
+    childrenNames: 'Alice',
+    parentsNames: 'Ana',
+    year: 2026,
+  });
+
+  const extraFormData = new FormData();
+  appendGuideMetadata(extraFormData, {
+    title: 'Família Silva',
+    childrenNames: 'Alice',
+    parentsNames: 'Ana',
+    year: 2026,
+    restaurantRecommendationsExtra: true,
+  });
+
+  assert.equal(baseFormData.get('restaurant_recommendations_extra'), null);
+  assert.equal(extraFormData.get('restaurant_recommendations_extra'), 'true');
 });

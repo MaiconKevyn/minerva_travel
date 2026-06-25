@@ -5,8 +5,10 @@ import httpx
 from PIL import Image, ImageDraw
 
 from minerva_travel.image_generation import (
+    CoverValidationResult,
     PlaceholderImageGenerator,
     ReplicateImageGenerator,
+    generate_cover_with_guardrails,
     _write_replicate_output,
     cover_prompt,
     landmark_lineart_prompt,
@@ -41,6 +43,143 @@ def test_cover_prompt_avoids_text_inside_image():
 
     assert "Do not include any readable text" in prompt
     assert "Paris, Londres" in prompt
+
+
+def test_cover_prompt_preserves_expected_family_member_count():
+    prompt_for_two = cover_prompt(
+        title="Pequenos Exploradores pela Europa",
+        destination_names=["Paris"],
+        expected_visible_family_member_count=2,
+    )
+    prompt_for_three = cover_prompt(
+        title="Pequenos Exploradores pela Europa",
+        destination_names=["Paris"],
+        expected_visible_family_member_count=3,
+    )
+    prompt_for_four = cover_prompt(
+        title="Pequenos Exploradores pela Europa",
+        destination_names=["Paris"],
+        expected_visible_family_member_count=4,
+    )
+
+    assert "exactly 2 visible family members" in prompt_for_two
+    assert "exactly 3 visible family members" in prompt_for_three
+    assert "exactly 4 visible family members" in prompt_for_four
+    assert "Do not omit, crop out, replace, or merge any family member" in prompt_for_four
+
+
+def test_cover_guardrail_falls_back_when_validation_fails(tmp_path):
+    source = tmp_path / "family.png"
+    output = tmp_path / "cover.png"
+    Image.new("RGB", (640, 480), "#90c4df").save(source)
+
+    class FakeGenerator:
+        calls = 0
+
+        def generate_cover(
+            self,
+            family_photo,
+            output_path,
+            title,
+            destination_names,
+            *,
+            expected_visible_family_member_count=None,
+        ):
+            self.calls += 1
+            output_path.write_bytes(f"bad-cover-{self.calls}".encode())
+            return output_path
+
+    class FailingValidator:
+        def validate(self, image_path, expected_visible_family_member_count):
+            return CoverValidationResult(
+                status="failed",
+                visible_people_count=1,
+                message="Only one person detected",
+            )
+
+    generator = FakeGenerator()
+
+    result = generate_cover_with_guardrails(
+        generator=generator,
+        family_photo=source,
+        output_path=output,
+        title="Família Silva",
+        destination_names=["Paris"],
+        expected_visible_family_member_count=4,
+        validator=FailingValidator(),
+    )
+
+    assert generator.calls == 2
+    assert result.fallback_used is True
+    assert result.validation.status == "failed"
+    assert result.validation.visible_people_count == 1
+    assert output.exists()
+    with Image.open(output) as fallback:
+        assert fallback.size == (1200, 1600)
+
+
+def test_cover_guardrail_keeps_generated_cover_when_validation_passes(tmp_path):
+    source = tmp_path / "family.png"
+    output = tmp_path / "cover.png"
+    source.write_bytes(b"source")
+
+    class FakeGenerator:
+        def generate_cover(
+            self,
+            family_photo,
+            output_path,
+            title,
+            destination_names,
+            *,
+            expected_visible_family_member_count=None,
+        ):
+            assert expected_visible_family_member_count == 4
+            output_path.write_bytes(b"generated-cover")
+            return output_path
+
+    class PassingValidator:
+        def validate(self, image_path, expected_visible_family_member_count):
+            return CoverValidationResult(
+                status="passed",
+                visible_people_count=4,
+            )
+
+    result = generate_cover_with_guardrails(
+        generator=FakeGenerator(),
+        family_photo=source,
+        output_path=output,
+        title="Família Silva",
+        destination_names=["Paris"],
+        expected_visible_family_member_count=4,
+        validator=PassingValidator(),
+    )
+
+    assert result.fallback_used is False
+    assert result.validation.status == "passed"
+    assert output.read_bytes() == b"generated-cover"
+
+
+def test_cover_guardrail_keeps_backward_compatible_generation_without_expected_count(tmp_path):
+    source = tmp_path / "family.png"
+    output = tmp_path / "cover.png"
+    source.write_bytes(b"source")
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(b"legacy-cover")
+            return output_path
+
+    result = generate_cover_with_guardrails(
+        generator=FakeGenerator(),
+        family_photo=source,
+        output_path=output,
+        title="Família Silva",
+        destination_names=["Paris"],
+    )
+
+    assert result.fallback_used is False
+    assert result.validation is None
+    assert output.read_bytes() == b"legacy-cover"
 
 
 def test_placeholder_image_generator_creates_trip_summary(tmp_path):

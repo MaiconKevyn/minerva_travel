@@ -18,6 +18,9 @@ PACE_STOP_LIMITS = {
     "full": 4,
 }
 
+MAX_SEARCH_PROFILES = 12
+MIN_VISIBLE_OPTIONS_PER_DESTINATION = 12
+
 TEXT_SEARCH_FIELD_MASK = (
     "places.id,"
     "places.displayName,"
@@ -41,26 +44,44 @@ INTEREST_ALIASES = {
     "gastronomia": "food",
     "historia": "history",
     "historia local": "history",
-    "lojas": "shopping",
+    "lojas": "local_stores",
+    "lojas locais": "local_stores",
+    "mercados": "local_stores",
     "compras": "shopping",
     "museu": "museums",
     "museus": "museums",
+    "outdoor": "outdoor",
+    "ar livre": "outdoor",
+    "atividade ao ar livre": "outdoor",
+    "atividades ao ar livre": "outdoor",
     "parque": "parks",
     "parques": "parks",
-    "pracas": "parks",
+    "praca": "squares",
+    "pracas": "squares",
     "rio": "river",
+    "teatro": "theaters",
+    "teatros": "theaters",
     "vistas": "views",
 }
 
 INTEREST_LABELS = {
     "animals": "animais",
     "art": "arte",
+    "education": "educativo",
     "food": "comida",
+    "family": "familia",
     "history": "historia",
+    "icons": "icones",
+    "local_stores": "lojas locais",
     "museums": "museus",
+    "outdoor": "ao ar livre",
     "parks": "parques",
+    "play": "brincadeiras",
     "river": "rio e passeios",
+    "science": "ciencia",
     "shopping": "lojas",
+    "squares": "pracas",
+    "theaters": "teatros",
     "views": "vistas",
 }
 
@@ -69,21 +90,31 @@ INTEREST_QUERIES = {
     "art": "museus de arte galerias arte para familia",
     "education": "atividades educativas para criancas",
     "food": "comida local restaurantes familiares doces famosos",
-    "family": "lugares bons para ir com criancas",
+    "family": "programas em familia lugares bons para ir com criancas",
     "history": "pontos historicos monumentos castelos centro historico",
+    "local_stores": "lojas locais mercados livrarias brinquedos artesanato familia",
     "museums": "museus pontos culturais para criancas",
-    "parks": "parques jardins pracas atividades ao ar livre",
+    "outdoor": "atividades ao ar livre trilhas jardins waterfront familia",
+    "parks": "parques jardins areas verdes para criancas",
     "play": "atividades divertidas para criancas",
     "river": "passeio de barco rio waterfront familia",
     "science": "museus de ciencia e descobertas para criancas",
     "shopping": "lojas mercados compras familiares",
+    "squares": "pracas largos espacos publicos para familia",
+    "theaters": "teatros infantis espetaculos centros culturais para familia",
     "views": "mirantes vistas panoramicas observatorio",
 }
 
 DEFAULT_QUERIES = [
     ("icons", "principais pontos turisticos imperdiveis para familia"),
-    ("parks", "parques jardins pracas para criancas"),
+    ("parks", "parques jardins areas verdes para criancas"),
+    ("squares", "pracas largos espacos publicos para familia"),
+    ("theaters", "teatros infantis espetaculos centros culturais para familia"),
     ("museums", "museus atividades culturais para familia"),
+    ("art", "galerias museus de arte para familia"),
+    ("outdoor", "atividades ao ar livre trilhas jardins waterfront familia"),
+    ("local_stores", "lojas locais mercados livrarias brinquedos familia"),
+    ("family", "programas em familia atividades para criancas"),
 ]
 
 GOOGLE_TYPE_CATEGORIES = {
@@ -91,14 +122,23 @@ GOOGLE_TYPE_CATEGORIES = {
     "aquarium": "animals",
     "art_gallery": "art",
     "bakery": "food",
+    "book_store": "local_stores",
     "cafe": "food",
+    "concert_hall": "theaters",
+    "cultural_center": "theaters",
+    "hiking_area": "outdoor",
     "historical_landmark": "history",
     "library": "education",
-    "market": "shopping",
+    "market": "local_stores",
+    "movie_theater": "theaters",
     "museum": "museums",
+    "national_park": "outdoor",
     "park": "parks",
+    "performing_arts_theater": "theaters",
+    "playground": "family",
     "restaurant": "food",
     "shopping_mall": "shopping",
+    "store": "local_stores",
     "tourist_attraction": "icons",
     "zoo": "animals",
 }
@@ -119,13 +159,32 @@ CATEGORY_DURATIONS = {
     "food": 60,
     "history": 75,
     "icons": 75,
+    "local_stores": 60,
     "museums": 120,
+    "outdoor": 90,
     "parks": 75,
     "play": 90,
     "river": 90,
     "science": 120,
     "shopping": 90,
+    "squares": 60,
+    "theaters": 120,
     "views": 60,
+}
+
+YOUNG_CHILD_CATEGORIES = {
+    "animals",
+    "art",
+    "education",
+    "family",
+    "museums",
+    "outdoor",
+    "parks",
+    "play",
+    "river",
+    "science",
+    "squares",
+    "views",
 }
 
 
@@ -150,9 +209,11 @@ def discover_dynamic_itinerary(
         )
         destination_query = intent.destination or request.destination
         resolved = _geocode_destination(http_client, api_key, destination_query)
-        search_profiles = search_profiles_from_intent(intent, explicit_interests=request.interests)
-        if not search_profiles:
-            search_profiles = _search_profiles(request.interests)
+        intent_profiles = search_profiles_from_intent(
+            intent,
+            explicit_interests=request.interests,
+        )
+        search_profiles = _combined_search_profiles(intent_profiles, request.interests)
         candidates = _discover_places(http_client, api_key, request, resolved, search_profiles)
         if not candidates:
             raise ValueError("Nao encontrei locais suficientes para montar o roteiro.")
@@ -160,7 +221,10 @@ def discover_dynamic_itinerary(
         target_count = min(len(ranked), request.days * PACE_STOP_LIMITS[request.pace])
         selected = _select_balanced_stops(ranked, target_count)
         selected_ids = {item["selection_id"] for item in selected}
-        alternatives = [item for item in ranked if item["selection_id"] not in selected_ids][:8]
+        alternative_limit = max(8, MIN_VISIBLE_OPTIONS_PER_DESTINATION - len(selected))
+        alternatives = [
+            item for item in ranked if item["selection_id"] not in selected_ids
+        ][:alternative_limit]
         _enrich_visible_stops_with_photos(http_client, api_key, [*selected, *alternatives])
         public_selected = [_public_stop(item) for item in selected]
         public_alternatives = [_public_stop(item) for item in alternatives]
@@ -238,6 +302,7 @@ def _discover_places(
                 profile_index=profile_index,
                 normalized_interests=normalized_interests,
                 profile_reason=profile_reason,
+                children_ages=request.children_ages,
             )
             existing = candidates.get(place_id)
             if not existing or candidate["match_score"] > existing["match_score"]:
@@ -450,6 +515,7 @@ def _place_to_stop(
     profile_index: int,
     normalized_interests: set[str],
     profile_reason: str | None,
+    children_ages: list[int],
 ) -> dict[str, Any]:
     place_id = str(place["id"])
     name = str(place.get("displayName", {}).get("text") or "Local sugerido")
@@ -465,6 +531,11 @@ def _place_to_stop(
     for category in matching_categories:
         score += 80
         reasons.append(f"Interesse da familia: {INTEREST_LABELS.get(category, category)}.")
+
+    if children_ages and min(children_ages) <= 7:
+        if any(category in YOUNG_CHILD_CATEGORIES for category in categories):
+            score += 20
+            reasons.append("Boa opcao para criancas menores.")
 
     rating = place.get("rating")
     if isinstance(rating, int | float):
@@ -493,6 +564,7 @@ def _place_to_stop(
         "country": resolved["country"],
         "description": [_description_for(name, primary_category, resolved["city"])],
         "image": None,
+        "category": primary_category,
         "categories": categories,
         "duration_minutes": CATEGORY_DURATIONS.get(primary_category, 75),
         "family_tip": _family_tip(primary_category),
@@ -613,13 +685,14 @@ def _public_stop(stop: dict[str, Any]) -> dict[str, Any]:
 
 
 def _place_categories(place: dict[str, Any], query_category: str) -> list[str]:
-    categories = [
+    categories = []
+    if query_category != "must_see":
+        categories.append(query_category)
+    categories.extend(
         GOOGLE_TYPE_CATEGORIES[place_type]
         for place_type in place.get("types", [])
         if place_type in GOOGLE_TYPE_CATEGORIES
-    ]
-    if query_category != "must_see" and query_category not in categories:
-        categories.append(query_category)
+    )
     return list(dict.fromkeys(categories))
 
 
@@ -651,7 +724,32 @@ def _search_profiles(interests: Iterable[str]) -> list[tuple[str, str]]:
     for profile in DEFAULT_QUERIES:
         if profile[0] not in {item[0] for item in profiles}:
             profiles.append(profile)
-    return profiles[:4]
+    return profiles[:MAX_SEARCH_PROFILES]
+
+
+def _combined_search_profiles(
+    intent_profiles: list[tuple[str, str]],
+    explicit_interests: Iterable[str],
+) -> list[tuple[str, str]]:
+    profile_interests = [
+        category
+        for category, _query in intent_profiles
+        if category in INTEREST_QUERIES
+    ]
+    default_profiles = _search_profiles([*explicit_interests, *profile_interests])
+    return _dedupe_search_profiles([*intent_profiles, *default_profiles])[:MAX_SEARCH_PROFILES]
+
+
+def _dedupe_search_profiles(profiles: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
+    deduped: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for category, query in profiles:
+        key = (category, _normalize_text(query))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append((category, query))
+    return deduped
 
 
 def _normalize_interests(interests: Iterable[str]) -> set[str]:
@@ -724,6 +822,14 @@ def _description_for(name: str, category: str, city: str) -> str:
         return f"{name} entra no roteiro como uma parada para provar sabores locais em {city}."
     if category == "parks":
         return f"{name} e uma pausa ao ar livre para observar, brincar e respirar durante a viagem."
+    if category == "squares":
+        return f"{name} oferece uma parada leve em praca para circular, observar e brincar."
+    if category == "outdoor":
+        return f"{name} coloca a familia em movimento ao ar livre durante a viagem."
+    if category == "theaters":
+        return f"{name} traz um programa cultural com palco, historias e imaginacao."
+    if category == "local_stores":
+        return f"{name} ajuda a descobrir sabores, objetos e memorias locais de {city}."
     if category in {"museums", "art"}:
         return (
             f"{name} ajuda a transformar cultura e arte em uma descoberta visual "
@@ -739,6 +845,14 @@ def _family_tip(category: str) -> str:
         return "Convide as criancas a escolherem um sabor novo para experimentar."
     if category == "parks":
         return "Separe alguns minutos para uma brincadeira curta ou desenho do lugar."
+    if category == "squares":
+        return "Procurem juntos uma estatua, fonte ou detalhe que conte uma historia."
+    if category == "outdoor":
+        return "Combinem uma pequena missao de observacao antes de comecar o passeio."
+    if category == "theaters":
+        return "Antes do espetaculo, imaginem quem serao os personagens principais."
+    if category == "local_stores":
+        return "Escolham uma lembranca pequena que represente o destino."
     if category in {"museums", "art"}:
         return "Escolha uma obra ou detalhe favorito antes de sair."
     if category == "history":

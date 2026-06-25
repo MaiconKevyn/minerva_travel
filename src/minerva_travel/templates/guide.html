@@ -126,29 +126,40 @@
         <div class="stamp">diario de viagem</div>
       </section>
 
-      {% if item.destination.language_tips %}
+      {% set language_activities = guide.activity_plan
+        | selectattr("destination_id", "equalto", item.destination.id)
+        | selectattr("type", "equalto", "language_learning")
+        | list %}
+      {% if language_activities %}
         <section class="page language-page phase-before">
           <div class="phase-badge">Antes da viagem</div>
           <p class="page-kicker">{{ item.destination.city }}</p>
           <h2>Palavras para usar</h2>
           <p class="language-intro">
-            Algumas palavras em {{ item.destination.language_name }} para brincar de falar antes de chegar e tentar usar durante o passeio.
+            Uma palavra em {{ language_activities[0].language_name }} para brincar de falar antes de chegar e tentar usar durante o passeio.
           </p>
 
           <div class="language-grid">
-            {% for tip in item.destination.language_tips %}
-              <article class="language-tip-card">
-                <strong>{{ tip.phrase }}</strong>
-                <span>{{ tip.pronunciation }}</span>
-                <p>{{ tip.meaning }}</p>
-                <small>{{ tip.use_case }}</small>
+            {% for activity in language_activities %}
+              <article class="language-tip-card language-learning-activity">
+                <strong>{{ activity.language_phrase }}</strong>
+                <span>{{ activity.language_pronunciation }}</span>
+                <p>{{ activity.language_meaning }}</p>
+                {% for checklist_item in activity.checklist_items %}
+                  <small>{{ checklist_item }}</small>
+                {% endfor %}
               </article>
             {% endfor %}
           </div>
 
           <div class="airplane-activity">
             <p class="page-kicker">atividade para o aviao</p>
-            <p>Escolha uma palavra desta pagina e pratique com alguem da familia. Depois, desenhe onde voce acha que poderia usa-la.</p>
+            {% for activity in language_activities %}
+              <p>{{ activity.prompt }}</p>
+              {% if activity.extension_prompt %}
+                <p>{{ activity.extension_prompt }}</p>
+              {% endif %}
+            {% endfor %}
             <div class="drawing-box"></div>
           </div>
         </section>
@@ -182,6 +193,83 @@
           <div class="stamp">diario de viagem</div>
         </section>
       {% endfor %}
+
+      {% for activity in guide.activity_plan if activity.destination_id == item.destination.id and activity.type != "language_learning" %}
+        <section class="page activity-page activity-{{ activity.type }}">
+          <div class="phase-badge">Atividade</div>
+          <p class="page-kicker">{{ item.destination.city }}</p>
+          <h2>{{ activity.title }}</h2>
+          <p>{{ activity.prompt }}</p>
+
+          {% if activity.type == "coloring" and activity.lineart_image %}
+            <div class="activity-coloring-frame">
+              <img class="lineart-image" src="{{ activity.lineart_image }}" alt="">
+            </div>
+          {% elif activity.type == "word_search" %}
+            <div class="word-search-box">
+              {% for word in activity.words %}
+                <span>{{ word }}</span>
+              {% endfor %}
+            </div>
+            <div class="writing-lines compact-lines"></div>
+          {% elif activity.type == "spot_the_difference" %}
+            <div class="difference-grid">
+              <div></div>
+              <div></div>
+            </div>
+            <div class="writing-lines compact-lines"></div>
+          {% elif activity.type == "checklist" %}
+            <ul class="activity-checklist">
+              {% for checklist_item in activity.checklist_items %}
+                <li><span class="checkbox"></span>{{ checklist_item }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="drawing-box"></div>
+            <div class="writing-lines compact-lines"></div>
+          {% endif %}
+
+          {% if activity.extension_prompt %}
+            <div class="activity-extension">
+              <strong>Desafio extra</strong>
+              <p>{{ activity.extension_prompt }}</p>
+            </div>
+          {% endif %}
+        </section>
+      {% endfor %}
+
+      {% set restaurant_items = guide.restaurant_recommendations
+        | selectattr("destination_id", "equalto", item.destination.id)
+        | list %}
+      {% if restaurant_items %}
+        <section class="page restaurant-page">
+          <div class="phase-badge">Extra opcional</div>
+          <p class="page-kicker">{{ item.destination.city }}</p>
+          <h2>Onde comer perto do roteiro</h2>
+          <p class="restaurant-freshness-note">
+            Confira horarios, reservas e funcionamento antes de visitar.
+          </p>
+          <div class="restaurant-list">
+            {% for restaurant in restaurant_items %}
+              <article class="restaurant-card">
+                <h3>{{ restaurant.name }}</h3>
+                <p class="restaurant-context">{{ restaurant.nearby_context }}</p>
+                <p>{{ restaurant.reason }}</p>
+                {% if restaurant.cuisine %}
+                  <small>{{ restaurant.cuisine }}</small>
+                {% endif %}
+                {% if restaurant.suitability_notes %}
+                  <ul>
+                    {% for note in restaurant.suitability_notes %}
+                      <li>{{ note }}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
 
       <section class="page notes-page phase-after">
         <div class="phase-badge">Depois da visita</div>
@@ -224,6 +312,19 @@
         <p>Que este livro lembre voces de como e bom explorar o mundo, fazer perguntas e se encantar com as pequenas e grandes coisas da vida.</p>
         <p class="signature">Com todo o amor,<br>{{ guide.request.parents_display }}</p>
       </div>
+    </section>
+
+    <section class="page final-checklist-page phase-after">
+      <div class="phase-badge">Depois da viagem</div>
+      <p class="page-kicker">para completar juntos</p>
+      <h2>Checklist da aventura</h2>
+      <ul class="activity-checklist final-checklist">
+        <li><span class="checkbox"></span>Escolhemos nosso lugar favorito</li>
+        <li><span class="checkbox"></span>Desenhamos uma lembranca importante</li>
+        <li><span class="checkbox"></span>Contamos uma historia da viagem para alguem</li>
+        <li><span class="checkbox"></span>Guardamos uma pergunta para a proxima aventura</li>
+      </ul>
+      <div class="writing-lines compact-lines"></div>
     </section>
 
     {% if guide.image_credits %}

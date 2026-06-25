@@ -4,12 +4,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, UploadCloud, CheckCircle2 } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
+import {
+  deriveExpectedFamilyMemberCount,
+  normalizeFamilyMemberCount,
+} from '@/utils/guide-form.js';
 
 const Step2CoverPhoto = () => {
-  const { coverPhoto, coverPhotoUrl, updateCoverPhoto, nextStep } = useConversationalGuide();
+  const {
+    coverPhoto,
+    coverPhotoUrl,
+    updateCoverPhoto,
+    expectedCoverFamilyMemberCount,
+    updateExpectedCoverFamilyMemberCount,
+    childrenList,
+    parentsList,
+    nextStep
+  } = useConversationalGuide();
   const [isDragging, setIsDragging] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const fileInputRef = useRef(null);
+  const derivedFamilyMemberCount = deriveExpectedFamilyMemberCount({ childrenList, parentsList });
+  const confirmedFamilyMemberCount = normalizeFamilyMemberCount(expectedCoverFamilyMemberCount);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -35,9 +50,24 @@ const Step2CoverPhoto = () => {
   };
 
   const handleConfirm = () => {
-    if (!coverPhoto) return;
+    if (!coverPhoto || confirmedFamilyMemberCount <= 0) return;
     setIsConfirmed(true);
   };
+
+  const handleFamilyMemberCountChange = (event) => {
+    updateExpectedCoverFamilyMemberCount(event.target.value);
+  };
+
+  useEffect(() => {
+    if (coverPhoto && confirmedFamilyMemberCount <= 0 && derivedFamilyMemberCount > 0) {
+      updateExpectedCoverFamilyMemberCount(derivedFamilyMemberCount);
+    }
+  }, [
+    coverPhoto,
+    confirmedFamilyMemberCount,
+    derivedFamilyMemberCount,
+    updateExpectedCoverFamilyMemberCount,
+  ]);
 
   useEffect(() => {
     if (isConfirmed) {
@@ -101,6 +131,27 @@ const Step2CoverPhoto = () => {
               )}
             </div>
 
+            <div className="mx-auto max-w-xl rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm">
+              <label htmlFor="expected-cover-family-count" className="text-sm font-bold text-foreground">
+                Quantas pessoas aparecem na foto?
+              </label>
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <input
+                  id="expected-cover-family-count"
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={confirmedFamilyMemberCount || ''}
+                  onChange={handleFamilyMemberCountChange}
+                  placeholder={derivedFamilyMemberCount ? String(derivedFamilyMemberCount) : '4'}
+                  className="h-12 w-full rounded-xl border border-border bg-background px-4 text-base font-semibold text-foreground outline-none transition focus:border-primary sm:w-32"
+                />
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Se a ilustração não preservar todo mundo, usamos uma capa segura com a foto original.
+                </p>
+              </div>
+            </div>
+
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: coverPhoto ? 1 : 0 }}
@@ -108,7 +159,7 @@ const Step2CoverPhoto = () => {
             >
               <Button
                 onClick={handleConfirm}
-                disabled={!coverPhoto}
+                disabled={!coverPhoto || confirmedFamilyMemberCount <= 0}
               className="w-full rounded-full bg-primary px-8 py-6 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-primary/90 sm:w-auto"
             >
                 Continuar para revisão <ArrowRight className="ml-2 w-5 h-5" />
@@ -131,6 +182,11 @@ const Step2CoverPhoto = () => {
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
               Capa escolhida!
             </h2>
+            {confirmedFamilyMemberCount > 0 && (
+              <p className="text-muted-foreground">
+                Vamos preservar {confirmedFamilyMemberCount} pessoa{confirmedFamilyMemberCount === 1 ? '' : 's'} na capa.
+              </p>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

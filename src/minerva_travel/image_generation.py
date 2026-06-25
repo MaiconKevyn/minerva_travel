@@ -1,9 +1,34 @@
+from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
-from typing import Protocol
+from typing import Literal, Protocol
 from unicodedata import normalize
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+
+
+@dataclass(frozen=True)
+class CoverValidationResult:
+    status: Literal["passed", "failed", "unavailable", "inconclusive"]
+    visible_people_count: int | None = None
+    message: str = ""
+
+
+@dataclass(frozen=True)
+class CoverGenerationResult:
+    image_path: Path
+    fallback_used: bool
+    validation: CoverValidationResult | None = None
+    attempts: int = 1
+
+
+class CoverImageValidator(Protocol):
+    def validate(
+        self,
+        image_path: Path,
+        expected_visible_family_member_count: int,
+    ) -> CoverValidationResult:
+        """Validate whether generated cover output preserves the expected person count."""
 
 
 class ImageGenerator(Protocol):
@@ -13,6 +38,8 @@ class ImageGenerator(Protocol):
         output_path: Path,
         title: str,
         destination_names: list[str],
+        *,
+        expected_visible_family_member_count: int | None = None,
     ) -> Path:
         """Generate a cover image and return its local path."""
 
@@ -51,6 +78,8 @@ class PlaceholderImageGenerator:
         output_path: Path,
         title: str,
         destination_names: list[str],
+        *,
+        expected_visible_family_member_count: int | None = None,
     ) -> Path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         image = Image.new("RGB", (1200, 1600), "#f7efe3")
@@ -69,14 +98,16 @@ class PlaceholderImageGenerator:
         draw.ellipse((170, 245, 1030, 1025), fill="#d8ebf1", outline="#89abc2", width=5)
         draw.rectangle((305, 760, 895, 1040), fill="#c9b59b", outline="#7d6549", width=5)
 
-        people_x = [430, 545, 665, 780]
-        colors = ["#6a93b8", "#d77a61", "#83a95c", "#c9a94d"]
+        people_count = _bounded_family_member_count(expected_visible_family_member_count) or 4
+        start_x = 600 - ((people_count - 1) * 62)
+        people_x = [start_x + (index * 124) for index in range(people_count)]
+        colors = ["#6a93b8", "#d77a61", "#83a95c", "#c9a94d", "#8d7cc3", "#69b482"]
         for index, x in enumerate(people_x):
             draw.ellipse((x - 42, 585, x + 42, 669), fill="#f2c6a0", outline="#7d6549", width=3)
             draw.rounded_rectangle(
                 (x - 52, 670, x + 52, 860),
                 radius=28,
-                fill=colors[index],
+                fill=colors[index % len(colors)],
                 outline="#7d6549",
                 width=3,
             )
@@ -243,11 +274,17 @@ class ReplicateImageGenerator:
         output_path: Path,
         title: str,
         destination_names: list[str],
+        *,
+        expected_visible_family_member_count: int | None = None,
     ) -> Path:
         import replicate
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        prompt = cover_prompt(title=title, destination_names=destination_names)
+        prompt = cover_prompt(
+            title=title,
+            destination_names=destination_names,
+            expected_visible_family_member_count=expected_visible_family_member_count,
+        )
         with family_photo.open("rb") as image_file:
             output = _run_replicate_with_retry(
                 replicate,
@@ -346,14 +383,199 @@ class ReplicateImageGenerator:
         return output_path
 
 
-def cover_prompt(title: str, destination_names: list[str]) -> str:
+def get_cover_image_validator() -> CoverImageValidator | None:
+    return None
+
+
+def generate_cover_with_guardrails(
+    *,
+    generator: ImageGenerator,
+    family_photo: Path,
+    output_path: Path,
+    title: str,
+    destination_names: list[str],
+    expected_visible_family_member_count: int | None = None,
+    validator: CoverImageValidator | None = None,
+) -> CoverGenerationResult:
+    expected_count = _bounded_family_member_count(expected_visible_family_member_count)
+    if expected_count is None:
+        _generate_cover(
+            generator,
+            family_photo,
+            output_path,
+            title,
+            destination_names,
+            None,
+        )
+        return CoverGenerationResult(image_path=output_path, fallback_used=False)
+
+    attempts = 0
+    latest_validation: CoverValidationResult | None = None
+    for _ in range(2):
+        attempts += 1
+        _generate_cover(
+            generator,
+            family_photo,
+            output_path,
+            title,
+            destination_names,
+            expected_count,
+        )
+        if validator is None:
+            latest_validation = CoverValidationResult(
+                status="unavailable",
+                message="No generated-cover person-count validator is configured.",
+            )
+            break
+
+        latest_validation = validator.validate(output_path, expected_count)
+        if latest_validation.status == "passed":
+            return CoverGenerationResult(
+                image_path=output_path,
+                fallback_used=False,
+                validation=latest_validation,
+                attempts=attempts,
+            )
+        if latest_validation.status != "failed":
+            break
+
+    write_family_cover_fallback(
+        family_photo=family_photo,
+        output_path=output_path,
+        title=title,
+        destination_names=destination_names,
+        expected_visible_family_member_count=expected_count,
+    )
+    return CoverGenerationResult(
+        image_path=output_path,
+        fallback_used=True,
+        validation=latest_validation,
+        attempts=attempts,
+    )
+
+
+def _generate_cover(
+    generator: ImageGenerator,
+    family_photo: Path,
+    output_path: Path,
+    title: str,
+    destination_names: list[str],
+    expected_visible_family_member_count: int | None,
+) -> Path:
+    if expected_visible_family_member_count is None:
+        return generator.generate_cover(
+            family_photo=family_photo,
+            output_path=output_path,
+            title=title,
+            destination_names=destination_names,
+        )
+    return generator.generate_cover(
+        family_photo=family_photo,
+        output_path=output_path,
+        title=title,
+        destination_names=destination_names,
+        expected_visible_family_member_count=expected_visible_family_member_count,
+    )
+
+
+def write_family_cover_fallback(
+    *,
+    family_photo: Path,
+    output_path: Path,
+    title: str,
+    destination_names: list[str],
+    expected_visible_family_member_count: int | None = None,
+) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (1200, 1600), "#fff8ea")
+    draw = ImageDraw.Draw(image)
+
+    draw.rounded_rectangle((58, 58, 1142, 1542), radius=72, fill="#fdfbf7")
+    draw.rounded_rectangle((110, 145, 1090, 1160), radius=44, fill="#d8ebf1")
+
+    try:
+        with Image.open(family_photo) as source:
+            photo = ImageOps.exif_transpose(source).convert("RGB")
+        framed = ImageOps.fit(
+            photo,
+            (900, 900),
+            method=Image.Resampling.LANCZOS,
+            centering=(0.5, 0.42),
+        )
+        image.paste(framed, (150, 190))
+    except OSError:
+        _draw_family_silhouette_fallback(
+            draw,
+            expected_visible_family_member_count,
+        )
+
+    font_large = _font(58)
+    font_medium = _font(34)
+    draw.text((600, 1260), title, anchor="mm", fill="#214c70", font=font_large)
+    draw.text(
+        (600, 1330),
+        " + ".join(destination_names),
+        anchor="mm",
+        fill="#5a6f7c",
+        font=font_medium,
+    )
+    image.save(output_path)
+    return output_path
+
+
+def _draw_family_silhouette_fallback(
+    draw: ImageDraw.ImageDraw,
+    expected_visible_family_member_count: int | None,
+) -> None:
+    people_count = _bounded_family_member_count(expected_visible_family_member_count) or 4
+    start_x = 600 - ((people_count - 1) * 58)
+    colors = ["#6a93b8", "#d77a61", "#83a95c", "#c9a94d", "#8d7cc3", "#69b482"]
+    for index in range(people_count):
+        x = start_x + (index * 116)
+        draw.ellipse((x - 38, 470, x + 38, 546), fill="#f2c6a0", outline="#7d6549", width=3)
+        draw.rounded_rectangle(
+            (x - 48, 548, x + 48, 740),
+            radius=28,
+            fill=colors[index % len(colors)],
+            outline="#7d6549",
+            width=3,
+        )
+
+
+def _bounded_family_member_count(value: int | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return None
+    if count < 1:
+        return None
+    return min(count, 20)
+
+
+def cover_prompt(
+    title: str,
+    destination_names: list[str],
+    expected_visible_family_member_count: int | None = None,
+) -> str:
     landmarks = ", ".join(destination_names)
+    expected_count = _bounded_family_member_count(expected_visible_family_member_count)
+    family_count_guidance = ""
+    if expected_count is not None:
+        family_count_guidance = (
+            f"The reference photo contains exactly {expected_count} visible family "
+            f"members. The illustration must include exactly {expected_count} visible "
+            "family members with balanced placement and similar relative sizes. "
+            "Do not omit, crop out, replace, or merge any family member. "
+            "Do not turn a group photo into a portrait of only one adult or child. "
+        )
     return (
         "Transform the reference photo into a polished children's book watercolor "
         "illustration for a personalized family travel guide cover. Preserve the "
-        "main couple's recognizable composition, friendly smiles, approximate hair "
-        "colors, glasses, and pose, but render them as soft illustrated characters, "
-        "not a photorealistic copy. Use warm natural light, soft pastel colors, "
+        "family group's recognizable composition, friendly smiles, approximate hair "
+        "colors, glasses, ages, and poses, but render them as soft illustrated "
+        f"characters, not a photorealistic copy. {family_count_guidance}Use warm natural light, soft pastel colors, "
         "and a subtle background inspired by these confirmed tourist landmarks: "
         f"{landmarks}. "
         "Vertical cover composition, generous clean space for title text added later. "

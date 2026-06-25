@@ -1,21 +1,21 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  CalendarDays,
   Loader2,
   Map as MapIcon,
   RefreshCcw,
-  SlidersHorizontal,
-  Sparkles,
 } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import {
   defaultSelectedLandmarksForMode,
+  buildDiscoverItineraryPayload,
+  categoryLabelForAttraction,
   discoverItinerary,
+  filterAttractionsByCategory,
   mergeDestinationSuggestions,
   mergeLandmarkSuggestions,
   mergeResolvedLandmarkLocations,
@@ -23,6 +23,7 @@ import {
   mapRecommendationToParsedData,
   missingSelectedMapLandmarks,
   parseLandmarks,
+  primaryAttractionCategory,
   splitLandmarksBySource,
   splitQuickSuggestionLandmarks,
 } from '@/utils/minerva-api.js';
@@ -30,27 +31,11 @@ import LandmarkCard from './LandmarkCard.jsx';
 import DestinationGroup from './DestinationGroup.jsx';
 import MapOverviewModal from './MapOverviewModal.jsx';
 
-const interestOptions = [
-  { label: 'Parques', value: 'parques' },
-  { label: 'Museus', value: 'museus' },
-  { label: 'Arte', value: 'arte' },
-  { label: 'Animais', value: 'animais' },
-  { label: 'Comida', value: 'comida' },
-  { label: 'Historia', value: 'historia' },
-  { label: 'Lojas', value: 'lojas' },
-  { label: 'Rio', value: 'rio' },
-  { label: 'Vistas', value: 'vistas' },
-];
-
-const paceOptions = [
-  { label: 'Leve', value: 'light' },
-  { label: 'Equilibrado', value: 'balanced' },
-  { label: 'Completo', value: 'full' },
-];
-
 const Step4Attractions = () => {
   const {
     destination,
+    destinationsList,
+    childrenList,
     parsedData,
     setParsedData,
     selectedLandmarks,
@@ -59,7 +44,6 @@ const Step4Attractions = () => {
     recommendedItinerary,
     setRecommendedItinerary,
     itineraryPreferences,
-    setItineraryPreferences,
     isLoadingLandmarks,
     setIsLoadingLandmarks,
     hasSearchedLandmarks,
@@ -71,7 +55,6 @@ const Step4Attractions = () => {
   const [error, setError] = useState(null);
   const [loadingMode, setLoadingMode] = useState('quick');
   const [resultMode, setResultMode] = useState('quick');
-  const [showPreferenceSetup, setShowPreferenceSetup] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isMapExploringMore, setIsMapExploringMore] = useState(false);
   const [mapExploreError, setMapExploreError] = useState('');
@@ -79,20 +62,8 @@ const Step4Attractions = () => {
   const [isResolvingMapLocations, setIsResolvingMapLocations] = useState(false);
   const [mapLocationError, setMapLocationError] = useState('');
   const [mapLocationNotice, setMapLocationNotice] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
   const autoLoadedDestinationRef = useRef('');
-
-  const updatePreference = (key, value) => {
-    setItineraryPreferences((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const toggleInterest = (interest) => {
-    setItineraryPreferences((prev) => ({
-      ...prev,
-      interests: prev.interests.includes(interest)
-        ? prev.interests.filter((item) => item !== interest)
-        : [...prev.interests, interest],
-    }));
-  };
 
   const applyParsedResult = useCallback((mapped, mode, itinerary = null) => {
     setParsedData({
@@ -156,18 +127,15 @@ const Step4Attractions = () => {
     setError(null);
 
     try {
-      const itinerary = await discoverItinerary({
+      const itinerary = await discoverItinerary(buildDiscoverItineraryPayload({
         destination,
-        days: itineraryPreferences.days,
-        interests: itineraryPreferences.interests,
-        pace: itineraryPreferences.pace,
-        children_ages: [],
-        must_see: [],
-      });
+        destinationsList,
+        itineraryPreferences,
+        childrenList,
+      }));
       const mapped = mapRecommendationToParsedData(itinerary, null);
 
       applyParsedResult(mapped, mode, itinerary);
-      setShowPreferenceSetup(false);
     } catch (err) {
       if (allowManualFallback) {
         try {
@@ -187,6 +155,8 @@ const Step4Attractions = () => {
   }, [
     applyParsedResult,
     destination,
+    destinationsList,
+    childrenList,
     itineraryPreferences.days,
     itineraryPreferences.interests,
     itineraryPreferences.pace,
@@ -206,27 +176,34 @@ const Step4Attractions = () => {
         ...new Set([
           ...itineraryPreferences.interests,
           'parques',
+          'pracas',
+          'teatros',
           'museus',
           'arte',
+          'ar livre',
+          'lojas locais',
+          'familia',
           'historia',
           'comida',
           'animais',
           'rio',
-          'vistas',
           'education',
-          'family',
-          'science',
-          'play',
         ]),
       ].slice(0, 12);
 
-      const itinerary = await discoverItinerary({
+      const payload = buildDiscoverItineraryPayload({
         destination,
-        days: Math.max(Number(itineraryPreferences.days) || 1, 3),
-        interests: broaderInterests,
-        pace: 'full',
-        children_ages: [],
-        must_see: [],
+        destinationsList,
+        itineraryPreferences: {
+          ...itineraryPreferences,
+          interests: broaderInterests,
+          pace: 'full',
+        },
+        childrenList,
+      });
+      const itinerary = await discoverItinerary({
+        ...payload,
+        days: Math.max(Number(payload.days) || 1, 3),
       });
       const mapped = mapRecommendationToParsedData(itinerary, null);
       const existingIds = new Set(parsedData.landmarks.map((landmark) => landmark.id));
@@ -252,6 +229,8 @@ const Step4Attractions = () => {
     }
   }, [
     destination,
+    destinationsList,
+    childrenList,
     isMapExploringMore,
     itineraryPreferences.days,
     itineraryPreferences.interests,
@@ -309,7 +288,6 @@ const Step4Attractions = () => {
       hasSearchedLandmarks ||
       isLoadingLandmarks ||
       error ||
-      showPreferenceSetup ||
       autoLoadedDestinationRef.current === trimmedDestination
     ) {
       return;
@@ -323,7 +301,6 @@ const Step4Attractions = () => {
     hasSearchedLandmarks,
     isLoadingLandmarks,
     processAttractions,
-    showPreferenceSetup,
   ]);
 
   const selectedCount = selectedLandmarks.length;
@@ -335,127 +312,66 @@ const Step4Attractions = () => {
   const quickSections = splitLandmarksBySource(parsedData.landmarks);
   const itinerarySections = splitQuickSuggestionLandmarks(parsedData.landmarks);
   const alternatives = itinerarySections.alternatives;
+  const categoryFilters = useMemo(() => {
+    const categories = parsedData.landmarks
+      .map((landmark) => primaryAttractionCategory(landmark))
+      .filter(Boolean);
+    return [...new Set(categories)];
+  }, [parsedData.landmarks]);
 
-  const renderPreferenceSetup = () => (
-    <motion.div
-      key="setup"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-4xl mx-auto space-y-8"
-    >
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
-          <Sparkles className="w-8 h-8" />
-        </div>
-        <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
-          Como voce quer montar o roteiro?
-        </h2>
-        <p className="text-lg text-muted-foreground font-medium max-w-2xl mx-auto">
-          {destination}
-        </p>
-      </div>
+  useEffect(() => {
+    if (activeCategory !== 'all' && !categoryFilters.includes(activeCategory)) {
+      setActiveCategory('all');
+    }
+  }, [activeCategory, categoryFilters]);
 
-      <div className="bg-card dark:bg-slate-800 rounded-[32px] p-6 md:p-8 border border-border/60 shadow-sm space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-[0.8fr_1.2fr] gap-6">
-          <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
-              <CalendarDays className="w-4 h-4" /> Dias
-            </label>
-            <div className="flex items-center gap-3 flex-wrap">
-              {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-                <button
-                  type="button"
-                  key={day}
-                  onClick={() => updatePreference('days', day)}
-                  className={`h-11 w-11 rounded-full font-bold transition-all ${
-                    itineraryPreferences.days === day
-                      ? 'bg-primary text-white shadow-md'
-                      : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-                  }`}
-                >
-                  {day}
-                </button>
-              ))}
-            </div>
-          </div>
+  const renderCategoryFilters = () => {
+    if (categoryFilters.length <= 1) {
+      return null;
+    }
 
-          <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4" /> Ritmo
-            </label>
-            <div className="flex flex-wrap gap-3">
-              {paceOptions.map((option) => (
-                <button
-                  type="button"
-                  key={option.value}
-                  onClick={() => updatePreference('pace', option.value)}
-                  className={`rounded-full px-5 py-3 font-bold transition-all ${
-                    itineraryPreferences.pace === option.value
-                      ? 'bg-secondary text-white shadow-md'
-                      : 'bg-muted text-muted-foreground hover:bg-secondary/10 hover:text-secondary'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+    const categoryCount = (category) =>
+      filterAttractionsByCategory(parsedData.landmarks, category).length;
 
-        <div className="space-y-3">
-          <label className="text-sm font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            Programas que combinam
-          </label>
-          <div className="flex flex-wrap gap-3">
-            {interestOptions.map((interest) => {
-              const selected = itineraryPreferences.interests.includes(interest.value);
-              return (
-                <button
-                  type="button"
-                  key={interest.value}
-                  onClick={() => toggleInterest(interest.value)}
-                  className={`rounded-full px-5 py-3 font-bold transition-all ${
-                    selected
-                      ? 'bg-primary text-white shadow-md'
-                      : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-                  }`}
-                >
-                  {interest.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr] gap-4 pt-2">
-          <Button onClick={goBack} variant="outline" className="rounded-full px-6 py-6 text-base sm:px-8 sm:text-lg">
-            <ArrowLeft className="w-5 h-5 mr-2" /> Editar destino
-          </Button>
-          {parsedData.landmarks.length > 0 && (
-            <Button
-              onClick={() => setShowPreferenceSetup(false)}
-              variant="outline"
-              className="rounded-full px-6 py-6 text-base font-bold sm:px-8 sm:text-lg"
-            >
-              Voltar aos cards
-            </Button>
-          )}
-          <Button
-            onClick={() => processAttractions({ mode: 'itinerary' })}
-            className="flex-1 rounded-full bg-primary px-6 py-6 text-base font-bold text-white hover:bg-primary/90 sm:px-8 sm:text-lg"
+    return (
+      <div className="flex flex-wrap justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveCategory('all')}
+          className={`rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
+            activeCategory === 'all'
+              ? 'border-primary bg-primary text-white'
+              : 'border-border bg-card text-muted-foreground hover:border-primary/60 hover:text-primary'
+          }`}
+        >
+          Todas ({parsedData.landmarks.length})
+        </button>
+        {categoryFilters.map((category) => (
+          <button
+            key={category}
+            type="button"
+            onClick={() => setActiveCategory(category)}
+            className={`rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
+              activeCategory === category
+                ? 'border-secondary bg-secondary text-white'
+                : 'border-border bg-card text-muted-foreground hover:border-secondary/60 hover:text-secondary'
+            }`}
           >
-            Atualizar sugestao <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
-        </div>
+            {categoryLabelForAttraction(category)} ({categoryCount(category)})
+          </button>
+        ))}
       </div>
-    </motion.div>
-  );
+    );
+  };
 
   const renderItineraryDays = () => (
     <div className="space-y-10">
       {recommendedItinerary.days.map((day) => {
-        const dayLandmarks = parsedData.landmarks.filter(
-          (landmark) => !landmark.is_alternative && landmark.itinerary_day === day.day
+        const dayLandmarks = filterAttractionsByCategory(
+          parsedData.landmarks.filter(
+            (landmark) => !landmark.is_alternative && landmark.itinerary_day === day.day
+          ),
+          activeCategory
         );
 
         if (dayLandmarks.length === 0) return null;
@@ -506,7 +422,7 @@ const Step4Attractions = () => {
             </h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {alternatives.slice(0, 6).map((landmark, lIdx) => (
+            {filterAttractionsByCategory(alternatives, activeCategory).slice(0, 12).map((landmark, lIdx) => (
               <LandmarkCard
                 key={landmark.id}
                 landmark={landmark}
@@ -524,7 +440,7 @@ const Step4Attractions = () => {
 
   const renderQuickSuggestionCards = () => (
     <div className="space-y-12">
-      {quickSections.mentioned.length > 0 && (
+      {filterAttractionsByCategory(quickSections.mentioned, activeCategory).length > 0 && (
         <section className="space-y-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -536,12 +452,13 @@ const Step4Attractions = () => {
               </h3>
             </div>
             <div className="rounded-full bg-muted px-4 py-2 text-sm font-bold text-muted-foreground w-fit">
-              {quickSections.mentioned.filter((landmark) => selectedLandmarks.includes(landmark.id)).length} selecionados
+              {filterAttractionsByCategory(quickSections.mentioned, activeCategory)
+                .filter((landmark) => selectedLandmarks.includes(landmark.id)).length} selecionados
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {quickSections.mentioned.map((landmark, lIdx) => (
+            {filterAttractionsByCategory(quickSections.mentioned, activeCategory).map((landmark, lIdx) => (
               <LandmarkCard
                 key={landmark.id}
                 landmark={landmark}
@@ -555,7 +472,7 @@ const Step4Attractions = () => {
         </section>
       )}
 
-      {quickSections.suggested.length > 0 && (
+      {filterAttractionsByCategory(quickSections.suggested, activeCategory).length > 0 && (
         <section className="pt-6 space-y-5 border-t border-border/60">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
@@ -566,7 +483,7 @@ const Step4Attractions = () => {
             </h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {quickSections.suggested.slice(0, 12).map((landmark, lIdx) => (
+            {filterAttractionsByCategory(quickSections.suggested, activeCategory).slice(0, 12).map((landmark, lIdx) => (
               <LandmarkCard
                 key={landmark.id}
                 landmark={landmark}
@@ -585,7 +502,10 @@ const Step4Attractions = () => {
   const renderManualGroups = () => (
     <div className="space-y-16">
       {parsedData.destinations.map((dest, dIdx) => {
-        const destLandmarks = parsedData.landmarks.filter((landmark) => landmark.destination_id === dest.id);
+        const destLandmarks = filterAttractionsByCategory(
+          parsedData.landmarks.filter((landmark) => landmark.destination_id === dest.id),
+          activeCategory
+        );
 
         if (destLandmarks.length === 0) return null;
 
@@ -606,14 +526,6 @@ const Step4Attractions = () => {
       })}
     </div>
   );
-
-  if (showPreferenceSetup && !isLoadingLandmarks && !error) {
-    return (
-      <div className="w-full max-w-5xl mx-auto flex flex-col min-h-[60vh] py-4">
-        {renderPreferenceSetup()}
-      </div>
-    );
-  }
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col min-h-[60vh] py-4">
@@ -726,6 +638,7 @@ const Step4Attractions = () => {
                     ? 'Organizamos os pontos que voce ja citou. Selecione os locais que farao parte do guia da sua familia.'
                     : 'Inclui pontos que voce citou e sugestoes baseadas no seu texto. Selecione o que entra no guia.'}
               </p>
+              {renderCategoryFilters()}
               <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
                 <Button onClick={goBack} variant="outline" className="rounded-full px-6 py-3">
                   Editar destino
@@ -747,11 +660,11 @@ const Step4Attractions = () => {
                 <Button
                   onClick={() => {
                     setError(null);
-                    setShowPreferenceSetup(true);
+                    processAttractions({ mode: 'itinerary' });
                   }}
                   className="rounded-full px-6 py-3 bg-secondary hover:bg-secondary/90 text-white"
                 >
-                  Sugerir roteiro com dias e categorias
+                  Atualizar sugestões
                 </Button>
               </div>
               {selectedCount > 0 && (

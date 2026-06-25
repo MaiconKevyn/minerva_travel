@@ -10,13 +10,27 @@ def test_guide_request_builds_display_names():
     request = GuideRequest(
         title="Pequenos Exploradores pela Europa",
         children_names=["Alice", "Antonio"],
+        children_ages=[5, 9],
         parents_names=["Ana", "Otavio"],
         year=2026,
         selected_landmarks=["paris:eiffel-tower", "london:big-ben"],
     )
 
     assert request.children_display == "Alice e Antonio"
+    assert request.children_ages == [5, 9]
     assert request.parents_display == "mamae Ana e papai Otavio"
+
+
+def test_guide_request_allows_name_only_child_compatibility():
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower"],
+    )
+
+    assert request.children_ages == []
 
 
 def test_guide_request_requires_at_least_one_landmark():

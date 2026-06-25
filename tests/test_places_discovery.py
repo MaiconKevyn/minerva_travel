@@ -1,8 +1,239 @@
+import json
+
 import httpx
 
 from minerva_travel.custom_landmarks import build_custom_destinations, parse_custom_landmarks
 from minerva_travel.models import DynamicItineraryRequest
 from minerva_travel.place_discovery import discover_dynamic_itinerary, resolve_landmark_locations
+
+
+def test_discover_dynamic_itinerary_normalizes_options_with_category_and_identity():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Paris", "Franca", 48.8566, 2.3522)
+        if "places:searchText" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "places": [
+                        _place("museum-central", "Museu Central", ["museum"]),
+                    ]
+                },
+            )
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(
+                destination="Paris",
+                days=1,
+                interests=["museus"],
+                pace="light",
+                children_ages=[6],
+            ),
+            api_key="test-key",
+            client=client,
+        )
+
+    visible_options = [
+        *[stop for day in recommendation["days"] for stop in day["stops"]],
+        *recommendation["alternatives"],
+    ]
+
+    assert visible_options
+    option = visible_options[0]
+    assert option["destination_id"] == "google-paris"
+    assert option["name"] == "Museu Central"
+    assert option["category"] == "museums"
+    assert "museums" in option["categories"]
+    assert option["selection_id"] == "google:museum-central"
+    assert option["landmark_id"] == "museu-central"
+    assert "Boa opcao para criancas menores." in option["match_reasons"]
+
+
+def test_discover_dynamic_itinerary_returns_broader_family_categories_when_available():
+    requested_queries: list[str] = []
+
+    places_by_token = [
+        ("parque", _place("park", "Parque Botanico", ["park"])),
+        ("praca", _place("square", "Praca Central", ["tourist_attraction"])),
+        ("teatro", _place("theater", "Teatro Infantil", ["performing_arts_theater"])),
+        ("museu", _place("museum", "Museu das Criancas", ["museum"])),
+        ("arte", _place("art", "Galeria de Arte Kids", ["art_gallery"])),
+        ("ar livre", _place("outdoor", "Circuito ao Ar Livre", ["tourist_attraction"])),
+        ("lojas locais", _place("local-store", "Loja Local de Brinquedos", ["market"])),
+        ("familia", _place("family", "Programa em Familia", ["tourist_attraction"])),
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Porto", "Portugal", 41.1579, -8.6291)
+        if "places:searchText" in url:
+            payload = json.loads(request.read().decode())
+            query = payload["textQuery"]
+            requested_queries.append(query)
+            normalized_query = _ascii(query)
+            places = [
+                place
+                for token, place in places_by_token
+                if token in normalized_query
+            ]
+            return httpx.Response(200, json={"places": places})
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(
+                destination="Porto",
+                days=2,
+                interests=[],
+                pace="full",
+                children_ages=[4, 9],
+            ),
+            api_key="test-key",
+            client=client,
+        )
+
+    visible_options = [
+        *[stop for day in recommendation["days"] for stop in day["stops"]],
+        *recommendation["alternatives"],
+    ]
+    categories = {stop["category"] for stop in visible_options}
+
+    assert {
+        "parks",
+        "squares",
+        "theaters",
+        "museums",
+        "art",
+        "outdoor",
+        "local_stores",
+        "family",
+    }.issubset(categories)
+    assert any("teatro" in _ascii(query) for query in requested_queries)
+    assert any("lojas locais" in _ascii(query) for query in requested_queries)
+
+
+def test_discover_dynamic_itinerary_supplements_generic_intent_with_default_categories():
+    places_by_token = [
+        ("parque", _place("park", "Parque Botanico", ["park"])),
+        ("praca", _place("square", "Praca Central", ["tourist_attraction"])),
+        ("teatro", _place("theater", "Teatro Infantil", ["performing_arts_theater"])),
+        ("museu", _place("museum", "Museu das Criancas", ["museum"])),
+        ("arte", _place("art", "Galeria de Arte Kids", ["art_gallery"])),
+        ("ar livre", _place("outdoor", "Circuito ao Ar Livre", ["tourist_attraction"])),
+        ("lojas locais", _place("local-store", "Loja Local de Brinquedos", ["market"])),
+        ("familia", _place("family", "Programa em Familia", ["tourist_attraction"])),
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Porto", "Portugal", 41.1579, -8.6291)
+        if "places:searchText" in url:
+            payload = json.loads(request.read().decode())
+            normalized_query = _ascii(payload["textQuery"])
+            return httpx.Response(
+                200,
+                json={
+                    "places": [
+                        place
+                        for token, place in places_by_token
+                        if token in normalized_query
+                    ]
+                },
+            )
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(
+                destination="Porto",
+                days=2,
+                pace="full",
+                children_ages=[4, 9],
+            ),
+            api_key="test-key",
+            openai_api_key="test-openai-key",
+            client=client,
+            intent_responder=lambda **_: {
+                "output_text": (
+                    "{"
+                    '"destination":"Porto, Portugal",'
+                    '"must_see_places":[],'
+                    '"discovery_requests":['
+                    '{"kind":"general","query":"viajar com a familia",'
+                    '"topic":"viajar com a familia","near":"","meal":"",'
+                    '"audience":"children"}'
+                    "],"
+                    '"inferred_interests":[]'
+                    "}"
+                )
+            },
+        )
+
+    visible_options = [
+        *[stop for day in recommendation["days"] for stop in day["stops"]],
+        *recommendation["alternatives"],
+    ]
+
+    assert {
+        "parks",
+        "squares",
+        "theaters",
+        "museums",
+        "art",
+        "outdoor",
+        "local_stores",
+        "family",
+    }.issubset({stop["category"] for stop in visible_options})
+
+
+def test_discover_dynamic_itinerary_exposes_minimum_unique_options_when_available():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "maps/api/geocode/json" in url:
+            return _geocode_response("Lisboa", "Portugal", 38.7223, -9.1393)
+        if "places:searchText" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "places": [
+                        _place(f"place-{idx}", f"Local {idx}", ["tourist_attraction"])
+                        for idx in range(1, 15)
+                    ]
+                },
+            )
+        raise AssertionError(f"Unexpected request: {url}")
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        recommendation = discover_dynamic_itinerary(
+            DynamicItineraryRequest(destination="Lisboa", days=1, pace="light"),
+            api_key="test-key",
+            client=client,
+        )
+
+    visible_ids = [
+        *[
+            stop["selection_id"]
+            for day in recommendation["days"]
+            for stop in day["stops"]
+        ],
+        *[stop["selection_id"] for stop in recommendation["alternatives"]],
+    ]
+
+    assert len(visible_ids) >= 12
+    assert len(visible_ids) == len(set(visible_ids))
 
 
 def test_discover_dynamic_itinerary_uses_natural_language_intent_for_child_requests():
@@ -619,6 +850,14 @@ def _place(
         "photos": photos or [],
         "googleMapsUri": f"https://maps.google.com/?cid={place_id}",
     }
+
+
+def _ascii(value: str) -> str:
+    return (
+        value.encode("ascii", errors="ignore")
+        .decode()
+        .casefold()
+    )
 
 
 def _geocode_response(city: str, country: str, lat: float, lng: float) -> httpx.Response:
