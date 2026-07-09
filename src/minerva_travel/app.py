@@ -94,6 +94,15 @@ class LandmarkParseRequest(BaseModel):
     message: str
 
 
+class KnownDestinationInput(BaseModel):
+    place: str
+    landmarks: list[str]
+
+
+class StructuredLandmarksResolveRequest(BaseModel):
+    destinations: list[KnownDestinationInput]
+
+
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
     catalog = load_catalog()
@@ -196,6 +205,65 @@ def resolve_custom_landmarks(payload: CustomLandmarksResolveRequest) -> dict[str
     }
 
 
+@app.post("/api/landmarks/resolve-structured")
+def resolve_structured_landmarks(payload: StructuredLandmarksResolveRequest) -> dict[str, object]:
+    custom_inputs: list[CustomLandmarkInput] = []
+    for destination in payload.destinations:
+        city, country = _split_destination_place(destination.place)
+        for landmark_name in destination.landmarks:
+            cleaned_name = landmark_name.strip()
+            if not cleaned_name:
+                continue
+            custom_inputs.append(
+                CustomLandmarkInput(name=cleaned_name, city=city, country=country)
+            )
+    if not custom_inputs:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe pelo menos um ponto turistico por destino.",
+        )
+
+    custom_destinations, selected_landmarks = build_custom_destinations(custom_inputs)
+    location_metadata = {}
+    api_key = google_maps_api_key()
+    if api_key:
+        location_metadata = resolve_landmark_locations(
+            custom_destinations,
+            api_key=api_key,
+            include_photos=True,
+        )
+    return {
+        "custom_landmarks": json.dumps(
+            [
+                {
+                    "name": landmark.name,
+                    "city": landmark.city,
+                    "country": landmark.country,
+                    "description": landmark.description,
+                }
+                for landmark in custom_inputs
+            ],
+            ensure_ascii=False,
+        ),
+        "selected_landmarks": selected_landmarks,
+        "destinations": serialize_preview_destinations(
+            custom_destinations,
+            [],
+            {},
+            location_metadata,
+        ),
+    }
+
+
+def _split_destination_place(place: str) -> tuple[str, str]:
+    parts = [part.strip() for part in place.replace(";", ",").split(",") if part.strip()]
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], ", ".join(parts[1:])
+
+
 @app.post("/api/landmarks/parse")
 def parse_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
     try:
@@ -224,7 +292,11 @@ def parse_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
     location_metadata = {}
     api_key = google_maps_api_key()
     if api_key:
-        location_metadata = resolve_landmark_locations(custom_destinations, api_key=api_key)
+        location_metadata = resolve_landmark_locations(
+            custom_destinations,
+            api_key=api_key,
+            include_photos=True,
+        )
     return {
         "custom_landmarks": json.dumps(
             [
@@ -982,6 +1054,7 @@ def serialize_preview_destinations(
     location_metadata: dict[str, dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
     locations = location_metadata or {}
+    default_confidence = 1.0 if not parsed_landmarks else 0
     confidence_by_name = {
         (item["name"] if isinstance(item, dict) else item.name): (
             item["confidence"] if isinstance(item, dict) else item.confidence
@@ -1001,8 +1074,16 @@ def serialize_preview_destinations(
                     "name": landmark.name,
                     "description": landmark.description,
                     "representative_query": landmark.representative_query,
-                    "confidence": confidence_by_name.get(landmark.name, 0),
-                    "image": serialize_preview_image(images.get(f"{destination.id}:{landmark.id}")),
+                    "confidence": confidence_by_name.get(landmark.name, default_confidence),
+                    "image": (
+                        serialize_preview_image(images.get(f"{destination.id}:{landmark.id}"))
+                        or _location_preview_image(
+                            locations.get(f"{destination.id}:{landmark.id}")
+                        )
+                    ),
+                    "image_attributions": _location_image_attributions(
+                        locations.get(f"{destination.id}:{landmark.id}"),
+                    ),
                     **_preview_location_metadata(
                         locations.get(f"{destination.id}:{landmark.id}"),
                     ),
@@ -1012,6 +1093,26 @@ def serialize_preview_destinations(
         }
         for destination in destinations
     ]
+
+
+def _location_preview_image(location: dict[str, object] | None) -> dict[str, str] | None:
+    image_url = str((location or {}).get("image_url") or "")
+    if not image_url:
+        return None
+    return {
+        "image_url": image_url,
+        "source_url": "",
+        "author": "",
+        "license_short_name": "",
+        "license_url": "",
+    }
+
+
+def _location_image_attributions(location: dict[str, object] | None) -> list[dict[str, str]]:
+    attributions = (location or {}).get("image_attributions")
+    if not isinstance(attributions, list):
+        return []
+    return [attribution for attribution in attributions if isinstance(attribution, dict)]
 
 
 def _preview_location_metadata(location: dict[str, object] | None) -> dict[str, object]:

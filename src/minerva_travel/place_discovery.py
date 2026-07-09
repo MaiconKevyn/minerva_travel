@@ -358,6 +358,7 @@ def resolve_landmark_locations(
     *,
     api_key: str | None,
     client: httpx.Client | None = None,
+    include_photos: bool = False,
 ) -> dict[str, dict[str, Any]]:
     if not api_key or not destinations:
         return {}
@@ -366,16 +367,44 @@ def resolve_landmark_locations(
     http_client = client or httpx.Client(timeout=20)
     try:
         resolved: dict[str, dict[str, Any]] = {}
+        photo_uri_cache: dict[str, str | None] = {}
         for destination in destinations:
             for landmark in destination.landmarks:
                 selection_id = f"{destination.id}:{landmark.id}"
                 place = _resolve_landmark_place(http_client, api_key, destination, landmark.name)
-                if place:
-                    resolved[selection_id] = _location_metadata(place)
+                if not place:
+                    continue
+                metadata = _location_metadata(place)
+                if include_photos:
+                    metadata.update(
+                        _location_photo_metadata(http_client, api_key, place, photo_uri_cache)
+                    )
+                resolved[selection_id] = metadata
         return resolved
     finally:
         if owns_client:
             http_client.close()
+
+
+def _location_photo_metadata(
+    client: httpx.Client,
+    api_key: str,
+    place: dict[str, Any],
+    photo_uri_cache: dict[str, str | None],
+) -> dict[str, Any]:
+    photo = _first_place_photo(place)
+    photo_name = str(photo.get("name") or "")
+    if not photo_name:
+        return {}
+    if photo_name not in photo_uri_cache:
+        photo_uri_cache[photo_name] = _fetch_place_photo_uri(client, api_key, photo_name)
+    photo_uri = photo_uri_cache[photo_name]
+    if not photo_uri:
+        return {}
+    return {
+        "image_url": photo_uri,
+        "image_attributions": _photo_attributions(photo),
+    }
 
 
 def _resolve_landmark_place(

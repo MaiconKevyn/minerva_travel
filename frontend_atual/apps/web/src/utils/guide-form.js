@@ -3,12 +3,18 @@ export const createGuideDestination = (index = 0) => ({
   place: '',
   timing: '',
   days: 1,
+  landmarks: [''],
 });
 
 const normalizePositiveInteger = (value) => {
   const number = Number.parseInt(value, 10);
   return Number.isFinite(number) && number > 0 ? number : 0;
 };
+
+export const normalizeDestinationLandmarks = (landmarks = []) =>
+  landmarks
+    .map((landmark) => String(landmark || '').trim())
+    .filter(Boolean);
 
 export const normalizeFamilyMemberCount = (value) => {
   const count = normalizePositiveInteger(value);
@@ -21,6 +27,7 @@ export const normalizeGuideDestinations = (destinations = []) =>
     place: String(destination.place || '').trim(),
     timing: String(destination.timing || '').trim(),
     days: normalizePositiveInteger(destination.days),
+    landmarks: normalizeDestinationLandmarks(destination.landmarks),
   }));
 
 export const normalizeRouteSuggestionDestinations = (destinations = []) =>
@@ -43,6 +50,14 @@ export const validGuideDestinations = (destinations = []) => {
   );
 };
 
+export const validKnownGuideDestinations = (destinations = []) => {
+  const normalized = normalizeGuideDestinations(destinations);
+  return (
+    validGuideDestinations(normalized) &&
+    normalized.every((destination) => destination.landmarks.length > 0)
+  );
+};
+
 export const totalTripDays = (destinations = []) =>
   normalizeGuideDestinations(destinations).reduce(
     (total, destination) => total + Math.max(destination.days, 0),
@@ -54,7 +69,10 @@ export const serializeGuideDestinations = (destinations = []) =>
     .filter((destination) => destination.place || destination.timing || destination.days > 0)
     .map((destination, index) => {
       const dayLabel = destination.days === 1 ? '1 dia' : `${destination.days} dias`;
-      return `Destino ${index + 1}: ${destination.place}; quando: ${destination.timing}; duração: ${dayLabel}.`;
+      const landmarkSuffix = destination.landmarks.length > 0
+        ? ` pontos turísticos: ${destination.landmarks.join(', ')}.`
+        : '';
+      return `Destino ${index + 1}: ${destination.place}; quando: ${destination.timing}; duração: ${dayLabel}.${landmarkSuffix}`;
     })
     .join('\n');
 

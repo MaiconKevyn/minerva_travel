@@ -14,7 +14,10 @@ import Step5Review from '@/components/Step5Review.jsx';
 import { Button } from '@/components/ui/button';
 
 const CreateGuidePageContent = () => {
-  const { currentStep, goBack } = useConversationalGuide();
+  const { currentStep, goBack, itineraryMode } = useConversationalGuide();
+  // No modo "Ja sei o roteiro" a etapa de preferencias (2) e pulada.
+  const visibleSteps = itineraryMode === 'known' ? [1, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6];
+  const currentStepPosition = Math.max(visibleSteps.indexOf(currentStep), 0);
 
   const renderStep = () => {
     switch (currentStep) {
@@ -57,7 +60,7 @@ const CreateGuidePageContent = () => {
 
             <div className="flex-1 max-w-xs mx-auto text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                {[1, 2, 3, 4, 5, 6].map((s) => (
+                {visibleSteps.map((s) => (
                   <div
                     key={s}
                     className={`h-2 rounded-full transition-all duration-500 ${
@@ -67,7 +70,7 @@ const CreateGuidePageContent = () => {
                 ))}
               </div>
               <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-                Passo {currentStep} de 6
+                Passo {currentStepPosition + 1} de {visibleSteps.length}
               </p>
             </div>
 

@@ -50,12 +50,16 @@ export const ConversationalGuideProvider = ({ children }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // No modo "Ja sei o roteiro" a etapa de preferencias (2) e pulada: o usuario
+  // ja informou os pontos turisticos e vai direto para a confirmacao com fotos.
   const nextStep = () => {
-    setStep(Math.min(currentStep + 1, 6));
+    const skipPreferences = itineraryMode === 'known' && currentStep === 1;
+    setStep(Math.min(skipPreferences ? 3 : currentStep + 1, 6));
   };
 
   const goBack = () => {
-    setStep(Math.max(currentStep - 1, 1));
+    const skipPreferences = itineraryMode === 'known' && currentStep === 3;
+    setStep(Math.max(skipPreferences ? 1 : currentStep - 1, 1));
   };
 
   const updateFamilyName = (name) => setFamilyName(name);
