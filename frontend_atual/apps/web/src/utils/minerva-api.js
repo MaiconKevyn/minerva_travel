@@ -524,6 +524,8 @@ export const appendGuideMetadata = (formData, guideData = {}) => {
   }
 };
 
+const stripDestinationLandmarks = ({ landmarks: _landmarks, ...destination }) => destination;
+
 export const buildDiscoverItineraryPayload = ({
   destination = '',
   destinationsList = [],
@@ -544,7 +546,7 @@ export const buildDiscoverItineraryPayload = ({
     pace: itineraryPreferences.pace || 'balanced',
     children_ages: deriveChildAges(childrenList),
     must_see: [],
-    structured_destinations: structuredDestinations,
+    structured_destinations: structuredDestinations.map(stripDestinationLandmarks),
   };
 };
 
@@ -566,7 +568,7 @@ export const buildRouteSuggestionPayload = ({
     pace: itineraryPreferences.pace || 'balanced',
     interests: itineraryPreferences.interests || [],
     children_ages: deriveChildAges(childrenList),
-    structured_destinations: structuredDestinations,
+    structured_destinations: structuredDestinations.map(stripDestinationLandmarks),
   };
 };
 
@@ -642,6 +644,47 @@ export const suggestItineraryRoutes = async (payload) => {
   }
 
   return response.json();
+};
+
+export const buildStructuredLandmarksPayload = ({ destinationsList = [] } = {}) => ({
+  destinations: normalizeGuideDestinations(destinationsList)
+    .filter((item) => item.place && item.landmarks.length > 0)
+    .map((item) => ({ place: item.place, landmarks: item.landmarks })),
+});
+
+export const resolveStructuredLandmarks = async (payload) => {
+  const baseUrl = apiBaseUrl();
+
+  try {
+    const response = await fetch(`${baseUrl}/api/landmarks/resolve-structured`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Erro do servidor: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return {
+      destinations: data.destinations || [],
+      landmarks: data.landmarks || [],
+      selected_landmarks: data.selected_landmarks || [],
+    };
+  } catch (error) {
+    console.error('Minerva API Error:', error);
+    throw new Error(
+      error.message.includes('Failed to fetch')
+        ? 'Erro de rede: Verifique sua conexão com a internet.'
+        : error.message || 'Não foi possível organizar os pontos turísticos informados.'
+    );
+  }
 };
 
 export const parseLandmarks = async (message) => {

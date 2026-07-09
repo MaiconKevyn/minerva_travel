@@ -261,8 +261,9 @@ def test_parse_landmarks_enriches_confirmed_places_with_map_location(monkeypatch
             }
         ]
 
-    def fake_resolve(destinations, api_key: str):
+    def fake_resolve(destinations, *, api_key: str, include_photos: bool = False):
         assert api_key == "test-google-key"
+        assert include_photos is True
         assert destinations[0].city == "Paris"
         return {
             "custom-paris:torre-eiffel": {
@@ -296,6 +297,88 @@ def test_parse_landmarks_enriches_confirmed_places_with_map_location(monkeypatch
     assert landmark["google_maps_uri"] == "https://maps.google.com/?cid=eiffel"
     assert landmark["formatted_address"] == "Champ de Mars, 5 Av. Anatole France, Paris"
     assert landmark["location_status"] == "resolved"
+
+
+def test_resolve_structured_landmarks_groups_by_destination_and_selects_all(monkeypatch):
+    def fake_resolve(destinations, *, api_key: str, include_photos: bool = False):
+        assert api_key == "test-google-key"
+        assert include_photos is True
+        assert destinations[0].city == "Paris"
+        return {
+            "custom-paris:torre-eiffel": {
+                "place_id": "eiffel",
+                "google_maps_uri": "https://maps.google.com/?cid=eiffel",
+                "formatted_address": "Champ de Mars, Paris",
+                "latitude": 48.8584,
+                "longitude": 2.2945,
+                "location_status": "resolved",
+                "image_url": "https://places.googleapis.com/photo/eiffel.jpg",
+                "image_attributions": [{"display_name": "Foto: Guia Local", "uri": ""}],
+            }
+        }
+
+    monkeypatch.setattr("minerva_travel.app.google_maps_api_key", lambda: "test-google-key")
+    monkeypatch.setattr("minerva_travel.app.resolve_landmark_locations", fake_resolve)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/landmarks/resolve-structured",
+        json={
+            "destinations": [
+                {"place": "Paris, França", "landmarks": ["Torre Eiffel", "Museu do Louvre"]},
+                {"place": "Roma", "landmarks": ["Coliseu"]},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["selected_landmarks"] == [
+        "custom-paris:torre-eiffel",
+        "custom-paris:museu-do-louvre",
+        "custom-roma:coliseu",
+    ]
+
+    paris, roma = payload["destinations"]
+    assert paris["city"] == "Paris"
+    assert paris["country"] == "França"
+    assert roma["city"] == "Roma"
+
+    eiffel, louvre = paris["landmarks"]
+    assert eiffel["confidence"] == 1.0
+    assert eiffel["latitude"] == 48.8584
+    assert eiffel["image"]["image_url"] == "https://places.googleapis.com/photo/eiffel.jpg"
+    assert eiffel["image_attributions"] == [{"display_name": "Foto: Guia Local", "uri": ""}]
+    assert louvre["image"] is None
+    assert louvre["location_status"] == "missing"
+
+
+def test_resolve_structured_landmarks_without_google_key_keeps_structure(monkeypatch):
+    monkeypatch.setattr("minerva_travel.app.google_maps_api_key", lambda: None)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/landmarks/resolve-structured",
+        json={"destinations": [{"place": "Lisboa, Portugal", "landmarks": ["Oceanário"]}]},
+    )
+
+    assert response.status_code == 200
+    landmark = response.json()["destinations"][0]["landmarks"][0]
+    assert landmark["name"] == "Oceanário"
+    assert landmark["location_status"] == "missing"
+    assert landmark["image"] is None
+
+
+def test_resolve_structured_landmarks_requires_at_least_one_landmark():
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/landmarks/resolve-structured",
+        json={"destinations": [{"place": "Paris, França", "landmarks": ["   "]}]},
+    )
+
+    assert response.status_code == 400
+    assert "pelo menos um ponto turistico" in response.json()["detail"]
 
 
 def test_sample_preview_renders_pdf_layout_html():

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import {
   defaultSelectedLandmarksForMode,
   buildDiscoverItineraryPayload,
+  buildStructuredLandmarksPayload,
   categoryLabelForAttraction,
   discoverItinerary,
   filterAttractionsByCategory,
@@ -24,6 +25,7 @@ import {
   missingSelectedMapLandmarks,
   parseLandmarks,
   primaryAttractionCategory,
+  resolveStructuredLandmarks,
   splitLandmarksBySource,
   splitQuickSuggestionLandmarks,
 } from '@/utils/minerva-api.js';
@@ -36,6 +38,7 @@ const Step4Attractions = () => {
     destination,
     destinationsList,
     childrenList,
+    itineraryMode: guideItineraryMode,
     parsedData,
     setParsedData,
     selectedLandmarks,
@@ -51,6 +54,8 @@ const Step4Attractions = () => {
     nextStep,
     goBack,
   } = useConversationalGuide();
+
+  const knownItineraryMode = guideItineraryMode === 'known';
 
   const [error, setError] = useState(null);
   const [loadingMode, setLoadingMode] = useState('quick');
@@ -113,6 +118,35 @@ const Step4Attractions = () => {
     applyParsedResult,
     destination,
     loadManualMappedLandmarks,
+    setIsLoadingLandmarks,
+  ]);
+
+  const processKnownItinerary = useCallback(async () => {
+    const payload = buildStructuredLandmarksPayload({ destinationsList });
+    if (payload.destinations.length === 0) return;
+
+    setLoadingMode('manual');
+    setIsLoadingLandmarks(true);
+    setError(null);
+
+    try {
+      const data = await resolveStructuredLandmarks(payload);
+      const mapped = mapParsedLandmarksToParsedData(data);
+
+      if (mapped.landmarks.length === 0) {
+        throw new Error('Nao conseguimos organizar os pontos turisticos informados.');
+      }
+
+      applyParsedResult(mapped, 'manual', null);
+    } catch (err) {
+      console.error('Error resolving structured landmarks:', err);
+      setError(err.message || 'Nao foi possivel organizar os pontos turisticos informados.');
+    } finally {
+      setIsLoadingLandmarks(false);
+    }
+  }, [
+    applyParsedResult,
+    destinationsList,
     setIsLoadingLandmarks,
   ]);
 
@@ -247,7 +281,11 @@ const Step4Attractions = () => {
     setMapLocationNotice('');
 
     try {
-      const mapped = await loadManualMappedLandmarks();
+      const mapped = knownItineraryMode
+        ? mapParsedLandmarksToParsedData(
+            await resolveStructuredLandmarks(buildStructuredLandmarksPayload({ destinationsList }))
+          )
+        : await loadManualMappedLandmarks();
       const mergedLandmarks = mergeResolvedLandmarkLocations(
         parsedData.landmarks,
         mapped.landmarks
@@ -273,7 +311,9 @@ const Step4Attractions = () => {
     }
   }, [
     destination,
+    destinationsList,
     isResolvingMapLocations,
+    knownItineraryMode,
     loadManualMappedLandmarks,
     parsedData.landmarks,
     selectedLandmarks,
@@ -294,13 +334,19 @@ const Step4Attractions = () => {
     }
 
     autoLoadedDestinationRef.current = trimmedDestination;
-    processAttractions({ mode: 'quick', allowManualFallback: true });
+    if (knownItineraryMode) {
+      processKnownItinerary();
+    } else {
+      processAttractions({ mode: 'quick', allowManualFallback: true });
+    }
   }, [
     destination,
     error,
     hasSearchedLandmarks,
     isLoadingLandmarks,
+    knownItineraryMode,
     processAttractions,
+    processKnownItinerary,
   ]);
 
   const selectedCount = selectedLandmarks.length;
@@ -586,7 +632,9 @@ const Step4Attractions = () => {
               </Button>
               <Button
                 onClick={() => {
-                  if (loadingMode === 'manual') {
+                  if (knownItineraryMode) {
+                    processKnownItinerary();
+                  } else if (loadingMode === 'manual') {
                     processManualAttractions();
                   } else {
                     processAttractions({
@@ -635,7 +683,9 @@ const Step4Attractions = () => {
                 {itineraryMode
                   ? recommendedItinerary.summary
                   : manualMode
-                    ? 'Organizamos os pontos que voce ja citou. Selecione os locais que farao parte do guia da sua familia.'
+                    ? knownItineraryMode
+                      ? 'Confira as fotos dos pontos que voce informou e veja o mapa da viagem. Desmarque o que nao entrar no guia.'
+                      : 'Organizamos os pontos que voce ja citou. Selecione os locais que farao parte do guia da sua familia.'
                     : 'Inclui pontos que voce citou e sugestoes baseadas no seu texto. Selecione o que entra no guia.'}
               </p>
               {renderCategoryFilters()}
@@ -657,15 +707,17 @@ const Step4Attractions = () => {
                   <MapIcon className="mr-2 h-4 w-4" />
                   Ver mapa da viagem
                 </Button>
-                <Button
-                  onClick={() => {
-                    setError(null);
-                    processAttractions({ mode: 'itinerary' });
-                  }}
-                  className="rounded-full px-6 py-3 bg-secondary hover:bg-secondary/90 text-white"
-                >
-                  Atualizar sugestões
-                </Button>
+                {!knownItineraryMode && (
+                  <Button
+                    onClick={() => {
+                      setError(null);
+                      processAttractions({ mode: 'itinerary' });
+                    }}
+                    className="rounded-full px-6 py-3 bg-secondary hover:bg-secondary/90 text-white"
+                  >
+                    Atualizar sugestões
+                  </Button>
+                )}
               </div>
               {selectedCount > 0 && (
                 <div className="mx-auto mt-5 max-w-2xl rounded-2xl border border-border/70 bg-card/80 px-4 py-3 text-left shadow-sm">
@@ -758,7 +810,7 @@ const Step4Attractions = () => {
         landmarks={parsedData.landmarks}
         selectedLandmarks={selectedLandmarks}
         onToggleLandmark={toggleLandmarkSelection}
-        onExploreMore={exploreMoreMapPlaces}
+        onExploreMore={knownItineraryMode ? undefined : exploreMoreMapPlaces}
         isExploringMore={isMapExploringMore}
         exploreError={mapExploreError}
         exploreNotice={mapExploreNotice}

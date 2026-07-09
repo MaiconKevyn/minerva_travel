@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowRight,
   CalendarDays,
+  Landmark,
   ListChecks,
   Loader2,
   MapPin,
@@ -10,6 +11,7 @@ import {
   Plus,
   Sparkles,
   Trash2,
+  X,
 } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -22,6 +24,7 @@ import {
   normalizeGuideDestinations,
   parseFreeformItineraryText,
   validGuideDestinations,
+  validKnownGuideDestinations,
 } from '@/utils/guide-form.js';
 import {
   buildRouteSuggestionPayload,
@@ -32,7 +35,7 @@ const itineraryModeOptions = [
   {
     id: 'known',
     label: 'Já sei o roteiro',
-    description: 'Adicionar cada destino com data e duração.',
+    description: 'Adicionar cada destino com os pontos turísticos que vão visitar.',
     icon: ListChecks,
   },
   {
@@ -98,6 +101,49 @@ const Step3Destination = () => {
     setError('');
   };
 
+  const landmarkBoxesFor = (destination) =>
+    destination.landmarks?.length ? destination.landmarks : [''];
+
+  const updateLandmarkField = (id, landmarkIndex, value) => {
+    setLocalDestinations((prev) =>
+      prev.map((destination) => {
+        if (destination.id !== id) return destination;
+        const landmarks = [...landmarkBoxesFor(destination)];
+        landmarks[landmarkIndex] = value;
+        return { ...destination, landmarks };
+      })
+    );
+    setError('');
+  };
+
+  const handleAddLandmark = (id) => {
+    setLocalDestinations((prev) =>
+      prev.map((destination) =>
+        destination.id === id
+          ? { ...destination, landmarks: [...landmarkBoxesFor(destination), ''] }
+          : destination
+      )
+    );
+    setError('');
+  };
+
+  const handleRemoveLandmark = (id, landmarkIndex) => {
+    setLocalDestinations((prev) =>
+      prev.map((destination) => {
+        if (destination.id !== id) return destination;
+        const landmarks = landmarkBoxesFor(destination);
+        if (landmarks.length === 1) {
+          return { ...destination, landmarks: [''] };
+        }
+        return {
+          ...destination,
+          landmarks: landmarks.filter((_, index) => index !== landmarkIndex),
+        };
+      })
+    );
+    setError('');
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
     const normalized = normalizeGuideDestinations(localDestinations);
@@ -112,6 +158,11 @@ const Step3Destination = () => {
 
     if (!validGuideDestinations(normalized)) {
       setError('Preencha o destino, quando a viagem acontece e por quantos dias em cada parada.');
+      return;
+    }
+
+    if (itineraryMode === 'known' && !validKnownGuideDestinations(normalized)) {
+      setError('Adicione pelo menos um ponto turístico em cada destino.');
       return;
     }
 
@@ -402,6 +453,57 @@ const Step3Destination = () => {
                 />
               </div>
             </div>
+
+            {itineraryMode === 'known' && (
+              <div className="mt-6 rounded-2xl border border-border/60 bg-background/60 p-4 sm:p-5">
+                <Label className="mb-3 flex items-center gap-2 font-bold">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Landmark className="h-4 w-4" />
+                  </span>
+                  Pontos turísticos {destination.place ? `em ${destination.place}` : 'deste destino'}
+                </Label>
+                <div className="space-y-3">
+                  {landmarkBoxesFor(destination).map((landmarkName, landmarkIndex) => (
+                    <div
+                      key={`${destination.id}-landmark-${landmarkIndex}`}
+                      className="flex items-center gap-3"
+                    >
+                      <Input
+                        value={landmarkName}
+                        onChange={(event) =>
+                          updateLandmarkField(destination.id, landmarkIndex, event.target.value)
+                        }
+                        placeholder={`Ex: ${landmarkIndex === 0 ? 'Torre Eiffel' : 'Museu do Louvre'}`}
+                        aria-label={`Ponto turístico ${landmarkIndex + 1} do destino ${index + 1}`}
+                        className="rounded-xl py-6 text-base"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveLandmark(destination.id, landmarkIndex)}
+                        disabled={
+                          landmarkBoxesFor(destination).length === 1 && !landmarkName.trim()
+                        }
+                        className="h-12 w-12 shrink-0 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
+                        aria-label="Remover ponto turístico"
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleAddLandmark(destination.id)}
+                  className="mt-4 w-full rounded-xl border-2 border-dashed py-5 font-bold text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5 hover:text-primary"
+                >
+                  <Plus className="mr-2 h-5 w-5" />
+                  Adicionar ponto turístico
+                </Button>
+              </div>
+            )}
           </div>
         ))}
 
@@ -433,7 +535,9 @@ const Step3Destination = () => {
 
         <div className="flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground">
           <CalendarDays className="h-4 w-4" />
-          O tempo de cada destino será usado para montar o ritmo do roteiro.
+          {itineraryMode === 'known'
+            ? 'Vamos buscar as fotos e o mapa dos pontos turísticos que você informar.'
+            : 'O tempo de cada destino será usado para montar o ritmo do roteiro.'}
         </div>
       </motion.form>
     </div>

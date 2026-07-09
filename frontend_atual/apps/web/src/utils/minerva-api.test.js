@@ -613,6 +613,28 @@ test('buildDiscoverItineraryPayload includes structured destinations preferences
   ]);
 });
 
+test('buildStructuredLandmarksPayload keeps only destinations with place and landmarks', () => {
+  const payload = minervaApi.buildStructuredLandmarksPayload({
+    destinationsList: [
+      {
+        id: 'paris',
+        place: 'Paris, França',
+        timing: 'Julho de 2026',
+        days: 3,
+        landmarks: [' Torre Eiffel ', '', 'Museu do Louvre'],
+      },
+      { id: 'sem-pontos', place: 'Londres', timing: 'depois', days: 2, landmarks: ['  '] },
+      { id: 'sem-lugar', place: '', timing: '', days: 1, landmarks: ['Coliseu'] },
+    ],
+  });
+
+  assert.deepEqual(payload, {
+    destinations: [
+      { place: 'Paris, França', landmarks: ['Torre Eiffel', 'Museu do Louvre'] },
+    ],
+  });
+});
+
 test('buildRouteSuggestionPayload sends freeform constraints and current structured destinations', () => {
   assert.equal(typeof minervaApi.buildRouteSuggestionPayload, 'function');
   const payload = minervaApi.buildRouteSuggestionPayload({

@@ -367,6 +367,57 @@ def test_resolve_landmark_locations_retries_until_google_places_returns_coordina
     assert len(search_queries) == 2
 
 
+def test_resolve_landmark_locations_include_photos_adds_image_metadata():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "places:searchText" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "places": [
+                        _place(
+                            "eiffel",
+                            "Torre Eiffel",
+                            ["tourist_attraction"],
+                            photos=[
+                                {
+                                    "name": "places/eiffel/photos/photo-1",
+                                    "authorAttributions": [
+                                        {"displayName": "Guia Local", "uri": "https://exemplo"}
+                                    ],
+                                }
+                            ],
+                        )
+                    ]
+                },
+            )
+        if "/photos/photo-1/media" in url:
+            return httpx.Response(
+                200,
+                json={"photoUri": "https://lh3.googleusercontent.com/eiffel-photo"},
+            )
+        raise AssertionError(f"Unexpected request: {url}")
+
+    destinations, _selected = build_custom_destinations(
+        parse_custom_landmarks("Torre Eiffel, Paris, Franca")
+    )
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(transport=transport) as client:
+        metadata = resolve_landmark_locations(
+            destinations,
+            api_key="test-key",
+            client=client,
+            include_photos=True,
+        )
+
+    resolved = metadata["custom-paris:torre-eiffel"]
+    assert resolved["image_url"] == "https://lh3.googleusercontent.com/eiffel-photo"
+    assert resolved["image_attributions"] == [
+        {"display_name": "Guia Local", "uri": "https://exemplo"}
+    ]
+
+
 def test_resolve_landmark_locations_does_not_fall_back_to_bare_query_for_known_destination():
     search_queries: list[str] = []
 

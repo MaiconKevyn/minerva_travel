@@ -20,14 +20,50 @@ test('serializeGuideDestinations preserves place timing duration and order', () 
   ]);
 
   assert.deepEqual(destinations, [
-    { id: 'first', place: 'Paris, França', timing: 'Julho de 2026', days: 3 },
-    { id: 'second', place: 'Londres', timing: 'depois de Paris', days: 2 },
+    { id: 'first', place: 'Paris, França', timing: 'Julho de 2026', days: 3, landmarks: [] },
+    { id: 'second', place: 'Londres', timing: 'depois de Paris', days: 2, landmarks: [] },
   ]);
   assert.equal(
     serializeGuideDestinations(destinations),
     'Destino 1: Paris, França; quando: Julho de 2026; duração: 3 dias.\nDestino 2: Londres; quando: depois de Paris; duração: 2 dias.',
   );
   assert.equal(totalTripDays(destinations), 5);
+});
+
+test('normalizeGuideDestinations trims landmark names and drops empty boxes', () => {
+  const destinations = normalizeGuideDestinations([
+    {
+      id: 'first',
+      place: 'Paris, França',
+      timing: 'Julho de 2026',
+      days: 3,
+      landmarks: [' Torre Eiffel ', '', 'Museu do Louvre', '   '],
+    },
+  ]);
+
+  assert.deepEqual(destinations[0].landmarks, ['Torre Eiffel', 'Museu do Louvre']);
+  assert.equal(
+    serializeGuideDestinations(destinations),
+    'Destino 1: Paris, França; quando: Julho de 2026; duração: 3 dias. pontos turísticos: Torre Eiffel, Museu do Louvre.',
+  );
+});
+
+test('validKnownGuideDestinations requires at least one landmark per destination', () => {
+  const base = { place: 'Paris', timing: 'Julho', days: 3 };
+
+  assert.equal(
+    guideForm.validKnownGuideDestinations([{ ...base, landmarks: ['Torre Eiffel'] }]),
+    true,
+  );
+  assert.equal(guideForm.validKnownGuideDestinations([{ ...base, landmarks: ['  '] }]), false);
+  assert.equal(guideForm.validKnownGuideDestinations([{ ...base }]), false);
+  assert.equal(
+    guideForm.validKnownGuideDestinations([
+      { ...base, landmarks: ['Torre Eiffel'] },
+      { place: 'Roma', timing: 'Agosto', days: 2, landmarks: [] },
+    ]),
+    false,
+  );
 });
 
 test('validGuideDestinations requires place timing and positive duration', () => {

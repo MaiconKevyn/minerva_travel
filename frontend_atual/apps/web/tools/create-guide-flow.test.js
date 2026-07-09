@@ -16,8 +16,25 @@ test('create guide wizard asks for structured destination first and uses six ste
   assert.match(page, /case 5: return <Step2CoverPhoto \/>;/);
   assert.match(page, /case 6: return <Step5Review \/>;/);
   assert.match(page, /\[1, 2, 3, 4, 5, 6\]/);
-  assert.match(page, /Passo \{currentStep\} de 6/);
-  assert.match(context, /Math\.min\(currentStep \+ 1, 6\)/);
+  assert.match(page, /Passo \{currentStepPosition \+ 1\} de \{visibleSteps\.length\}/);
+});
+
+test('known itinerary mode skips the preferences step and collects landmarks upfront', () => {
+  const page = readProjectFile('src/pages/CreateGuidePage.jsx');
+  const context = readProjectFile('src/contexts/ConversationalGuideContext.jsx');
+  const destinationStep = readProjectFile('src/components/Step3Destination.jsx');
+  const attractionsStep = readProjectFile('src/components/Step4Attractions.jsx');
+  const api = readProjectFile('src/utils/minerva-api.js');
+
+  assert.match(page, /itineraryMode === 'known' \? \[1, 3, 4, 5, 6\] : \[1, 2, 3, 4, 5, 6\]/);
+  assert.match(context, /itineraryMode === 'known' && currentStep === 1/);
+  assert.match(context, /itineraryMode === 'known' && currentStep === 3/);
+  assert.match(destinationStep, /Adicionar ponto tur.stico/);
+  assert.match(destinationStep, /validKnownGuideDestinations/);
+  assert.match(attractionsStep, /processKnownItinerary/);
+  assert.match(attractionsStep, /resolveStructuredLandmarks/);
+  assert.match(api, /buildStructuredLandmarksPayload/);
+  assert.match(api, /api\/landmarks\/resolve-structured/);
 });
 
 test('destination step captures repeatable structured destination fields', () => {
