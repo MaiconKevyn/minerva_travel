@@ -238,6 +238,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          target: runtime
           load: true
           pull: true
           tags: minerva-travel:ci
