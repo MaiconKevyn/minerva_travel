@@ -8,7 +8,7 @@ from minerva_travel.supabase_storage import (
 from minerva_travel.wikimedia_assets import WikimediaAsset
 
 
-def test_sync_wikimedia_asset_uploads_image_and_metadata_to_public_bucket(tmp_path):
+def test_sync_wikimedia_asset_uploads_image_and_metadata_to_private_bucket(tmp_path):
     image_path = tmp_path / "eiffel.jpg"
     image_path.write_bytes(b"image-bytes")
     requests: list[httpx.Request] = []
@@ -40,10 +40,7 @@ def test_sync_wikimedia_asset_uploads_image_and_metadata_to_public_bucket(tmp_pa
     synced = sync_wikimedia_asset_to_storage(client, asset)
 
     assert synced.storage_path == "wikimedia/paris/eiffel-tower.jpg"
-    assert synced.public_url == (
-        "https://project.supabase.co/storage/v1/object/public/"
-        "landmark-assets/wikimedia/paris/eiffel-tower.jpg"
-    )
+    assert synced.public_url is None
     assert [request.method for request in requests] == ["POST", "POST"]
     assert requests[0].headers["content-type"] == "image/jpeg"
     assert requests[1].headers["content-type"] == "application/json"

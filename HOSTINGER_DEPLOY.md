@@ -83,10 +83,12 @@ pagina e aberta diretamente no navegador.
 
 ## Backend e CORS
 
-Enquanto o site estiver no dominio temporario da Hostinger, o backend pode usar:
+Enquanto o site estiver no domínio temporário da Hostinger, configure a origem exata;
+`*` não é aceito em produção:
 
 ```env
-CORS_ALLOW_ORIGINS=*
+CORS_ALLOW_ORIGINS=https://minerva-travel.hostingerapp.com
+FRONTEND_BASE_URL=https://minerva-travel.hostingerapp.com
 ```
 
 Para a etapa de roteiro dinamico funcionar, configure no backend publicado

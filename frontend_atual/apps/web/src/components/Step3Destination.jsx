@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowRight,
@@ -60,6 +60,9 @@ const Step3Destination = () => {
     setItineraryMode,
     itineraryPreferences,
     childrenList,
+    restoredDraftId,
+    restoredDestinationsList,
+    draftResetKey,
     nextStep
   } = useConversationalGuide();
   const [localDestinations, setLocalDestinations] = useState(
@@ -71,6 +74,28 @@ const Step3Destination = () => {
   const [routeIdea, setRouteIdea] = useState('');
   const [suggestedRoutes, setSuggestedRoutes] = useState([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const pendingFocusDestinationId = useRef(null);
+  const formErrorRef = useRef(null);
+
+  useEffect(() => {
+    const hasMeaningfulChange = localDestinations.some((item) =>
+      item.place.trim() || item.timing.trim() || item.landmarks?.some((landmark) => landmark.trim())
+    );
+    if (hasMeaningfulChange) updateDestinationsList(localDestinations);
+  }, [localDestinations, updateDestinationsList]);
+
+  useEffect(() => {
+    if (!restoredDraftId) return;
+    setLocalDestinations(
+      restoredDestinationsList?.length
+        ? normalizeGuideDestinations(restoredDestinationsList)
+        : [createGuideDestination()]
+    );
+  }, [restoredDestinationsList, restoredDraftId]);
+
+  useEffect(() => {
+    if (draftResetKey > 0) setLocalDestinations([createGuideDestination()]);
+  }, [draftResetKey]);
 
   const changeItineraryMode = (mode) => {
     setItineraryMode(mode);
@@ -87,22 +112,50 @@ const Step3Destination = () => {
   };
 
   const handleAddDestination = () => {
+    const newDestination = createGuideDestination();
+    pendingFocusDestinationId.current = newDestination.id;
     setLocalDestinations((prev) => [
       ...prev,
-      createGuideDestination(prev.length),
+      newDestination,
     ]);
     setError('');
   };
 
   const handleRemoveDestination = (id) => {
-    setLocalDestinations((prev) =>
-      prev.length === 1 ? prev : prev.filter((destination) => destination.id !== id)
+    if (localDestinations.length === 1) return;
+
+    const removedIndex = localDestinations.findIndex((destination) => destination.id === id);
+    const remainingDestinations = localDestinations.filter(
+      (destination) => destination.id !== id
     );
+    const focusIndex = Math.min(Math.max(removedIndex, 0), remainingDestinations.length - 1);
+    pendingFocusDestinationId.current = remainingDestinations[focusIndex]?.id || null;
+    setLocalDestinations(remainingDestinations);
     setError('');
   };
 
   const landmarkBoxesFor = (destination) =>
     destination.landmarks?.length ? destination.landmarks : [''];
+
+  const focusFirstInvalidField = (destinations) => {
+    const destinationIndex = destinations.findIndex((item) =>
+      !item.place || !item.timing || !Number.isFinite(Number(item.days)) || Number(item.days) < 1
+    );
+    if (destinationIndex >= 0) {
+      const invalid = destinations[destinationIndex];
+      const field = !invalid.place
+        ? 'place'
+        : !invalid.timing
+          ? 'timing'
+          : 'days';
+      document.getElementById(`${invalid.id}-${field}`)?.focus();
+      return;
+    }
+    const missingLandmarkDestination = destinations.find((item) =>
+      !landmarkBoxesFor(item).some((landmark) => landmark.trim())
+    );
+    document.getElementById(`${missingLandmarkDestination?.id}-landmark-0`)?.focus();
+  };
 
   const updateLandmarkField = (id, landmarkIndex, value) => {
     setLocalDestinations((prev) =>
@@ -153,16 +206,19 @@ const Step3Destination = () => {
       freeformResult?.followUpQuestions?.some((question) => question.field === 'order')
     ) {
       setError('Confirme a ordem dos destinos antes de continuar.');
+      formErrorRef.current?.focus();
       return;
     }
 
     if (!validGuideDestinations(normalized)) {
       setError('Preencha o destino, quando a viagem acontece e por quantos dias em cada parada.');
+      focusFirstInvalidField(normalized);
       return;
     }
 
     if (itineraryMode === 'known' && !validKnownGuideDestinations(normalized)) {
       setError('Adicione pelo menos um ponto turístico em cada destino.');
+      focusFirstInvalidField(normalized);
       return;
     }
 
@@ -242,7 +298,7 @@ const Step3Destination = () => {
         className="space-y-6"
         onSubmit={handleSubmit}
       >
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Como montar o roteiro">
           {itineraryModeOptions.map((option) => {
             const Icon = option.icon;
             const selected = itineraryMode === option.id;
@@ -250,6 +306,8 @@ const Step3Destination = () => {
               <button
                 key={option.id}
                 type="button"
+                role="radio"
+                aria-checked={selected}
                 onClick={() => changeItineraryMode(option.id)}
                 className={`rounded-2xl border p-4 text-left transition ${
                   selected
@@ -412,6 +470,12 @@ const Step3Destination = () => {
                 </Label>
                 <Input
                   id={`${destination.id}-place`}
+                  ref={(input) => {
+                    if (input && pendingFocusDestinationId.current === destination.id) {
+                      pendingFocusDestinationId.current = null;
+                      input.focus();
+                    }
+                  }}
                   autoFocus={index === 0}
                   value={destination.place}
                   onChange={(event) =>
@@ -419,6 +483,8 @@ const Step3Destination = () => {
                   }
                   placeholder="Ex: Paris, França"
                   className="rounded-xl py-6 text-base"
+                  aria-invalid={Boolean(error && !destination.place.trim())}
+                  aria-describedby={error && !destination.place.trim() ? 'destination-error' : undefined}
                 />
               </div>
 
@@ -434,6 +500,8 @@ const Step3Destination = () => {
                   }
                   placeholder="Ex: Julho de 2026"
                   className="rounded-xl py-6 text-base"
+                  aria-invalid={Boolean(error && !destination.timing.trim())}
+                  aria-describedby={error && !destination.timing.trim() ? 'destination-error' : undefined}
                 />
               </div>
 
@@ -450,6 +518,8 @@ const Step3Destination = () => {
                     updateDestinationField(destination.id, 'days', event.target.value)
                   }
                   className="rounded-xl py-6 text-base"
+                  aria-invalid={Boolean(error && Number(destination.days) < 1)}
+                  aria-describedby={error && Number(destination.days) < 1 ? 'destination-error' : undefined}
                 />
               </div>
             </div>
@@ -469,12 +539,25 @@ const Step3Destination = () => {
                       className="flex items-center gap-3"
                     >
                       <Input
+                        id={`${destination.id}-landmark-${landmarkIndex}`}
                         value={landmarkName}
                         onChange={(event) =>
                           updateLandmarkField(destination.id, landmarkIndex, event.target.value)
                         }
                         placeholder={`Ex: ${landmarkIndex === 0 ? 'Torre Eiffel' : 'Museu do Louvre'}`}
                         aria-label={`Ponto turístico ${landmarkIndex + 1} do destino ${index + 1}`}
+                        aria-invalid={Boolean(
+                          error &&
+                            itineraryMode === 'known' &&
+                            !landmarkBoxesFor(destination).some((item) => item.trim())
+                        )}
+                        aria-describedby={
+                          error &&
+                          itineraryMode === 'known' &&
+                          !landmarkBoxesFor(destination).some((item) => item.trim())
+                            ? 'destination-error'
+                            : undefined
+                        }
                         className="rounded-xl py-6 text-base"
                       />
                       <Button
@@ -508,7 +591,13 @@ const Step3Destination = () => {
         ))}
 
         {error && (
-          <p className="rounded-2xl bg-destructive/10 px-4 py-3 text-center text-sm font-bold text-destructive">
+          <p
+            ref={formErrorRef}
+            id="destination-error"
+            role="alert"
+            tabIndex={-1}
+            className="rounded-2xl bg-destructive/10 px-4 py-3 text-center text-sm font-bold text-destructive"
+          >
             {error}
           </p>
         )}

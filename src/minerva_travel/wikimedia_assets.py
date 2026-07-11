@@ -3,7 +3,11 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-DEFAULT_WIKIMEDIA_MANIFEST = Path("runtime/wikimedia/manifest.json")
+# Versioned catalog assets are part of the release artifact. Runtime assets are
+# reserved for temporary custom-landmark lookups and must not be the only source
+# of truth for a production guide.
+DEFAULT_WIKIMEDIA_MANIFEST = Path("data/wikimedia/manifest.json")
+LEGACY_WIKIMEDIA_MANIFEST = Path("runtime/wikimedia/manifest.json")
 
 
 class WikimediaAsset(BaseModel):
@@ -32,6 +36,12 @@ class ImageCredit(BaseModel):
 def load_wikimedia_manifest(
     path: Path = DEFAULT_WIKIMEDIA_MANIFEST,
 ) -> dict[str, WikimediaAsset]:
+    if (
+        path == DEFAULT_WIKIMEDIA_MANIFEST
+        and not path.exists()
+        and LEGACY_WIKIMEDIA_MANIFEST.exists()
+    ):
+        path = LEGACY_WIKIMEDIA_MANIFEST
     if not path.exists():
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))

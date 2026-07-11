@@ -1,6 +1,7 @@
 import unicodedata
 from collections.abc import Iterable
 from math import ceil
+from pathlib import Path
 
 from minerva_travel.models import (
     Catalog,
@@ -145,9 +146,7 @@ def _validate_must_see(
         except ValueError as error:
             raise ValueError(f"Ponto turistico invalido: {selection_id}") from error
         if destination_id not in destination_ids:
-            raise ValueError(
-                f"Ponto turistico fora dos destinos selecionados: {selection_id}"
-            )
+            raise ValueError(f"Ponto turistico fora dos destinos selecionados: {selection_id}")
         try:
             catalog.find_landmark(destination_id, landmark_id)
         except KeyError as error:
@@ -192,7 +191,7 @@ def _build_stop(
         city=destination.city,
         country=destination.country,
         description=landmark.description,
-        image=landmark.image,
+        image=Path(landmark.image),
         category=landmark.categories[0] if landmark.categories else None,
         categories=landmark.categories,
         duration_minutes=landmark.duration_minutes,
@@ -213,9 +212,7 @@ def _normalize_interests(interests: Iterable[str]) -> set[str]:
 def _normalize_text(value: str) -> str:
     ascii_value = unicodedata.normalize("NFKD", value)
     ascii_value = "".join(
-        character
-        for character in ascii_value
-        if not unicodedata.combining(character)
+        character for character in ascii_value if not unicodedata.combining(character)
     )
     return " ".join(ascii_value.strip().casefold().split())
 

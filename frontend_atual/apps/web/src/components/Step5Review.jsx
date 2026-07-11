@@ -1,18 +1,33 @@
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Users, Camera, Sparkles, Star, Loader2, Navigation, Download } from 'lucide-react';
+import {
+  Camera,
+  Download,
+  ExternalLink,
+  Loader2,
+  MapPin,
+  Navigation,
+  Sparkles,
+  Star,
+  Users,
+} from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import {
   categoryLabelForAttraction,
+  buildGuideItineraryPayload,
+  createIdempotencyKey,
+  downloadGuidePdf,
   generatePDF,
   RESTAURANT_RECOMMENDATIONS_EXTRA,
   selectGuideLandmarks,
+  waitForGuideJob,
 } from '@/utils/minerva-api.js';
 import {
   deriveChildAges,
   deriveChildNames,
+  PRIVACY_CONSENT_VERSION,
   serializeGuideDestinations,
 } from '@/utils/guide-form.js';
 import { toast } from 'sonner';
@@ -30,6 +45,9 @@ const Step5Review = () => {
     childrenList,
     parentsList,
     expectedCoverFamilyMemberCount,
+    photoProcessingConsent,
+    privacyConsentAt,
+    itineraryMode,
     itineraryPreferences,
     recommendedItinerary,
     restaurantRecommendationsExtra,
@@ -40,7 +58,11 @@ const Step5Review = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
+  const [pdfFilename, setPdfFilename] = useState('guia-minerva-travel.pdf');
   const [coverStatus, setCoverStatus] = useState(null);
+  const [isRetrievingPdf, setIsRetrievingPdf] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState('');
+  const generationIdempotencyKey = useRef(null);
 
   // Derive the rich data from the IDs
   const finalLandmarks = selectGuideLandmarks(parsedData.landmarks, selectedLandmarks);
@@ -60,6 +82,13 @@ const Step5Review = () => {
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
+      const itinerary = buildGuideItineraryPayload({
+        itineraryMode,
+        destinationsList,
+        itineraryPreferences,
+        recommendedDays,
+        extraLandmarks,
+      });
       const guideData = {
         title: `Família ${familyName}`,
         childrenNames,
@@ -68,16 +97,31 @@ const Step5Review = () => {
         year,
         familyPhoto: coverPhoto, // Pass the actual File object
         expectedVisibleFamilyMemberCount: expectedCoverFamilyMemberCount,
+        photoProcessingConsent,
+        privacyConsentVersion: PRIVACY_CONSENT_VERSION,
+        privacyConsentAt,
         landmarks: finalLandmarks,
         selectedLandmarks,
+        itinerary,
         restaurantRecommendationsExtra,
       };
 
-      const result = await generatePDF(guideData);
+      generationIdempotencyKey.current ||= createIdempotencyKey();
+      const submitted = await generatePDF(guideData, {
+        idempotencyKey: generationIdempotencyKey.current,
+      });
+      const result = submitted.job_id
+        ? await waitForGuideJob(submitted.job_id, {
+          onUpdate: (job) => {
+            const stage = String(job.stage || 'preparando').replaceAll('_', ' ');
+            setGenerationStatus(`Etapa: ${stage} (${job.progress || 0}%).`);
+          },
+        })
+        : submitted;
 
       if (result.download_url) {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://minerva-travel.onrender.com';
-        setPdfUrl(`${baseUrl}${result.download_url}`);
+        setPdfUrl(result.download_url);
+        setPdfFilename(result.filename || 'guia-minerva-travel.pdf');
         setCoverStatus(result.cover_status || null);
         setIsSuccess(true);
         toast.success('Guia de viagem gerado com sucesso!');
@@ -100,6 +144,31 @@ const Step5Review = () => {
       toast.error('Não foi possível gerar o PDF.');
     } finally {
       setIsGenerating(false);
+      setGenerationStatus('');
+    }
+  };
+
+  const handlePdfAction = async ({ open = false } = {}) => {
+    setIsRetrievingPdf(true);
+    try {
+      const { blob, filename } = await downloadGuidePdf(pdfUrl);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      if (open) {
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+      } else {
+        link.download = filename || pdfFilename;
+      }
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
+    } catch (error) {
+      toast.error(error.message || 'Não foi possível acessar o PDF.');
+    } finally {
+      setIsRetrievingPdf(false);
     }
   };
 
@@ -126,10 +195,24 @@ const Step5Review = () => {
         )}
         <div className="pt-8 flex flex-col sm:flex-row gap-4 justify-center">
           <Button
-            onClick={() => window.open(pdfUrl, '_blank')}
+            onClick={() => handlePdfAction({ open: true })}
+            disabled={isRetrievingPdf}
+            variant="outline"
+            className="rounded-full px-10 py-6 font-bold text-lg hover:-translate-y-1 transition-all"
+          >
+            {isRetrievingPdf ? (
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            ) : (
+              <ExternalLink className="w-5 h-5 mr-2" />
+            )}
+            Abrir PDF
+          </Button>
+          <Button
+            onClick={() => handlePdfAction()}
+            disabled={isRetrievingPdf}
             className="rounded-full px-10 py-6 bg-primary hover:bg-primary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all"
           >
-            <Download className="w-5 h-5 mr-2" /> Download PDF
+            <Download className="w-5 h-5 mr-2" /> Baixar PDF
           </Button>
           <Button
             onClick={() => window.location.href = '/'}
@@ -341,6 +424,11 @@ const Step5Review = () => {
           )}
         </Button>
       </div>
+      {isGenerating && (
+        <p className="mt-4 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+          {generationStatus || 'Enviamos seu guia para a fila de geração.'}
+        </p>
+      )}
     </div>
   );
 };

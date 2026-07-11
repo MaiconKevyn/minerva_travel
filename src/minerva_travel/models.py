@@ -1,20 +1,114 @@
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from minerva_travel.contract_limits import (
+    MAX_GUIDE_CHILDREN,
+    MAX_GUIDE_DESTINATIONS,
+    MAX_GUIDE_LANDMARKS,
+    MAX_GUIDE_PARENTS,
+    MAX_GUIDE_YEAR,
+    MAX_VISIBLE_FAMILY_MEMBERS,
+    MIN_GUIDE_YEAR,
+)
 from minerva_travel.wikimedia_assets import ImageCredit
 
+ActivityType = Literal[
+    "coloring",
+    "word_search",
+    "spot_the_difference",
+    "detail_hunt",
+    "drawing",
+    "short_prompt",
+    "checklist",
+    "language_learning",
+]
+ActivityComplexity = Literal["preschool", "early_reader", "older_child", "family"]
 
-class GuideRequest(BaseModel):
-    title: str = Field(min_length=1)
-    children_names: list[str] = Field(min_length=1, max_length=10)
-    children_ages: list[int] = Field(default_factory=list, max_length=10)
-    parents_names: list[str] = Field(min_length=1, max_length=2)
-    year: int = Field(ge=2024, le=2100)
-    selected_landmarks: list[str] = Field(min_length=1, max_length=30)
-    expected_visible_family_member_count: int | None = Field(default=None, ge=1, le=20)
+
+class StrictRequestModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class GuideDestinationPlan(StrictRequestModel):
+    id: str = Field(min_length=1, max_length=120)
+    place: str = Field(min_length=1, max_length=160)
+    timing: str = Field(min_length=1, max_length=160)
+    days: int = Field(ge=1, le=30)
+    order: int = Field(ge=1, le=10)
+
+
+class GuideItineraryStopPlan(StrictRequestModel):
+    selection_id: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+    destination_id: str | None = Field(default=None, max_length=120)
+
+
+class GuideItineraryDayPlan(StrictRequestModel):
+    day: int = Field(ge=1, le=30)
+    title: str = Field(min_length=1, max_length=200)
+    theme: str = Field(default="", max_length=300)
+    stops: list[GuideItineraryStopPlan] = Field(default_factory=list, max_length=30)
+
+
+class GuideItineraryPlan(StrictRequestModel):
+    mode: Literal["known", "freeform", "suggested"] = "known"
+    pace: Literal["light", "balanced", "full"] = "balanced"
+    interests: list[str] = Field(default_factory=list, max_length=12)
+    destinations: list[GuideDestinationPlan] = Field(
+        min_length=1, max_length=MAX_GUIDE_DESTINATIONS
+    )
+    days: list[GuideItineraryDayPlan] = Field(default_factory=list, max_length=MAX_GUIDE_LANDMARKS)
+    unplanned_stops: list[GuideItineraryStopPlan] = Field(
+        default_factory=list, max_length=MAX_GUIDE_LANDMARKS
+    )
+
+    @property
+    def pace_label(self) -> str:
+        return {
+            "light": "leve",
+            "balanced": "equilibrado",
+            "full": "intenso",
+        }[self.pace]
+
+    @property
+    def mode_label(self) -> str:
+        return {
+            "known": "roteiro definido pela família",
+            "freeform": "roteiro organizado a partir da ideia da família",
+            "suggested": "roteiro sugerido e confirmado pela família",
+        }[self.mode]
+
+    @property
+    def total_days(self) -> int:
+        return sum(destination.days for destination in self.destinations)
+
+
+class GuideRequest(StrictRequestModel):
+    title: str = Field(min_length=1, max_length=160)
+    children_names: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(
+        min_length=1,
+        max_length=MAX_GUIDE_CHILDREN,
+    )
+    children_ages: list[Annotated[int, Field(ge=0, le=17)]] = Field(
+        default_factory=list,
+        max_length=MAX_GUIDE_CHILDREN,
+    )
+    parents_names: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(
+        min_length=1,
+        max_length=MAX_GUIDE_PARENTS,
+    )
+    year: int = Field(ge=MIN_GUIDE_YEAR, le=MAX_GUIDE_YEAR)
+    selected_landmarks: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        min_length=1,
+        max_length=MAX_GUIDE_LANDMARKS,
+    )
+    expected_visible_family_member_count: int | None = Field(
+        default=None, ge=1, le=MAX_VISIBLE_FAMILY_MEMBERS
+    )
     restaurant_recommendations_extra: bool = False
+    itinerary: GuideItineraryPlan | None = None
 
     @property
     def children_display(self) -> str:
@@ -22,9 +116,7 @@ class GuideRequest(BaseModel):
 
     @property
     def parents_display(self) -> str:
-        if len(self.parents_names) == 1:
-            return f"mamae/papai {self.parents_names[0]}"
-        return f"mamae {self.parents_names[0]} e papai {self.parents_names[1]}"
+        return join_pt(self.parents_names)
 
 
 class Landmark(BaseModel):
@@ -50,9 +142,7 @@ class LanguageTip(BaseModel):
 
 
 class PhaseActivities(BaseModel):
-    before: str = (
-        "No caminho, procure esta cidade no mapa e imagine o que voces vao encontrar."
-    )
+    before: str = "No caminho, procure esta cidade no mapa e imagine o que voces vao encontrar."
     during: str = "Durante a visita, escolha um detalhe para observar com calma."
     after: str = "Depois da visita, desenhe ou escreva uma lembranca importante."
 
@@ -66,10 +156,16 @@ class Destination(BaseModel):
     favorites_prompt: str
     coloring_title: str
     coloring_subtitle: str
+    curiosities: list[str] = Field(default_factory=list)
     language_name: str | None = None
     language_tips: list[LanguageTip] = Field(default_factory=list)
     phase_activities: PhaseActivities = Field(default_factory=PhaseActivities)
     landmarks: list[Landmark] = Field(min_length=1)
+
+    @property
+    def location_label(self) -> str:
+        parts = [self.city.strip(), self.country.strip()]
+        return ", ".join(part for part in parts if part)
 
     def sorted_landmarks(self) -> list[Landmark]:
         return sorted(self.landmarks, key=lambda landmark: landmark.sort_order)
@@ -119,23 +215,15 @@ class RestaurantRecommendation(BaseModel):
 
 class GuideActivity(BaseModel):
     destination_id: str
-    type: Literal[
-        "coloring",
-        "word_search",
-        "spot_the_difference",
-        "detail_hunt",
-        "drawing",
-        "short_prompt",
-        "checklist",
-        "language_learning",
-    ]
+    type: ActivityType
     title: str
     prompt: str
-    complexity: Literal["preschool", "early_reader", "older_child", "family"]
+    complexity: ActivityComplexity
     phase: Literal["before", "during", "after"] = "during"
     landmark_name: str | None = None
     lineart_image: Path | str | None = None
     words: list[str] = Field(default_factory=list)
+    word_search_grid: list[str] = Field(default_factory=list)
     checklist_items: list[str] = Field(default_factory=list)
     extension_prompt: str | None = None
     language_name: str | None = None
@@ -191,8 +279,7 @@ class GuideContext(BaseModel):
         items = self.summary_landmarks
         if not items:
             return "sua viagem"
-        first = items[0]
-        return f"{first.destination.city}, {first.destination.country}"
+        return items[0].destination.location_label or "sua viagem"
 
     @property
     def summary_map_columns(self) -> int:
@@ -208,7 +295,7 @@ class GuideContext(BaseModel):
         items = self.summary_landmarks
         rows: list[list[GuideSummaryLandmark | None]] = []
         for index in range(0, len(items), columns):
-            row: list[GuideSummaryLandmark | None] = items[index : index + columns]
+            row: list[GuideSummaryLandmark | None] = list(items[index : index + columns])
             missing = columns - len(row)
             leading_empty = missing // 2
             trailing_empty = missing - leading_empty
@@ -216,39 +303,41 @@ class GuideContext(BaseModel):
         return rows
 
 
-
-class ItineraryRecommendationRequest(BaseModel):
-    destination_ids: list[str] = Field(min_length=1, max_length=10)
+class ItineraryRecommendationRequest(StrictRequestModel):
+    destination_ids: list[str] = Field(min_length=1, max_length=MAX_GUIDE_DESTINATIONS)
     days: int = Field(ge=1, le=14)
     interests: list[str] = Field(default_factory=list, max_length=12)
     pace: Literal["light", "balanced", "full"] = "balanced"
-    children_ages: list[int] = Field(default_factory=list, max_length=10)
-    must_see_landmarks: list[str] = Field(default_factory=list, max_length=30)
+    children_ages: list[int] = Field(default_factory=list, max_length=MAX_GUIDE_CHILDREN)
+    must_see_landmarks: list[str] = Field(default_factory=list, max_length=MAX_GUIDE_LANDMARKS)
 
 
-class DynamicItineraryRequest(BaseModel):
+class DynamicItineraryRequest(StrictRequestModel):
     destination: str = Field(min_length=2, max_length=500)
     days: int = Field(ge=1, le=14)
     interests: list[str] = Field(default_factory=list, max_length=12)
     pace: Literal["light", "balanced", "full"] = "balanced"
-    children_ages: list[int] = Field(default_factory=list, max_length=10)
-    must_see: list[str] = Field(default_factory=list, max_length=30)
+    children_ages: list[int] = Field(default_factory=list, max_length=MAX_GUIDE_CHILDREN)
+    must_see: list[str] = Field(default_factory=list, max_length=MAX_GUIDE_LANDMARKS)
 
 
-class StructuredDestinationInput(BaseModel):
+class StructuredDestinationInput(StrictRequestModel):
     id: str | None = None
     place: str = Field(min_length=1, max_length=160)
     timing: str = Field(default="", max_length=160)
     days: int = Field(default=0, ge=0, le=30)
 
 
-class RouteSuggestionRequest(BaseModel):
+class RouteSuggestionRequest(StrictRequestModel):
     trip_idea: str = Field(default="", max_length=1000)
     days: int = Field(default=3, ge=1, le=30)
     interests: list[str] = Field(default_factory=list, max_length=12)
     pace: Literal["light", "balanced", "full"] = "balanced"
     children_ages: list[int] = Field(default_factory=list, max_length=10)
-    structured_destinations: list[StructuredDestinationInput] = Field(default_factory=list, max_length=10)
+    structured_destinations: list[StructuredDestinationInput] = Field(
+        default_factory=list,
+        max_length=MAX_GUIDE_DESTINATIONS,
+    )
 
 
 class RouteSuggestionOption(BaseModel):

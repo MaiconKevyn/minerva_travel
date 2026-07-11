@@ -3,7 +3,12 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from minerva_travel.models import Destination, GuideRequest, Landmark
+from minerva_travel.models import (
+    Destination,
+    GuideItineraryPlan,
+    GuideRequest,
+    Landmark,
+)
 
 
 def test_guide_request_builds_display_names():
@@ -18,7 +23,7 @@ def test_guide_request_builds_display_names():
 
     assert request.children_display == "Alice e Antonio"
     assert request.children_ages == [5, 9]
-    assert request.parents_display == "mamae Ana e papai Otavio"
+    assert request.parents_display == "Ana e Otavio"
 
 
 def test_guide_request_allows_name_only_child_compatibility():
@@ -54,6 +59,58 @@ def test_guide_request_accepts_up_to_ten_children_names():
     )
 
     assert len(request.children_names) == 10
+
+
+def test_guide_request_accepts_inclusive_responsible_group():
+    names = ["Ana", "Otavio", "Vera"]
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        parents_names=names,
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower"],
+    )
+
+    assert request.parents_names == names
+    assert request.parents_display == "Ana, Otavio e Vera"
+
+
+def test_guide_itinerary_preserves_reviewed_trip_contract():
+    itinerary = GuideItineraryPlan.model_validate(
+        {
+            "mode": "freeform",
+            "pace": "light",
+            "interests": ["museus", "parques"],
+            "destinations": [
+                {
+                    "id": "paris",
+                    "place": "Paris, França",
+                    "timing": "Julho de 2026",
+                    "days": 3,
+                    "order": 1,
+                }
+            ],
+            "days": [
+                {
+                    "day": 1,
+                    "title": "Primeiro dia em Paris",
+                    "theme": "Ícones da cidade",
+                    "stops": [
+                        {
+                            "selection_id": "paris:eiffel-tower",
+                            "name": "Torre Eiffel",
+                            "destination_id": "paris",
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert itinerary.total_days == 3
+    assert itinerary.pace_label == "leve"
+    assert itinerary.mode_label.startswith("roteiro organizado")
+    assert itinerary.days[0].stops[0].selection_id == "paris:eiffel-tower"
 
 
 def _sample_landmark() -> Landmark:

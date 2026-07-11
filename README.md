@@ -1,24 +1,63 @@
 # Minerva Travel
 
-MVP local para gerar um guia de viagem infantil personalizado em PDF.
+MVP de diário/activity book infantil personalizado de viagem, em PDF A4.
 
 ## Escopo atual
 
 - Roteiro baseado em `docs/PEQUENOS_EXPLORADORES_EUROPA_2026 - PDF.pdf`.
-- Frontend Vite/React com upload de foto, dados da familia, selecao de roteiro e preview.
+- Frontend Vite/React com upload de foto, dados da família, seleção de roteiro, rascunho
+  seguro e painel de re-download.
 - Capa e imagens dos pontos turisticos geradas por provider configuravel
   (`placeholder` ou `replicate`), com reaproveitamento de imagens Wikimedia
   quando houver uma foto representativa do ponto turistico.
 - Interpretacao de pontos turisticos em linguagem natural via OpenAI no backend.
 - PDF organizado em momentos da viagem: antes, durante e depois, com dicas de idioma e atividades infantis por destino.
-- PDF final para download no navegador.
+- Jobs assíncronos, idempotentes e recuperáveis; o dashboard acompanha o status e o download.
+- Rascunhos protegidos por owner, com expiração padrão de 14 dias; a foto não entra no
+  rascunho e deve ser reenviada com consentimento antes da geração.
 
 ## Instalar
 
+O ambiente de referencia usa Python 3.11.15 (fixado em `.python-version`) e Node
+22. As dependencias Python devem ser instaladas a partir de `uv.lock`, sem
+recalcular versoes:
+
 ```bash
-uv sync --extra dev
+uv sync --frozen --extra dev
 cd frontend_atual/apps/web
-npm install
+npm ci
+```
+
+O WeasyPrint tambem depende de bibliotecas nativas. No macOS com Homebrew:
+
+```bash
+brew install glib pango cairo harfbuzz fontconfig libffi
+```
+
+Em Debian/Ubuntu:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  fonts-dejavu-core libcairo2 libfontconfig1 libfreetype6 \
+  libgdk-pixbuf-2.0-0 libglib2.0-0 libharfbuzz-subset0 libharfbuzz0b \
+  libpango-1.0-0 libpangocairo-1.0-0 libpangoft2-1.0-0 shared-mime-info
+```
+
+Confirme o carregamento das bibliotecas e uma geracao real antes de iniciar o
+backend:
+
+```bash
+uv run python -c "from weasyprint import HTML; HTML(string='<h1>Minerva</h1>').write_pdf('/tmp/minerva-smoke.pdf')"
+uv run python scripts/smoke_pdf.py /tmp/minerva-guide-smoke.pdf
+```
+
+Se o macOS ainda informar que nao encontrou `libgobject-2.0-0`, confirme o
+prefixo com `brew --prefix glib` e exponha as bibliotecas do Homebrew no mesmo
+terminal:
+
+```bash
+export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib:${DYLD_FALLBACK_LIBRARY_PATH:-}"
 ```
 
 ## Gerar assets placeholder
@@ -26,6 +65,18 @@ npm install
 ```bash
 python3 scripts/create_placeholder_assets.py
 ```
+
+Os ícones acima são fixtures offline de desenvolvimento. Para atualizar os
+assets que podem ser publicados, baixe e registre as referências licenciadas do
+catálogo com:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/fetch_wikimedia_assets.py
+```
+
+O comando grava as imagens em `assets/wikimedia/` e a fonte, autor e licença em
+`data/wikimedia/manifest.json`. A API de produção recusa gerar um guia se algum
+landmark selecionado não tiver esse registro verificável.
 
 ## Rodar backend
 
@@ -35,18 +86,62 @@ uv run uvicorn minerva_travel.app:app --reload --host 127.0.0.1 --port 8000
 
 Backend: `http://localhost:8000`.
 
+O backend não publica mais uma segunda interface: `GET /` responde com redirecionamento
+para o frontend e o antigo `POST /generate` responde `410`. Use sempre `/api/generate`.
+
+### Rodar backend em container
+
+O Dockerfile usa o mesmo Python do desenvolvimento e CI, inclui as bibliotecas
+nativas do WeasyPrint e executa o processo com usuario nao root:
+
+```bash
+docker build --pull -t minerva-travel .
+docker volume create minerva-travel-runtime
+docker run --rm --name minerva-travel \
+  -p 8000:8000 \
+  -v minerva-travel-runtime:/app/runtime \
+  minerva-travel
+```
+
+Para habilitar providers externos, acrescente `--env-file .env` ao comando
+`docker run`. O healthcheck consulta `http://127.0.0.1:8000/api/catalog`; em outro
+terminal, consulte o estado com:
+
+```bash
+docker inspect --format '{{.State.Health.Status}}' minerva-travel
+```
+
 ## Rodar frontend
 
 ```bash
 cd frontend_atual/apps/web
 cp .env.example .env
-npm install
+npm ci
 npm run dev
 ```
 
 Frontend: `http://localhost:3000`.
 
 O frontend usa `VITE_API_BASE_URL` para chamar o backend FastAPI.
+A separação completa de variáveis entre frontend, API, worker, staging e
+produção está em `docs/ENVIRONMENT_MATRIX.md`.
+
+### Worker de geração
+
+Em produção, `ASYNC_GUIDE_JOBS_ENABLED=true` faz o `POST /api/generate` retornar `202`
+com `job_id`. Execute um processo worker separado com as mesmas variáveis de ambiente:
+
+```bash
+uv run python scripts/run_guide_worker.py
+```
+
+O worker aplica lease, retry exponencial para falhas transitórias e limite de tentativas.
+Eventos JSON sem PII incluem `request_id`, `job_id`, estágio, duração e um hash do usuário.
+
+O CI audita dependências, executa SAST e procura vulnerabilidades, segredos e
+configurações inseguras. Exceções temporárias devem ter mitigação, teste e prazo
+de revisão registrados em `docs/SECURITY_EXCEPTIONS.md`; exceções genéricas não
+são aceitas.
 
 ## Preview do layout do PDF
 
@@ -134,7 +229,13 @@ SUPABASE_BUCKET_LANDMARK_ASSETS=landmark-assets
 SUPABASE_BUCKET_FAMILY_UPLOADS=family-uploads
 SUPABASE_BUCKET_GENERATED_GUIDES=generated-guides
 SUPABASE_BUCKET_GENERATED_COVERS=generated-covers
-CORS_ALLOW_ORIGINS=*
+CORS_ALLOW_ORIGINS=https://minerva-travel.hostingerapp.com
+FRONTEND_BASE_URL=https://minerva-travel.hostingerapp.com
+GUIDE_RETENTION_DAYS=30
+GUIDE_DRAFT_RETENTION_DAYS=14
+ASYNC_GUIDE_JOBS_ENABLED=true
+GUIDE_JOB_MAX_ATTEMPTS=3
+OBSERVABILITY_HASH_SALT=gere_um_valor_unico_por_ambiente
 ```
 
 Com `IMAGE_PROVIDER=replicate`, o backend usa a foto enviada para gerar a capa.

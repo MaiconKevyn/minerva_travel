@@ -11,7 +11,7 @@ def test_lookup_destination_language_uses_known_destination_metadata():
     language = lookup_destination_language(catalog.find_destination("paris"))
 
     assert language is not None
-    assert language.name == "frances"
+    assert language.name == "francês"
     assert [tip.phrase for tip in language.tips[:2]] == ["Bonjour", "Merci"]
 
 

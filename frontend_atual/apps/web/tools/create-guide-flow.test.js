@@ -115,14 +115,14 @@ test('attraction selection exposes category labels filters and review context', 
   assert.match(review, /categoryLabelForAttraction/);
 });
 
-test('review step offers restaurant recommendations as a priced optional extra', () => {
+test('review step offers restaurant recommendations under the explicit pilot contract', () => {
   const api = readProjectFile('src/utils/minerva-api.js');
   const context = readProjectFile('src/contexts/ConversationalGuideContext.jsx');
   const review = readProjectFile('src/components/Step5Review.jsx');
 
   assert.match(api, /RESTAURANT_RECOMMENDATIONS_EXTRA/);
-  assert.match(api, /price_cents:\s*2990/);
-  assert.match(api, /R\$ 29,90/);
+  assert.match(api, /price_cents:\s*0/);
+  assert.match(api, /Incluído no piloto/);
   assert.match(context, /restaurantRecommendationsExtra/);
   assert.match(review, /RESTAURANT_RECOMMENDATIONS_EXTRA/);
   assert.match(review, /setRestaurantRecommendationsExtra/);

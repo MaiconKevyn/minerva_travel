@@ -4,7 +4,11 @@ import httpx
 
 from minerva_travel.custom_landmarks import build_custom_destinations, parse_custom_landmarks
 from minerva_travel.models import DynamicItineraryRequest
-from minerva_travel.place_discovery import discover_dynamic_itinerary, resolve_landmark_locations
+from minerva_travel.place_discovery import (
+    _place_categories,
+    discover_dynamic_itinerary,
+    resolve_landmark_locations,
+)
 
 
 def test_discover_dynamic_itinerary_normalizes_options_with_category_and_identity():
@@ -54,6 +58,12 @@ def test_discover_dynamic_itinerary_normalizes_options_with_category_and_identit
     assert "Boa opcao para criancas menores." in option["match_reasons"]
 
 
+def test_google_place_type_takes_priority_over_the_search_profile_category():
+    categories = _place_categories(_place("museum-central", "Museu Central", ["museum"]), "food")
+
+    assert categories == ["museums", "food"]
+
+
 def test_discover_dynamic_itinerary_returns_broader_family_categories_when_available():
     requested_queries: list[str] = []
 
@@ -77,11 +87,7 @@ def test_discover_dynamic_itinerary_returns_broader_family_categories_when_avail
             query = payload["textQuery"]
             requested_queries.append(query)
             normalized_query = _ascii(query)
-            places = [
-                place
-                for token, place in places_by_token
-                if token in normalized_query
-            ]
+            places = [place for token, place in places_by_token if token in normalized_query]
             return httpx.Response(200, json={"places": places})
         raise AssertionError(f"Unexpected request: {url}")
 
@@ -143,9 +149,7 @@ def test_discover_dynamic_itinerary_supplements_generic_intent_with_default_cate
                 200,
                 json={
                     "places": [
-                        place
-                        for token, place in places_by_token
-                        if token in normalized_query
+                        place for token, place in places_by_token if token in normalized_query
                     ]
                 },
             )
@@ -224,11 +228,7 @@ def test_discover_dynamic_itinerary_exposes_minimum_unique_options_when_availabl
         )
 
     visible_ids = [
-        *[
-            stop["selection_id"]
-            for day in recommendation["days"]
-            for stop in day["stops"]
-        ],
+        *[stop["selection_id"] for day in recommendation["days"] for stop in day["stops"]],
         *[stop["selection_id"] for stop in recommendation["alternatives"]],
     ]
 
@@ -268,9 +268,7 @@ def test_discover_dynamic_itinerary_uses_natural_language_intent_for_child_reque
                 return httpx.Response(
                     200,
                     json={
-                        "places": [
-                            _place("art-kids", "Atelier Infantil de Arte", ["art_gallery"])
-                        ]
+                        "places": [_place("art-kids", "Atelier Infantil de Arte", ["art_gallery"])]
                     },
                 )
             return httpx.Response(200, json={"places": []})
@@ -339,11 +337,7 @@ def test_resolve_landmark_locations_retries_until_google_places_returns_coordina
                 return httpx.Response(200, json={"places": []})
             return httpx.Response(
                 200,
-                json={
-                    "places": [
-                        _place("eiffel", "Torre Eiffel", ["tourist_attraction"])
-                    ]
-                },
+                json={"places": [_place("eiffel", "Torre Eiffel", ["tourist_attraction"])]},
             )
         raise AssertionError(f"Unexpected request: {url}")
 
@@ -706,9 +700,7 @@ def test_discover_dynamic_itinerary_keeps_only_best_google_result_for_mentioned_
         *recommendation["alternatives"],
     ]
     stop_names = [stop["name"] for stop in visible_stops]
-    mentioned_names = [
-        stop["name"] for stop in visible_stops if stop["source_type"] == "mentioned"
-    ]
+    mentioned_names = [stop["name"] for stop in visible_stops if stop["source_type"] == "mentioned"]
 
     assert "Museu do Louvre" in stop_names
     assert "Piramide do Louvre" not in stop_names
@@ -811,11 +803,7 @@ def test_discover_dynamic_itinerary_prioritizes_requested_interests():
             client=client,
         )
 
-    selected_ids = [
-        stop["selection_id"]
-        for day in recommendation["days"]
-        for stop in day["stops"]
-    ]
+    selected_ids = [stop["selection_id"] for day in recommendation["days"] for stop in day["stops"]]
 
     assert recommendation["recommendation_source"] == "google_places"
     assert selected_ids[0] == "google:museum-1"
@@ -904,11 +892,7 @@ def _place(
 
 
 def _ascii(value: str) -> str:
-    return (
-        value.encode("ascii", errors="ignore")
-        .decode()
-        .casefold()
-    )
+    return value.encode("ascii", errors="ignore").decode().casefold()
 
 
 def _geocode_response(city: str, country: str, lat: float, lng: float) -> httpx.Response:

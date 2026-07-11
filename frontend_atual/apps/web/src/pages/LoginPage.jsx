@@ -7,11 +7,12 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import { Airplane, Flower } from '@/components/DecorativeElements.jsx';
-import { Loader2, Key } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Key } from 'lucide-react';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
@@ -61,14 +62,14 @@ const LoginPage = () => {
   return (
     <>
       <Helmet>
-        <title>Entrar - Aventuras em Família</title>
+        <title>Entrar - Minerva Travel</title>
         <meta name="description" content="Faça login para acessar seus guias de viagem mágicos." />
       </Helmet>
 
       <div className="min-h-screen bg-background flex flex-col transition-colors duration-200">
         <Header />
 
-        <main className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
+        <main id="main-content" tabIndex={-1} className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
           <Flower className="absolute bottom-20 left-10 w-32 h-32 text-secondary opacity-10" />
           <Airplane className="absolute top-20 right-20 w-24 h-24 text-primary opacity-10" />
 
@@ -83,9 +84,11 @@ const LoginPage = () => {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-foreground mb-1">Email Mágico</label>
+                <label htmlFor="login-email" className="block text-sm font-bold text-foreground mb-1">Email Mágico</label>
                 <input
+                  id="login-email"
                   type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -96,7 +99,7 @@ const LoginPage = () => {
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-bold text-foreground">Senha Secreta</label>
+                  <label htmlFor="login-password" className="block text-sm font-bold text-foreground">Senha Secreta</label>
                   <button
                     type="button"
                     onClick={handlePasswordReset}
@@ -106,14 +109,27 @@ const LoginPage = () => {
                     {isResetting ? 'Enviando...' : 'Esqueceu a senha?'}
                   </button>
                 </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 pr-14 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    aria-pressed={showPassword}
+                  >
+                    {showPassword ? <EyeOff aria-hidden="true" className="h-5 w-5" /> : <Eye aria-hidden="true" className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
 
               <Button

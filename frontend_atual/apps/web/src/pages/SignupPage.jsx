@@ -7,13 +7,15 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import { Flower, Airplane, Suitcase } from '@/components/DecorativeElements.jsx';
-import { Sparkles, ArrowRight, Loader2 } from 'lucide-react';
+import { Sparkles, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const SignupPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { signup } = useAuth();
@@ -57,14 +59,14 @@ const SignupPage = () => {
   return (
     <>
       <Helmet>
-        <title>Criar Conta - Aventuras em Família</title>
+        <title>Criar Conta - Minerva Travel</title>
         <meta name="description" content="Crie sua conta para começar a escrever o livro de viagens da sua família." />
       </Helmet>
 
       <div className="min-h-screen bg-background flex flex-col transition-colors duration-200">
         <Header />
 
-        <main className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
+        <main id="main-content" tabIndex={-1} className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
           <Flower className="absolute top-20 left-10 w-24 h-24 text-primary opacity-10" />
           <Airplane className="absolute bottom-20 right-10 w-32 h-32 text-secondary opacity-10" />
           <Suitcase className="absolute top-40 right-20 w-16 h-16 text-accent opacity-10" />
@@ -80,9 +82,11 @@ const SignupPage = () => {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-foreground mb-1">Nome da Família ou Responsável</label>
+                <label htmlFor="signup-name" className="block text-sm font-bold text-foreground mb-1">Nome da Família ou Responsável</label>
                 <input
+                  id="signup-name"
                   type="text"
+                  autoComplete="name"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -92,9 +96,11 @@ const SignupPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-foreground mb-1">Email Mágico</label>
+                <label htmlFor="signup-email" className="block text-sm font-bold text-foreground mb-1">Email Mágico</label>
                 <input
+                  id="signup-email"
                   type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -104,39 +110,75 @@ const SignupPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-foreground mb-1">Senha Secreta</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all text-foreground"
-                  placeholder="Mínimo 8 caracteres"
-                />
+                <label htmlFor="signup-password" className="block text-sm font-bold text-foreground mb-1">Senha Secreta</label>
+                <div className="relative">
+                  <input
+                    id="signup-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    aria-describedby="signup-password-help signup-password-strength"
+                    className="w-full px-4 py-3 pr-14 rounded-2xl border-2 border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all text-foreground"
+                    placeholder="Mínimo 8 caracteres"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    aria-pressed={showPassword}
+                  >
+                    {showPassword ? <EyeOff aria-hidden="true" className="h-5 w-5" /> : <Eye aria-hidden="true" className="h-5 w-5" />}
+                  </button>
+                </div>
 
                 {password && (
-                  <div className="mt-2 flex gap-1 h-2">
-                    <div className={`flex-1 rounded-full ${strength >= 1 ? 'bg-destructive' : 'bg-muted'}`} />
-                    <div className={`flex-1 rounded-full ${strength >= 2 ? 'bg-secondary' : 'bg-muted'}`} />
-                    <div className={`flex-1 rounded-full ${strength >= 3 ? 'bg-accent' : 'bg-muted'}`} />
+                  <div
+                    id="signup-password-strength"
+                    role="meter"
+                    aria-label="Força da senha"
+                    aria-valuemin="0"
+                    aria-valuemax="3"
+                    aria-valuenow={strength}
+                    aria-valuetext={strength === 3 ? 'Forte' : 'Ainda não atende aos requisitos'}
+                    className="mt-2 flex gap-1 h-2"
+                  >
+                    <div aria-hidden="true" className={`flex-1 rounded-full ${strength >= 1 ? 'bg-destructive' : 'bg-muted'}`} />
+                    <div aria-hidden="true" className={`flex-1 rounded-full ${strength >= 2 ? 'bg-secondary' : 'bg-muted'}`} />
+                    <div aria-hidden="true" className={`flex-1 rounded-full ${strength >= 3 ? 'bg-accent' : 'bg-muted'}`} />
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-1 font-medium">
+                <p id="signup-password-help" className="text-xs text-muted-foreground mt-1 font-medium">
                   {strength < 3 && password ? 'A senha deve ter 8+ letras, 1 maiúscula e 1 número.' : ''}
                   {strength === 3 && 'Senha forte! 🌟'}
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-foreground mb-1">Confirme a Senha</label>
-                <input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all text-foreground"
-                  placeholder="Repita sua senha secreta"
-                />
+                <label htmlFor="signup-confirm-password" className="block text-sm font-bold text-foreground mb-1">Confirme a Senha</label>
+                <div className="relative">
+                  <input
+                    id="signup-confirm-password"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-3 pr-14 rounded-2xl border-2 border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all text-foreground"
+                    placeholder="Repita sua senha secreta"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((visible) => !visible)}
+                    className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label={showConfirmPassword ? 'Ocultar confirmação da senha' : 'Mostrar confirmação da senha'}
+                    aria-pressed={showConfirmPassword}
+                  >
+                    {showConfirmPassword ? <EyeOff aria-hidden="true" className="h-5 w-5" /> : <Eye aria-hidden="true" className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
 
               <Button

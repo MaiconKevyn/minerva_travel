@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import authClient from '../lib/authClient.js';
 import * as minervaApi from './minerva-api.js';
 import {
   appendGuideLandmarks,
@@ -682,10 +683,204 @@ test('appendGuideMetadata preserves family cover count with child ages for PDF g
   assert.equal(formData.get('expected_visible_family_member_count'), '4');
 });
 
-test('restaurant recommendations extra exposes initial price contract', () => {
+test('appendGuideMetadata sends versioned photo-processing consent', () => {
+  const formData = new FormData();
+
+  appendGuideMetadata(formData, {
+    title: 'Guia da Família',
+    photoProcessingConsent: true,
+    privacyConsentVersion: '2026-07-09',
+    privacyConsentAt: '2026-07-09T18:30:00.000Z',
+  });
+
+  assert.equal(formData.get('photo_processing_consent'), 'true');
+  assert.equal(formData.get('privacy_consent_version'), '2026-07-09');
+  assert.equal(formData.get('privacy_consent_at'), '2026-07-09T18:30:00.000Z');
+});
+
+test('buildGuideItineraryPayload preserves destinations preferences and reviewed days', () => {
+  const itinerary = minervaApi.buildGuideItineraryPayload({
+    itineraryMode: 'freeform',
+    destinationsList: [
+      {
+        id: 'paris',
+        place: 'Paris, França',
+        timing: 'Julho de 2026',
+        days: 3,
+        landmarks: ['Torre Eiffel'],
+      },
+    ],
+    itineraryPreferences: {
+      pace: 'light',
+      interests: ['museus', 'parques'],
+    },
+    recommendedDays: [
+      {
+        day: 1,
+        title: 'Primeiro dia em Paris',
+        theme: 'Ícones da cidade',
+        landmarks: [
+          {
+            id: 'paris:eiffel-tower',
+            name: 'Torre Eiffel',
+            destination_id: 'paris',
+          },
+        ],
+      },
+    ],
+    extraLandmarks: [
+      {
+        id: 'paris:louvre',
+        name: 'Museu do Louvre',
+        destination_id: 'paris',
+      },
+    ],
+  });
+
+  assert.deepEqual(itinerary, {
+    mode: 'freeform',
+    pace: 'light',
+    interests: ['museus', 'parques'],
+    destinations: [
+      {
+        id: 'paris',
+        place: 'Paris, França',
+        timing: 'Julho de 2026',
+        days: 3,
+        order: 1,
+      },
+    ],
+    days: [
+      {
+        day: 1,
+        title: 'Primeiro dia em Paris',
+        theme: 'Ícones da cidade',
+        stops: [
+          {
+            selection_id: 'paris:eiffel-tower',
+            name: 'Torre Eiffel',
+            destination_id: 'paris',
+          },
+        ],
+      },
+    ],
+    unplanned_stops: [
+      {
+        selection_id: 'paris:louvre',
+        name: 'Museu do Louvre',
+        destination_id: 'paris',
+      },
+    ],
+  });
+});
+
+test('appendGuideMetadata serializes the itinerary reviewed by the family', () => {
+  const formData = new FormData();
+  const itinerary = {
+    mode: 'known',
+    pace: 'balanced',
+    interests: [],
+    destinations: [
+      {
+        id: 'lisbon',
+        place: 'Lisboa, Portugal',
+        timing: 'Agosto de 2026',
+        days: 2,
+        order: 1,
+      },
+    ],
+    days: [],
+    unplanned_stops: [],
+  };
+
+  appendGuideMetadata(formData, {
+    title: 'Família Silva',
+    childrenNames: 'Alice',
+    parentsNames: 'Ana',
+    year: 2026,
+    itinerary,
+  });
+
+  assert.deepEqual(JSON.parse(formData.get('itinerary_json')), itinerary);
+});
+
+test('restaurant recommendations extra is explicit about the no-charge pilot contract', () => {
   assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.id, 'restaurant_recommendations_extra');
-  assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.price_cents, 2990);
-  assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.price_label, 'R$ 29,90');
+  assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.price_cents, 0);
+  assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.price_label, 'Incluído no piloto');
+});
+
+test('generatePDF sends the same caller-owned idempotency key with the authenticated request', async () => {
+  const originalFetch = globalThis.fetch;
+  let capturedOptions;
+  await authClient.signup('idempotency-owner@example.com', 'Senha123', 'Família Silva');
+  await authClient.login('idempotency-owner@example.com', 'Senha123');
+  globalThis.fetch = async (_url, options = {}) => {
+    capturedOptions = options;
+    return new Response(JSON.stringify({ download_url: '/download/guide.pdf' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  try {
+    await minervaApi.generatePDF({
+      title: 'Família Silva',
+      childrenNames: 'Alice',
+      parentsNames: 'Ana',
+      year: 2026,
+      familyPhoto: new Blob(['photo'], { type: 'image/png' }),
+      selectedLandmarks: ['paris:eiffel-tower'],
+    }, { idempotencyKey: 'guide-stable-retry-key' });
+
+    assert.equal(capturedOptions.headers.get('Idempotency-Key'), 'guide-stable-retry-key');
+    assert.equal(capturedOptions.headers.get('Authorization'), 'Bearer local-development-token');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});
+
+test('waitForGuideJob polls an owner-scoped job until its durable result is ready', async () => {
+  const originalFetch = globalThis.fetch;
+  const seen = [];
+  await authClient.signup('job-owner@example.com', 'Senha123', 'Família Silva');
+  await authClient.login('job-owner@example.com', 'Senha123');
+  globalThis.fetch = async (url, options = {}) => {
+    seen.push({ url: String(url), options });
+    const payload = seen.length === 1
+      ? { id: 'job-123', status: 'running', stage: 'rendering_pdf', progress: 75 }
+      : {
+        id: 'job-123',
+        status: 'succeeded',
+        stage: 'complete',
+        progress: 100,
+        result: { download_url: '/download/guide.pdf', filename: 'guide.pdf' },
+      };
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  const updates = [];
+
+  try {
+    const result = await minervaApi.waitForGuideJob('job-123', {
+      intervalMs: 0,
+      sleep: async () => {},
+      onUpdate: (job) => updates.push([job.stage, job.progress]),
+    });
+
+    assert.deepEqual(result, { download_url: '/download/guide.pdf', filename: 'guide.pdf' });
+    assert.deepEqual(updates, [['rendering_pdf', 75], ['complete', 100]]);
+    assert.deepEqual(seen.map(({ url }) => new URL(url).pathname), ['/api/jobs/job-123', '/api/jobs/job-123']);
+    seen.forEach(({ options }) => {
+      assert.equal(options.headers.get('Authorization'), 'Bearer local-development-token');
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
 });
 
 test('appendGuideMetadata sends restaurant extra entitlement only when selected', () => {
@@ -708,4 +903,151 @@ test('appendGuideMetadata sends restaurant extra entitlement only when selected'
 
   assert.equal(baseFormData.get('restaurant_recommendations_extra'), null);
   assert.equal(extraFormData.get('restaurant_recommendations_extra'), 'true');
+});
+
+test('guide library APIs list, read, delete and download through authenticated owner routes', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  const guide = {
+    id: 'guide-123',
+    title: 'Família Silva em Lisboa',
+    status: 'succeeded',
+    created_at: '2026-07-09T12:00:00+00:00',
+    updated_at: '2026-07-09T12:00:00+00:00',
+    expires_at: '2026-08-08T12:00:00+00:00',
+    cover_fallback_used: false,
+    destinations: [{ id: 'lisbon', place: 'Lisboa, Portugal' }],
+    download_url: '/download/guide-123.pdf',
+  };
+
+  await authClient.signup('dashboard-owner@example.com', 'Senha123', 'Família Silva');
+  await authClient.login('dashboard-owner@example.com', 'Senha123');
+
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    const method = options.method || 'GET';
+
+    if (String(url).endsWith('/api/guides') && method === 'GET') {
+      return new Response(JSON.stringify({ guides: [guide] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/api/guides/guide-123') && method === 'GET') {
+      return new Response(JSON.stringify(guide), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/api/guides/guide-123') && method === 'DELETE') {
+      return new Response(JSON.stringify({ deleted: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/download/guide-123.pdf') && method === 'GET') {
+      return new Response('%PDF-test', {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': 'attachment; filename="familia-silva.pdf"',
+        },
+      });
+    }
+    return new Response(null, { status: 404 });
+  };
+
+  try {
+    assert.deepEqual(await minervaApi.listGuides(), [guide]);
+    assert.deepEqual(await minervaApi.getGuide('guide-123'), guide);
+    assert.equal(await minervaApi.deleteGuide('guide-123'), true);
+    const download = await minervaApi.downloadGuidePdf(guide.download_url);
+
+    assert.equal(await download.blob.text(), '%PDF-test');
+    assert.equal(download.filename, 'familia-silva.pdf');
+    assert.deepEqual(
+      calls.map(({ url, options }) => [new URL(url).pathname, options.method || 'GET']),
+      [
+        ['/api/guides', 'GET'],
+        ['/api/guides/guide-123', 'GET'],
+        ['/api/guides/guide-123', 'DELETE'],
+        ['/download/guide-123.pdf', 'GET'],
+      ],
+    );
+    calls.forEach(({ options }) => {
+      assert.equal(options.headers.get('Authorization'), 'Bearer local-development-token');
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});
+
+test('guide draft APIs restore, save and discard through authenticated owner routes', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  const draft = {
+    id: 'draft-123',
+    title: 'Rascunho de guia',
+    payload: { current_step: 3, family_name: 'Silva' },
+    revision: 2,
+    status: 'active',
+  };
+
+  await authClient.signup('draft-owner@example.com', 'Senha123', 'Família Rascunho');
+  await authClient.login('draft-owner@example.com', 'Senha123');
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    const method = options.method || 'GET';
+    if (String(url).endsWith('/api/drafts/current') && method === 'GET') {
+      return new Response(JSON.stringify({ draft }), { status: 200 });
+    }
+    if (String(url).endsWith('/api/drafts') && method === 'POST') {
+      return new Response(JSON.stringify({ ...draft, id: 'draft-created', revision: 1 }), { status: 201 });
+    }
+    if (String(url).endsWith('/api/drafts/draft-123') && method === 'PUT') {
+      return new Response(JSON.stringify(draft), { status: 200 });
+    }
+    if (String(url).endsWith('/api/drafts/draft-123') && method === 'DELETE') {
+      return new Response(JSON.stringify({ deleted: true }), { status: 200 });
+    }
+    return new Response(null, { status: 404 });
+  };
+
+  try {
+    assert.deepEqual(await minervaApi.getCurrentGuideDraft(), draft);
+    const created = await minervaApi.createGuideDraft({ title: draft.title, payload: draft.payload });
+    assert.equal(created.id, 'draft-created');
+    assert.deepEqual(
+      await minervaApi.updateGuideDraft(draft.id, {
+        title: draft.title,
+        payload: draft.payload,
+        revision: 1,
+      }),
+      draft,
+    );
+    assert.equal(await minervaApi.discardGuideDraft(draft.id), true);
+    assert.deepEqual(
+      calls.map(({ url, options }) => [new URL(url).pathname, options.method || 'GET']),
+      [
+        ['/api/drafts/current', 'GET'],
+        ['/api/drafts', 'POST'],
+        ['/api/drafts/draft-123', 'PUT'],
+        ['/api/drafts/draft-123', 'DELETE'],
+      ],
+    );
+    calls.forEach(({ options }) => {
+      assert.equal(options.headers.get('Authorization'), 'Bearer local-development-token');
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});
+
+test('guide download rejects external URLs before sending the owner token', async () => {
+  await assert.rejects(
+    () => minervaApi.downloadGuidePdf('https://malicious.example/guide.pdf'),
+    /Link de download inválido/,
+  );
 });

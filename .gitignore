@@ -2,11 +2,11 @@
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+.coverage
 *.egg-info/
 build/
 runtime/
 output/
-docs/
 .env
 .idea/
 .superpowers/
@@ -24,3 +24,5 @@ frontend_atual/package.json
 frontend_atual/package-lock.json
 frontend_atual/apps/api/
 frontend_atual/apps/pocketbase/
+frontend_atual/apps/web/test-results/
+frontend_atual/apps/web/playwright-report/

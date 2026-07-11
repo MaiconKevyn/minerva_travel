@@ -46,7 +46,10 @@ def discover_restaurants_for_guide(
         seen_place_ids: set[str] = set()
         per_destination_counts: dict[str, int] = {}
         for anchor in restaurant_anchors(guide_destinations):
-            if per_destination_counts.get(anchor.destination_id, 0) >= MAX_RESTAURANTS_PER_DESTINATION:
+            if (
+                per_destination_counts.get(anchor.destination_id, 0)
+                >= MAX_RESTAURANTS_PER_DESTINATION
+            ):
                 continue
             for place in _search_restaurants(http_client, api_key, anchor.query):
                 place_id = str(place.get("id") or "")
@@ -144,10 +147,10 @@ def _restaurant_recommendation(
         return None
     cuisine = _cuisine_note(place)
     notes = _suitability_notes(place)
-    reason = f"Opcao {anchor.nearby_context} para uma pausa em familia."
+    reason = f"Opção {anchor.nearby_context} para uma pausa em família."
     rating = place.get("rating")
     if isinstance(rating, int | float) and rating >= 4.4:
-        reason = f"Opcao bem avaliada {anchor.nearby_context} para uma pausa em familia."
+        reason = f"Opção bem avaliada {anchor.nearby_context} para uma pausa em família."
 
     return RestaurantRecommendation(
         destination_id=anchor.destination_id,

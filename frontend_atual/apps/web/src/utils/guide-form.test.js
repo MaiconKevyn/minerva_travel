@@ -30,6 +30,69 @@ test('serializeGuideDestinations preserves place timing duration and order', () 
   assert.equal(totalTripDays(destinations), 5);
 });
 
+test('createGuideDestination keeps IDs unique when a destination is removed and another is added', () => {
+  const destinations = [
+    guideForm.createGuideDestination(),
+    guideForm.createGuideDestination(),
+    guideForm.createGuideDestination(),
+  ];
+  const removedId = destinations[1].id;
+  const afterRemoval = destinations.filter((destination) => destination.id !== removedId);
+  const afterAddition = [...afterRemoval, guideForm.createGuideDestination()];
+
+  assert.equal(new Set(afterAddition.map((destination) => destination.id)).size, 3);
+  assert.notEqual(afterAddition.at(-1).id, removedId);
+  assert.match(afterAddition.at(-1).id, /^destination-/);
+});
+
+test('family member limits match the current guide contract', () => {
+  assert.equal(guideForm.MAX_GUIDE_CHILDREN, 10);
+  assert.equal(guideForm.MAX_GUIDE_PARENTS, 10);
+});
+
+test('validateFamilyPhoto accepts a matching PNG within byte and dimension limits', async () => {
+  const pngHeader = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const file = new File([pngHeader], 'familia.png', { type: 'image/png' });
+
+  const result = await guideForm.validateFamilyPhoto(file, {
+    decodeDimensions: async () => ({ width: 1200, height: 800 }),
+  });
+
+  assert.deepEqual(result, { valid: true, code: 'valid_image', message: '' });
+});
+
+test('validateFamilyPhoto rejects fake image content and unsupported declarations', async () => {
+  const fakePng = new File([Uint8Array.from([1, 2, 3, 4])], 'familia.png', {
+    type: 'image/png',
+  });
+  const svg = new File(['<svg></svg>'], 'familia.svg', { type: 'image/svg+xml' });
+
+  assert.equal((await guideForm.validateFamilyPhoto(fakePng)).code, 'content_mismatch');
+  assert.equal((await guideForm.validateFamilyPhoto(svg)).code, 'unsupported_type');
+});
+
+test('validateFamilyPhoto rejects excessive file and pixel dimensions before upload', async () => {
+  const oversized = {
+    name: 'familia.jpg',
+    type: 'image/jpeg',
+    size: guideForm.FAMILY_PHOTO_MAX_BYTES + 1,
+    slice: () => {
+      throw new Error('Large file should be rejected before reading.');
+    },
+  };
+  const jpeg = new File([Uint8Array.from([0xff, 0xd8, 0xff, 0x00])], 'familia.jpg', {
+    type: 'image/jpeg',
+  });
+
+  assert.equal((await guideForm.validateFamilyPhoto(oversized)).code, 'file_too_large');
+  assert.equal(
+    (await guideForm.validateFamilyPhoto(jpeg, {
+      decodeDimensions: async () => ({ width: 12_001, height: 100 }),
+    })).code,
+    'dimensions_exceeded',
+  );
+});
+
 test('normalizeGuideDestinations trims landmark names and drops empty boxes', () => {
   const destinations = normalizeGuideDestinations([
     {

@@ -17,4 +17,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-runtime': ['react', 'react-dom', 'react-router-dom'],
+          'ui-runtime': ['framer-motion', 'lucide-react', 'sonner'],
+        },
+      },
+    },
+  },
 });

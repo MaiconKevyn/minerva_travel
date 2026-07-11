@@ -80,11 +80,14 @@ def test_choose_best_representative_candidate_prefers_specific_landmark_terms():
         },
     )
 
-    assert choose_best_representative_candidate(
-        [generic, specific],
-        required_terms=["eiffel", "tower"],
-        rejected_terms=[],
-    ) == specific
+    assert (
+        choose_best_representative_candidate(
+            [generic, specific],
+            required_terms=["eiffel", "tower"],
+            rejected_terms=[],
+        )
+        == specific
+    )
 
 
 def test_normalize_search_text_treats_punctuation_as_spaces():

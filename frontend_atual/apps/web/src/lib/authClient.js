@@ -1,4 +1,3 @@
-import PocketBase from 'pocketbase';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 const LOCAL_USERS_KEY = 'minerva_local_users';
@@ -72,7 +71,7 @@ const formatAuthError = (error, fallback) => {
   const normalized = message.toLowerCase();
 
   if (normalized.includes('email not confirmed')) {
-    return 'Este email ainda nao foi confirmado. Verifique sua caixa de entrada ou desative a confirmacao de email no Supabase para o MVP.';
+    return 'Este e-mail ainda não foi confirmado. Verifique sua caixa de entrada ou desative a confirmação de e-mail no Supabase para o MVP.';
   }
 
   if (normalized.includes('invalid login credentials')) {
@@ -145,6 +144,10 @@ export const createLocalAuthClient = (storage = globalThis.localStorage || creat
       return readSession();
     },
 
+    async getAccessToken() {
+      return readSession() ? 'local-development-token' : null;
+    },
+
     async login(email, password) {
       const users = readUsers();
       const normalizedEmail = normalizeEmail(email);
@@ -167,7 +170,7 @@ export const createLocalAuthClient = (storage = globalThis.localStorage || creat
       const normalizedEmail = normalizeEmail(email);
 
       if (users[normalizedEmail]) {
-        return { success: false, error: 'Este email ja esta cadastrado.' };
+        return { success: false, error: 'Este e-mail já está cadastrado.' };
       }
 
       const passwordDigest = await createPasswordDigest(normalizedEmail, password);
@@ -185,21 +188,21 @@ export const createLocalAuthClient = (storage = globalThis.localStorage || creat
     async requestPasswordReset() {
       return {
         success: false,
-        error: 'Recuperacao de senha exige Supabase configurado.',
+        error: 'Recuperação de senha exige Supabase configurado.',
       };
     },
 
     async preparePasswordRecovery() {
       return {
         success: false,
-        error: 'Recuperacao de senha exige Supabase configurado.',
+        error: 'Recuperação de senha exige Supabase configurado.',
       };
     },
 
     async updatePassword() {
       return {
         success: false,
-        error: 'Recuperacao de senha exige Supabase configurado.',
+        error: 'Recuperação de senha exige Supabase configurado.',
       };
     },
 
@@ -257,6 +260,15 @@ export const createSupabaseAuthClient = ({
 
       setSession(data?.session || null);
       return currentUser;
+    },
+
+    async getAccessToken() {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Supabase session error:', error);
+        return null;
+      }
+      return data?.session?.access_token || null;
     },
 
     async login(email, password) {
@@ -387,91 +399,35 @@ export const createSupabaseAuthClient = ({
   };
 };
 
-export const createPocketBaseAuthClient = (pocketBaseUrl) => {
-  const pb = new PocketBase(pocketBaseUrl);
-
-  return {
-    get model() {
-      return pb.authStore.model;
-    },
-
-    get isValid() {
-      return pb.authStore.isValid;
-    },
-
-    subscribe(listener) {
-      return pb.authStore.onChange((token, model) => {
-        listener(model);
-      });
-    },
-
-    async initialize() {
-      return pb.authStore.model;
-    },
-
-    async login(email, password) {
-      try {
-        const authData = await pb.collection('users').authWithPassword(email, password, { $autoCancel: false });
-        return { success: true, data: authData };
-      } catch (error) {
-        console.error('Login error:', error);
-        return { success: false, error: error.message || 'Login falhou. Verifique suas credenciais.' };
-      }
-    },
-
-    async signup(email, password, name) {
-      try {
-        await pb.collection('users').create({
-          email,
-          password,
-          passwordConfirm: password,
-          name,
-        }, { $autoCancel: false });
-
-        return { success: true };
-      } catch (error) {
-        console.error('Signup error:', error);
-        return { success: false, error: error.message || 'Falha ao criar conta.' };
-      }
-    },
-
-    async requestPasswordReset() {
-      return {
-        success: false,
-        error: 'Recuperacao de senha exige Supabase configurado.',
-      };
-    },
-
-    async preparePasswordRecovery() {
-      return {
-        success: false,
-        error: 'Recuperacao de senha exige Supabase configurado.',
-      };
-    },
-
-    async updatePassword() {
-      return {
-        success: false,
-        error: 'Recuperacao de senha exige Supabase configurado.',
-      };
-    },
-
-    logout() {
-      pb.authStore.clear();
-    },
-  };
-};
-
 export const createAuthClient = ({
+  authMode = import.meta.env?.VITE_AUTH_MODE || runtimeConfig().VITE_AUTH_MODE,
+  appEnvironment = (
+    import.meta.env?.VITE_APP_ENV ||
+    runtimeConfig().VITE_APP_ENV ||
+    (import.meta.env?.PROD ? 'production' : 'development')
+  ),
   supabaseUrl = import.meta.env?.VITE_SUPABASE_URL || runtimeConfig().VITE_SUPABASE_URL,
   supabasePublishableKey = (
     import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY || runtimeConfig().VITE_SUPABASE_PUBLISHABLE_KEY
   ),
   createSupabaseClient: createSupabaseClientOverride = createSupabaseClient,
-  pocketBaseUrl = import.meta.env?.VITE_POCKETBASE_URL,
   storage = globalThis.localStorage,
 } = {}) => {
-  if (supabaseUrl && supabasePublishableKey) {
+  const environment = String(appEnvironment || 'development').trim().toLowerCase();
+  const selectedMode = String(authMode || '').trim().toLowerCase();
+  const production = environment === 'production';
+
+  if (selectedMode === 'local') {
+    if (production) {
+      throw new Error('Autenticação local não pode ser habilitada em produção.');
+    }
+    return createLocalAuthClient(storage || createMemoryStorage());
+  }
+
+  if (selectedMode === 'supabase' || (!selectedMode && supabaseUrl && supabasePublishableKey)) {
+    if (!supabaseUrl || !supabasePublishableKey) {
+      throw new Error('Supabase Auth exige URL e chave pública configuradas.');
+    }
     return createSupabaseAuthClient({
       supabaseUrl,
       supabasePublishableKey,
@@ -479,8 +435,12 @@ export const createAuthClient = ({
     });
   }
 
-  if (pocketBaseUrl) {
-    return createPocketBaseAuthClient(pocketBaseUrl);
+  if (production) {
+    throw new Error('Supabase Auth e obrigatorio em producao.');
+  }
+
+  if (selectedMode) {
+    throw new Error(`Modo de autenticação não suportado: ${selectedMode}.`);
   }
 
   return createLocalAuthClient(storage || createMemoryStorage());

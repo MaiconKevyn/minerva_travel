@@ -73,19 +73,25 @@ export const BookCarousel = ({ slides, className }) => {
       </div>
 
       {/* Dot Indicators */}
-      <div className="absolute bottom-4 inset-x-0 flex justify-center gap-2 z-10">
+      <div className="absolute bottom-1 inset-x-0 flex justify-center z-10 sm:bottom-2">
         {slides.map((_, index) => (
           <button
             key={index}
             onClick={() => goToSlide(index)}
             aria-label={`Ir para página ${index + 1}`}
-            className={cn(
-              "w-2.5 h-2.5 rounded-full transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-              index === currentIndex
-                ? "bg-primary w-6"
-                : "bg-white/60 dark:bg-slate-400/60 hover:bg-white dark:hover:bg-slate-300"
-            )}
-          />
+            aria-current={index === currentIndex ? 'true' : undefined}
+            className="flex h-11 w-11 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                "h-2.5 rounded-full transition-all duration-300",
+                index === currentIndex
+                  ? "w-6 bg-primary"
+                  : "w-2.5 bg-white/60 dark:bg-slate-400/60"
+              )}
+            />
+          </button>
         ))}
       </div>
     </div>

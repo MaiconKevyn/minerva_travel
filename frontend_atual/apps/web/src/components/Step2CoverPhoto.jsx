@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, UploadCloud, CheckCircle2 } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import {
   deriveExpectedFamilyMemberCount,
   normalizeFamilyMemberCount,
+  validateFamilyPhoto,
 } from '@/utils/guide-form.js';
 
 const Step2CoverPhoto = () => {
@@ -16,12 +18,16 @@ const Step2CoverPhoto = () => {
     updateCoverPhoto,
     expectedCoverFamilyMemberCount,
     updateExpectedCoverFamilyMemberCount,
+    photoProcessingConsent,
+    updatePhotoProcessingConsent,
     childrenList,
     parentsList,
     nextStep
   } = useConversationalGuide();
   const [isDragging, setIsDragging] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const fileInputRef = useRef(null);
   const derivedFamilyMemberCount = deriveExpectedFamilyMemberCount({ childrenList, parentsList });
   const confirmedFamilyMemberCount = normalizeFamilyMemberCount(expectedCoverFamilyMemberCount);
@@ -35,22 +41,36 @@ const Step2CoverPhoto = () => {
     setIsDragging(false);
   };
 
-  const handleDrop = (e) => {
+  const selectPhoto = async (file) => {
+    setPhotoError('');
+    setIsValidatingPhoto(true);
+    const result = await validateFamilyPhoto(file);
+    setIsValidatingPhoto(false);
+    if (!result.valid) {
+      updateCoverPhoto(null);
+      setPhotoError(result.message);
+      return;
+    }
+    updateCoverPhoto(file);
+  };
+
+  const handleDrop = async (e) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      updateCoverPhoto(e.dataTransfer.files[0]);
+      await selectPhoto(e.dataTransfer.files[0]);
     }
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     if (e.target.files && e.target.files[0]) {
-      updateCoverPhoto(e.target.files[0]);
+      await selectPhoto(e.target.files[0]);
     }
+    e.target.value = '';
   };
 
   const handleConfirm = () => {
-    if (!coverPhoto || confirmedFamilyMemberCount <= 0) return;
+    if (!coverPhoto || confirmedFamilyMemberCount <= 0 || !photoProcessingConsent) return;
     setIsConfirmed(true);
   };
 
@@ -101,6 +121,16 @@ const Step2CoverPhoto = () => {
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
+              role="button"
+              tabIndex="0"
+              aria-busy={isValidatingPhoto}
+              aria-describedby="family-photo-help family-photo-error"
               className={`relative cursor-pointer overflow-hidden rounded-3xl border-4 border-dashed transition-all duration-300 aspect-[16/9] md:aspect-[21/9] flex flex-col items-center justify-center group ${
                 isDragging ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-border/60 hover:border-primary/50 hover:bg-muted/30'
               }`}
@@ -109,7 +139,8 @@ const Step2CoverPhoto = () => {
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
-                accept="image/*"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                aria-label="Selecionar foto de capa"
                 className="hidden"
               />
 
@@ -126,10 +157,21 @@ const Step2CoverPhoto = () => {
                     <UploadCloud className="w-10 h-10" />
                   </div>
                   <p className="font-bold text-xl text-foreground mb-2">Clique ou arraste uma foto aqui</p>
-                  <p className="text-muted-foreground">PNG, JPG ou WEBP até 10MB</p>
+                  <p id="family-photo-help" className="text-muted-foreground">
+                    PNG, JPG ou WEBP até 10 MB
+                  </p>
+                  {isValidatingPhoto && (
+                    <p className="mt-2 text-sm font-semibold text-primary">Validando foto...</p>
+                  )}
                 </div>
               )}
             </div>
+
+            {photoError && (
+              <p id="family-photo-error" role="alert" className="text-sm font-semibold text-destructive">
+                {photoError}
+              </p>
+            )}
 
             <div className="mx-auto max-w-xl rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm">
               <label htmlFor="expected-cover-family-count" className="text-sm font-bold text-foreground">
@@ -152,14 +194,45 @@ const Step2CoverPhoto = () => {
               </div>
             </div>
 
+            <div className="mx-auto max-w-xl rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm">
+              <label className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={photoProcessingConsent}
+                  onChange={(event) => updatePhotoProcessingConsent(event.target.checked)}
+                  className="mt-1 h-5 w-5 shrink-0 accent-primary"
+                  aria-describedby="photo-consent-details"
+                />
+                <span id="photo-consent-details">
+                  Autorizo o processamento desta foto e dos dados do guia para gerar o PDF.
+                  Conforme a configuração do serviço, a foto ou o texto podem ser enviados aos
+                  provedores de IA e mapas informados na{' '}
+                  <Link
+                    to="/privacy"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-bold text-primary underline"
+                  >
+                    Política de Privacidade
+                  </Link>
+                  . A foto não será usada para treinamento sem uma autorização separada.
+                </span>
+              </label>
+            </div>
+
             <motion.div
               initial={{ opacity: 0 }}
-              animate={{ opacity: coverPhoto ? 1 : 0 }}
+                animate={{ opacity: coverPhoto ? 1 : 0 }}
               className="flex justify-center"
             >
               <Button
                 onClick={handleConfirm}
-                disabled={!coverPhoto || confirmedFamilyMemberCount <= 0}
+                disabled={
+                  !coverPhoto ||
+                  confirmedFamilyMemberCount <= 0 ||
+                  !photoProcessingConsent ||
+                  isValidatingPhoto
+                }
               className="w-full rounded-full bg-primary px-8 py-6 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-primary/90 sm:w-auto"
             >
                 Continuar para revisão <ArrowRight className="ml-2 w-5 h-5" />

@@ -33,8 +33,10 @@ def test_render_guide_html_contains_selected_content():
 
     assert "Alice e Antonio" in html
     assert "Torre Eiffel" in html
-    assert "JA VISITEI" in html
+    assert "JÁ VISITEI" in html
     assert "@page" in html
+    assert "size: A4" in html
+    assert '<meta name="author" content="Minerva Travel">' in html
 
 
 def test_render_guide_html_contains_image_credits_when_present():
@@ -60,7 +62,7 @@ def test_render_guide_html_contains_image_credits_when_present():
 
     html = render_guide_html(context)
 
-    assert "Creditos das imagens" in html
+    assert "Créditos das imagens" in html
     assert "Jane Doe / Wikimedia Commons" in html
 
 
@@ -88,7 +90,7 @@ def test_render_guide_html_contains_trip_phases_language_tips_and_reflection_pro
     assert "Bonjour" in html
     assert "Thank you" in html
     assert "Obrigado/obrigada" in html
-    assert "Caca ao detalhe" in html
+    assert "Caça ao detalhe" in html
     assert "O que eu aprendi" in html
     assert ".phase-badge" in html
     assert ".language-tip-card" in html
@@ -227,7 +229,7 @@ def test_render_guide_html_includes_optional_restaurants_with_freshness_note():
     assert "Bistro Familiar" in html
     assert "perto de Torre Eiffel" in html
     assert "Cardapio simples para criancas" in html
-    assert "Confira horarios, reservas e funcionamento antes de visitar" in html
+    assert "Confira horários, reservas e funcionamento antes de visitar" in html
 
 
 def test_render_guide_html_adds_trip_summary_after_cover():
@@ -261,8 +263,7 @@ def test_render_guide_html_adds_trip_summary_after_cover():
 def test_render_guide_html_trip_summary_lists_all_confirmed_landmarks():
     catalog = load_catalog(Path("data/destinations/europe_2026.json"))
     paris_landmarks = [
-        f"paris:{landmark.id}"
-        for landmark in catalog.find_destination("paris").landmarks
+        f"paris:{landmark.id}" for landmark in catalog.find_destination("paris").landmarks
     ]
     request = GuideRequest(
         title="Pequenos Exploradores pela Europa",
@@ -279,14 +280,20 @@ def test_render_guide_html_trip_summary_lists_all_confirmed_landmarks():
     )
 
     html = render_guide_html(context)
+    # A carta de boas-vindas abre o guia; o resumo do roteiro vem em seguida.
+    assert html.index('<section class="page letter-page') < html.index(
+        '<section class="page trip-summary-page'
+    )
     summary = html.split('<section class="page trip-summary-page', maxsplit=1)[1].split(
-        '<section class="page letter-page', maxsplit=1
+        '<section class="page city-page', maxsplit=1
     )[0]
 
     assert 'data-summary-count="10"' in summary
     assert "summary-density-compact" in summary
     assert summary.count("summary-stop-card") == 10
-    assert summary.count('class="summary-map-marker summary-route-marker"') == 10
+    # Com ilustracao gerada, a rota pontilhada e os marcadores ficam de fora.
+    assert summary.count('class="summary-map-marker summary-route-marker"') == 0
+    assert "summary-route-svg" not in summary
     assert '<img src="assets/landmarks' not in summary
     assert "summary-legend-photo" not in summary
     assert "runtime/generated/summary.png" in summary
@@ -317,13 +324,13 @@ def test_render_guide_html_trip_summary_uses_dense_layout_for_many_landmarks():
 
     html = render_guide_html(context)
     summary = html.split('<section class="page trip-summary-page', maxsplit=1)[1].split(
-        '<section class="page letter-page', maxsplit=1
+        '<section class="page city-page', maxsplit=1
     )[0]
 
     assert 'data-summary-count="17"' in summary
     assert "summary-density-dense" in summary
     assert summary.count("summary-stop-card") == 17
-    assert summary.count('class="summary-map-marker summary-route-marker"') == 17
+    assert summary.count('class="summary-map-marker summary-route-marker"') == 0
     assert "Torre Eiffel" in summary
     assert "Big Ben" in summary
 
@@ -345,3 +352,24 @@ def test_write_pdf_creates_non_empty_file(tmp_path):
     assert result == output
     assert output.exists()
     assert output.stat().st_size > 1000
+
+
+def test_render_guide_html_skips_static_coloring_page_when_activity_plan_has_coloring():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        children_ages=[4],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower", "paris:louvre"],
+    )
+    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+
+    assert any(activity.type == "coloring" for activity in context.activity_plan)
+    html = render_guide_html(context)
+
+    # A atividade de colorir ja entrega a pagina de pintura; a pagina estatica
+    # duplicada nao deve ser impressa de novo para o mesmo destino.
+    assert 'class="page activity-page activity-coloring"' in html
+    assert 'class="page coloring-page"' not in html

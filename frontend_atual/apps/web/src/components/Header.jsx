@@ -7,6 +7,8 @@ import { Airplane, Flower } from './DecorativeElements.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import ThemeToggle from '@/components/ThemeToggle.jsx';
 
+const mobileMenuId = 'primary-mobile-navigation';
+
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -17,7 +19,7 @@ const Header = () => {
 
   const navLinks = [
     { path: '/', label: 'Início' },
-    { path: '/pricing', label: 'Preços' },
+    { path: '/pricing', label: 'Piloto' },
     { path: '/create', label: 'Criar Guia' }
   ];
 
@@ -33,23 +35,31 @@ const Header = () => {
         <div className="flex items-center justify-between h-20">
 
           {/* Logo with Decorative Element */}
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="relative w-12 h-12 bg-secondary/10 rounded-2xl flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
+          <Link
+            to="/"
+            aria-label="Minerva Travel — página inicial"
+            className="flex items-center gap-3 group"
+          >
+            <div
+              aria-hidden="true"
+              className="relative w-12 h-12 bg-secondary/10 rounded-2xl flex items-center justify-center group-hover:scale-105 transition-transform duration-300"
+            >
               <Airplane className="w-8 h-8 text-secondary" />
               <Flower className="absolute -bottom-2 -right-2 w-6 h-6 text-primary scale-0 group-hover:scale-100 transition-transform duration-300" />
             </div>
             <span className="text-2xl font-serif font-bold text-foreground tracking-tight hidden sm:block">
-              Aventuras em <span className="text-primary">Família</span>
+              Minerva <span className="text-primary">Travel</span>
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-4">
+          <nav aria-label="Navegação principal" className="hidden md:flex items-center gap-4">
             <div className="flex gap-2">
               {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
+                  aria-current={isActive(link.path) ? 'page' : undefined}
                   className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
                     isActive(link.path)
                       ? 'bg-primary text-primary-foreground shadow-md'
@@ -67,7 +77,11 @@ const Header = () => {
 
             {isAuthenticated ? (
               <div className="flex items-center gap-4 ml-2">
-                <Link to="/dashboard" className="flex items-center gap-2 text-sm font-bold hover:text-primary transition-colors">
+                <Link
+                  to="/dashboard"
+                  aria-current={isActive('/dashboard') ? 'page' : undefined}
+                  className="flex items-center gap-2 text-sm font-bold hover:text-primary transition-colors"
+                >
                   <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent-foreground">
                     <User className="w-4 h-4" />
                   </div>
@@ -96,7 +110,10 @@ const Header = () => {
               variant="ghost"
               size="icon"
               className="rounded-full text-foreground/80 hover:bg-muted"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => setMobileMenuOpen((isOpen) => !isOpen)}
+              aria-label={mobileMenuOpen ? 'Fechar menu principal' : 'Abrir menu principal'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls={mobileMenuId}
             >
               {mobileMenuOpen ? (
                 <X className="w-6 h-6" />
@@ -109,13 +126,18 @@ const Header = () => {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <nav className="md:hidden py-4 absolute top-20 left-0 w-full bg-background border-b border-border shadow-lg px-4 space-y-4 pb-6">
+          <nav
+            id={mobileMenuId}
+            aria-label="Navegação principal móvel"
+            className="md:hidden py-4 absolute top-20 left-0 w-full bg-background border-b border-border shadow-lg px-4 space-y-4 pb-6"
+          >
             <div className="space-y-2">
               {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
                   onClick={() => setMobileMenuOpen(false)}
+                  aria-current={isActive(link.path) ? 'page' : undefined}
                   className={`block px-5 py-3 rounded-2xl text-base font-medium transition-all duration-200 ${
                     isActive(link.path)
                       ? 'bg-primary/10 text-primary'
@@ -134,11 +156,13 @@ const Header = () => {
                 <Link
                   to="/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
+                  aria-current={isActive('/dashboard') ? 'page' : undefined}
                   className="block px-5 py-3 rounded-2xl text-base font-medium bg-accent/10 text-accent-foreground"
                 >
                   Meu Painel
                 </Link>
                 <button
+                  type="button"
                   onClick={handleLogout}
                   className="w-full text-left px-5 py-3 rounded-2xl text-base font-medium text-destructive hover:bg-destructive/10 transition-colors"
                 >
@@ -150,6 +174,7 @@ const Header = () => {
                 <Link
                   to="/login"
                   onClick={() => setMobileMenuOpen(false)}
+                  aria-current={isActive('/login') ? 'page' : undefined}
                   className="block px-5 py-3 rounded-2xl text-base font-medium text-center border-2 border-border"
                 >
                   Entrar
@@ -157,6 +182,7 @@ const Header = () => {
                 <Link
                   to="/signup"
                   onClick={() => setMobileMenuOpen(false)}
+                  aria-current={isActive('/signup') ? 'page' : undefined}
                   className="block px-5 py-3 rounded-2xl text-base font-bold text-center bg-secondary text-white"
                 >
                   Criar Conta

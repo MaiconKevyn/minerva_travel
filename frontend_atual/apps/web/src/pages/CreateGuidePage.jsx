@@ -14,7 +14,15 @@ import Step5Review from '@/components/Step5Review.jsx';
 import { Button } from '@/components/ui/button';
 
 const CreateGuidePageContent = () => {
-  const { currentStep, goBack, itineraryMode } = useConversationalGuide();
+  const {
+    currentStep,
+    goBack,
+    itineraryMode,
+    draftId,
+    draftStatus,
+    draftError,
+    discardDraft,
+  } = useConversationalGuide();
   // No modo "Ja sei o roteiro" a etapa de preferencias (2) e pulada.
   const visibleSteps = itineraryMode === 'known' ? [1, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6];
   const currentStepPosition = Math.max(visibleSteps.indexOf(currentStep), 0);
@@ -34,14 +42,14 @@ const CreateGuidePageContent = () => {
   return (
     <>
       <Helmet>
-        <title>Criar Guia - Aventuras em Família</title>
+        <title>Criar Guia - Minerva Travel</title>
         <meta name="description" content="Crie seu guia de viagem conversando com nosso assistente." />
       </Helmet>
 
       <div className="min-h-screen bg-background flex flex-col transition-colors duration-200">
         <Header />
 
-        <main className="flex-1 flex flex-col relative py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+        <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col relative py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
 
           {/* Top Bar with Progress and Back Button */}
           <div className="flex items-center justify-between gap-2 mb-8 md:mb-16">
@@ -74,8 +82,34 @@ const CreateGuidePageContent = () => {
               </p>
             </div>
 
-            <div className="w-14 sm:w-24" /> {/* Spacer to balance flex-between */}
+            <div className="flex w-14 justify-end sm:w-24">
+              {draftId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={discardDraft}
+                  disabled={draftStatus === 'saving'}
+                  aria-label="Descartar rascunho"
+                  className="px-2 text-xs font-bold text-muted-foreground hover:text-destructive sm:px-3"
+                >
+                  <span className="hidden sm:inline">Descartar</span>
+                  <span className="sm:hidden" aria-hidden="true">×</span>
+                </Button>
+              )}
+            </div>
           </div>
+
+          <p
+            className={`-mt-5 mb-5 text-center text-xs font-medium ${
+              draftStatus === 'error' ? 'text-destructive' : 'text-muted-foreground'
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {draftStatus === 'saving' && 'Salvando rascunho…'}
+            {draftStatus === 'saved' && 'Rascunho salvo com segurança. A foto será enviada novamente antes da geração.'}
+            {draftStatus === 'error' && draftError}
+          </p>
 
           {/* Form Area */}
           <div className="flex-1 flex flex-col justify-center">

@@ -5,6 +5,9 @@ import {
   serializeGuideDestinations,
   totalTripDays,
 } from './guide-form.js';
+import { authenticatedFetch } from '../lib/authFetch.js';
+
+export { authorizationHeaders } from '../lib/authFetch.js';
 
 const DEFAULT_API_BASE_URL = 'https://minerva-travel.onrender.com';
 
@@ -12,11 +15,18 @@ export const apiBaseUrl = () => import.meta.env?.VITE_API_BASE_URL || DEFAULT_AP
 
 export const RESTAURANT_RECOMMENDATIONS_EXTRA = {
   id: 'restaurant_recommendations_extra',
-  label: 'Recomendacoes de restaurantes para a familia',
-  description: 'Sugestoes de restaurantes proximos aos locais selecionados.',
-  price_cents: 2990,
+  label: 'Recomendações de restaurantes para a família',
+  description: 'Sugestões de restaurantes próximos aos locais selecionados, incluídas no piloto.',
+  price_cents: 0,
   currency: 'BRL',
-  price_label: 'R$ 29,90',
+  price_label: 'Incluído no piloto',
+};
+
+export const createIdempotencyKey = () => {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return `guide-${globalThis.crypto.randomUUID()}`;
+  }
+  return `guide-${Date.now()}-${Math.random().toString(36).slice(2, 14)}`;
 };
 
 export const ATTRACTION_CATEGORY_LABELS = {
@@ -522,6 +532,76 @@ export const appendGuideMetadata = (formData, guideData = {}) => {
   if (guideData.restaurantRecommendationsExtra) {
     formData.append('restaurant_recommendations_extra', 'true');
   }
+  if (guideData.itinerary) {
+    formData.append('itinerary_json', JSON.stringify(guideData.itinerary));
+  }
+  if (guideData.photoProcessingConsent) {
+    formData.append('photo_processing_consent', 'true');
+  }
+  if (guideData.privacyConsentVersion) {
+    formData.append('privacy_consent_version', String(guideData.privacyConsentVersion));
+  }
+  if (guideData.privacyConsentAt) {
+    formData.append('privacy_consent_at', String(guideData.privacyConsentAt));
+  }
+};
+
+const guideItineraryStop = (landmark = {}) => {
+  const selectionId = landmark.selection_id || landmark.id;
+  const name = String(landmark.name || '').trim();
+  if (!selectionId || !name) {
+    return null;
+  }
+  return {
+    selection_id: String(selectionId),
+    name,
+    destination_id: landmark.destination_id ? String(landmark.destination_id) : null,
+  };
+};
+
+export const buildGuideItineraryPayload = ({
+  itineraryMode = 'known',
+  destinationsList = [],
+  itineraryPreferences = {},
+  recommendedDays = [],
+  extraLandmarks = [],
+} = {}) => {
+  const destinations = normalizeGuideDestinations(destinationsList)
+    .filter((item) => item.place && item.timing && item.days > 0)
+    .map((item, index) => ({
+      id: String(item.id || `destination-${index + 1}`),
+      place: item.place,
+      timing: item.timing,
+      days: item.days,
+      order: index + 1,
+    }));
+
+  if (destinations.length === 0) {
+    return null;
+  }
+
+  const validModes = new Set(['known', 'freeform', 'suggested']);
+  const validPaces = new Set(['light', 'balanced', 'full']);
+  const days = recommendedDays
+    .map((day, index) => ({
+      day: Number.parseInt(day.day, 10) || index + 1,
+      title: String(day.title || `Dia ${index + 1}`).trim(),
+      theme: String(day.theme || '').trim(),
+      stops: (day.landmarks || []).map(guideItineraryStop).filter(Boolean),
+    }))
+    .filter((day) => day.stops.length > 0);
+
+  return {
+    mode: validModes.has(itineraryMode) ? itineraryMode : 'known',
+    pace: validPaces.has(itineraryPreferences.pace) ? itineraryPreferences.pace : 'balanced',
+    interests: (itineraryPreferences.interests || [])
+      .map((interest) => String(interest).trim())
+      .filter(Boolean)
+      .slice(0, 12),
+    destinations,
+    days,
+    unplanned_stops: extraLandmarks.map(guideItineraryStop).filter(Boolean),
+  };
 };
 
 const stripDestinationLandmarks = ({ landmarks: _landmarks, ...destination }) => destination;
@@ -572,10 +652,166 @@ export const buildRouteSuggestionPayload = ({
   };
 };
 
+const responseErrorMessage = async (response, fallbackMessage) => {
+  const payload = await response.json().catch(() => ({}));
+  const detail = payload?.detail;
+
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (typeof detail?.message === 'string' && detail.message.trim()) return detail.message;
+  if (typeof payload?.message === 'string' && payload.message.trim()) return payload.message;
+  return `${fallbackMessage} (${response.status})`;
+};
+
+const guideDetailsUrl = (guideId) => {
+  const normalizedGuideId = String(guideId || '').trim();
+  if (!normalizedGuideId) throw new Error('Identificador do guia inválido.');
+  return `${apiBaseUrl()}/api/guides/${encodeURIComponent(normalizedGuideId)}`;
+};
+
+export const listGuides = async ({ signal } = {}) => {
+  const response = await authenticatedFetch(`${apiBaseUrl()}/api/guides`, {
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível carregar seus guias'));
+  }
+
+  const payload = await response.json();
+  return Array.isArray(payload?.guides) ? payload.guides : [];
+};
+
+const draftUrl = (draftId = '') => {
+  const suffix = draftId ? `/${encodeURIComponent(String(draftId))}` : '';
+  return `${apiBaseUrl()}/api/drafts${suffix}`;
+};
+
+export const getCurrentGuideDraft = async ({ signal } = {}) => {
+  const response = await authenticatedFetch(`${draftUrl()}/current`, {
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível recuperar o rascunho'));
+  }
+  const payload = await response.json();
+  return payload?.draft || null;
+};
+
+export const createGuideDraft = async ({ title = '', payload = {} }, { signal } = {}) => {
+  const response = await authenticatedFetch(draftUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ title, payload }),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível salvar o rascunho'));
+  }
+  return response.json();
+};
+
+export const updateGuideDraft = async (
+  draftId,
+  { title = '', payload = {}, revision },
+  { signal } = {},
+) => {
+  const response = await authenticatedFetch(draftUrl(draftId), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ title, payload, revision }),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível salvar o rascunho'));
+  }
+  return response.json();
+};
+
+export const discardGuideDraft = async (draftId, { signal } = {}) => {
+  const response = await authenticatedFetch(draftUrl(draftId), {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível descartar o rascunho'));
+  }
+  return (await response.json())?.deleted === true;
+};
+
+export const getGuide = async (guideId, { signal } = {}) => {
+  const response = await authenticatedFetch(guideDetailsUrl(guideId), {
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível carregar o guia'));
+  }
+
+  return response.json();
+};
+
+export const deleteGuide = async (guideId, { signal } = {}) => {
+  const response = await authenticatedFetch(guideDetailsUrl(guideId), {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível excluir o guia'));
+  }
+
+  const payload = await response.json();
+  return payload?.deleted === true;
+};
+
+const safeDownloadUrl = (downloadUrl) => {
+  const browserOrigin = globalThis.location?.origin || DEFAULT_API_BASE_URL;
+  const baseUrl = new URL(
+    `${apiBaseUrl().replace(/\/$/, '')}/`,
+    `${browserOrigin.replace(/\/$/, '')}/`,
+  );
+  const resolvedUrl = new URL(String(downloadUrl || ''), baseUrl);
+  if (resolvedUrl.origin !== baseUrl.origin || !resolvedUrl.pathname.startsWith('/download/')) {
+    throw new Error('Link de download inválido.');
+  }
+  return resolvedUrl.toString();
+};
+
+const downloadFilename = (response, downloadUrl) => {
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const encodedFilename = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const plainFilename = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+  const fallbackFilename = decodeURIComponent(new URL(downloadUrl).pathname.split('/').at(-1) || 'guia.pdf');
+  const filename = encodedFilename ? decodeURIComponent(encodedFilename) : plainFilename;
+  return String(filename || fallbackFilename).replace(/[\\/]/g, '-');
+};
+
+export const downloadGuidePdf = async (downloadUrl, { signal } = {}) => {
+  const resolvedUrl = safeDownloadUrl(downloadUrl);
+  const response = await authenticatedFetch(resolvedUrl, {
+    headers: { Accept: 'application/pdf' },
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível baixar o guia'));
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: downloadFilename(response, resolvedUrl),
+  };
+};
+
 export const fetchCatalog = async () => {
   const baseUrl = apiBaseUrl();
 
-  const response = await fetch(`${baseUrl}/api/catalog`, {
+  const response = await authenticatedFetch(`${baseUrl}/api/catalog`, {
     headers: { Accept: 'application/json' },
   });
 
@@ -589,7 +825,7 @@ export const fetchCatalog = async () => {
 export const recommendItinerary = async (payload) => {
   const baseUrl = apiBaseUrl();
 
-  const response = await fetch(`${baseUrl}/api/itinerary/recommend`, {
+  const response = await authenticatedFetch(`${baseUrl}/api/itinerary/recommend`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -609,7 +845,7 @@ export const recommendItinerary = async (payload) => {
 export const discoverItinerary = async (payload) => {
   const baseUrl = apiBaseUrl();
 
-  const response = await fetch(`${baseUrl}/api/itinerary/discover`, {
+  const response = await authenticatedFetch(`${baseUrl}/api/itinerary/discover`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -629,7 +865,7 @@ export const discoverItinerary = async (payload) => {
 export const suggestItineraryRoutes = async (payload) => {
   const baseUrl = apiBaseUrl();
 
-  const response = await fetch(`${baseUrl}/api/itinerary/routes/suggest`, {
+  const response = await authenticatedFetch(`${baseUrl}/api/itinerary/routes/suggest`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -656,7 +892,7 @@ export const resolveStructuredLandmarks = async (payload) => {
   const baseUrl = apiBaseUrl();
 
   try {
-    const response = await fetch(`${baseUrl}/api/landmarks/resolve-structured`, {
+    const response = await authenticatedFetch(`${baseUrl}/api/landmarks/resolve-structured`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -691,11 +927,11 @@ export const parseLandmarks = async (message) => {
   const baseUrl = apiBaseUrl();
 
   try {
-    const response = await fetch(`${baseUrl}/api/landmarks/parse`, {
+    const response = await authenticatedFetch(`${baseUrl}/api/landmarks/parse`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
       },
       body: JSON.stringify({ message })
     });
@@ -723,7 +959,7 @@ export const parseLandmarks = async (message) => {
   }
 };
 
-export const generatePDF = async (guideData) => {
+export const generatePDF = async (guideData, { idempotencyKey } = {}) => {
   const baseUrl = apiBaseUrl();
 
   try {
@@ -739,8 +975,11 @@ export const generatePDF = async (guideData) => {
 
     appendGuideLandmarks(formData, guideData);
 
-    const response = await fetch(`${baseUrl}/api/generate`, {
+    const response = await authenticatedFetch(`${baseUrl}/api/generate`, {
       method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey || createIdempotencyKey(),
+      },
       // Do NOT set Content-Type header, let the browser set it with the correct boundary for FormData
       body: formData
     });
@@ -754,4 +993,48 @@ export const generatePDF = async (guideData) => {
     console.error('Minerva API PDF Generation Error:', error);
     throw new Error('Não foi possível gerar o PDF.');
   }
+};
+
+export const getGuideJob = async (jobId, { signal } = {}) => {
+  const safeJobId = String(jobId || '').trim();
+  if (!safeJobId) {
+    throw new Error('Identificador da geração inválido.');
+  }
+  const response = await authenticatedFetch(`${apiBaseUrl()}/api/jobs/${encodeURIComponent(safeJobId)}`, {
+    method: 'GET',
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Não foi possível consultar a geração (${response.status}).`);
+  }
+  return response.json();
+};
+
+export const waitForGuideJob = async (
+  jobId,
+  {
+    onUpdate = () => {},
+    intervalMs = 1000,
+    maxAttempts = 180,
+    signal,
+    sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+  } = {},
+) => {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const job = await getGuideJob(jobId, { signal });
+    onUpdate(job);
+    if (job.status === 'succeeded' && job.result?.download_url) {
+      return job.result;
+    }
+    if (job.status === 'failed') {
+      throw new Error(job.error?.message || 'Não foi possível gerar o guia.');
+    }
+    if (job.status === 'cancelled') {
+      throw new Error('A geração foi cancelada.');
+    }
+    if (attempt < maxAttempts - 1) {
+      await sleep(intervalMs);
+    }
+  }
+  throw new Error('A geração está demorando mais que o esperado. Acompanhe-a no seu painel.');
 };

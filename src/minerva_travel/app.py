@@ -1,33 +1,74 @@
+import hashlib
 import json
+import os
+import re
+import sqlite3
+from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from time import perf_counter
+from typing import Annotated, Any, Literal
 from urllib.parse import urlparse
 from uuid import uuid4
 
 import httpx
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, UnidentifiedImageError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from minerva_travel import storage
+from minerva_travel.asset_policy import (
+    AssetProvenanceError,
+    assert_selected_asset_provenance,
+    asset_provenance_required,
+)
+from minerva_travel.auth import CurrentUser
 from minerva_travel.catalog import load_catalog
 from minerva_travel.config import (
+    app_environment,
+    async_guide_jobs_enabled,
     coloring_lineart_generation_enabled,
     cors_allowed_origins,
+    frontend_base_url,
     google_maps_api_key,
+    guide_job_max_attempts,
     image_generation_concurrency,
     image_provider,
     landmark_art_generation_enabled,
+    pilot_restaurant_recommendations_enabled,
+)
+from minerva_travel.contract_limits import (
+    MAX_GUIDE_CHILDREN,
+    MAX_GUIDE_DESTINATIONS,
+    MAX_GUIDE_LANDMARKS,
+    MAX_GUIDE_PARENTS,
+    MAX_GUIDE_YEAR,
+    MAX_VISIBLE_FAMILY_MEMBERS,
+    MIN_GUIDE_YEAR,
+    public_contract_limits,
 )
 from minerva_travel.custom_landmarks import (
     CustomLandmarkInput,
     build_custom_destinations,
     merge_custom_destinations,
     parse_custom_landmarks,
+    slugify,
 )
 from minerva_travel.guide_builder import build_guide_context
 from minerva_travel.image_generation import (
@@ -38,19 +79,59 @@ from minerva_travel.image_generation import (
     simplify_child_coloring_lineart,
 )
 from minerva_travel.itinerary import recommend_itinerary
+from minerva_travel.itinerary_routes import suggest_itinerary_routes
 from minerva_travel.landmark_parser import ParsedLandmark, parse_landmarks_from_message
 from minerva_travel.models import (
     Destination,
     DynamicItineraryRequest,
+    GuideDestinationPlan,
+    GuideItineraryDayPlan,
+    GuideItineraryPlan,
+    GuideItineraryStopPlan,
     GuideRequest,
+    ItineraryRecommendation,
     ItineraryRecommendationRequest,
     Landmark,
     RouteSuggestionRequest,
+    RouteSuggestionResponse,
+    StrictRequestModel,
 )
+from minerva_travel.observability import emit_event
 from minerva_travel.pdf import render_guide_html, write_pdf
+from minerva_travel.persistence import (
+    GuideJobRecord,
+    delete_guide_and_assets,
+    delete_private_asset,
+    guide_repository,
+    purge_all_data_for_owner,
+)
 from minerva_travel.place_discovery import discover_dynamic_itinerary, resolve_landmark_locations
+from minerva_travel.privacy import (
+    PrivacyConsent,
+    PrivacyConsentError,
+    validate_photo_processing_consent,
+)
+from minerva_travel.request_control import (
+    ConcurrencyLease,
+    IdempotencyInProgressError,
+    IdempotencyKeyRequiredError,
+    IdempotencyReservation,
+    RequestControlError,
+    SQLiteRequestControl,
+    configured_concurrency_lease_seconds,
+    configured_idempotency_pending_ttl_seconds,
+    configured_idempotency_ttl_seconds,
+    configured_provider_concurrency_limit,
+    configured_quota_period_seconds,
+    configured_rate_policy,
+    configured_user_concurrency_limit,
+    configured_user_quota,
+    get_request_control,
+    idempotency_key_required,
+    request_controls_enabled,
+    stable_request_hash,
+)
 from minerva_travel.restaurant_recommendations import discover_restaurants_for_guide
-from minerva_travel.itinerary_routes import suggest_itinerary_routes
 from minerva_travel.supabase_storage import sync_wikimedia_assets_to_storage
 from minerva_travel.wikimedia_assets import WikimediaAsset, load_wikimedia_manifest
 from minerva_travel.wikimedia_client import (
@@ -59,7 +140,6 @@ from minerva_travel.wikimedia_client import (
     find_landmark_asset_metadata,
 )
 
-TEMPLATE_DIR = Path(__file__).parent / "templates"
 CUSTOM_LANDMARK_IMAGE_HOSTS = {
     "lh3.googleusercontent.com",
     "upload.wikimedia.org",
@@ -69,93 +149,655 @@ CUSTOM_LANDMARK_IMAGE_HOSTS = {
 CUSTOM_LANDMARK_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 LINEART_CANVAS_SIZE = (1200, 850)
 
-app = FastAPI(title="Minerva Travel MVP")
+
+class ApiErrorResponse(BaseModel):
+    code: str
+    message: str
+    field_errors: list[dict[str, Any]]
+    request_id: str
+    detail: Any = None
+
+
+class CatalogLandmarkResponse(BaseModel):
+    id: str
+    selection_id: str
+    name: str
+    description: list[str]
+    sort_order: int
+    categories: list[str]
+    duration_minutes: int
+    family_tip: str | None = None
+
+
+class CatalogDestinationResponse(BaseModel):
+    id: str
+    country: str
+    city: str
+    display_title: str
+    intro: list[str]
+    landmarks: list[CatalogLandmarkResponse]
+
+
+class CatalogResponse(BaseModel):
+    id: str
+    title: str
+    destinations: list[CatalogDestinationResponse]
+
+
+class HealthLiveResponse(BaseModel):
+    status: Literal["ok"]
+
+
+class HealthChecksResponse(BaseModel):
+    database: Literal["ok"]
+    storage: Literal["ok"]
+
+
+class HealthReadyResponse(BaseModel):
+    status: Literal["ok"]
+    checks: HealthChecksResponse
+
+
+class GuideResponse(BaseModel):
+    id: str
+    title: str
+    status: str
+    created_at: str
+    updated_at: str
+    expires_at: str | None = None
+    cover_fallback_used: bool
+    destinations: list[dict[str, Any]]
+    download_url: str | None = None
+
+
+class GuideListResponse(BaseModel):
+    guides: list[GuideResponse]
+
+
+class GuideDraftResponse(BaseModel):
+    id: str
+    title: str
+    payload: dict[str, Any]
+    revision: int
+    status: str
+    created_at: str
+    updated_at: str
+    expires_at: str | None = None
+
+
+class CurrentGuideDraftResponse(BaseModel):
+    draft: GuideDraftResponse | None
+
+
+class DeletedResponse(BaseModel):
+    deleted: Literal[True]
+
+
+class GuideJobErrorResponse(BaseModel):
+    code: str
+    message: str
+
+
+class GuideJobResponse(BaseModel):
+    id: str
+    status: str
+    stage: str
+    progress: int = Field(ge=0, le=100)
+    attempt_count: int = Field(ge=0)
+    max_attempts: int = Field(ge=1)
+    cancel_requested: bool
+    created_at: str
+    updated_at: str
+    started_at: str | None = None
+    completed_at: str | None = None
+    error: GuideJobErrorResponse | None = None
+    result: dict[str, Any] | None = None
+
+
+class GuideJobListResponse(BaseModel):
+    jobs: list[GuideJobResponse]
+
+
+class AccountDeletionResponse(DeletedResponse):
+    guides_deleted: int = Field(ge=0)
+    private_files_deleted: int = Field(ge=0)
+
+
+class ResolvedDestinationResponse(BaseModel):
+    id: str
+    city: str
+    country: str
+    formatted_address: str
+    latitude: float
+    longitude: float
+
+
+class DynamicItineraryResponse(ItineraryRecommendation):
+    resolved_destination: ResolvedDestinationResponse
+
+
+class CustomLandmarkResponse(BaseModel):
+    id: str
+    selection_id: str
+    name: str
+    description: list[str]
+    representative_query: str | None = None
+    required_terms: list[str] = Field(default_factory=list)
+
+
+class CustomLandmarkDestinationResponse(BaseModel):
+    id: str
+    country: str
+    city: str
+    display_title: str
+    landmarks: list[CustomLandmarkResponse]
+
+
+class CustomLandmarksResponse(BaseModel):
+    selected_landmarks: list[str]
+    destinations: list[CustomLandmarkDestinationResponse]
+
+
+class PreviewImageResponse(BaseModel):
+    image_url: str
+    source_url: str
+    author: str
+    license_short_name: str
+    license_url: str
+
+
+class PreviewLandmarkResponse(BaseModel):
+    id: str
+    selection_id: str
+    name: str
+    description: list[str]
+    representative_query: str | None = None
+    confidence: float
+    image: PreviewImageResponse | None = None
+    image_attributions: list[dict[str, str]] = Field(default_factory=list)
+    location_status: str
+    place_id: str
+    google_maps_uri: str
+    formatted_address: str
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class PreviewDestinationResponse(BaseModel):
+    id: str
+    country: str
+    city: str
+    display_title: str
+    landmarks: list[PreviewLandmarkResponse]
+
+
+class LandmarkResolutionResponse(BaseModel):
+    custom_landmarks: str
+    selected_landmarks: list[str]
+    destinations: list[PreviewDestinationResponse]
+
+
+class CoverStatusResponse(BaseModel):
+    fallback_used: bool
+    validation_status: str | None = None
+    visible_people_count: int | None = None
+    validation_message: str = ""
+    expected_visible_family_member_count: int | None = None
+    attempts: int = Field(default=0, ge=0)
+
+
+class GuideGenerationCompletedResponse(BaseModel):
+    request_id: str
+    download_url: str
+    filename: str
+    cover_status: CoverStatusResponse
+
+
+class GuideGenerationQueuedResponse(BaseModel):
+    job_id: str
+    status: str
+    stage: str
+    progress: int = Field(ge=0, le=100)
+    poll_url: str
+
+
+GuideGenerationResponse = GuideGenerationCompletedResponse | GuideGenerationQueuedResponse
+
+
+class AccountExportIdentityResponse(BaseModel):
+    id: str
+    email: str | None = None
+
+
+class AccountExportResponse(BaseModel):
+    schema_version: Literal[1]
+    exported_at: str
+    account: AccountExportIdentityResponse
+    guides: list[dict[str, Any]]
+    drafts: list[dict[str, Any]]
+
+
+API_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    status_code: {"model": ApiErrorResponse, "description": "Erro padronizado da API"}
+    for status_code in (400, 401, 403, 404, 409, 410, 413, 422, 429, 500, 502, 503)
+}
+
+
+class MinervaFastAPI(FastAPI):
+    def openapi(self) -> dict[str, Any]:
+        schema = super().openapi()
+        schema["x-minerva-contract-limits"] = public_contract_limits()
+        return schema
+
+
+app = MinervaFastAPI(title="Minerva Travel MVP", version="1.0.0", responses=API_ERROR_RESPONSES)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allowed_origins(),
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Authorization", "Content-Type", "Idempotency-Key"],
+    expose_headers=["Idempotency-Replayed", "Retry-After", "X-Request-ID"],
 )
 
 
-def web_templates() -> Environment:
-    return Environment(
-        loader=FileSystemLoader(TEMPLATE_DIR),
-        autoescape=select_autoescape(["html", "xml"]),
+def _request_id(request: Request) -> str:
+    return str(getattr(request.state, "request_id", "") or uuid4().hex)
+
+
+def _default_error_code(status_code: int) -> str:
+    return {
+        400: "bad_request",
+        401: "authentication_required",
+        403: "forbidden",
+        404: "not_found",
+        409: "conflict",
+        410: "gone",
+        413: "payload_too_large",
+        422: "input_validation_error",
+        429: "rate_limit_exceeded",
+        500: "internal_error",
+        502: "provider_error",
+        503: "service_unavailable",
+    }.get(status_code, f"http_{status_code}")
+
+
+def _error_response(
+    request: Request,
+    *,
+    status_code: int,
+    detail: Any,
+    headers: dict[str, str] | None = None,
+) -> JSONResponse:
+    code = _default_error_code(status_code)
+    message = "A solicitação não pôde ser concluída."
+    field_errors: list[dict[str, Any]] = []
+    if isinstance(detail, dict):
+        code = str(detail.get("code") or code)
+        message = str(detail.get("message") or detail.get("detail") or message)
+        candidate_errors = detail.get("field_errors")
+        if isinstance(candidate_errors, list):
+            field_errors = [item for item in candidate_errors if isinstance(item, dict)]
+    elif isinstance(detail, list):
+        field_errors = [item for item in detail if isinstance(item, dict)]
+        message = "Revise os campos destacados e tente novamente."
+    elif detail:
+        message = str(detail)
+    payload = ApiErrorResponse(
+        code=code,
+        message=message,
+        field_errors=field_errors,
+        request_id=_request_id(request),
+        detail=detail,
+    )
+    return JSONResponse(
+        status_code=status_code,
+        content=jsonable_encoder(payload),
+        headers=headers,
     )
 
 
-class CustomLandmarksResolveRequest(BaseModel):
-    landmarks: str
+@app.middleware("http")
+async def security_and_request_headers(request: Request, call_next):
+    supplied_request_id = request.headers.get("X-Request-ID", "")[:64]
+    request_id = (
+        supplied_request_id
+        if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", supplied_request_id)
+        else uuid4().hex
+    )
+    request.state.request_id = request_id
+    started_at = perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        emit_event(
+            "api_request",
+            request_id=request_id,
+            route=request.url.path,
+            outcome="failed",
+            http_status=500,
+            duration_ms=round((perf_counter() - started_at) * 1000),
+        )
+        raise
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; "
+        "form-action 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+    )
+    if app_environment() == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    if request.url.path.startswith(
+        ("/api/account", "/api/drafts", "/api/guides", "/api/jobs", "/download/")
+    ):
+        response.headers["Cache-Control"] = "private, no-store, max-age=0"
+    emit_event(
+        "api_request",
+        request_id=request_id,
+        route=request.url.path,
+        outcome="succeeded" if response.status_code < 500 else "failed",
+        http_status=response.status_code,
+        duration_ms=round((perf_counter() - started_at) * 1000),
+    )
+    return response
 
 
-class LandmarkParseRequest(BaseModel):
-    message: str
+@app.exception_handler(storage.ImageUploadError)
+async def image_upload_error_handler(
+    request: Request,
+    error: storage.ImageUploadError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        status_code=error.status_code,
+        detail=error.as_detail(),
+    )
 
 
-class KnownDestinationInput(BaseModel):
-    place: str
-    landmarks: list[str]
+@app.exception_handler(RequestControlError)
+async def request_control_error_handler(
+    request: Request,
+    error: RequestControlError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        status_code=error.status_code,
+        detail=error.as_detail(),
+        headers=error.response_headers(),
+    )
 
 
-class StructuredLandmarksResolveRequest(BaseModel):
-    destinations: list[KnownDestinationInput]
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(
+    request: Request,
+    error: RequestValidationError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        status_code=422,
+        detail=error.errors(),
+    )
 
 
-@app.get("/", response_class=HTMLResponse)
-def home() -> str:
+@app.exception_handler(StarletteHTTPException)
+async def http_error_handler(
+    request: Request,
+    error: StarletteHTTPException,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        status_code=error.status_code,
+        detail=error.detail,
+        headers=dict(error.headers or {}),
+    )
+
+
+def expensive_request_guard(
+    scope: str,
+    provider: str | Callable[[], str],
+    *,
+    default_user_limit: int,
+    default_ip_limit: int,
+    default_window_seconds: int = 60,
+    default_user_concurrency: int = 2,
+    default_user_quota: int | None = None,
+    default_quota_period_seconds: int = 24 * 60 * 60,
+) -> Callable[..., AsyncIterator[None]]:
+    async def guard(
+        request: Request,
+        current_user: CurrentUser,
+    ) -> AsyncIterator[None]:
+        lease = admit_expensive_request(
+            request=request,
+            user_id=current_user.id,
+            scope=scope,
+            provider=provider() if callable(provider) else provider,
+            default_user_limit=default_user_limit,
+            default_ip_limit=default_ip_limit,
+            default_window_seconds=default_window_seconds,
+            default_user_concurrency=default_user_concurrency,
+            default_user_quota=default_user_quota,
+            default_quota_period_seconds=default_quota_period_seconds,
+        )
+        try:
+            yield
+        finally:
+            if lease is not None:
+                lease.release()
+
+    return guard
+
+
+def admit_expensive_request(
+    *,
+    request: Request,
+    user_id: str,
+    scope: str,
+    provider: str,
+    default_user_limit: int,
+    default_ip_limit: int,
+    default_window_seconds: int = 60,
+    default_user_concurrency: int = 2,
+    default_user_quota: int | None = None,
+    default_quota_period_seconds: int = 24 * 60 * 60,
+    control: SQLiteRequestControl | None = None,
+) -> ConcurrencyLease | None:
+    if not request_controls_enabled():
+        return None
+    active_control = control or get_request_control()
+    active_control.consume_rate(
+        configured_rate_policy(
+            scope,
+            default_user_limit=default_user_limit,
+            default_ip_limit=default_ip_limit,
+            default_window_seconds=default_window_seconds,
+        ),
+        user_id=user_id,
+        ip_address=request.client.host if request.client else "unknown",
+    )
+    if default_user_quota is not None:
+        active_control.consume_quota(
+            scope=scope,
+            user_id=user_id,
+            limit=configured_user_quota(scope, default=default_user_quota),
+            period_seconds=configured_quota_period_seconds(
+                scope,
+                default=default_quota_period_seconds,
+            ),
+        )
+    return active_control.acquire_concurrency(
+        scope=scope,
+        user_id=user_id,
+        provider=provider,
+        user_limit=configured_user_concurrency_limit(
+            scope,
+            default=default_user_concurrency,
+        ),
+        provider_limit=configured_provider_concurrency_limit(provider),
+        lease_seconds=configured_concurrency_lease_seconds(),
+    )
+
+
+class CustomLandmarksResolveRequest(StrictRequestModel):
+    landmarks: str = Field(min_length=2, max_length=20_000)
+
+
+class LandmarkParseRequest(StrictRequestModel):
+    message: str = Field(min_length=2, max_length=5_000)
+
+
+class KnownDestinationInput(StrictRequestModel):
+    place: str = Field(min_length=1, max_length=160)
+    landmarks: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        min_length=1,
+        max_length=MAX_GUIDE_LANDMARKS,
+    )
+
+
+class StructuredLandmarksResolveRequest(StrictRequestModel):
+    destinations: list[KnownDestinationInput] = Field(
+        min_length=1, max_length=MAX_GUIDE_DESTINATIONS
+    )
+
+
+class GuideDraftCreateRequest(StrictRequestModel):
+    title: str = Field(default="", max_length=200)
+    payload: dict[str, object] = Field(default_factory=dict)
+
+
+class GuideDraftUpdateRequest(GuideDraftCreateRequest):
+    revision: int = Field(ge=1)
+
+
+class GuideGenerationFormRequest(StrictRequestModel):
+    title: str = Field(min_length=1, max_length=160)
+    children_names: str = Field(min_length=1, max_length=MAX_GUIDE_CHILDREN * 102)
+    parents_names: str = Field(min_length=1, max_length=MAX_GUIDE_PARENTS * 102)
+    year: int = Field(ge=MIN_GUIDE_YEAR, le=MAX_GUIDE_YEAR)
+    children_ages: list[Annotated[int, Field(ge=0, le=17)]] = Field(
+        default_factory=list,
+        max_length=MAX_GUIDE_CHILDREN,
+    )
+    expected_visible_family_member_count: int | None = Field(
+        default=None, ge=1, le=MAX_VISIBLE_FAMILY_MEMBERS
+    )
+    selected_landmarks: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        default_factory=list,
+        max_length=MAX_GUIDE_LANDMARKS,
+    )
+    custom_landmarks: str | None = Field(default=None, max_length=20_000)
+    itinerary_json: str | None = Field(default=None, max_length=100_000)
+    restaurant_recommendations_extra: bool = False
+    photo_processing_consent: bool = False
+    privacy_consent_version: str | None = Field(default=None, max_length=100)
+    privacy_consent_at: str | None = Field(default=None, max_length=100)
+
+
+@app.get("/", include_in_schema=False)
+def home() -> RedirectResponse:
+    """Keep one public UI: the React application, not the retired Jinja form."""
+
+    return RedirectResponse(frontend_base_url(), status_code=307)
+
+
+@app.get("/api/catalog", response_model=CatalogResponse)
+def api_catalog() -> CatalogResponse:
     catalog = load_catalog()
-    template = web_templates().get_template("form.html")
-    return template.render(catalog=catalog)
-
-
-@app.get("/api/catalog")
-def api_catalog() -> dict[str, object]:
-    catalog = load_catalog()
-    return {
-        "id": catalog.id,
-        "title": catalog.title,
-        "destinations": [
-            {
-                "id": destination.id,
-                "country": destination.country,
-                "city": destination.city,
-                "display_title": destination.display_title,
-                "intro": destination.intro,
-                "landmarks": [
-                    {
-                        "id": landmark.id,
-                        "selection_id": f"{destination.id}:{landmark.id}",
-                        "name": landmark.name,
-                        "description": landmark.description,
-                        "sort_order": landmark.sort_order,
-                        "categories": landmark.categories,
-                        "duration_minutes": landmark.duration_minutes,
-                        "family_tip": landmark.family_tip,
-                    }
+    return CatalogResponse(
+        id=catalog.id,
+        title=catalog.title,
+        destinations=[
+            CatalogDestinationResponse(
+                id=destination.id,
+                country=destination.country,
+                city=destination.city,
+                display_title=destination.display_title,
+                intro=destination.intro,
+                landmarks=[
+                    CatalogLandmarkResponse(
+                        id=landmark.id,
+                        selection_id=f"{destination.id}:{landmark.id}",
+                        name=landmark.name,
+                        description=landmark.description,
+                        sort_order=landmark.sort_order,
+                        categories=landmark.categories,
+                        duration_minutes=landmark.duration_minutes,
+                        family_tip=landmark.family_tip,
+                    )
                     for landmark in destination.landmarks
                 ],
-            }
+            )
             for destination in catalog.destinations
         ],
-    }
+    )
 
 
-@app.post("/api/itinerary/recommend")
-def api_recommend_itinerary(payload: ItineraryRecommendationRequest) -> dict[str, object]:
+@app.get("/health/live", response_model=HealthLiveResponse)
+def health_live() -> HealthLiveResponse:
+    return HealthLiveResponse(status="ok")
+
+
+@app.get("/health/ready", response_model=HealthReadyResponse)
+def health_ready() -> HealthReadyResponse:
+    try:
+        storage.ensure_runtime_dirs()
+        database_ready = guide_repository().healthcheck()
+        storage_ready = storage.RUNTIME_DIR.exists() and os.access(storage.RUNTIME_DIR, os.W_OK)
+    except (OSError, sqlite3.Error):
+        database_ready = False
+        storage_ready = False
+    if not database_ready or not storage_ready:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "not_ready",
+                "message": "Dependências essenciais indisponíveis.",
+            },
+        )
+    return HealthReadyResponse(
+        status="ok",
+        checks=HealthChecksResponse(database="ok", storage="ok"),
+    )
+
+
+@app.post("/api/itinerary/recommend", response_model=ItineraryRecommendation)
+def api_recommend_itinerary(
+    payload: ItineraryRecommendationRequest,
+    _current_user: CurrentUser,
+) -> ItineraryRecommendation:
     catalog = load_catalog()
     try:
         recommendation = recommend_itinerary(catalog, payload)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    return recommendation.model_dump(mode="json")
+    return recommendation
 
 
-@app.post("/api/itinerary/discover")
-def api_discover_itinerary(payload: DynamicItineraryRequest) -> dict[str, object]:
+@app.post(
+    "/api/itinerary/discover",
+    response_model=DynamicItineraryResponse,
+    dependencies=[
+        Depends(
+            expensive_request_guard(
+                "itinerary_discover",
+                "google",
+                default_user_limit=3,
+                default_ip_limit=10,
+                default_user_concurrency=1,
+            )
+        )
+    ],
+)
+def api_discover_itinerary(
+    payload: DynamicItineraryRequest,
+    _current_user: CurrentUser,
+) -> DynamicItineraryResponse:
     try:
-        return discover_dynamic_itinerary(payload, api_key=google_maps_api_key())
+        return DynamicItineraryResponse.model_validate(
+            discover_dynamic_itinerary(payload, api_key=google_maps_api_key())
+        )
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except ValueError as error:
@@ -167,46 +809,68 @@ def api_discover_itinerary(payload: DynamicItineraryRequest) -> dict[str, object
         raise HTTPException(status_code=502, detail=detail) from error
 
 
-@app.post("/api/itinerary/routes/suggest")
-def api_suggest_itinerary_routes(payload: RouteSuggestionRequest) -> dict[str, object]:
+@app.post("/api/itinerary/routes/suggest", response_model=RouteSuggestionResponse)
+def api_suggest_itinerary_routes(
+    payload: RouteSuggestionRequest,
+    _current_user: CurrentUser,
+) -> RouteSuggestionResponse:
     catalog = load_catalog()
-    return suggest_itinerary_routes(payload, catalog).model_dump(mode="json")
+    return suggest_itinerary_routes(payload, catalog)
 
 
-@app.post("/api/custom-landmarks/resolve")
-def resolve_custom_landmarks(payload: CustomLandmarksResolveRequest) -> dict[str, object]:
+@app.post("/api/custom-landmarks/resolve", response_model=CustomLandmarksResponse)
+def resolve_custom_landmarks(
+    payload: CustomLandmarksResolveRequest,
+    _current_user: CurrentUser,
+) -> CustomLandmarksResponse:
     try:
         custom_landmarks = parse_custom_landmarks(payload.landmarks)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     custom_destinations, selected_landmarks = build_custom_destinations(custom_landmarks)
-    return {
-        "selected_landmarks": selected_landmarks,
-        "destinations": [
-            {
-                "id": destination.id,
-                "country": destination.country,
-                "city": destination.city,
-                "display_title": destination.display_title,
-                "landmarks": [
-                    {
-                        "id": landmark.id,
-                        "selection_id": f"{destination.id}:{landmark.id}",
-                        "name": landmark.name,
-                        "description": landmark.description,
-                        "representative_query": landmark.representative_query,
-                        "required_terms": landmark.required_terms,
-                    }
+    return CustomLandmarksResponse(
+        selected_landmarks=selected_landmarks,
+        destinations=[
+            CustomLandmarkDestinationResponse(
+                id=destination.id,
+                country=destination.country,
+                city=destination.city,
+                display_title=destination.display_title,
+                landmarks=[
+                    CustomLandmarkResponse(
+                        id=landmark.id,
+                        selection_id=f"{destination.id}:{landmark.id}",
+                        name=landmark.name,
+                        description=landmark.description,
+                        representative_query=landmark.representative_query,
+                        required_terms=landmark.required_terms,
+                    )
                     for landmark in destination.landmarks
                 ],
-            }
+            )
             for destination in custom_destinations
         ],
-    }
+    )
 
 
-@app.post("/api/landmarks/resolve-structured")
-def resolve_structured_landmarks(payload: StructuredLandmarksResolveRequest) -> dict[str, object]:
+@app.post(
+    "/api/landmarks/resolve-structured",
+    response_model=LandmarkResolutionResponse,
+    dependencies=[
+        Depends(
+            expensive_request_guard(
+                "landmarks_resolve",
+                "google",
+                default_user_limit=10,
+                default_ip_limit=30,
+            )
+        )
+    ],
+)
+def resolve_structured_landmarks(
+    payload: StructuredLandmarksResolveRequest,
+    _current_user: CurrentUser,
+) -> LandmarkResolutionResponse:
     custom_inputs: list[CustomLandmarkInput] = []
     for destination in payload.destinations:
         city, country = _split_destination_place(destination.place)
@@ -214,9 +878,7 @@ def resolve_structured_landmarks(payload: StructuredLandmarksResolveRequest) -> 
             cleaned_name = landmark_name.strip()
             if not cleaned_name:
                 continue
-            custom_inputs.append(
-                CustomLandmarkInput(name=cleaned_name, city=city, country=country)
-            )
+            custom_inputs.append(CustomLandmarkInput(name=cleaned_name, city=city, country=country))
     if not custom_inputs:
         raise HTTPException(
             status_code=400,
@@ -232,8 +894,8 @@ def resolve_structured_landmarks(payload: StructuredLandmarksResolveRequest) -> 
             api_key=api_key,
             include_photos=True,
         )
-    return {
-        "custom_landmarks": json.dumps(
+    return LandmarkResolutionResponse(
+        custom_landmarks=json.dumps(
             [
                 {
                     "name": landmark.name,
@@ -245,14 +907,17 @@ def resolve_structured_landmarks(payload: StructuredLandmarksResolveRequest) -> 
             ],
             ensure_ascii=False,
         ),
-        "selected_landmarks": selected_landmarks,
-        "destinations": serialize_preview_destinations(
-            custom_destinations,
-            [],
-            {},
-            location_metadata,
-        ),
-    }
+        selected_landmarks=selected_landmarks,
+        destinations=[
+            PreviewDestinationResponse.model_validate(destination)
+            for destination in serialize_preview_destinations(
+                custom_destinations,
+                [],
+                {},
+                location_metadata,
+            )
+        ],
+    )
 
 
 def _split_destination_place(place: str) -> tuple[str, str]:
@@ -264,8 +929,24 @@ def _split_destination_place(place: str) -> tuple[str, str]:
     return parts[0], ", ".join(parts[1:])
 
 
-@app.post("/api/landmarks/parse")
-def parse_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
+@app.post(
+    "/api/landmarks/parse",
+    response_model=LandmarkResolutionResponse,
+    dependencies=[
+        Depends(
+            expensive_request_guard(
+                "landmarks_parse",
+                "openai",
+                default_user_limit=5,
+                default_ip_limit=20,
+            )
+        )
+    ],
+)
+def parse_landmarks(
+    payload: LandmarkParseRequest,
+    _current_user: CurrentUser,
+) -> LandmarkResolutionResponse:
     try:
         parsed_landmarks = parse_landmarks_from_message(payload.message)
     except RuntimeError as error:
@@ -297,8 +978,8 @@ def parse_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
             api_key=api_key,
             include_photos=True,
         )
-    return {
-        "custom_landmarks": json.dumps(
+    return LandmarkResolutionResponse(
+        custom_landmarks=json.dumps(
             [
                 {
                     "name": landmark.name,
@@ -310,14 +991,17 @@ def parse_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
             ],
             ensure_ascii=False,
         ),
-        "selected_landmarks": selected_landmarks,
-        "destinations": serialize_preview_destinations(
-            custom_destinations,
-            parsed_landmarks,
-            {},
-            location_metadata,
-        ),
-    }
+        selected_landmarks=selected_landmarks,
+        destinations=[
+            PreviewDestinationResponse.model_validate(destination)
+            for destination in serialize_preview_destinations(
+                custom_destinations,
+                parsed_landmarks,
+                {},
+                location_metadata,
+            )
+        ],
+    )
 
 
 def _parsed_landmark_description(item: ParsedLandmark | dict[str, object]) -> list[str]:
@@ -327,9 +1011,25 @@ def _parsed_landmark_description(item: ParsedLandmark | dict[str, object]) -> li
     return [str(paragraph).strip() for paragraph in raw_description if str(paragraph).strip()]
 
 
-@app.post("/api/landmarks/parse-preview")
-def parse_preview_landmarks(payload: LandmarkParseRequest) -> dict[str, object]:
-    return parse_landmarks(payload)
+@app.post(
+    "/api/landmarks/parse-preview",
+    response_model=LandmarkResolutionResponse,
+    dependencies=[
+        Depends(
+            expensive_request_guard(
+                "landmarks_parse",
+                "openai",
+                default_user_limit=5,
+                default_ip_limit=20,
+            )
+        )
+    ],
+)
+def parse_preview_landmarks(
+    payload: LandmarkParseRequest,
+    current_user: CurrentUser,
+) -> LandmarkResolutionResponse:
+    return parse_landmarks(payload, current_user)
 
 
 @app.get("/preview/sample", response_class=HTMLResponse)
@@ -347,85 +1047,656 @@ def preview_sample() -> str:
         parents_names=["Ana", "Otavio"],
         year=2026,
         selected_landmarks=selected,
+        itinerary=GuideItineraryPlan(
+            mode="known",
+            pace="balanced",
+            interests=["história", "arte", "passeios em família"],
+            destinations=[
+                GuideDestinationPlan(
+                    id=destination.id,
+                    place=destination.location_label,
+                    timing="Europa 2026",
+                    days=max(1, min(3, len(destination.landmarks))),
+                    order=index,
+                )
+                for index, destination in enumerate(catalog.destinations, start=1)
+            ],
+            days=[
+                GuideItineraryDayPlan(
+                    day=index,
+                    title=f"Dia {index}: {destination.city}",
+                    theme=f"Descobertas em {destination.city}",
+                    stops=[
+                        GuideItineraryStopPlan(
+                            selection_id=f"{destination.id}:{landmark.id}",
+                            name=landmark.name,
+                            destination_id=destination.id,
+                        )
+                        for landmark in destination.landmarks[:3]
+                    ],
+                )
+                for index, destination in enumerate(catalog.destinations, start=1)
+            ],
+        ),
     )
     context = build_guide_context(
         request,
         catalog,
         Path("runtime/generated/representative-full-cover.png"),
-        wikimedia_assets=load_wikimedia_manifest(),
     )
     return render_guide_html(context, preview=True)
 
 
-@app.post("/generate", response_class=HTMLResponse)
-async def generate(
+@app.post("/generate", include_in_schema=False)
+def legacy_generate_removed() -> JSONResponse:
+    """Prevent the retired form from bypassing auth, jobs and idempotency."""
+
+    return JSONResponse(
+        status_code=410,
+        content={
+            "detail": {
+                "code": "legacy_generation_removed",
+                "message": "Use o aplicativo atualizado para criar um guia.",
+            }
+        },
+    )
+
+
+def parse_guide_generation_form(
     title: Annotated[str, Form()],
     children_names: Annotated[str, Form()],
     parents_names: Annotated[str, Form()],
     year: Annotated[int, Form()],
-    family_photo: Annotated[UploadFile, File()],
     children_ages: Annotated[list[int] | None, Form()] = None,
     expected_visible_family_member_count: Annotated[int | None, Form()] = None,
     selected_landmarks: Annotated[list[str] | None, Form()] = None,
     custom_landmarks: Annotated[str | None, Form()] = None,
+    itinerary_json: Annotated[str | None, Form()] = None,
     restaurant_recommendations_extra: Annotated[bool | None, Form()] = None,
-) -> str:
-    result = await generate_pdf_from_form(
-        title=title,
-        children_names=children_names,
-        children_ages=children_ages or [],
-        expected_visible_family_member_count=expected_visible_family_member_count,
-        parents_names=parents_names,
-        year=year,
-        selected_landmarks=selected_landmarks or [],
-        custom_landmarks=custom_landmarks,
-        restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
-        family_photo=family_photo,
-    )
+    photo_processing_consent: Annotated[bool, Form()] = False,
+    privacy_consent_version: Annotated[str | None, Form()] = None,
+    privacy_consent_at: Annotated[str | None, Form()] = None,
+) -> GuideGenerationFormRequest:
+    try:
+        return GuideGenerationFormRequest(
+            title=title,
+            children_names=children_names,
+            parents_names=parents_names,
+            year=year,
+            children_ages=children_ages or [],
+            expected_visible_family_member_count=expected_visible_family_member_count,
+            selected_landmarks=selected_landmarks or [],
+            custom_landmarks=custom_landmarks,
+            itinerary_json=itinerary_json,
+            restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
+            photo_processing_consent=photo_processing_consent,
+            privacy_consent_version=privacy_consent_version,
+            privacy_consent_at=privacy_consent_at,
+        )
+    except ValidationError as error:
+        raise RequestValidationError(error.errors()) from error
 
-    template = web_templates().get_template("result.html")
-    return template.render(download_url=result["download_url"], request=result["request"])
 
-
-@app.post("/api/generate")
+@app.post("/api/generate", response_model=GuideGenerationResponse)
 async def api_generate(
-    title: Annotated[str, Form()],
-    children_names: Annotated[str, Form()],
-    parents_names: Annotated[str, Form()],
-    year: Annotated[int, Form()],
+    form: Annotated[GuideGenerationFormRequest, Depends(parse_guide_generation_form)],
     family_photo: Annotated[UploadFile, File()],
-    children_ages: Annotated[list[int] | None, Form()] = None,
-    expected_visible_family_member_count: Annotated[int | None, Form()] = None,
-    selected_landmarks: Annotated[list[str] | None, Form()] = None,
-    custom_landmarks: Annotated[str | None, Form()] = None,
-    restaurant_recommendations_extra: Annotated[bool | None, Form()] = None,
-) -> dict[str, object]:
-    result = await generate_pdf_from_form(
-        title=title,
-        children_names=children_names,
-        children_ages=children_ages or [],
-        expected_visible_family_member_count=expected_visible_family_member_count,
-        parents_names=parents_names,
-        year=year,
-        selected_landmarks=selected_landmarks or [],
-        custom_landmarks=custom_landmarks,
-        restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
-        family_photo=family_photo,
-    )
+    request: Request,
+    response: Response,
+    current_user: CurrentUser,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> GuideGenerationResponse:
+    title = form.title
+    children_names = form.children_names
+    parents_names = form.parents_names
+    year = form.year
+    children_ages = form.children_ages
+    expected_visible_family_member_count = form.expected_visible_family_member_count
+    selected_landmarks = form.selected_landmarks
+    custom_landmarks = form.custom_landmarks
+    itinerary_json = form.itinerary_json
+    restaurant_recommendations_extra = form.restaurant_recommendations_extra
+    photo_processing_consent = form.photo_processing_consent
+    privacy_consent_version = form.privacy_consent_version
+    privacy_consent_at = form.privacy_consent_at
+
+    queue_generation = async_guide_jobs_enabled()
+    key_required = idempotency_key_required() or queue_generation
+    if key_required and not (idempotency_key or "").strip():
+        raise IdempotencyKeyRequiredError()
+
+    controls_enabled = request_controls_enabled()
+    uses_idempotency = key_required or bool(idempotency_key and idempotency_key.strip())
+    control = get_request_control() if controls_enabled or uses_idempotency else None
+    reservation: IdempotencyReservation | None = None
+    if uses_idempotency and control is not None:
+        request_hash = await generation_request_hash(
+            title=title,
+            children_names=children_names,
+            children_ages=children_ages or [],
+            expected_visible_family_member_count=expected_visible_family_member_count,
+            parents_names=parents_names,
+            year=year,
+            selected_landmarks=selected_landmarks or [],
+            custom_landmarks=custom_landmarks,
+            itinerary_json=itinerary_json,
+            restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
+            photo_processing_consent=photo_processing_consent,
+            privacy_consent_version=privacy_consent_version,
+            privacy_consent_at=privacy_consent_at,
+            family_photo=family_photo,
+        )
+        reservation = control.reserve_idempotency(
+            namespace="guide-generation-api",
+            user_id=current_user.id,
+            key=idempotency_key,
+            request_hash=request_hash,
+            required=key_required,
+            pending_ttl_seconds=configured_idempotency_pending_ttl_seconds(),
+        )
+        if reservation is not None and reservation.state == "completed":
+            response.status_code = reservation.response_status or 200
+            response.headers["Idempotency-Replayed"] = "true"
+            return validate_generation_response_payload(reservation.response_payload)
+        if reservation is not None and reservation.state == "in_progress":
+            if queue_generation:
+                existing_job = guide_repository().get_job_for_idempotency(
+                    current_user.id, idempotency_key or ""
+                )
+                if existing_job is not None:
+                    response.status_code = 202
+                    response.headers["Idempotency-Replayed"] = "true"
+                    return GuideGenerationQueuedResponse.model_validate(
+                        queued_job_payload(existing_job)
+                    )
+            raise IdempotencyInProgressError(
+                operation_id=reservation.operation_id,
+                retry_after=reservation.retry_after or 1,
+            )
+
+    lease: ConcurrencyLease | None = None
+    queued_photo_path: Path | None = None
+    job_persisted = False
+    try:
+        lease = admit_expensive_request(
+            request=request,
+            user_id=current_user.id,
+            scope="guide_generate",
+            provider=image_provider(),
+            default_user_limit=2,
+            default_ip_limit=5,
+            default_window_seconds=10 * 60,
+            default_user_concurrency=1,
+            default_user_quota=20,
+            control=control,
+        )
+        if queue_generation:
+            submission = validate_queued_generation_submission(
+                title=title,
+                children_names=children_names,
+                children_ages=children_ages or [],
+                expected_visible_family_member_count=expected_visible_family_member_count,
+                parents_names=parents_names,
+                year=year,
+                selected_landmarks=selected_landmarks or [],
+                custom_landmarks=custom_landmarks,
+                itinerary_json=itinerary_json,
+                restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
+                photo_processing_consent=photo_processing_consent,
+                privacy_consent_version=privacy_consent_version,
+                privacy_consent_at=privacy_consent_at,
+            )
+            queued_photo_path = await storage.save_upload(family_photo)
+            job_id = uuid4().hex
+            try:
+                created_job = guide_repository().create_job(
+                    job_id=job_id,
+                    user_id=current_user.id,
+                    idempotency_key=idempotency_key or job_id,
+                    request_snapshot=submission,
+                    photo_path=queued_photo_path,
+                    max_attempts=guide_job_max_attempts(),
+                )
+            except sqlite3.IntegrityError:
+                existing_job = guide_repository().get_job_for_idempotency(
+                    current_user.id, idempotency_key or ""
+                )
+                if existing_job is None:
+                    raise
+                delete_private_asset(queued_photo_path)
+                queued_photo_path = None
+                response.status_code = 202
+                response.headers["Idempotency-Replayed"] = "true"
+                return GuideGenerationQueuedResponse.model_validate(
+                    queued_job_payload(existing_job)
+                )
+            job_persisted = True
+            payload = queued_job_payload(created_job)
+            emit_event(
+                "guide_job_accepted",
+                request_id=getattr(request.state, "request_id", None),
+                job_id=created_job.id,
+                user_id=current_user.id,
+                stage=created_job.stage,
+                outcome="accepted",
+            )
+            if reservation is not None and control is not None:
+                try:
+                    control.complete_idempotency(
+                        reservation,
+                        response_payload=payload,
+                        response_status=202,
+                        ttl_seconds=configured_idempotency_ttl_seconds(),
+                    )
+                except RequestControlError:
+                    # The durable job row is the source of truth once it has
+                    # been committed. A replay can recover through its unique
+                    # user/key constraint even if the short-lived cache fails.
+                    pass
+                response.headers["Idempotency-Replayed"] = "false"
+            response.status_code = 202
+            return GuideGenerationQueuedResponse.model_validate(payload)
+        result = await generate_pdf_from_form(
+            title=title,
+            children_names=children_names,
+            children_ages=children_ages or [],
+            expected_visible_family_member_count=expected_visible_family_member_count,
+            parents_names=parents_names,
+            year=year,
+            selected_landmarks=selected_landmarks or [],
+            custom_landmarks=custom_landmarks,
+            itinerary_json=itinerary_json,
+            restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
+            family_photo=family_photo,
+            owner_id=current_user.id,
+            photo_processing_consent=photo_processing_consent,
+            privacy_consent_version=privacy_consent_version,
+            privacy_consent_at=privacy_consent_at,
+        )
+        payload = {
+            "request_id": result["request_id"],
+            "download_url": result["download_url"],
+            "filename": result["filename"],
+            "cover_status": result["cover_status"],
+        }
+        if reservation is not None and control is not None:
+            control.complete_idempotency(
+                reservation,
+                response_payload=payload,
+                response_status=200,
+                ttl_seconds=configured_idempotency_ttl_seconds(),
+            )
+            response.headers["Idempotency-Replayed"] = "false"
+        return GuideGenerationCompletedResponse.model_validate(payload)
+    except BaseException:
+        if queued_photo_path is not None and not job_persisted:
+            delete_private_asset(queued_photo_path)
+        if reservation is not None and control is not None:
+            try:
+                control.abandon_idempotency(reservation)
+            except RequestControlError:
+                pass
+        raise
+    finally:
+        if lease is not None:
+            lease.release()
+
+
+def queued_job_payload(job: GuideJobRecord) -> dict[str, object]:
+    """Return the stable submission response for a persisted guide job."""
+
+    job_id = job.id
     return {
-        "request_id": result["request_id"],
-        "download_url": result["download_url"],
-        "filename": result["filename"],
-        "cover_status": result["cover_status"],
+        "job_id": job_id,
+        "status": job.status,
+        "stage": job.stage,
+        "progress": job.progress,
+        "poll_url": f"/api/jobs/{job_id}",
     }
 
 
+def validate_generation_response_payload(
+    payload: dict[str, object] | None,
+) -> GuideGenerationResponse:
+    if not payload:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "idempotency_response_invalid",
+                "message": "A resposta idempotente armazenada está inválida.",
+            },
+        )
+    if "job_id" in payload:
+        return GuideGenerationQueuedResponse.model_validate(payload)
+    return GuideGenerationCompletedResponse.model_validate(payload)
+
+
+def validate_queued_generation_submission(
+    *,
+    title: str,
+    children_names: str,
+    children_ages: list[int],
+    expected_visible_family_member_count: int | None,
+    parents_names: str,
+    year: int,
+    selected_landmarks: list[str],
+    custom_landmarks: str | None,
+    itinerary_json: str | None,
+    restaurant_recommendations_extra: bool,
+    photo_processing_consent: bool,
+    privacy_consent_version: str | None,
+    privacy_consent_at: str | None,
+) -> dict[str, object]:
+    """Reject malformed queued work before it can consume a worker lease."""
+
+    try:
+        validate_photo_processing_consent(
+            granted=photo_processing_consent,
+            version=privacy_consent_version,
+            granted_at=privacy_consent_at,
+        )
+    except PrivacyConsentError as error:
+        raise HTTPException(status_code=422, detail=error.as_detail()) from error
+    try:
+        custom_items = parse_custom_landmarks(custom_landmarks)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if not selected_landmarks and not custom_items:
+        raise HTTPException(
+            status_code=400,
+            detail="Selecione ou informe pelo menos um ponto turístico.",
+        )
+    try:
+        GuideRequest(
+            title=title,
+            children_names=_split_names(children_names),
+            children_ages=[age for age in children_ages if age > 0],
+            parents_names=_split_names(parents_names),
+            year=year,
+            selected_landmarks=selected_landmarks or ["custom:pending"],
+            expected_visible_family_member_count=expected_visible_family_member_count,
+            restaurant_recommendations_extra=restaurant_recommendations_extra,
+            itinerary=parse_guide_itinerary(itinerary_json),
+        )
+    except (ValidationError, ValueError) as error:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "generation_input_invalid",
+                "message": "Revise os dados da família e do roteiro.",
+            },
+        ) from error
+    return {
+        "title": title,
+        "children_names": children_names,
+        "children_ages": children_ages,
+        "expected_visible_family_member_count": expected_visible_family_member_count,
+        "parents_names": parents_names,
+        "year": year,
+        "selected_landmarks": selected_landmarks,
+        "custom_landmarks": custom_landmarks,
+        "itinerary_json": itinerary_json,
+        "restaurant_recommendations_extra": restaurant_recommendations_extra,
+        "photo_processing_consent": photo_processing_consent,
+        "privacy_consent_version": privacy_consent_version,
+        "privacy_consent_at": privacy_consent_at,
+    }
+
+
+async def generation_request_hash(
+    *,
+    title: str,
+    children_names: str,
+    children_ages: list[int],
+    expected_visible_family_member_count: int | None,
+    parents_names: str,
+    year: int,
+    selected_landmarks: list[str],
+    custom_landmarks: str | None,
+    itinerary_json: str | None,
+    restaurant_recommendations_extra: bool,
+    photo_processing_consent: bool,
+    privacy_consent_version: str | None,
+    privacy_consent_at: str | None,
+    family_photo: UploadFile,
+) -> str:
+    photo_hash, photo_size = await upload_content_hash(family_photo)
+    return stable_request_hash(
+        {
+            "title": title,
+            "children_names": children_names,
+            "children_ages": children_ages,
+            "expected_visible_family_member_count": expected_visible_family_member_count,
+            "parents_names": parents_names,
+            "year": year,
+            "selected_landmarks": selected_landmarks,
+            "custom_landmarks": custom_landmarks,
+            "itinerary_json": itinerary_json,
+            "restaurant_recommendations_extra": restaurant_recommendations_extra,
+            "photo_processing_consent": photo_processing_consent,
+            "privacy_consent_version": privacy_consent_version,
+            "privacy_consent_at": privacy_consent_at,
+            "family_photo": {
+                "sha256": photo_hash,
+                "size": photo_size,
+                "content_type": family_photo.content_type,
+            },
+        }
+    )
+
+
+async def upload_content_hash(upload: UploadFile) -> tuple[str, int]:
+    max_bytes = storage.image_upload_max_bytes()
+    if upload.size is not None and upload.size > max_bytes:
+        raise storage.ImageUploadTooLargeError(
+            max_bytes=max_bytes,
+            bytes_read=upload.size,
+        )
+    digest = hashlib.sha256()
+    bytes_read = 0
+    await upload.seek(0)
+    try:
+        while True:
+            chunk = await upload.read(storage.IMAGE_UPLOAD_CHUNK_BYTES)
+            if not chunk:
+                break
+            bytes_read += len(chunk)
+            if bytes_read > max_bytes:
+                raise storage.ImageUploadTooLargeError(
+                    max_bytes=max_bytes,
+                    bytes_read=bytes_read,
+                )
+            digest.update(chunk)
+    finally:
+        await upload.seek(0)
+    return digest.hexdigest(), bytes_read
+
+
+@app.get("/api/guides", response_model=GuideListResponse)
+def list_guides(current_user: CurrentUser) -> GuideListResponse:
+    records = guide_repository().list_for_owner(current_user.id)
+    return GuideListResponse(
+        guides=[GuideResponse.model_validate(record.public_payload()) for record in records]
+    )
+
+
+@app.get("/api/drafts/current", response_model=CurrentGuideDraftResponse)
+def get_current_draft(current_user: CurrentUser) -> CurrentGuideDraftResponse:
+    draft = guide_repository().latest_draft_for_owner(current_user.id)
+    return CurrentGuideDraftResponse(
+        draft=GuideDraftResponse.model_validate(draft.public_payload()) if draft else None
+    )
+
+
+@app.post("/api/drafts", status_code=201, response_model=GuideDraftResponse)
+def create_draft(
+    payload: GuideDraftCreateRequest,
+    current_user: CurrentUser,
+) -> GuideDraftResponse:
+    try:
+        draft = guide_repository().create_draft(
+            user_id=current_user.id,
+            title=payload.title,
+            payload=payload.payload,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "draft_payload_invalid", "message": str(error)},
+        ) from error
+    emit_event("guide_draft_created", user_id=current_user.id, outcome="accepted")
+    return GuideDraftResponse.model_validate(draft.public_payload())
+
+
+@app.put("/api/drafts/{draft_id}", response_model=GuideDraftResponse)
+def update_draft(
+    draft_id: str,
+    payload: GuideDraftUpdateRequest,
+    current_user: CurrentUser,
+) -> GuideDraftResponse:
+    try:
+        draft = guide_repository().update_draft(
+            draft_id=draft_id,
+            user_id=current_user.id,
+            title=payload.title,
+            payload=payload.payload,
+            expected_revision=payload.revision,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "draft_payload_invalid", "message": str(error)},
+        ) from error
+    if draft is not None:
+        emit_event("guide_draft_saved", user_id=current_user.id, outcome="succeeded")
+        return GuideDraftResponse.model_validate(draft.public_payload())
+    existing = guide_repository().get_draft_for_owner(draft_id, current_user.id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "draft_revision_conflict",
+            "message": "Este rascunho foi atualizado em outra sessão. Recarregue a página.",
+            "revision": existing.revision,
+        },
+    )
+
+
+@app.delete("/api/drafts/{draft_id}", response_model=DeletedResponse)
+def delete_draft(draft_id: str, current_user: CurrentUser) -> DeletedResponse:
+    if not guide_repository().discard_draft(draft_id, current_user.id):
+        raise HTTPException(status_code=404, detail="Draft not found")
+    emit_event("guide_draft_discarded", user_id=current_user.id, outcome="cancelled")
+    return DeletedResponse(deleted=True)
+
+
+@app.get("/api/jobs", response_model=GuideJobListResponse)
+def list_jobs(current_user: CurrentUser) -> GuideJobListResponse:
+    jobs = guide_repository().list_jobs_for_owner(current_user.id)
+    return GuideJobListResponse(
+        jobs=[GuideJobResponse.model_validate(job.public_payload()) for job in jobs]
+    )
+
+
+@app.get("/api/jobs/{job_id}", response_model=GuideJobResponse)
+def job_details(job_id: str, current_user: CurrentUser) -> GuideJobResponse:
+    job = guide_repository().get_job_for_owner(job_id, current_user.id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return GuideJobResponse.model_validate(job.public_payload())
+
+
+@app.delete("/api/jobs/{job_id}", response_model=GuideJobResponse)
+def cancel_job(job_id: str, current_user: CurrentUser) -> GuideJobResponse:
+    repository = guide_repository()
+    job = repository.request_job_cancellation(job_id, current_user.id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    has_cross_owner_reference = repository.is_private_path_referenced_by_another_owner(
+        job.photo_path, current_user.id
+    )
+    if job.status == "cancelled" and not has_cross_owner_reference:
+        delete_private_asset(job.photo_path)
+    return GuideJobResponse.model_validate(job.public_payload())
+
+
+@app.get("/api/account/export", response_model=AccountExportResponse)
+def export_account_data(current_user: CurrentUser) -> JSONResponse:
+    repository = guide_repository()
+    records = repository.list_for_export(current_user.id)
+    drafts = repository.list_drafts_for_export(current_user.id)
+    return JSONResponse(
+        content={
+            "schema_version": 1,
+            "exported_at": datetime.now(UTC).isoformat(),
+            "account": {
+                "id": current_user.id,
+                "email": current_user.email,
+            },
+            "guides": [record.export_payload() for record in records],
+            "drafts": [draft.export_payload() for draft in drafts],
+        },
+        headers={
+            "Cache-Control": "private, no-store, max-age=0",
+            "Pragma": "no-cache",
+            "Content-Disposition": 'attachment; filename="minerva-travel-data-export.json"',
+        },
+    )
+
+
+@app.delete("/api/account/data", response_model=AccountDeletionResponse)
+def delete_account_data(current_user: CurrentUser) -> JSONResponse:
+    result = purge_all_data_for_owner(guide_repository(), current_user.id)
+    return JSONResponse(
+        content={
+            "deleted": True,
+            "guides_deleted": result.guides_deleted,
+            "private_files_deleted": result.private_files_deleted,
+        },
+        headers={
+            "Cache-Control": "private, no-store, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+@app.get("/api/guides/{guide_id}", response_model=GuideResponse)
+def guide_details(guide_id: str, current_user: CurrentUser) -> GuideResponse:
+    record = guide_repository().get_for_owner(guide_id, current_user.id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    return GuideResponse.model_validate(record.public_payload())
+
+
+@app.delete("/api/guides/{guide_id}", response_model=DeletedResponse)
+def delete_guide(guide_id: str, current_user: CurrentUser) -> DeletedResponse:
+    deleted = delete_guide_and_assets(guide_repository(), guide_id, current_user.id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    return DeletedResponse(deleted=True)
+
+
 @app.get("/download/{filename}")
-def download(filename: str) -> FileResponse:
-    path = storage.pdf_path(filename)
-    if not path.exists():
+def download(filename: str, current_user: CurrentUser) -> FileResponse:
+    record = guide_repository().get_by_pdf_for_owner(filename, current_user.id)
+    if record is None or record.status != "succeeded":
         raise HTTPException(status_code=404, detail="PDF not found")
-    return FileResponse(path, media_type="application/pdf", filename="minerva-travel-guide.pdf")
+    if record.is_expired:
+        raise HTTPException(status_code=410, detail="PDF expired")
+    path = storage.pdf_path(filename)
+    if path.name != filename or path.suffix.lower() != ".pdf" or not path.is_file():
+        raise HTTPException(status_code=404, detail="PDF not found")
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=f"{slugify(record.title)[:72] or 'guia'}-minerva-travel.pdf",
+        headers={
+            "Cache-Control": "private, no-store, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 async def generate_pdf_from_form(
@@ -437,8 +1708,61 @@ async def generate_pdf_from_form(
     year: int,
     selected_landmarks: list[str],
     family_photo: UploadFile,
+    owner_id: str,
     custom_landmarks: str | None = None,
+    itinerary_json: str | None = None,
     restaurant_recommendations_extra: bool = False,
+    photo_processing_consent: bool = False,
+    privacy_consent_version: str | None = None,
+    privacy_consent_at: str | None = None,
+) -> dict[str, object]:
+    try:
+        privacy_consent = validate_photo_processing_consent(
+            granted=photo_processing_consent,
+            version=privacy_consent_version,
+            granted_at=privacy_consent_at,
+        )
+    except PrivacyConsentError as error:
+        raise HTTPException(status_code=422, detail=error.as_detail()) from error
+
+    photo_path = await storage.save_upload(family_photo)
+    try:
+        return await generate_pdf_from_saved_photo(
+            title=title,
+            children_names=children_names,
+            children_ages=children_ages,
+            expected_visible_family_member_count=expected_visible_family_member_count,
+            parents_names=parents_names,
+            year=year,
+            selected_landmarks=selected_landmarks,
+            family_photo_path=photo_path,
+            owner_id=owner_id,
+            custom_landmarks=custom_landmarks,
+            itinerary_json=itinerary_json,
+            restaurant_recommendations_extra=restaurant_recommendations_extra,
+            privacy_consent=privacy_consent,
+        )
+    except Exception:
+        delete_private_asset(photo_path)
+        raise
+
+
+async def generate_pdf_from_saved_photo(
+    *,
+    title: str,
+    children_names: str,
+    children_ages: list[int],
+    expected_visible_family_member_count: int | None,
+    parents_names: str,
+    year: int,
+    selected_landmarks: list[str],
+    family_photo_path: Path,
+    owner_id: str,
+    custom_landmarks: str | None = None,
+    itinerary_json: str | None = None,
+    restaurant_recommendations_extra: bool = False,
+    privacy_consent: PrivacyConsent | None = None,
+    guide_id: str | None = None,
 ) -> dict[str, object]:
     catalog = load_catalog()
     custom_destinations, custom_selected = custom_destinations_from_form(custom_landmarks)
@@ -466,9 +1790,60 @@ async def generate_pdf_from_form(
         selected_landmarks=selected,
         expected_visible_family_member_count=expected_visible_family_member_count,
         restaurant_recommendations_extra=restaurant_recommendations_extra,
+        itinerary=parse_guide_itinerary(itinerary_json),
     )
-    request_id = uuid4().hex
-    photo_path = await storage.save_upload(family_photo)
+    request_id = guide_id or uuid4().hex
+    # Resolve the credited landmark images before calling an image provider.
+    # In production this fails closed rather than falling back to the bundled
+    # geometric fixtures that are intentionally retained for offline dev/tests.
+    wikimedia_assets = load_wikimedia_manifest()
+    wikimedia_assets.update(fetch_custom_wikimedia_assets(custom_destinations, request_id))
+    selected_wikimedia_assets = {
+        selection_id: asset
+        for selection_id, asset in wikimedia_assets.items()
+        if selection_id in selected
+    }
+    try:
+        assert_selected_asset_provenance(selected, selected_wikimedia_assets)
+    except AssetProvenanceError as error:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "approved_landmark_asset_unavailable",
+                "message": str(error),
+                "selection_ids": list(error.missing_selection_ids),
+            },
+        ) from error
+
+    approved_reference_images = {
+        selection_id: asset.local_path for selection_id, asset in selected_wikimedia_assets.items()
+    }
+    precomputed_lineart_images: dict[str, Path] = {}
+    if asset_provenance_required() and not landmark_art_generation_enabled():
+        # Run this inexpensive local transformation before a paid cover call.
+        # A corrupt reference therefore fails safely instead of delivering a
+        # generic coloring-page placeholder after spending provider budget.
+        precomputed_lineart_images = create_local_lineart_fallbacks(
+            catalog.destinations,
+            selected,
+            request_id,
+            reference_images=approved_reference_images,
+            allow_named_placeholder=False,
+        )
+        missing_lineart = sorted(set(selected) - set(precomputed_lineart_images))
+        if missing_lineart:
+            for path in precomputed_lineart_images.values():
+                delete_private_asset(path)
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "approved_landmark_lineart_unavailable",
+                    "message": "Não foi possível preparar desenhos reconhecíveis para colorir.",
+                    "selection_ids": missing_lineart,
+                },
+            )
+
+    photo_path = family_photo_path
     cover_landmark_names = selected_landmark_names(catalog.destinations, selected)
     cover_path = storage.generated_path(f"{request_id}-cover.png")
     generator = get_image_generator(image_provider())
@@ -488,13 +1863,6 @@ async def generate_pdf_from_form(
         destination_names=cover_landmark_names,
     )
 
-    wikimedia_assets = load_wikimedia_manifest()
-    wikimedia_assets.update(fetch_custom_wikimedia_assets(custom_destinations, request_id))
-    selected_wikimedia_assets = {
-        selection_id: asset
-        for selection_id, asset in wikimedia_assets.items()
-        if selection_id in selected
-    }
     wikimedia_assets.update(sync_wikimedia_assets_to_storage(selected_wikimedia_assets))
 
     landmark_images: dict[str, Path] = download_custom_landmark_images(
@@ -503,11 +1871,8 @@ async def generate_pdf_from_form(
         request_id,
         skip_selection_ids=set(selected_wikimedia_assets),
     )
-    custom_reference_images = {
-        selection_id: asset.local_path
-        for selection_id, asset in selected_wikimedia_assets.items()
-    }
-    custom_reference_images.update(landmark_images)
+    reference_images = dict(approved_reference_images)
+    reference_images.update(landmark_images)
     if landmark_art_generation_enabled():
         landmark_reference_images = {
             selection_id: asset.local_path
@@ -523,30 +1888,24 @@ async def generate_pdf_from_form(
             reference_images=landmark_reference_images,
         )
         landmark_images.update(generated_landmark_images)
+    elif precomputed_lineart_images:
+        landmark_lineart_images = precomputed_lineart_images
     elif coloring_lineart_generation_enabled():
-        landmark_lineart_images = generate_selected_landmark_lineart(
-            custom_destinations,
-            custom_selected,
-            request_id,
-            generator,
-            reference_images=custom_reference_images,
-        )
-        missing_lineart_ids = set(custom_selected) - set(landmark_lineart_images)
-        if missing_lineart_ids:
-            landmark_lineart_images.update(
-                create_local_lineart_fallbacks(
-                    custom_destinations,
-                    list(missing_lineart_ids),
-                    request_id,
-                    reference_images=custom_reference_images,
-                )
-            )
-    else:
+        # The color and coloring images must refer to the same landmark. The
+        # older path generated line art only for custom destinations and left
+        # catalog landmarks with geometric placeholder drawings.
         landmark_lineart_images = create_local_lineart_fallbacks(
-            custom_destinations,
+            catalog.destinations,
             selected,
             request_id,
-            reference_images=custom_reference_images,
+            reference_images=reference_images,
+        )
+    else:
+        landmark_lineart_images = create_local_lineart_fallbacks(
+            catalog.destinations,
+            selected,
+            request_id,
+            reference_images=reference_images,
         )
     context = build_guide_context(
         request,
@@ -557,7 +1916,7 @@ async def generate_pdf_from_form(
         landmark_images=landmark_images,
         landmark_lineart_images=landmark_lineart_images,
     )
-    if request.restaurant_recommendations_extra:
+    if request.restaurant_recommendations_extra and pilot_restaurant_recommendations_enabled():
         context = context.model_copy(
             update={
                 "restaurant_recommendations": discover_restaurants_for_guide(
@@ -566,8 +1925,45 @@ async def generate_pdf_from_form(
                 )
             }
         )
-    pdf_output = storage.pdf_path(f"{request_id}.pdf")
+    title_slug = slugify(request.title)[:48] or "guia"
+    pdf_output = storage.pdf_path(f"{title_slug}-{request_id[:16]}.pdf")
     write_pdf(context, pdf_output)
+    owned_assets = _owned_guide_assets(
+        request_id=request_id,
+        family_photo=photo_path,
+        cover=cover_path,
+        summary=summary_path,
+        pdf=pdf_output,
+        generated_images=[*landmark_images.values(), *landmark_lineart_images.values()],
+    )
+    try:
+        guide_repository().save_succeeded_guide(
+            guide_id=request_id,
+            user_id=owner_id,
+            title=request.title,
+            pdf_filename=pdf_output.name,
+            cover_fallback_used=cover_result.fallback_used,
+            metadata={
+                "destinations": [
+                    {
+                        "id": item.destination.id,
+                        "place": item.destination.location_label,
+                        "landmarks": [landmark.name for landmark in item.landmarks],
+                    }
+                    for item in context.destinations
+                ],
+                "year": request.year,
+                "itinerary": (
+                    request.itinerary.model_dump(mode="json") if request.itinerary else None
+                ),
+                "privacy_consent": privacy_consent.metadata() if privacy_consent else None,
+            },
+            assets=owned_assets,
+        )
+    except Exception:
+        for _kind, path in owned_assets:
+            delete_private_asset(path)
+        raise
     return {
         "request": request,
         "request_id": request_id,
@@ -575,6 +1971,35 @@ async def generate_pdf_from_form(
         "download_url": f"/download/{pdf_output.name}",
         "cover_status": cover_status_payload(cover_result, request),
     }
+
+
+def _owned_guide_assets(
+    *,
+    request_id: str,
+    family_photo: Path,
+    cover: Path,
+    summary: Path,
+    pdf: Path,
+    generated_images: list[Path],
+) -> list[tuple[str, Path]]:
+    candidates = [
+        ("family_upload", family_photo),
+        ("generated_cover", cover),
+        ("trip_summary", summary),
+        ("generated_guide", pdf),
+    ]
+    candidates.extend(
+        ("generated_landmark", path) for path in generated_images if request_id in path.parts
+    )
+    unique: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for kind, path in candidates:
+        marker = str(path)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        unique.append((kind, path))
+    return unique
 
 
 def cover_status_payload(
@@ -594,6 +2019,22 @@ def cover_status_payload(
 
 def _split_names(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def parse_guide_itinerary(raw: str | None) -> GuideItineraryPlan | None:
+    if not raw or not raw.strip():
+        return None
+    try:
+        return GuideItineraryPlan.model_validate_json(raw)
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_itinerary",
+                "message": "O roteiro revisado possui dados inválidos.",
+                "field_errors": error.errors(include_url=False),
+            },
+        ) from error
 
 
 def selected_landmark_names(destinations: list[Destination], selected: list[str]) -> list[str]:
@@ -688,6 +2129,7 @@ def create_local_lineart_fallbacks(
     selected: list[str],
     request_id: str,
     reference_images: dict[str, Path] | None = None,
+    allow_named_placeholder: bool = True,
 ) -> dict[str, Path]:
     if not destinations:
         return {}
@@ -703,6 +2145,8 @@ def create_local_lineart_fallbacks(
             output_path = output_dir / destination.id / f"{landmark.id}.png"
             reference_image = reference_images.get(selection_id)
             if not reference_image or not _write_reference_lineart(reference_image, output_path):
+                if not allow_named_placeholder:
+                    continue
                 _write_named_lineart_placeholder(
                     landmark.name,
                     destination.city,
@@ -945,8 +2389,7 @@ def enrich_missing_custom_descriptions(
         return custom_landmarks
 
     message = "\n".join(
-        f"{landmark.name}, {landmark.city}, {landmark.country}"
-        for landmark in custom_landmarks
+        f"{landmark.name}, {landmark.city}, {landmark.country}" for landmark in custom_landmarks
     )
     try:
         parsed_landmarks = parse_landmarks_from_message(message)
@@ -977,9 +2420,7 @@ def enrich_missing_custom_descriptions(
             _landmark_description_key(landmark.name, landmark.city, landmark.country)
         ) or descriptions_by_name.get(_normalize_landmark_text(landmark.name), [])
         enriched.append(
-            landmark.model_copy(update={"description": description})
-            if description
-            else landmark
+            landmark.model_copy(update={"description": description}) if description else landmark
         )
     return enriched
 
@@ -1077,9 +2518,7 @@ def serialize_preview_destinations(
                     "confidence": confidence_by_name.get(landmark.name, default_confidence),
                     "image": (
                         serialize_preview_image(images.get(f"{destination.id}:{landmark.id}"))
-                        or _location_preview_image(
-                            locations.get(f"{destination.id}:{landmark.id}")
-                        )
+                        or _location_preview_image(locations.get(f"{destination.id}:{landmark.id}"))
                     ),
                     "image_attributions": _location_image_attributions(
                         locations.get(f"{destination.id}:{landmark.id}"),

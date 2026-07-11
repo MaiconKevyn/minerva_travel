@@ -10,24 +10,24 @@ import { Flower, Airplane } from '@/components/DecorativeElements.jsx';
 
 const PricingPage = () => {
   const features = [
-    "Guia personalizado com memórias",
-    "Desenhos para colorir",
-    "Roteiro completo da viagem",
-    "Fotos e momentos especiais",
-    "Personalização com nomes da família"
+    "Diário infantil em PDF A4",
+    "Roteiro confirmado e atividades por fase",
+    "Uma foto familiar sanitizada para a capa",
+    "Créditos de imagens licenciadas",
+    "Download privado com expiração"
   ];
 
   return (
     <>
       <Helmet>
-        <title>Preços - Aventuras em Família</title>
-        <meta name="description" content="Conheça nossos planos e crie um guia de viagem inesquecível para sua família." />
+        <title>Piloto - Minerva Travel</title>
+        <meta name="description" content="Conheça o escopo do piloto sem cobrança da Minerva Travel." />
       </Helmet>
 
       <div className="min-h-screen flex flex-col bg-background transition-colors duration-200">
         <Header />
 
-        <main className="flex-1 relative overflow-hidden py-16 lg:py-24">
+        <main id="main-content" tabIndex={-1} className="flex-1 relative overflow-hidden py-16 lg:py-24">
           {/* Decorative Background Elements */}
           <Flower className="absolute top-20 left-10 w-32 h-32 text-primary opacity-10 transform -rotate-12" />
           <Airplane className="absolute bottom-40 right-10 w-24 h-24 text-secondary opacity-10 transform rotate-12" />
@@ -43,13 +43,13 @@ const PricingPage = () => {
                 transition={{ duration: 0.5 }}
               >
                 <span className="text-secondary font-bold tracking-widest uppercase text-sm mb-4 block">
-                  Investimento em Memórias
+                  Piloto controlado
                 </span>
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground mb-6 text-balance">
-                  Nossos Planos
+                  Produto em validação
                 </h1>
                 <p className="text-xl text-muted-foreground font-medium text-balance">
-                  Transforme sua próxima viagem em um tesouro de família. Um preço único para memórias que duram para sempre.
+                  O checkout ainda não foi homologado. Durante esta fase, não há cobrança nem promessa de entrega comercial.
                 </p>
               </motion.div>
             </div>
@@ -76,9 +76,11 @@ const PricingPage = () => {
                     </div>
                   </div>
 
-                  <div className="mb-8 flex items-baseline text-foreground">
-                    <span className="text-5xl font-extrabold tracking-tight">€29,99</span>
-                    <span className="text-xl text-muted-foreground ml-2 font-medium">/ guia</span>
+                  <div className="mb-8 rounded-2xl border border-secondary/30 bg-secondary/10 p-5 text-foreground">
+                    <span className="block text-2xl font-extrabold tracking-tight">Sem cobrança ativa</span>
+                    <span className="mt-1 block text-sm text-muted-foreground font-medium">
+                      Preço, impostos, reembolso e SLA serão publicados antes de qualquer venda.
+                    </span>
                   </div>
 
                   <div className="space-y-5 mb-10">
@@ -104,7 +106,7 @@ const PricingPage = () => {
                     className="w-full rounded-full text-lg py-7 bg-primary hover:bg-primary/90 text-white shadow-[0_8px_30px_rgb(232,122,93,0.3)] hover:shadow-[0_8px_40px_rgb(232,122,93,0.4)] transition-all duration-300 hover:-translate-y-1 group"
                   >
                     <Link to="/create">
-                      Começar a Criar Seu Guia
+                      Criar um guia de teste
                       <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </Link>
                   </Button>
@@ -123,22 +125,22 @@ const PricingPage = () => {
                 <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
                   <ShieldCheck className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="font-bold text-foreground">Pagamento Seguro</h3>
-                <p className="text-sm text-muted-foreground">Transação 100% protegida e criptografada.</p>
+                <h3 className="font-bold text-foreground">Piloto sem Pagamento</h3>
+                <p className="text-sm text-muted-foreground">Nenhum cartão ou dado financeiro é solicitado.</p>
               </div>
               <div className="flex flex-col items-center gap-3">
                 <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
                   <Star className="w-6 h-6 text-secondary" />
                 </div>
-                <h3 className="font-bold text-foreground">Qualidade Premium</h3>
-                <p className="text-sm text-muted-foreground">Design exclusivo e ilustrações encantadoras.</p>
+                <h3 className="font-bold text-foreground">PDF A4 verificável</h3>
+                <p className="text-sm text-muted-foreground">Roteiro, atividades, créditos e download privado.</p>
               </div>
               <div className="flex flex-col items-center gap-3">
                 <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
                   <Heart className="w-6 h-6 text-accent" />
                 </div>
-                <h3 className="font-bold text-foreground">Feito com Amor</h3>
-                <p className="text-sm text-muted-foreground">Cada detalhe pensado para a sua família.</p>
+                <h3 className="font-bold text-foreground">Privacidade explícita</h3>
+                <p className="text-sm text-muted-foreground">Consentimento, sanitização da foto e exclusão do guia.</p>
               </div>
             </motion.div>
 
@@ -154,14 +156,14 @@ const PricingPage = () => {
                 <div className="w-10 h-10 bg-card rounded-xl shadow-sm flex items-center justify-center">
                   <Heart className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-serif font-bold text-xl text-foreground">Aventuras em Família</span>
+                <span className="font-serif font-bold text-xl text-foreground">Minerva Travel</span>
               </div>
               <div className="flex gap-8 text-sm font-medium">
-                <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Política de Privacidade</span>
-                <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Termos de Uso</span>
+                <Link className="text-muted-foreground hover:text-foreground transition-colors" to="/privacy">Política de Privacidade</Link>
+                <Link className="text-muted-foreground hover:text-foreground transition-colors" to="/terms">Termos de Uso</Link>
               </div>
               <p className="text-sm text-muted-foreground font-medium">
-                © 2026 Histórias Mágicas Ltda.
+                © 2026 Minerva Travel · Projeto em piloto
               </p>
             </div>
           </div>

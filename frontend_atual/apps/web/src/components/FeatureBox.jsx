@@ -17,15 +17,15 @@ const features = [
   },
   {
     icon: Camera,
-    title: 'Memórias Eternizadas',
-    description: 'Reúna fotos e histórias em um guia que parece um livro de contos. Um tesouro para as crianças revisitarem.',
+    title: 'Uma Capa Familiar',
+    description: 'Use uma foto de capa sanitizada. Se a ilustração não puder ser validada, o guia preserva a foto original.',
     colorClass: 'text-secondary',
     bgClass: 'bg-secondary/10'
   },
   {
     icon: Heart,
-    title: 'Feito com Amor',
-    description: 'Sugestões de passeios que agradam todas as idades, com mapas ilustrados e dicas fáceis de seguir.',
+    title: 'Atividades para a Viagem',
+    description: 'Inclua caça-palavras, desenho, idioma e memórias organizadas para antes, durante e depois do passeio.',
     colorClass: 'text-accent',
     bgClass: 'bg-accent/10'
   }
@@ -102,7 +102,7 @@ const FeatureBox = () => {
             transition={{ delay: 0.2 }}
             className="text-xl text-muted-foreground font-medium"
           >
-            Um livro único com memórias, curiosidades e roteiro completo
+            Um PDF A4 com roteiro confirmado, curiosidades, atividades e créditos de imagem
           </motion.p>
         </div>
 

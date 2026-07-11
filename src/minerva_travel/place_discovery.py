@@ -222,9 +222,9 @@ def discover_dynamic_itinerary(
         selected = _select_balanced_stops(ranked, target_count)
         selected_ids = {item["selection_id"] for item in selected}
         alternative_limit = max(8, MIN_VISIBLE_OPTIONS_PER_DESTINATION - len(selected))
-        alternatives = [
-            item for item in ranked if item["selection_id"] not in selected_ids
-        ][:alternative_limit]
+        alternatives = [item for item in ranked if item["selection_id"] not in selected_ids][
+            :alternative_limit
+        ]
         _enrich_visible_stops_with_photos(http_client, api_key, [*selected, *alternatives])
         public_selected = [_public_stop(item) for item in selected]
         public_alternatives = [_public_stop(item) for item in alternatives]
@@ -485,11 +485,7 @@ def _best_landmark_place(
     if not candidates:
         return None
     normalized_requested = _normalize_text(landmark_name)
-    requested_terms = {
-        term
-        for term in normalized_requested.split()
-        if len(term) > 2
-    }
+    requested_terms = {term for term in normalized_requested.split() if len(term) > 2}
     return max(
         candidates,
         key=lambda place: _place_name_score(place, normalized_requested, requested_terms),
@@ -583,7 +579,8 @@ def _place_to_stop(
 
     primary_category = categories[0] if categories else "icons"
     photo = _first_place_photo(place)
-    location = place.get("location") if isinstance(place.get("location"), dict) else {}
+    raw_location = place.get("location")
+    location: dict[str, Any] = raw_location if isinstance(raw_location, dict) else {}
     return {
         "selection_id": f"google:{place_id}",
         "destination_id": resolved["id"],
@@ -714,14 +711,24 @@ def _public_stop(stop: dict[str, Any]) -> dict[str, Any]:
 
 
 def _place_categories(place: dict[str, Any], query_category: str) -> list[str]:
-    categories = []
-    if query_category != "must_see":
-        categories.append(query_category)
-    categories.extend(
+    # A Places type describes the venue itself, while the query category only
+    # describes how it was found.  A museum returned by a broad food/family
+    # query must still be presented as a museum to the family.
+    type_categories = [
         GOOGLE_TYPE_CATEGORIES[place_type]
         for place_type in place.get("types", [])
         if place_type in GOOGLE_TYPE_CATEGORIES
-    )
+    ]
+    categories = []
+    # ``tourist_attraction`` only yields the generic ``icons`` category.  In
+    # that case the focused search profile (park, square, outdoor, family)
+    # contains the more useful information.  Specific place types such as
+    # museum or theatre should always take precedence.
+    if query_category != "must_see" and (not type_categories or type_categories == ["icons"]):
+        categories.append(query_category)
+    categories.extend(type_categories)
+    if query_category != "must_see" and query_category not in categories:
+        categories.append(query_category)
     return list(dict.fromkeys(categories))
 
 
@@ -761,9 +768,7 @@ def _combined_search_profiles(
     explicit_interests: Iterable[str],
 ) -> list[tuple[str, str]]:
     profile_interests = [
-        category
-        for category, _query in intent_profiles
-        if category in INTEREST_QUERIES
+        category for category, _query in intent_profiles if category in INTEREST_QUERIES
     ]
     default_profiles = _search_profiles([*explicit_interests, *profile_interests])
     return _dedupe_search_profiles([*intent_profiles, *default_profiles])[:MAX_SEARCH_PROFILES]
@@ -861,8 +866,7 @@ def _description_for(name: str, category: str, city: str) -> str:
         return f"{name} ajuda a descobrir sabores, objetos e memorias locais de {city}."
     if category in {"museums", "art"}:
         return (
-            f"{name} ajuda a transformar cultura e arte em uma descoberta visual "
-            "para as criancas."
+            f"{name} ajuda a transformar cultura e arte em uma descoberta visual para as criancas."
         )
     if category == "history":
         return f"{name} conecta a familia com historias importantes do destino."

@@ -132,9 +132,7 @@ def main() -> int:
     os.environ["IMAGE_PROVIDER"] = "placeholder"
     os.environ["LANDMARK_ART_GENERATION"] = "false"
 
-    missing_keys = [
-        key for key in ("GOOGLE_MAPS_API_KEY", "OPENAI_API_KEY") if not os.getenv(key)
-    ]
+    missing_keys = [key for key in ("GOOGLE_MAPS_API_KEY", "OPENAI_API_KEY") if not os.getenv(key)]
     if missing_keys:
         print(f"Missing required environment keys: {', '.join(missing_keys)}", file=sys.stderr)
         return 2
@@ -280,9 +278,7 @@ def verify_discovery(
             failures.append(f"discovery did not find cited place group: {group}")
 
     missing_coordinates = [
-        str(stop.get("name", ""))
-        for stop in selected_stops
-        if not has_coordinates(stop)
+        str(stop.get("name", "")) for stop in selected_stops if not has_coordinates(stop)
     ]
     if missing_coordinates:
         failures.append(f"selected stops missing coordinates: {missing_coordinates[:4]}")
@@ -308,13 +304,17 @@ def verify_discovery(
     if unsafe_name_stops:
         failures.append(f"family-incompatible stop names selected: {unsafe_name_stops[:4]}")
 
-    return {
-        "resolved_destination": resolved,
-        "selected_count": len(selected_stops),
-        "selected_names": stop_names,
-        "alternative_count": len(recommendation.get("alternatives", [])),
-        "selected_with_images": len([stop for stop in selected_stops if stop.get("image")]),
-    }, selected_stops, failures
+    return (
+        {
+            "resolved_destination": resolved,
+            "selected_count": len(selected_stops),
+            "selected_names": stop_names,
+            "alternative_count": len(recommendation.get("alternatives", [])),
+            "selected_with_images": len([stop for stop in selected_stops if stop.get("image")]),
+        },
+        selected_stops,
+        failures,
+    )
 
 
 def verify_map_payload(selected_stops: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
@@ -348,9 +348,8 @@ def verify_pdf_generation(
             "name": stop["name"],
             "city": stop["city"],
             "country": stop["country"],
-            "description": stop.get("description") or [
-                f"{stop['name']} faz parte do roteiro da familia."
-            ],
+            "description": stop.get("description")
+            or [f"{stop['name']} faz parte do roteiro da familia."],
             "image": stop.get("image"),
             "image_attributions": stop.get("image_attributions") or [],
         }

@@ -4,51 +4,51 @@
   "destinations": [
     {
       "id": "paris",
-      "country": "Franca",
+      "country": "França",
       "city": "Paris",
-      "display_title": "FRANCA - PARIS",
+      "display_title": "FRANÇA - PARIS",
       "intro": [
-        "Paris e uma cidade linda e cheia de historia.",
-        "E conhecida como a cidade luz, cidade do amor e da arte.",
-        "La existem torres famosas, museus incriveis, jardins bonitos e comidas deliciosas.",
-        "Passear por Paris e como caminhar dentro de um livro de historias."
+        "Paris é uma cidade linda e cheia de história.",
+        "É conhecida como a cidade luz, cidade do amor e da arte.",
+        "Lá existem torres famosas, museus incríveis, jardins bonitos e comidas deliciosas.",
+        "Passear por Paris é como caminhar dentro de um livro de histórias."
       ],
       "favorites_prompt": "Meus lugares favoritos em Paris foram...",
       "coloring_title": "DESENHOS PARA COLORIR",
       "coloring_subtitle": "Para colorir e desenhar",
-      "language_name": "frances",
+      "language_name": "francês",
       "language_tips": [
         {
           "phrase": "Bonjour",
           "pronunciation": "bon-ZHUR",
           "meaning": "Oi / bom dia",
-          "use_case": "Use ao entrar em uma loja, cafe ou museu."
+          "use_case": "Use ao entrar em uma loja, café ou museu."
         },
         {
           "phrase": "Merci",
           "pronunciation": "mer-SI",
           "meaning": "Obrigado(a)",
-          "use_case": "Use quando alguem ajudar voce."
+          "use_case": "Use quando alguém ajudar você."
         },
         {
-          "phrase": "S'il vous plait",
+          "phrase": "S'il vous plaît",
           "pronunciation": "sil vu PLE",
           "meaning": "Por favor",
-          "use_case": "Use para pedir algo com educacao."
+          "use_case": "Use para pedir algo com educação."
         }
       ],
       "phase_activities": {
-        "before": "No aviao, encontre Paris no mapa e circule o lugar que voce esta mais curioso para visitar.",
-        "during": "Procure uma torre, um arco ou uma piramide de vidro e desenhe o detalhe que voce encontrou.",
-        "after": "Desenhe sua lembranca favorita de Paris e escreva uma palavra nova que voce aprendeu."
+        "before": "No avião, encontre Paris no mapa e circule o lugar que você está mais curioso para visitar.",
+        "during": "Procure uma torre, um arco ou uma pirâmide de vidro e desenhe o detalhe que você encontrou.",
+        "after": "Desenhe sua lembrança favorita de Paris e escreva uma palavra nova que você aprendeu."
       },
       "landmarks": [
         {
           "id": "eiffel-tower",
           "name": "Torre Eiffel",
           "description": [
-            "A Torre Eiffel e uma torre muito alta e famosa.",
-            "Ela e o simbolo de Paris e do alto dela da para ver a cidade inteira."
+            "A Torre Eiffel é uma torre muito alta e famosa.",
+            "Ela é o símbolo de Paris e, do alto dela, dá para ver a cidade inteira."
           ],
           "image": "assets/landmarks/paris/eiffel-tower.png",
           "lineart_image": "assets/lineart/paris/eiffel-tower.png",
@@ -59,7 +59,7 @@
             "architecture"
           ],
           "duration_minutes": 90,
-          "family_tip": "Bom para abrir a viagem com um simbolo que as criancas reconhecem.",
+          "family_tip": "Bom para abrir a viagem com um símbolo que as crianças reconhecem.",
           "representative_query": "Eiffel Tower Paris France landmark",
           "required_terms": [
             "eiffel",
@@ -80,8 +80,8 @@
           "id": "arc-de-triomphe",
           "name": "Arco do Triunfo",
           "description": [
-            "O Arco do Triunfo e um arco gigante construido para homenagear pessoas importantes da Franca.",
-            "Tambem e um simbolo de Paris."
+            "O Arco do Triunfo é um arco gigante construído para homenagear pessoas importantes da França.",
+            "Também é um símbolo de Paris."
           ],
           "image": "assets/landmarks/paris/arc-de-triomphe.png",
           "lineart_image": "assets/lineart/paris/arc-de-triomphe.png",
@@ -92,7 +92,7 @@
             "architecture"
           ],
           "duration_minutes": 45,
-          "family_tip": "Funciona bem como parada curta para falar de arcos, avenidas e simbolos.",
+          "family_tip": "Funciona bem como parada curta para falar de arcos, avenidas e símbolos.",
           "representative_query": "Arc de Triomphe Paris monument",
           "required_terms": [
             "arc",
@@ -107,8 +107,8 @@
           "id": "champs-elysees",
           "name": "Champs-Elysees",
           "description": [
-            "A Champs-Elysees e uma avenida grande e bonita, cheia de lojas, cafes e luzes.",
-            "E a rua mais famosa de Paris."
+            "A Champs-Elysees é uma avenida grande e bonita, cheia de lojas, cafés e luzes.",
+            "É a rua mais famosa de Paris."
           ],
           "image": "assets/landmarks/paris/champs-elysees.png",
           "lineart_image": "assets/lineart/paris/champs-elysees.png",
@@ -135,8 +135,8 @@
           "id": "louvre",
           "name": "Museu do Louvre",
           "description": [
-            "O Louvre e um dos museus mais famosos do mundo.",
-            "La ficam quadros e estatuas muito importantes, como a Monalisa."
+            "O Louvre é um dos museus mais famosos do mundo.",
+            "Lá ficam quadros e estátuas muito importantes, como a Mona Lisa."
           ],
           "image": "assets/landmarks/paris/louvre.png",
           "lineart_image": "assets/lineart/paris/louvre.png",
@@ -148,7 +148,7 @@
             "architecture"
           ],
           "duration_minutes": 120,
-          "family_tip": "Escolha poucas obras ou a piramide para manter a visita leve para criancas.",
+          "family_tip": "Escolha poucas obras ou a pirâmide para manter a visita leve para crianças.",
           "representative_query": "Louvre Pyramid museum Paris exterior",
           "required_terms": [
             "louvre"
@@ -163,7 +163,7 @@
           "name": "Museu d'Orsay",
           "description": [
             "O Museu d'Orsay tem muitos quadros coloridos e esculturas.",
-            "Ele fica em um predio que antes era uma estacao de trem, muito lindo."
+            "Ele fica em um prédio que antes era uma estação de trem, muito lindo."
           ],
           "image": "assets/landmarks/paris/orsay.png",
           "lineart_image": "assets/lineart/paris/orsay.png",
@@ -174,7 +174,7 @@
             "architecture"
           ],
           "duration_minutes": 90,
-          "family_tip": "A antiga estacao de trem ajuda a transformar arte em historia visual.",
+          "family_tip": "A antiga estação de trem ajuda a transformar arte em história visual.",
           "representative_query": "Musee d'Orsay Paris exterior",
           "required_terms": [
             "orsay"
@@ -190,10 +190,10 @@
         },
         {
           "id": "sacre-coeur",
-          "name": "Basilica de Sacre-Coeur",
+          "name": "Basilica de Sacré-Cœur",
           "description": [
-            "A Sacre-Coeur e uma igreja branca que fica no alto de um morro.",
-            "De la, a vista de Paris e linda."
+            "A Sacré-Cœur é uma igreja branca que fica no alto de um morro.",
+            "De lá, a vista de Paris é linda."
           ],
           "image": "assets/landmarks/paris/sacre-coeur.png",
           "lineart_image": "assets/lineart/paris/sacre-coeur.png",
@@ -219,10 +219,10 @@
         },
         {
           "id": "luxembourg",
-          "name": "Palacio e Jardim de Luxemburgo",
+          "name": "Palácio e Jardim de Luxemburgo",
           "description": [
-            "O Palacio de Luxemburgo fica ao lado de jardins grandes e bonitos.",
-            "E um lugar perfeito para passear e descansar."
+            "O Palácio de Luxemburgo fica ao lado de jardins grandes e bonitos.",
+            "É um lugar perfeito para passear e descansar."
           ],
           "image": "assets/landmarks/paris/luxembourg.png",
           "lineart_image": "assets/lineart/paris/luxembourg.png",
@@ -243,10 +243,10 @@
         },
         {
           "id": "versailles",
-          "name": "Palacio de Versalhes",
+          "name": "Palácio de Versalhes",
           "description": [
-            "O Palacio de Versalhes e um palacio enorme onde viveram reis e rainhas.",
-            "Ele tem saloes luxuosos e jardins gigantes, muito chique."
+            "O Palácio de Versalhes é um palácio enorme onde viveram reis e rainhas.",
+            "Ele tem salões luxuosos e jardins gigantes, muito chique."
           ],
           "image": "assets/landmarks/paris/versailles.png",
           "lineart_image": "assets/lineart/paris/versailles.png",
@@ -271,7 +271,7 @@
           "name": "Rio Sena",
           "description": [
             "O Rio Sena passa por Paris.",
-            "Fazer um passeio de barco e uma forma divertida de ver a cidade."
+            "Fazer um passeio de barco é uma forma divertida de ver a cidade."
           ],
           "image": "assets/landmarks/paris/seine.png",
           "lineart_image": "assets/lineart/paris/seine.png",
@@ -293,10 +293,10 @@
         },
         {
           "id": "palais-garnier",
-          "name": "Opera de Paris (Palais Garnier)",
+          "name": "Ópera de Paris (Palais Garnier)",
           "description": [
-            "A Opera de Paris e um predio muito bonito onde acontecem apresentacoes de musica, danca e teatro.",
-            "Bailarinas famosas ja dancaram la."
+            "A Ópera de Paris é um prédio muito bonito onde acontecem apresentações de música, dança e teatro.",
+            "Bailarinas famosas já dançaram lá."
           ],
           "image": "assets/landmarks/paris/palais-garnier.png",
           "lineart_image": "assets/lineart/paris/palais-garnier.png",
@@ -307,8 +307,8 @@
             "history"
           ],
           "duration_minutes": 60,
-          "family_tip": "Ajuda a conectar musica, danca e arquitetura em uma visita curta.",
-          "representative_query": "Paris Opera full frontal architecture Palais Garnier",
+          "family_tip": "Ajuda a conectar música, dança e arquitetura em uma visita curta.",
+          "representative_query": "Paris Ópera full frontal architecture Palais Garnier",
           "required_terms": [
             "paris",
             "opera"
@@ -329,52 +329,52 @@
       "city": "Londres",
       "display_title": "INGLATERRA - LONDRES",
       "intro": [
-        "Londres e uma cidade cheia de historia, castelos, pontes famosas e onibus vermelhos.",
-        "E um lugar animado, onde tradicao e modernidade caminham juntas.",
-        "A Inglaterra e uma monarquia, um pais que tem reis e rainhas."
+        "Londres é uma cidade cheia de história, castelos, pontes famosas e ônibus vermelhos.",
+        "É um lugar animado, onde tradicao e modernidade caminham juntas.",
+        "A Inglaterra é uma monarquia, um país que tem reis e rainhas."
       ],
       "favorites_prompt": "Meus lugares favoritos em Londres foram...",
       "coloring_title": "DESENHOS PARA COLORIR",
       "coloring_subtitle": "Para colorir e desenhar",
-      "language_name": "ingles",
+      "language_name": "inglês",
       "language_tips": [
         {
           "phrase": "Hello",
           "pronunciation": "HEL-oh",
           "meaning": "Oi",
-          "use_case": "Use para cumprimentar alguem."
+          "use_case": "Use para cumprimentar alguém."
         },
         {
           "phrase": "Thank you",
           "pronunciation": "THENK iu",
           "meaning": "Obrigado(a)",
-          "use_case": "Use quando alguem ajudar voce."
+          "use_case": "Use quando alguém ajudar você."
         },
         {
           "phrase": "Please",
           "pronunciation": "pliz",
           "meaning": "Por favor",
-          "use_case": "Use para pedir algo com educacao."
+          "use_case": "Use para pedir algo com educação."
         },
         {
           "phrase": "Excuse me",
           "pronunciation": "eks-KIUZ mi",
-          "meaning": "Com licenca / desculpe",
-          "use_case": "Use para chamar alguem ou passar com cuidado."
+          "meaning": "Com licença / desculpe",
+          "use_case": "Use para chamar alguém ou passar com cuidado."
         }
       ],
       "phase_activities": {
-        "before": "No aviao, procure no mapa onde fica Londres e pinte um caminho ate o rio Tamisa.",
-        "during": "Procure uma placa, um onibus vermelho ou um relogio grande e desenhe o detalhe que chamou sua atencao.",
-        "after": "Escreva qual simbolo de Londres voce reconheceria em outro livro ou desenho."
+        "before": "No avião, procure no mapa onde fica Londres e pinte um caminho até o rio Tamisa.",
+        "during": "Procure uma placa, um ônibus vermelho ou um relógio grande e desenhe o detalhe que chamou sua atenção.",
+        "after": "Escreva qual símbolo de Londres você reconheceria em outro livro ou desenho."
       },
       "landmarks": [
         {
           "id": "big-ben",
           "name": "Big Ben",
           "description": [
-            "O Big Ben e um relogio muito grande que fica em uma torre famosa de Londres.",
-            "E um dos principais pontos turisticos da cidade."
+            "O Big Ben é um relógio muito grande que fica em uma torre famosa de Londres.",
+            "É um dos principais pontos turísticos da cidade."
           ],
           "image": "assets/landmarks/london/big-ben.png",
           "lineart_image": "assets/lineart/london/big-ben.png",
@@ -396,15 +396,16 @@
             "leiden",
             "academiegebouw",
             "stained glass",
-            "interior"
+            "interior",
+            "inner"
           ]
         },
         {
           "id": "london-eye",
           "name": "London Eye",
           "description": [
-            "A London Eye e uma roda-gigante enorme.",
-            "La de cima e possivel ver toda a cidade de Londres."
+            "A London Eye é uma roda-gigante enorme.",
+            "Lá de cima é possível ver toda a cidade de Londres."
           ],
           "image": "assets/landmarks/london/london-eye.png",
           "lineart_image": "assets/lineart/london/london-eye.png",
@@ -415,7 +416,7 @@
             "rides"
           ],
           "duration_minutes": 60,
-          "family_tip": "Boa para criancas que gostam de ver a cidade do alto.",
+          "family_tip": "Boa para crianças que gostam de ver a cidade do alto.",
           "representative_query": "London Eye ferris wheel London landmark",
           "required_terms": [
             "london",
@@ -429,8 +430,8 @@
           "id": "buckingham-palace",
           "name": "Buckingham Palace + Troca da Guarda",
           "description": [
-            "O Buckingham Palace e o palacio onde mora o rei da Inglaterra.",
-            "A Troca da Guarda e uma cerimonia com musica e uniformes bonitos."
+            "O Buckingham Palace e o palácio onde mora o rei da Inglaterra.",
+            "A Troca da Guarda é uma cerimônia com música e uniformes bonitos."
           ],
           "image": "assets/landmarks/london/buckingham-palace.png",
           "lineart_image": "assets/lineart/london/buckingham-palace.png",
@@ -441,21 +442,22 @@
             "city-symbols"
           ],
           "duration_minutes": 75,
-          "family_tip": "Combine com a Troca da Guarda se a familia curte cerimonias e musica.",
+          "family_tip": "Combine com a Troca da Guarda se a família curte cerimônias e música.",
           "representative_query": "Buckingham Palace London exterior",
           "required_terms": [
             "buckingham"
           ],
           "rejected_terms": [
-            "statue only"
+            "statue only",
+            "ambassador"
           ]
         },
         {
           "id": "westminster-abbey",
           "name": "Abadia de Westminster",
           "description": [
-            "A Abadia de Westminster e uma igreja muito antiga e importante.",
-            "Reis e rainhas se casaram la em cerimonias especiais."
+            "A Abadia de Westminster é uma igreja muito antiga e importante.",
+            "Reis e rainhas se casaram lá em cerimônias especiais."
           ],
           "image": "assets/landmarks/london/westminster-abbey.png",
           "lineart_image": "assets/lineart/london/westminster-abbey.png",
@@ -465,7 +467,7 @@
             "architecture"
           ],
           "duration_minutes": 75,
-          "family_tip": "Boa para familias que gostam de historias de reis, rainhas e predios antigos.",
+          "family_tip": "Boa para famílias que gostam de histórias de reis, rainhas e prédios antigos.",
           "representative_query": "Westminster Abbey London building exterior",
           "required_terms": [
             "westminster",
@@ -478,14 +480,15 @@
             "courtyard",
             "detail",
             "statue only",
-            "interior"
+            "interior",
+            "jewel tower"
           ]
         },
         {
           "id": "tower-bridge",
           "name": "Tower Bridge + Rio Tamisa",
           "description": [
-            "A Tower Bridge e uma ponte famosa de Londres.",
+            "A Tower Bridge é uma ponte famosa de Londres.",
             "O Rio Tamisa atravessa Londres e passa por muitos pontos importantes da cidade."
           ],
           "image": "assets/landmarks/london/tower-bridge.png",
@@ -512,8 +515,8 @@
           "id": "red-phone-booth",
           "name": "Cabine telefonica vermelha",
           "description": [
-            "A cabine telefonica vermelha e antiga e virou um simbolo da cidade.",
-            "Atualmente ela e muito usada para tirar fotos."
+            "A cabine telefonica vermelha é antiga e virou um símbolo da cidade.",
+            "Atualmente ela é muito usada para tirar fotos."
           ],
           "image": "assets/landmarks/london/red-phone-booth.png",
           "lineart_image": "assets/lineart/london/red-phone-booth.png",
@@ -524,7 +527,7 @@
             "photo-stop"
           ],
           "duration_minutes": 20,
-          "family_tip": "Parada rapida para foto e para procurar outros simbolos vermelhos na rua.",
+          "family_tip": "Parada rapida para foto e para procurar outros símbolos vermelhos na rua.",
           "representative_query": "red telephone box London street",
           "required_terms": [
             "telephone"
@@ -536,10 +539,10 @@
         },
         {
           "id": "red-bus",
-          "name": "Onibus Vermelho",
+          "name": "Ônibus Vermelho",
           "description": [
-            "O onibus vermelho de dois andares e um dos simbolos mais conhecidos de Londres.",
-            "E muito legal andar nele e ver tudo mais alto."
+            "O ônibus vermelho de dois andares é um dos símbolos mais conhecidos de Londres.",
+            "É muito legal andar nele e ver tudo mais alto."
           ],
           "image": "assets/landmarks/london/red-bus.png",
           "lineart_image": "assets/lineart/london/red-bus.png",
@@ -550,7 +553,7 @@
             "icons"
           ],
           "duration_minutes": 45,
-          "family_tip": "Boa opcao para transformar deslocamento em passeio.",
+          "family_tip": "Boa opção para transformar deslocamento em passeio.",
           "representative_query": "London red double decker bus street",
           "required_terms": [
             "bus"
@@ -568,46 +571,46 @@
       "city": "Cambridge",
       "display_title": "INGLATERRA - CAMBRIDGE",
       "intro": [
-        "Cambridge e uma cidade estudantil, conhecida por suas belas escolas e passeios de barco pelo rio Cam.",
-        "Esse passeio se chama punting, um barquinho empurrado com um bastao comprido.",
-        "A Universidade de Cambridge e uma das mais antigas do mundo."
+        "Cambridge é uma cidade estudantil, conhecida por suas belas escolas e passeios de barco pelo rio Cam.",
+        "Esse passeio se chama punting, um barquinho empurrado com um bastão comprido.",
+        "A Universidade de Cambridge é uma das mais antigas do mundo."
       ],
       "favorites_prompt": "Meus lugares favoritos em Cambridge foram...",
       "coloring_title": "DESENHOS PARA COLORIR",
       "coloring_subtitle": "Para colorir e desenhar",
-      "language_name": "ingles",
+      "language_name": "inglês",
       "language_tips": [
         {
           "phrase": "Hello",
           "pronunciation": "HEL-oh",
           "meaning": "Oi",
-          "use_case": "Use para cumprimentar alguem."
+          "use_case": "Use para cumprimentar alguém."
         },
         {
           "phrase": "Thank you",
           "pronunciation": "THENK iu",
           "meaning": "Obrigado(a)",
-          "use_case": "Use quando alguem ajudar voce."
+          "use_case": "Use quando alguém ajudar você."
         },
         {
           "phrase": "Please",
           "pronunciation": "pliz",
           "meaning": "Por favor",
-          "use_case": "Use para pedir algo com educacao."
+          "use_case": "Use para pedir algo com educação."
         }
       ],
       "phase_activities": {
         "before": "Antes de chegar, imagine como seria estudar em uma cidade cheia de livros, pontes e bicicletas.",
-        "during": "Procure uma ponte, um barco ou uma bicicleta e marque o que voce encontrou primeiro.",
-        "after": "Escreva ou desenhe uma coisa que voce aprendeu em Cambridge."
+        "during": "Procure uma ponte, um barco ou uma bicicleta e marque o que você encontrou primeiro.",
+        "after": "Escreva ou desenhe uma coisa que você aprendeu em Cambridge."
       },
       "landmarks": [
         {
           "id": "cambridge-university",
           "name": "Universidade de Cambridge",
           "description": [
-            "A Universidade de Cambridge e uma das universidades mais antigas e famosas do mundo.",
-            "Muitas pessoas importantes estudaram nessa cidade cheia de historia."
+            "A Universidade de Cambridge é uma das universidades mais antigas e famosas do mundo.",
+            "Muitas pessoas importantes estudaram nessa cidade cheia de história."
           ],
           "image": "assets/landmarks/cambridge/cambridge-university.png",
           "lineart_image": "assets/lineart/cambridge/cambridge-university.png",
@@ -626,7 +629,9 @@
           "rejected_terms": [
             "logo",
             "map",
-            "detail"
+            "detail",
+            "antechapel",
+            "interior"
           ]
         },
         {
@@ -634,7 +639,7 @@
           "name": "Passeio de barco pelo Rio Cam",
           "description": [
             "O passeio pelo Rio Cam se chama punting.",
-            "O barquinho e empurrado com um bastao comprido enquanto a cidade aparece ao redor."
+            "O barquinho é empurrado com um bastão comprido enquanto a cidade aparece ao redor."
           ],
           "image": "assets/landmarks/cambridge/river-cam.png",
           "lineart_image": "assets/lineart/cambridge/river-cam.png",
@@ -663,57 +668,57 @@
       "city": "Lisboa",
       "display_title": "PORTUGAL - LISBOA",
       "intro": [
-        "Lisboa e uma cidade alegre, com bondinhos amarelos, castelos, doces famosos e um rio muito bonito.",
-        "E um lugar perfeito para passear com a familia."
+        "Lisboa é uma cidade alegre, com bondinhos amarelos, castelos, doces famosos é um rio muito bonito.",
+        "É um lugar perfeito para passear com a família."
       ],
       "favorites_prompt": "Meus lugares favoritos em Lisboa foram...",
       "coloring_title": "DESENHOS PARA COLORIR",
       "coloring_subtitle": "Para colorir e desenhar",
-      "language_name": "portugues de Portugal",
+      "language_name": "português de Portugal",
       "language_tips": [
         {
-          "phrase": "Ola",
+          "phrase": "Olá",
           "pronunciation": "oh-LA",
           "meaning": "Oi",
-          "use_case": "Use para cumprimentar alguem."
+          "use_case": "Use para cumprimentar alguém."
         },
         {
           "phrase": "Bom dia",
           "pronunciation": "bom DI-a",
           "meaning": "Bom dia",
-          "use_case": "Use pela manha ao chegar em algum lugar."
+          "use_case": "Use pela manhã ao chegar em algum lugar."
         },
         {
           "phrase": "Por favor",
           "pronunciation": "por fa-VOR",
           "meaning": "Por favor",
-          "use_case": "Use para pedir algo com educacao."
+          "use_case": "Use para pedir algo com educação."
         },
         {
           "phrase": "Obrigado/obrigada",
           "pronunciation": "oh-bri-GA-do / oh-bri-GA-da",
           "meaning": "Obrigado(a)",
-          "use_case": "Use quando alguem ajudar voce."
+          "use_case": "Use quando alguém ajudar você."
         },
         {
           "phrase": "Autocarro",
           "pronunciation": "au-to-CAR-ro",
-          "meaning": "Onibus",
-          "use_case": "Palavra comum em Portugal para falar de onibus."
+          "meaning": "Ônibus",
+          "use_case": "Palavra comum em Portugal para falar de ônibus."
         }
       ],
       "phase_activities": {
         "before": "No caminho, procure no mapa onde o rio Tejo encontra a cidade.",
         "during": "Procure um azulejo, um bondinho amarelo ou uma vista para o rio e desenhe o que viu.",
-        "after": "Escreva qual som, cheiro ou comida fez voce lembrar de Lisboa."
+        "after": "Escreva qual som, cheiro ou comida fez você lembrar de Lisboa."
       },
       "landmarks": [
         {
           "id": "oceanario",
           "name": "Oceanario",
           "description": [
-            "O Oceanario e um aquario gigante, onde vivem peixes grandes, pequenos e de varias partes do mundo.",
-            "E um dos aquarios mais visitados da Europa."
+            "O Oceanario é um aquário gigante, onde vivem peixes grandes, pequenos e de varias partes do mundo.",
+            "É um dos aquários mais visitados da Europa."
           ],
           "image": "assets/landmarks/lisbon/oceanario.png",
           "lineart_image": "assets/lineart/lisbon/oceanario.png",
@@ -724,7 +729,7 @@
             "education"
           ],
           "duration_minutes": 120,
-          "family_tip": "Otimo para criancas curiosas por animais e tambem funciona em dia de chuva.",
+          "family_tip": "Ótimo para crianças curiosas por animais e também funciona em dia de chuva.",
           "representative_query": "Oceanario de Lisboa aquarium exterior",
           "required_terms": [
             "oceanario"
@@ -737,7 +742,7 @@
           "id": "yellow-tram",
           "name": "Eletrico amarelo",
           "description": [
-            "O eletrico amarelo e um bondinho famoso que anda pelas ruas de Lisboa.",
+            "O elétrico amarelo é um bondinho famoso que anda pelas ruas de Lisboa.",
             "Ele deixa o passeio pela cidade ainda mais divertido."
           ],
           "image": "assets/landmarks/lisbon/yellow-tram.png",
@@ -763,8 +768,8 @@
           "id": "jeronimos",
           "name": "Mosteiro dos Jeronimos",
           "description": [
-            "E um predio muito antigo e bonito, com muitas pedras desenhadas e detalhes diferentes.",
-            "Ele homenageia a epoca em que portugueses faziam grandes viagens pelo mar."
+            "É um prédio muito antigo e bonito, com muitas pedras desenhadas e detalhes diferentes.",
+            "Ele homenageia a época em que portugueses faziam grandes viagens pelo mar."
           ],
           "image": "assets/landmarks/lisbon/jeronimos.png",
           "lineart_image": "assets/lineart/lisbon/jeronimos.png",
@@ -774,7 +779,7 @@
             "architecture"
           ],
           "duration_minutes": 75,
-          "family_tip": "Bom para procurar detalhes nas pedras e falar das grandes navegacoes.",
+          "family_tip": "Bom para procurar detalhes nas pedras e falar das grandes navegações.",
           "representative_query": "Jeronimos Monastery Lisbon exterior",
           "required_terms": [
             "jeronimos"
@@ -785,10 +790,10 @@
         },
         {
           "id": "descobrimentos",
-          "name": "Padrao dos Descobrimentos e das Caravelas",
+          "name": "Padrão dos Descobrimentos e das Caravelas",
           "description": [
-            "O Padrao dos Descobrimentos homenageia os navegadores portugueses.",
-            "Ele lembra as viagens de barco feitas ha muitos anos pelas caravelas."
+            "O Padrão dos Descobrimentos homenageia os navegadores portugueses.",
+            "Ele lembra as viagens de barco feitas há muitos anos pelas caravelas."
           ],
           "image": "assets/landmarks/lisbon/descobrimentos.png",
           "lineart_image": "assets/lineart/lisbon/descobrimentos.png",
@@ -800,7 +805,7 @@
           ],
           "duration_minutes": 45,
           "family_tip": "Combine com o Tejo para explicar mapas, barcos e viagens antigas.",
-          "representative_query": "Padrao dos Descobrimentos Lisboa",
+          "representative_query": "Padrão dos Descobrimentos Lisboa",
           "required_terms": [
             "padrao"
           ],
@@ -810,10 +815,10 @@
         },
         {
           "id": "santo-antonio",
-          "name": "Igreja Santo Antonio",
+          "name": "Igreja de Santo António",
           "description": [
-            "A Igreja de Santo Antonio e uma igreja pequena e especial em Lisboa.",
-            "Muitas pessoas visitam esse lugar para conhecer a historia desse santo."
+            "A Igreja de Santo António é uma igreja pequena e especial em Lisboa.",
+            "Muitas pessoas visitam esse lugar para conhecer a história desse santo."
           ],
           "image": "assets/landmarks/lisbon/santo-antonio.png",
           "lineart_image": "assets/lineart/lisbon/santo-antonio.png",
@@ -823,7 +828,7 @@
             "architecture"
           ],
           "duration_minutes": 40,
-          "family_tip": "Parada curta para familias que gostam de historias locais e lugares pequenos.",
+          "family_tip": "Parada curta para famílias que gostam de histórias locais e lugares pequenos.",
           "representative_query": "Igreja de Santo Antonio Lisboa exterior",
           "required_terms": [
             "antonio"
@@ -835,10 +840,10 @@
         },
         {
           "id": "pastel-de-belem",
-          "name": "Comer Pastel de Belem",
+          "name": "Comer Pastel de Belém",
           "description": [
-            "O Pastel de Belem e um doce tipico portugues, muito famoso e delicioso.",
-            "E uma parada obrigatoria em Lisboa."
+            "O Pastel de Belém é um doce típico português, muito famoso e delicioso.",
+            "É uma parada obrigatória em Lisboa."
           ],
           "image": "assets/landmarks/lisbon/pastel-de-belem.png",
           "lineart_image": "assets/lineart/lisbon/pastel-de-belem.png",
@@ -848,7 +853,7 @@
             "city-symbols"
           ],
           "duration_minutes": 45,
-          "family_tip": "Boa pausa para provar um doce local e registrar uma memoria sensorial.",
+          "family_tip": "Boa pausa para provar um doce local e registrar uma memória sensorial.",
           "representative_query": "Pastel de Belem Lisboa",
           "required_terms": [
             "belem"
@@ -859,9 +864,9 @@
         },
         {
           "id": "praca-comercio",
-          "name": "Praca do Comercio / Rio Tejo",
+          "name": "Praça do Comércio / Rio Tejo",
           "description": [
-            "A Praca do Comercio e uma praca grande e bonita, perto do Rio Tejo.",
+            "A Praça do Comércio é uma praça grande e bonita, perto do Rio Tejo.",
             "Esse rio corta a cidade de Lisboa."
           ],
           "image": "assets/landmarks/lisbon/praca-comercio.png",
@@ -874,7 +879,7 @@
           ],
           "duration_minutes": 60,
           "family_tip": "Boa para caminhar, ver o Tejo e fechar o dia com espaco aberto.",
-          "representative_query": "Praca do Comercio Lisboa",
+          "representative_query": "Praça do Comercio Lisboa",
           "required_terms": [
             "comercio"
           ],

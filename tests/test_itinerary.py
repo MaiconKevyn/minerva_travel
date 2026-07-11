@@ -58,11 +58,7 @@ def test_recommend_itinerary_api_returns_cards_ready_for_frontend_editing():
 
     assert response.status_code == 200
     payload = response.json()
-    selected_ids = [
-        stop["selection_id"]
-        for day in payload["days"]
-        for stop in day["stops"]
-    ]
+    selected_ids = [stop["selection_id"] for day in payload["days"] for stop in day["stops"]]
 
     assert payload["summary"] == "Roteiro sugerido para Lisboa em 1 dia."
     assert payload["selected_landmarks"] == selected_ids
@@ -88,11 +84,7 @@ def test_recommend_itinerary_keeps_all_must_see_cards_visible():
     )
 
     recommendation = recommend_itinerary(catalog, request)
-    visible_stop_ids = [
-        stop.selection_id
-        for day in recommendation.days
-        for stop in day.stops
-    ]
+    visible_stop_ids = [stop.selection_id for day in recommendation.days for stop in day.stops]
 
     assert recommendation.selected_landmarks == visible_stop_ids
     assert visible_stop_ids == [
@@ -131,6 +123,14 @@ def test_discover_itinerary_api_delegates_dynamic_request(monkeypatch):
             "selected_landmarks": ["google:colosseum"],
             "days": [],
             "alternatives": [],
+            "resolved_destination": {
+                "id": "google-roma",
+                "city": "Roma",
+                "country": "Italia",
+                "formatted_address": "Roma, Italia",
+                "latitude": 41.9028,
+                "longitude": 12.4964,
+            },
         }
 
     monkeypatch.setattr("minerva_travel.app.google_maps_api_key", lambda: "test-key")

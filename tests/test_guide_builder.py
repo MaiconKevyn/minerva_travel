@@ -2,7 +2,7 @@ from pathlib import Path
 
 from minerva_travel.catalog import load_catalog
 from minerva_travel.guide_builder import build_guide_context
-from minerva_travel.models import GuideRequest, RestaurantRecommendation
+from minerva_travel.models import GuideItineraryPlan, GuideRequest, RestaurantRecommendation
 from minerva_travel.wikimedia_assets import WikimediaAsset
 
 
@@ -41,6 +41,65 @@ def test_build_guide_context_preserves_catalog_order_inside_destination():
     assert [landmark.id for landmark in context.destinations[0].landmarks] == [
         "eiffel-tower",
         "louvre",
+    ]
+
+
+def test_build_guide_context_uses_reviewed_destination_and_stop_order():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    itinerary = GuideItineraryPlan.model_validate(
+        {
+            "destinations": [
+                {"id": "london", "place": "Londres", "timing": "primeiro", "days": 1, "order": 1},
+                {"id": "paris", "place": "Paris", "timing": "depois", "days": 2, "order": 2},
+            ],
+            "days": [
+                {
+                    "day": 1,
+                    "title": "Londres",
+                    "stops": [
+                        {
+                            "selection_id": "london:big-ben",
+                            "name": "Big Ben",
+                            "destination_id": "london",
+                        },
+                    ],
+                },
+                {
+                    "day": 2,
+                    "title": "Paris",
+                    "stops": [
+                        {
+                            "selection_id": "paris:louvre",
+                            "name": "Louvre",
+                            "destination_id": "paris",
+                        },
+                    ],
+                },
+            ],
+            "unplanned_stops": [
+                {
+                    "selection_id": "paris:eiffel-tower",
+                    "name": "Torre Eiffel",
+                    "destination_id": "paris",
+                },
+            ],
+        }
+    )
+    request = GuideRequest(
+        title="Londres e Paris",
+        children_names=["Alice"],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower", "london:big-ben", "paris:louvre"],
+        itinerary=itinerary,
+    )
+
+    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+
+    assert [item.destination.id for item in context.destinations] == ["london", "paris"]
+    assert [landmark.id for landmark in context.destinations[1].landmarks] == [
+        "louvre",
+        "eiffel-tower",
     ]
 
 
@@ -86,6 +145,48 @@ def test_build_guide_context_creates_single_destination_activity_plan():
     assert all(activity.title for activity in destination_activities)
     assert all(activity.prompt for activity in destination_activities)
     assert all(activity.complexity == "early_reader" for activity in destination_activities)
+
+
+def test_build_guide_context_word_search_activity_carries_playable_grid():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        children_ages=[7],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower", "paris:louvre"],
+    )
+
+    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+
+    word_search = next(
+        activity for activity in context.activity_plan if activity.type == "word_search"
+    )
+    assert len(word_search.word_search_grid) == 10
+    assert all(len(row) == 10 for row in word_search.word_search_grid)
+    assert word_search.words
+    assert "DIA1" not in word_search.words
+    columns = ["".join(row[index] for row in word_search.word_search_grid) for index in range(10)]
+    searchable = list(word_search.word_search_grid) + columns
+    for word in word_search.words:
+        assert any(word in line for line in searchable)
+
+
+def test_build_guide_context_never_plans_spot_the_difference_without_art():
+    catalog = load_catalog(Path("data/destinations/europe_2026.json"))
+    request = GuideRequest(
+        title="Pequenos Exploradores pela Europa",
+        children_names=["Alice"],
+        children_ages=[11],
+        parents_names=["Ana"],
+        year=2026,
+        selected_landmarks=["paris:eiffel-tower", "paris:louvre", "london:big-ben"],
+    )
+
+    context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
+
+    assert all(activity.type != "spot_the_difference" for activity in context.activity_plan)
 
 
 def test_build_guide_context_diversifies_activity_types_for_multiple_destinations():
@@ -307,7 +408,7 @@ def test_build_guide_context_uses_family_language_prompt_without_ages():
     activity = _language_activity_for_ages([])
 
     assert activity.complexity == "family"
-    assert "familia" in activity.prompt.lower()
+    assert "família" in activity.prompt.lower()
 
 
 def test_build_guide_context_uses_wikimedia_images_and_credits():
@@ -358,10 +459,12 @@ def _language_activity_for_ages(children_ages: list[int]):
     )
     context = build_guide_context(request, catalog, Path("runtime/generated/cover.png"))
 
-    return next(activity for activity in context.activity_plan if activity.type == "language_learning")
+    return next(
+        activity for activity in context.activity_plan if activity.type == "language_learning"
+    )
 
 
-def test_build_guide_context_prefers_wikimedia_public_url_when_available():
+def test_build_guide_context_keeps_local_wikimedia_path_for_secure_pdf():
     catalog = load_catalog(Path("data/destinations/europe_2026.json"))
     request = GuideRequest(
         title="Pequenos Exploradores pela Europa",
@@ -377,7 +480,6 @@ def test_build_guide_context_prefers_wikimedia_public_url_when_available():
             source_url="https://commons.wikimedia.org/wiki/File:Eiffel_Tower.jpg",
             image_url="https://upload.wikimedia.org/example.jpg",
             local_path=Path("runtime/wikimedia/paris/eiffel-tower.jpg"),
-            public_url="https://project.supabase.co/storage/v1/object/public/landmark-assets/paris/eiffel-tower.jpg",
             storage_path="paris/eiffel-tower.jpg",
             author="Jane Doe",
             license_short_name="CC BY-SA 4.0",
@@ -393,7 +495,7 @@ def test_build_guide_context_prefers_wikimedia_public_url_when_available():
         wikimedia_assets=assets,
     )
 
-    assert context.destinations[0].landmarks[0].image == assets["paris:eiffel-tower"].public_url
+    assert context.destinations[0].landmarks[0].image == assets["paris:eiffel-tower"].local_path
 
 
 def test_build_guide_context_prefers_generated_landmark_images():

@@ -44,10 +44,6 @@ class SupabaseStorageClient:
         self.config = config
         self._client = http_client or httpx.Client(timeout=60, follow_redirects=True)
 
-    def public_url(self, bucket: str, storage_path: str) -> str:
-        path = quote(storage_path, safe="/")
-        return f"{self.config.url}/storage/v1/object/public/{bucket}/{path}"
-
     def upload_file(
         self,
         bucket: str,
@@ -101,7 +97,6 @@ def sync_wikimedia_asset_to_storage(
     image_path = _asset_image_storage_path(asset)
     metadata_path = _asset_metadata_storage_path(asset)
     bucket = client.config.landmark_assets_bucket
-    public_url = client.public_url(bucket, image_path)
     client.upload_file(
         bucket=bucket,
         storage_path=image_path,
@@ -113,11 +108,14 @@ def sync_wikimedia_asset_to_storage(
         storage_path=metadata_path,
         payload={
             **asset.model_dump(mode="json"),
-            "public_url": public_url,
+            # Buckets are deliberately private. The PDF renderer consumes the
+            # reviewed local file, and any future browser delivery must use an
+            # owner-authorized signed URL instead of a durable public URL.
+            "public_url": None,
             "storage_path": image_path,
         },
     )
-    return asset.model_copy(update={"public_url": public_url, "storage_path": image_path})
+    return asset.model_copy(update={"public_url": None, "storage_path": image_path})
 
 
 def sync_wikimedia_assets_to_storage(

@@ -10,7 +10,7 @@ const interestOptions = [
   { label: 'Arte', value: 'arte' },
   { label: 'Animais', value: 'animais' },
   { label: 'Comida', value: 'comida' },
-  { label: 'Historia', value: 'historia' },
+  { label: 'História', value: 'historia' },
   { label: 'Lojas', value: 'lojas' },
   { label: 'Rio', value: 'rio' },
   { label: 'Vistas', value: 'vistas' },

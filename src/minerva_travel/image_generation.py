@@ -1,10 +1,11 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol, cast
 from unicodedata import normalize
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, UnidentifiedImageError
 
 
 @dataclass(frozen=True)
@@ -84,10 +85,6 @@ class PlaceholderImageGenerator:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         image = Image.new("RGB", (1200, 1600), "#f7efe3")
         draw = ImageDraw.Draw(image)
-        font_large = _font(74)
-        font_medium = _font(42)
-        font_small = _font(32)
-
         draw.rounded_rectangle(
             (90, 90, 1110, 1510),
             radius=36,
@@ -95,39 +92,41 @@ class PlaceholderImageGenerator:
             outline="#6a93b8",
             width=6,
         )
-        draw.ellipse((170, 245, 1030, 1025), fill="#d8ebf1", outline="#89abc2", width=5)
-        draw.rectangle((305, 760, 895, 1040), fill="#c9b59b", outline="#7d6549", width=5)
-
-        people_count = _bounded_family_member_count(expected_visible_family_member_count) or 4
-        start_x = 600 - ((people_count - 1) * 62)
-        people_x = [start_x + (index * 124) for index in range(people_count)]
-        colors = ["#6a93b8", "#d77a61", "#83a95c", "#c9a94d", "#8d7cc3", "#69b482"]
-        for index, x in enumerate(people_x):
-            draw.ellipse((x - 42, 585, x + 42, 669), fill="#f2c6a0", outline="#7d6549", width=3)
+        photo = _safe_cover_photo(family_photo, size=(920, 900))
+        if photo is not None:
+            mask = Image.new("L", photo.size, 0)
+            ImageDraw.Draw(mask).rounded_rectangle((0, 0, *photo.size), radius=42, fill=255)
+            image.paste(photo, (140, 145), mask)
             draw.rounded_rectangle(
-                (x - 52, 670, x + 52, 860),
-                radius=28,
-                fill=colors[index % len(colors)],
-                outline="#7d6549",
-                width=3,
+                (130, 135, 1070, 1065),
+                radius=54,
+                outline="#fffaf1",
+                width=18,
             )
+        else:
+            # Development fixtures may intentionally contain invalid bytes.
+            # Keep the fallback warm and generic without exposing internal
+            # labels or pretending to know what the family looks like.
+            draw.ellipse((170, 245, 1030, 1025), fill="#d8ebf1", outline="#89abc2", width=5)
+            draw.rectangle((305, 760, 895, 1040), fill="#c9b59b", outline="#7d6549", width=5)
+            people_count = _bounded_family_member_count(expected_visible_family_member_count) or 4
+            start_x = 600 - ((people_count - 1) * 62)
+            colors = ["#6a93b8", "#d77a61", "#83a95c", "#c9a94d", "#8d7cc3", "#69b482"]
+            for index in range(people_count):
+                x = start_x + (index * 124)
+                draw.ellipse((x - 42, 585, x + 42, 669), fill="#f2c6a0", outline="#7d6549", width=3)
+                draw.rounded_rectangle(
+                    (x - 52, 670, x + 52, 860),
+                    radius=28,
+                    fill=colors[index % len(colors)],
+                    outline="#7d6549",
+                    width=3,
+                )
 
-        draw.text((600, 1120), "CAPA PLACEHOLDER", anchor="mm", fill="#214c70", font=font_large)
-        draw.text((600, 1205), title, anchor="mm", fill="#214c70", font=font_medium)
-        draw.text(
-            (600, 1270),
-            " + ".join(destination_names),
-            anchor="mm",
-            fill="#5a6f7c",
-            font=font_small,
-        )
-        draw.text(
-            (600, 1365),
-            f"Foto base: {family_photo.name}",
-            anchor="mm",
-            fill="#7d6549",
-            font=font_small,
-        )
+        draw.arc((210, 1110, 990, 1470), start=190, end=345, fill="#d77a61", width=8)
+        draw.ellipse((248, 1322, 280, 1354), fill="#d77a61")
+        draw.ellipse((900, 1230, 932, 1262), fill="#6a93b8")
+        draw.polygon([(600, 1190), (640, 1270), (600, 1250), (560, 1270)], fill="#c9a94d")
         image.save(output_path)
         return output_path
 
@@ -409,6 +408,25 @@ def generate_cover_with_guardrails(
         )
         return CoverGenerationResult(image_path=output_path, fallback_used=False)
 
+    if validator is None:
+        validation = CoverValidationResult(
+            status="unavailable",
+            message="A validação automática da ilustração não está disponível.",
+        )
+        write_family_cover_fallback(
+            family_photo=family_photo,
+            output_path=output_path,
+            title=title,
+            destination_names=destination_names,
+            expected_visible_family_member_count=expected_count,
+        )
+        return CoverGenerationResult(
+            image_path=output_path,
+            fallback_used=True,
+            validation=validation,
+            attempts=0,
+        )
+
     attempts = 0
     latest_validation: CoverValidationResult | None = None
     for _ in range(2):
@@ -421,13 +439,6 @@ def generate_cover_with_guardrails(
             destination_names,
             expected_count,
         )
-        if validator is None:
-            latest_validation = CoverValidationResult(
-                status="unavailable",
-                message="No generated-cover person-count validator is configured.",
-            )
-            break
-
         latest_validation = validator.validate(output_path, expected_count)
         if latest_validation.status == "passed":
             return CoverGenerationResult(
@@ -478,6 +489,17 @@ def _generate_cover(
     )
 
 
+def _safe_cover_photo(photo_path: Path, *, size: tuple[int, int]) -> Image.Image | None:
+    """Prepare the uploaded photo for the local, privacy-preserving cover fallback."""
+
+    try:
+        with Image.open(photo_path) as source:
+            normalized = ImageOps.exif_transpose(source).convert("RGB")
+            return ImageOps.fit(normalized, size, method=Image.Resampling.LANCZOS)
+    except (OSError, UnidentifiedImageError):
+        return None
+
+
 def write_family_cover_fallback(
     *,
     family_photo: Path,
@@ -486,39 +508,33 @@ def write_family_cover_fallback(
     destination_names: list[str],
     expected_visible_family_member_count: int | None = None,
 ) -> Path:
+    # Quando a ilustracao nao pode ser validada, a foto sanitizada preserva a
+    # composicao real da familia e evita pagar por uma geracao que sera
+    # descartada. O titulo fica no painel do template, fora da imagem.
+    del title, destination_names
     output_path.parent.mkdir(parents=True, exist_ok=True)
     image = Image.new("RGB", (1200, 1600), "#fff8ea")
     draw = ImageDraw.Draw(image)
 
     draw.rounded_rectangle((58, 58, 1142, 1542), radius=72, fill="#fdfbf7")
-    draw.rounded_rectangle((110, 145, 1090, 1160), radius=44, fill="#d8ebf1")
-
+    draw.rounded_rectangle((110, 145, 1090, 1240), radius=44, fill="#d8ebf1")
     try:
         with Image.open(family_photo) as source:
             photo = ImageOps.exif_transpose(source).convert("RGB")
         framed = ImageOps.fit(
             photo,
-            (900, 900),
+            (980, 1095),
             method=Image.Resampling.LANCZOS,
             centering=(0.5, 0.42),
         )
-        image.paste(framed, (150, 190))
-    except OSError:
+        image.paste(framed, (110, 145))
+    except (OSError, ValueError):
+        draw.ellipse((250, 240, 950, 940), fill="#eaf4f8", outline="#9dc3d4", width=4)
         _draw_family_silhouette_fallback(
             draw,
             expected_visible_family_member_count,
         )
 
-    font_large = _font(58)
-    font_medium = _font(34)
-    draw.text((600, 1260), title, anchor="mm", fill="#214c70", font=font_large)
-    draw.text(
-        (600, 1330),
-        " + ".join(destination_names),
-        anchor="mm",
-        fill="#5a6f7c",
-        font=font_medium,
-    )
     image.save(output_path)
     return output_path
 
@@ -575,7 +591,8 @@ def cover_prompt(
         "illustration for a personalized family travel guide cover. Preserve the "
         "family group's recognizable composition, friendly smiles, approximate hair "
         "colors, glasses, ages, and poses, but render them as soft illustrated "
-        f"characters, not a photorealistic copy. {family_count_guidance}Use warm natural light, soft pastel colors, "
+        f"characters, not a photorealistic copy. {family_count_guidance}"
+        "Use warm natural light, soft pastel colors, "
         "and a subtle background inspired by these confirmed tourist landmarks: "
         f"{landmarks}. "
         "Vertical cover composition, generous clean space for title text added later. "
@@ -722,7 +739,8 @@ def _remove_small_lineart_components(
     grayscale = image.convert("L")
     width, height = grayscale.size
     total_pixels = width * height
-    black_pixels = bytearray(1 if pixel < 128 else 0 for pixel in grayscale.getdata())
+    pixels = cast(Iterable[int], grayscale.get_flattened_data())
+    black_pixels = bytearray(1 if pixel < 128 else 0 for pixel in pixels)
     visited = bytearray(total_pixels)
     keep = bytearray(total_pixels)
 
@@ -774,7 +792,7 @@ def _write_replicate_output(output: object, output_path: Path) -> None:
     raise TypeError(f"Unsupported Replicate output type: {type(candidate)!r}")
 
 
-def _read_replicate_file_output(candidate: object) -> bytes:
+def _read_replicate_file_output(candidate: Any) -> bytes:
     def operation() -> bytes:
         return candidate.read()
 

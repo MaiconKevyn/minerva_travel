@@ -4,6 +4,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError
 
+from minerva_travel.contract_limits import MAX_GUIDE_LANDMARKS
+from minerva_travel.destination_facts import lookup_destination_facts
 from minerva_travel.models import Destination, Landmark
 from minerva_travel.wikimedia_client import normalize_search_text
 
@@ -11,6 +13,8 @@ DEFAULT_CITY = "Roteiro personalizado"
 DEFAULT_COUNTRY = "Personalizado"
 PLACEHOLDER_IMAGE = Path("assets/landmarks/paris/eiffel-tower.png")
 PLACEHOLDER_LINEART = Path("assets/lineart/paris/eiffel-tower.png")
+MAX_CUSTOM_LANDMARKS = MAX_GUIDE_LANDMARKS
+MAX_CUSTOM_LANDMARKS_BYTES = 20_000
 STOPWORDS = {
     "a",
     "as",
@@ -45,10 +49,16 @@ class CustomLandmarkInput(BaseModel):
 def parse_custom_landmarks(raw: str | None) -> list[CustomLandmarkInput]:
     if not raw or not raw.strip():
         return []
+    if len(raw.encode("utf-8")) > MAX_CUSTOM_LANDMARKS_BYTES:
+        raise ValueError("custom_landmarks excede o limite de 20 KB.")
     stripped = raw.strip()
     if stripped.startswith("["):
-        return _parse_json_landmarks(stripped)
-    return _parse_text_landmarks(stripped)
+        landmarks = _parse_json_landmarks(stripped)
+    else:
+        landmarks = _parse_text_landmarks(stripped)
+    if len(landmarks) > MAX_CUSTOM_LANDMARKS:
+        raise ValueError("Informe no maximo 30 pontos turisticos personalizados.")
+    return landmarks
 
 
 def build_custom_destinations(
@@ -85,16 +95,29 @@ def build_custom_destinations(
                     rejected_terms=["map", "logo"],
                 )
             )
+        # "Personalizado" e apenas chave interna de agrupamento; nunca deve
+        # aparecer no PDF. Sem pais real, o rotulo fica so com a cidade.
+        visible_country = "" if country == DEFAULT_COUNTRY else country
+        display_title = (
+            f"{visible_country.upper()} - {city.upper()}" if visible_country else city.upper()
+        )
+        facts = lookup_destination_facts(city, visible_country)
+        intro = (
+            facts.intro
+            if facts
+            else [
+                f"{city} faz parte do roteiro especial desta viagem.",
+                "Os lugares abaixo foram escolhidos pela familia para explorar com calma.",
+            ]
+        )
         destinations.append(
             Destination(
                 id=destination_id,
-                country=country,
+                country=visible_country,
                 city=city,
-                display_title=f"{country.upper()} - {city.upper()}",
-                intro=[
-                    f"{city} faz parte do roteiro especial desta viagem.",
-                    "Os lugares abaixo foram escolhidos pela familia para explorar com calma.",
-                ],
+                display_title=display_title,
+                intro=intro,
+                curiosities=facts.curiosities if facts else [],
                 favorites_prompt=f"Meus lugares favoritos em {city} foram...",
                 coloring_title="DESENHOS PARA COLORIR",
                 coloring_subtitle="Para colorir e desenhar",

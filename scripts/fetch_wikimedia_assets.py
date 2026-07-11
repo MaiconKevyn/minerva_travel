@@ -10,11 +10,14 @@ from minerva_travel.catalog import load_catalog
 from minerva_travel.wikimedia_assets import WikimediaAsset
 from minerva_travel.wikimedia_client import USER_AGENT, fetch_landmark_asset
 
+CANONICAL_ASSET_DIR = Path("assets/wikimedia")
+CANONICAL_MANIFEST_PATH = Path("data/wikimedia/manifest.json")
+
 
 def main() -> None:
     limit, targets, force = parse_args(sys.argv[1:])
-    output_dir = Path("runtime/wikimedia")
-    manifest_path = output_dir / "manifest.json"
+    output_dir = CANONICAL_ASSET_DIR
+    manifest_path = CANONICAL_MANIFEST_PATH
     catalog = load_catalog()
     assets = load_existing_assets(manifest_path)
     missing = []
@@ -49,9 +52,7 @@ def main() -> None:
                 if asset:
                     print(f"  saved: {asset.local_path}", flush=True)
                     assets = [
-                        existing
-                        for existing in assets
-                        if existing.selection_id != selection_id
+                        existing for existing in assets if existing.selection_id != selection_id
                     ]
                     assets.append(asset)
                     save_manifest(manifest_path, assets)

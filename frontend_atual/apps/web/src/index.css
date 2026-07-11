@@ -17,12 +17,12 @@
     --popover: 0 0% 100%;
     --popover-foreground: 24 15% 20%;
 
-    /* Warm Orange */
-    --primary: 15 76% 58%;
+    /* Warm Orange, dark enough for AA contrast with white text. */
+    --primary: 15 65% 40%;
     --primary-foreground: 0 0% 100%;
 
-    /* Soft Blue */
-    --secondary: 202 43% 58%;
+    /* Storybook blue, dark enough for AA contrast with white text. */
+    --secondary: 202 55% 36%;
     --secondary-foreground: 0 0% 100%;
 
     /* Gentle Green */
@@ -31,14 +31,14 @@
 
     /* Soft Pink/Coral for highlights */
     --muted: 15 30% 95%;
-    --muted-foreground: 24 10% 45%;
+    --muted-foreground: 24 12% 36%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 35 25% 85%;
     --input: 35 25% 85%;
-    --ring: 15 76% 58%;
+    --ring: 15 65% 40%;
 
     --radius: 1.5rem;
   }
@@ -53,11 +53,11 @@
     --popover: 222 47% 15%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 15 76% 58%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 15 82% 70%;
+    --primary-foreground: 24 15% 10%;
 
-    --secondary: 202 43% 58%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 202 55% 70%;
+    --secondary-foreground: 24 15% 10%;
 
     --muted: 217 32% 17%;
     --muted-foreground: 215 20.2% 65.1%;
@@ -65,8 +65,8 @@
     --accent: 142 30% 45%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 60% 50%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 78% 72%;
+    --destructive-foreground: 24 15% 10%;
 
     --border: 217 32% 17%;
     --input: 217 32% 17%;
@@ -76,6 +76,12 @@
   * {
     border-color: hsl(var(--border));
     transition: border-color 200ms ease;
+  }
+
+  .dark .bg-primary.text-white,
+  .dark .bg-secondary.text-white,
+  .dark .bg-destructive.text-white {
+    color: hsl(var(--primary-foreground));
   }
 
   html {
@@ -195,5 +201,20 @@
   .writing-vertical {
     writing-mode: vertical-rl;
     text-orientation: mixed;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

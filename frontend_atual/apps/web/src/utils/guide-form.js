@@ -1,5 +1,151 @@
-export const createGuideDestination = (index = 0) => ({
-  id: `destination-${index + 1}`,
+export const MAX_GUIDE_CHILDREN = 10;
+export const MAX_GUIDE_PARENTS = 10;
+export const MAX_GUIDE_DESTINATIONS = 10;
+export const MAX_GUIDE_LANDMARKS = 30;
+export const MAX_VISIBLE_FAMILY_MEMBERS = 20;
+export const MIN_GUIDE_YEAR = 2024;
+export const MAX_GUIDE_YEAR = 2100;
+export const FAMILY_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+export const FAMILY_PHOTO_MAX_PIXELS = 40_000_000;
+export const FAMILY_PHOTO_MAX_WIDTH = 12_000;
+export const FAMILY_PHOTO_MAX_HEIGHT = 12_000;
+export const PRIVACY_CONSENT_VERSION = '2026-07-09';
+
+const FAMILY_PHOTO_FORMATS = {
+  'image/jpeg': { extensions: ['.jpg', '.jpeg'], format: 'jpeg' },
+  'image/png': { extensions: ['.png'], format: 'png' },
+  'image/webp': { extensions: ['.webp'], format: 'webp' },
+};
+
+const fileExtension = (name = '') => {
+  const normalized = String(name).trim().toLowerCase();
+  const dotIndex = normalized.lastIndexOf('.');
+  return dotIndex >= 0 ? normalized.slice(dotIndex) : '';
+};
+
+const detectedFamilyPhotoFormat = (bytes) => {
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff
+  ) return 'jpeg';
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) return 'png';
+  if (
+    bytes.length >= 12 &&
+    String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' &&
+    String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'
+  ) return 'webp';
+  return null;
+};
+
+const decodeBrowserImageDimensions = async (file) => {
+  if (typeof globalThis.createImageBitmap === 'function') {
+    const bitmap = await globalThis.createImageBitmap(file);
+    const dimensions = { width: bitmap.width, height: bitmap.height };
+    bitmap.close?.();
+    return dimensions;
+  }
+  if (typeof globalThis.Image !== 'function' || !globalThis.URL?.createObjectURL) {
+    throw new Error('Não foi possível ler as dimensões da imagem neste navegador.');
+  }
+  const objectUrl = globalThis.URL.createObjectURL(file);
+  try {
+    return await new Promise((resolve, reject) => {
+      const image = new globalThis.Image();
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => reject(new Error('A imagem está corrompida ou incompleta.'));
+      image.src = objectUrl;
+    });
+  } finally {
+    globalThis.URL.revokeObjectURL(objectUrl);
+  }
+};
+
+export const validateFamilyPhoto = async (
+  file,
+  { decodeDimensions = decodeBrowserImageDimensions } = {},
+) => {
+  if (!file || typeof file.slice !== 'function') {
+    return { valid: false, code: 'missing_file', message: 'Escolha uma foto para continuar.' };
+  }
+  if (!file.size) {
+    return { valid: false, code: 'empty_file', message: 'A foto selecionada está vazia.' };
+  }
+  if (file.size > FAMILY_PHOTO_MAX_BYTES) {
+    return {
+      valid: false,
+      code: 'file_too_large',
+      message: 'A foto deve ter no máximo 10 MB.',
+    };
+  }
+  const mimeType = String(file.type || '').toLowerCase();
+  const format = FAMILY_PHOTO_FORMATS[mimeType];
+  const extension = fileExtension(file.name);
+  if (!format || !format.extensions.includes(extension)) {
+    return {
+      valid: false,
+      code: 'unsupported_type',
+      message: 'Envie uma foto JPEG, PNG ou WebP com a extensão correta.',
+    };
+  }
+  try {
+    const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+    if (detectedFamilyPhotoFormat(header) !== format.format) {
+      return {
+        valid: false,
+        code: 'content_mismatch',
+        message: 'O conteúdo da foto não corresponde ao tipo de arquivo informado.',
+      };
+    }
+    const { width, height } = await decodeDimensions(file);
+    if (
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      width <= 0 ||
+      height <= 0 ||
+      width > FAMILY_PHOTO_MAX_WIDTH ||
+      height > FAMILY_PHOTO_MAX_HEIGHT ||
+      width * height > FAMILY_PHOTO_MAX_PIXELS
+    ) {
+      return {
+        valid: false,
+        code: 'dimensions_exceeded',
+        message: 'A foto excede o limite de 12.000 px por lado ou 40 megapixels.',
+      };
+    }
+  } catch (error) {
+    return {
+      valid: false,
+      code: 'invalid_image',
+      message: error?.message || 'A foto está corrompida ou não pôde ser lida.',
+    };
+  }
+  return { valid: true, code: 'valid_image', message: '' };
+};
+
+let fallbackIdSequence = 0;
+
+export const createGuideItemId = (prefix = 'guide-item') => {
+  const randomUuid = globalThis.crypto?.randomUUID?.();
+  if (randomUuid) return `${prefix}-${randomUuid}`;
+
+  fallbackIdSequence += 1;
+  return `${prefix}-${Date.now().toString(36)}-${fallbackIdSequence.toString(36)}`;
+};
+
+export const createGuideDestination = () => ({
+  id: createGuideItemId('destination'),
   place: '',
   timing: '',
   days: 1,

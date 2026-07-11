@@ -13,13 +13,14 @@ const HomePage = () => {
   return (
     <>
       <Helmet>
-        <title>Aventuras em Família - O seu guia de viagem ilustrado</title>
-        <meta name="description" content="Crie guias de viagem personalizados como livros de histórias para a sua família. Transforme cada viagem em uma aventura mágica." />
+        <title>Minerva Travel - Diário infantil personalizado de viagem</title>
+        <meta name="description" content="Crie um diário infantil de viagem em PDF A4 com roteiro confirmado, atividades e uma capa familiar." />
       </Helmet>
 
       <div className="min-h-screen flex flex-col bg-background transition-colors duration-200">
         <Header />
 
+        <main id="main-content" tabIndex={-1}>
         {/* Storybook Hero Section */}
         <section className="relative pt-12 pb-24 lg:pt-20 lg:pb-32 overflow-hidden flex-1 flex items-center">
           <Flower className="absolute top-10 right-10 w-24 h-24 text-primary opacity-20" />
@@ -49,7 +50,7 @@ const HomePage = () => {
                 </h1>
 
                 <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto lg:mx-0 font-medium">
-                  Transforme o planejamento das férias em um divertido livro de histórias. Adicione destinos, fotos e veja a mágica acontecer.
+                  Transforme o roteiro confirmado da família em um diário infantil A4 com atividades, memórias e uma capa personalizada.
                 </p>
 
                 <div className="pt-4">
@@ -96,6 +97,7 @@ const HomePage = () => {
             <FeatureBox />
           </div>
         </section>
+        </main>
 
         {/* Footer */}
         <footer className="bg-muted py-12 border-t border-border mt-auto relative overflow-hidden transition-colors duration-200">
@@ -106,14 +108,14 @@ const HomePage = () => {
                 <div className="w-10 h-10 bg-card rounded-xl shadow-sm flex items-center justify-center">
                   <Heart className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-serif font-bold text-xl text-foreground">Aventuras em Família</span>
+                <span className="font-serif font-bold text-xl text-foreground">Minerva Travel</span>
               </div>
               <div className="flex gap-8 text-sm font-medium">
-                <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Política de Privacidade</span>
-                <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Termos de Uso</span>
+                <Link className="text-muted-foreground hover:text-foreground transition-colors" to="/privacy">Política de Privacidade</Link>
+                <Link className="text-muted-foreground hover:text-foreground transition-colors" to="/terms">Termos de Uso</Link>
               </div>
               <p className="text-sm text-muted-foreground font-medium">
-                © 2026 Histórias Mágicas Ltda.
+                © 2026 Minerva Travel · Projeto em piloto
               </p>
             </div>
           </div>

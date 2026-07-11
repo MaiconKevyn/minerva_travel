@@ -3,9 +3,9 @@ import test from 'node:test';
 
 import { createAuthClient, createMemoryStorage } from './authClient.js';
 
-test('createAuthClient uses local auth when no PocketBase URL is configured', async () => {
+test('createAuthClient uses local auth when no Supabase configuration is provided', async () => {
   const storage = createMemoryStorage();
-  const authClient = createAuthClient({ pocketBaseUrl: '', storage });
+  const authClient = createAuthClient({ storage });
   const changes = [];
 
   const unsubscribe = authClient.subscribe((user) => {
@@ -351,7 +351,7 @@ test('Supabase auth returns a clear message when email is not confirmed', async 
   const result = await authClient.login('mae@example.com', 'Senha123');
 
   assert.equal(result.success, false);
-  assert.match(result.error, /email ainda nao foi confirmado/i);
+  assert.match(result.error, /e-mail ainda não foi confirmado/i);
 });
 
 test('createAuthClient can read Supabase config from runtime config file', () => {
@@ -383,4 +383,65 @@ test('createAuthClient can read Supabase config from runtime config file', () =>
   } else {
     globalThis.__MINERVA_CONFIG__ = originalConfig;
   }
+});
+
+test('explicit local mode isolates development from a configured Supabase project', async () => {
+  let supabaseCreated = false;
+  const storage = createMemoryStorage();
+  const authClient = createAuthClient({
+    authMode: 'local',
+    appEnvironment: 'development',
+    supabaseUrl: 'https://project.supabase.co',
+    supabasePublishableKey: 'sb_publishable_test',
+    createSupabaseClient: () => {
+      supabaseCreated = true;
+      throw new Error('Supabase must not be initialized in local mode.');
+    },
+    storage,
+  });
+
+  assert.deepEqual(
+    await authClient.signup('e2e@example.com', 'Senha123', 'Familia E2E'),
+    { success: true },
+  );
+  assert.equal(supabaseCreated, false);
+});
+
+test('production refuses local identity mode', () => {
+  assert.throws(
+    () => createAuthClient({ authMode: 'local', appEnvironment: 'production' }),
+    /local não pode ser habilitada/i,
+  );
+});
+
+test('unsupported identity modes fail closed in development', () => {
+  assert.throws(
+    () => createAuthClient({
+      authMode: 'legacy-provider',
+      appEnvironment: 'development',
+    }),
+    /Modo de autenticação não suportado/i,
+  );
+});
+
+test('production requires a complete Supabase configuration', () => {
+  assert.throws(
+    () => createAuthClient({
+      authMode: 'supabase',
+      appEnvironment: 'production',
+      supabaseUrl: '',
+      supabasePublishableKey: '',
+    }),
+    /Supabase Auth exige URL e chave pública/i,
+  );
+  assert.throws(
+    () => createAuthClient({
+      authMode: '',
+      appEnvironment: 'production',
+      supabaseUrl: '',
+      supabasePublishableKey: '',
+      pocketBaseUrl: '',
+    }),
+    /Supabase Auth e obrigatorio/i,
+  );
 });

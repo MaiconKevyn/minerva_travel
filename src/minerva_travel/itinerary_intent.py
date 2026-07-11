@@ -126,9 +126,10 @@ def parse_itinerary_intent(
     effective_api_key = api_key or os.getenv("OPENAI_API_KEY")
     if responder or effective_api_key:
         try:
+            effective_model = model or os.getenv("OPENAI_LANDMARK_MODEL") or "gpt-4o-2024-08-06"
             response = (responder or _create_structured_response)(
                 api_key=effective_api_key,
-                model=model or os.getenv("OPENAI_LANDMARK_MODEL", "gpt-4o-2024-08-06"),
+                model=effective_model,
                 message=cleaned,
             )
             intent = _parse_response_payload(response)
@@ -302,9 +303,7 @@ def _extract_output_text(response: dict[str, Any]) -> str:
 
 def _fallback_intent(message: str) -> ItineraryIntent:
     inferred_interests = [
-        value
-        for key, value in INTEREST_ALIASES.items()
-        if key in _normalize_text(message)
+        value for key, value in INTEREST_ALIASES.items() if key in _normalize_text(message)
     ]
     return ItineraryIntent(
         destination=message,

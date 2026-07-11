@@ -1,0 +1,334 @@
+name: Backend Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11.15"
+  UV_VERSION: "0.11.28"
+
+jobs:
+  security:
+    name: Dependency, SAST, secret and config scans
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Audit locked Python production dependencies
+        run: |
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt \
+            | uvx --from pip-audit==2.10.0 pip-audit --strict \
+                --ignore-vuln CVE-2026-49452 -r /dev/stdin
+
+      - name: Python SAST
+        run: uvx --from bandit==1.9.4 bandit -q -r src -ll
+
+      - name: Audit locked frontend dependencies
+        run: npm audit --audit-level=high
+
+      - name: Filesystem vulnerability, secret and misconfiguration scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+
+  backend:
+    name: Ruff, pytest and PDF
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install WeasyPrint and PDF system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            fonts-dejavu-core \
+            libcairo2 \
+            libfontconfig1 \
+            libfreetype6 \
+            libgdk-pixbuf-2.0-0 \
+            libglib2.0-0 \
+            libharfbuzz-subset0 \
+            libharfbuzz0b \
+            libpango-1.0-0 \
+            libpangocairo-1.0-0 \
+            libpangoft2-1.0-0 \
+            poppler-utils \
+            qpdf \
+            shared-mime-info
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install locked dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Validate Supabase migration structure
+        run: bash scripts/check_supabase_migrations.sh
+
+      - name: Validate environment examples
+        run: uv run python scripts/check_env_examples.py
+
+      - name: Verify committed OpenAPI contract snapshot
+        run: uv run python scripts/export_openapi.py --check
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+      - name: Python typecheck
+        run: uv run mypy src/minerva_travel
+
+      - name: Full backend test suite
+        run: uv run pytest --cov=minerva_travel --cov-report=term-missing --cov-fail-under=75
+        env:
+          APP_ENV: test
+          AUTH_REQUIRED: "false"
+          IMAGE_PROVIDER: placeholder
+          LANDMARK_ART_GENERATION: "false"
+          COLORING_LINEART_GENERATION: "false"
+          SUPABASE_STORAGE_ENABLED: "false"
+
+      - name: Generate real PDF smoke artifact
+        run: uv run python scripts/smoke_pdf.py runtime/ci/minerva-smoke.pdf
+
+      - name: Inspect and render PDF
+        run: |
+          pdfinfo runtime/ci/minerva-smoke.pdf | tee runtime/ci/minerva-smoke-pdfinfo.txt
+          grep --fixed-strings "Page size:       595.276 x 841.89 pts (A4)" \
+            runtime/ci/minerva-smoke-pdfinfo.txt
+          qpdf --check runtime/ci/minerva-smoke.pdf
+          pdftoppm \
+            -f 1 \
+            -singlefile \
+            -png \
+            -r 120 \
+            runtime/ci/minerva-smoke.pdf \
+            runtime/ci/minerva-smoke-page-1
+
+      - name: Upload PDF smoke artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pdf-smoke
+          path: |
+            runtime/ci/minerva-smoke.pdf
+            runtime/ci/minerva-smoke-page-1.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+  frontend:
+    name: Frontend lint, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: frontend_atual/apps/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Enforce JavaScript bundle budget
+        run: npm run check:bundle
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser E2E and axe WCAG checks
+        run: npm run test:e2e
+        env:
+          VITE_AUTH_MODE: local
+          VITE_API_BASE_URL: http://127.0.0.1:8000
+
+      - name: Upload browser evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-browser-evidence
+          path: |
+            frontend_atual/apps/web/playwright-report
+            frontend_atual/apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  container-smoke:
+    name: Container API and PDF smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          pull: true
+          tags: minerva-travel:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan runtime image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: minerva-travel:ci
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+
+      - name: Start container
+        run: |
+          docker run --detach \
+            --name minerva-travel-ci \
+            --publish 127.0.0.1:8000:8000 \
+            --env APP_ENV=test \
+            --env AUTH_REQUIRED=false \
+            --env IMAGE_PROVIDER=placeholder \
+            --env LANDMARK_ART_GENERATION=false \
+            --env COLORING_LINEART_GENERATION=false \
+            --env SUPABASE_STORAGE_ENABLED=false \
+            minerva-travel:ci
+
+      - name: Wait for container healthcheck
+        run: |
+          for attempt in $(seq 1 45); do
+            status="$(docker inspect --format='{{.State.Health.Status}}' minerva-travel-ci)"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            if [ "$status" = "unhealthy" ]; then
+              docker logs minerva-travel-ci
+              exit 1
+            fi
+            sleep 2
+          done
+          docker logs minerva-travel-ci
+          exit 1
+
+      - name: Generate and download PDF through API
+        run: |
+          mkdir --parents runtime/ci
+          consent_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          curl --fail-with-body \
+            --form "title=Minerva Travel Container Smoke" \
+            --form "children_names=Alice" \
+            --form "children_ages=7" \
+            --form "parents_names=Ana" \
+            --form "year=2026" \
+            --form "selected_landmarks=paris:eiffel-tower" \
+            --form "photo_processing_consent=true" \
+            --form "privacy_consent_version=2026-07-09" \
+            --form "privacy_consent_at=${consent_at}" \
+            --form "family_photo=@assets/landmarks/paris/eiffel-tower.png;type=image/png" \
+            http://127.0.0.1:8000/api/generate \
+            --output runtime/ci/container-smoke-response.json
+          download_url="$(python -c 'import json; print(json.load(open("runtime/ci/container-smoke-response.json"))["download_url"])')"
+          curl --fail-with-body \
+            "http://127.0.0.1:8000${download_url}" \
+            --output runtime/ci/container-smoke.pdf
+          test "$(head -c 4 runtime/ci/container-smoke.pdf)" = "%PDF"
+          pdfinfo runtime/ci/container-smoke.pdf | tee runtime/ci/container-smoke-pdfinfo.txt
+          grep --fixed-strings "Page size:       595.276 x 841.89 pts (A4)" \
+            runtime/ci/container-smoke-pdfinfo.txt
+          qpdf --check runtime/ci/container-smoke.pdf
+
+      - name: Show container logs on failure
+        if: ${{ failure() }}
+        run: docker logs minerva-travel-ci
+
+      - name: Capture sanitized container logs
+        if: ${{ always() }}
+        run: docker logs minerva-travel-ci > runtime/ci/container-smoke.log 2>&1
+
+      - name: Stop container
+        if: ${{ always() }}
+        run: docker rm --force minerva-travel-ci
+
+      - name: Upload container smoke artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-pdf-smoke
+          path: |
+            runtime/ci/container-smoke-response.json
+            runtime/ci/container-smoke.pdf
+            runtime/ci/container-smoke-pdfinfo.txt
+            runtime/ci/container-smoke.log
+          if-no-files-found: ignore
+          retention-days: 7

@@ -25,14 +25,7 @@ test('Vite config stays simple for Hostinger framework detection', () => {
 });
 
 test('Hostinger frontend does not hard-code Horizons backend paths', () => {
-  const files = [
-    'src/lib/pocketbaseClient.js',
-    'src/lib/apiServerClient.js',
-    'src/lib/integratedAiClient.js',
-    'src/lib/authClient.js',
-  ];
-
-  const source = files.map((path) => readProjectFile(path)).join('\n');
+  const source = readProjectFile('src/lib/authClient.js');
 
   assert.doesNotMatch(source, /\/hcgi\/(?:platform|api)/);
 });
@@ -44,6 +37,14 @@ test('Hostinger static files do not advertise Horizons or Vite defaults', () => 
   ].join('\n');
 
   assert.doesNotMatch(source, /Hostinger Horizons|vite\.svg/);
+});
+
+test('llms index advertises the real public and create routes', () => {
+  const llms = readProjectFile('public/llms.txt');
+
+  assert.match(llms, /\[Início\]\(\/\)/);
+  assert.match(llms, /\[Criar guia\]\(\/create\)/);
+  assert.doesNotMatch(llms, /\/home|\/createguide|Aventuras em Família/);
 });
 
 test('runtime config loads before the React entrypoint', () => {

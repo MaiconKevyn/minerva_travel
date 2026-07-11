@@ -3,13 +3,29 @@
 <head>
   <meta charset="utf-8">
   <title>{{ guide.request.title }}</title>
-  <style>{{ css }}</style>
+  <meta name="author" content="Minerva Travel">
+  <meta name="description" content="Diário infantil personalizado da viagem de {{ guide.request.children_display }}">
+  <meta name="keywords" content="viagem em família, diário infantil, atividades de viagem">
+  <meta name="generator" content="Minerva Travel / WeasyPrint">
+  {# CSS versionado e lido do pacote, nunca fornecido pelo usuário. #}
+  <style>{{ css | safe }}</style>
 </head>
 <body class="{% if preview %}preview-mode{% endif %}">
   <main class="guide-shell">
     <section class="page cover-page">
       <div class="cover-art">
-        <img class="cover-image" src="{{ guide.cover_image }}" alt="">
+        {% set cover_fallback = none %}
+        {% if guide.destinations and guide.destinations[0].landmarks %}
+          {% set cover_fallback = guide.destinations[0].landmarks[0].image %}
+        {% endif %}
+        {% set cover_src = asset_src(guide.cover_image, cover_fallback) %}
+        {% if cover_src %}
+          <img class="cover-image" src="{{ cover_src }}" alt="Ilustracao da capa da viagem">
+        {% else %}
+          <div class="image-fallback cover-image-fallback" role="img" aria-label="Capa ilustrada indisponível">
+            <span>nossa aventura</span>
+          </div>
+        {% endif %}
       </div>
       <div class="cover-panel">
         <p class="eyebrow">diario ilustrado de viagem</p>
@@ -19,41 +35,152 @@
       </div>
     </section>
 
+    <section class="page letter-page journey-phase-page phase-before">
+      <div class="phase-badge">Antes da viagem</div>
+      <div class="page-kicker">para ler antes de embarcar</div>
+      <h2>Nossa grande aventura</h2>
+      <div class="letter-card">
+        <p>{{ guide.request.children_display }}, este guia foi criado para acompanhar uma viagem cheia de descobertas.</p>
+        <p>Antes de chegar, vocês podem olhar o mapa, descobrir palavras novas e escolher os lugares que mais dão curiosidade.</p>
+        <p class="callout">Atividade para o avião: marque no mapa mental da aventura qual cidade vocês vão conhecer primeiro.</p>
+      </div>
+      <div class="phase-grid">
+        {% for item in guide.destinations %}
+          <article class="phase-card">
+            <span>{{ loop.index }}</span>
+            <h3>{{ item.destination.city }}</h3>
+            <p>{{ item.destination.phase_activities.before }}</p>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% if guide.request.itinerary %}
+      {% set itinerary = guide.request.itinerary %}
+      {% for destination_batch in itinerary.destinations|batch(5) %}
+        <section class="page journey-plan-page phase-before">
+          <div class="phase-badge">Plano confirmado</div>
+          <p class="page-kicker">ordem, período e duração</p>
+          <h2>Nosso plano de viagem</h2>
+          {% if loop.first %}
+            <div class="journey-plan-meta">
+              <span>{{ itinerary.mode_label }}</span>
+              <span>Ritmo {{ itinerary.pace_label }}</span>
+              <span>{{ itinerary.total_days }} {% if itinerary.total_days == 1 %}dia{% else %}dias{% endif %}</span>
+            </div>
+            {% if itinerary.interests %}
+              <p class="journey-plan-interests">
+                Interesses da família: {{ itinerary.interests|join(", ") }}
+              </p>
+            {% endif %}
+          {% else %}
+            <p class="journey-plan-continuation">Continuação dos destinos confirmados.</p>
+          {% endif %}
+          <ol class="journey-destination-list">
+            {% for destination in destination_batch %}
+              <li class="journey-destination-card">
+                <span class="journey-destination-order">{{ destination.order }}</span>
+                <div>
+                  <strong>{{ destination.place }}</strong>
+                  <p>{{ destination.timing }}</p>
+                </div>
+                <span class="journey-duration">
+                  {{ destination.days }} {% if destination.days == 1 %}dia{% else %}dias{% endif %}
+                </span>
+              </li>
+            {% endfor %}
+          </ol>
+        </section>
+      {% endfor %}
+
+      {% for day in itinerary.days %}
+        {% for stop_batch in day.stops|batch(12) %}
+          <section class="page journey-plan-page journey-day-page phase-during">
+            <div class="phase-badge">Durante a viagem</div>
+            <p class="page-kicker">dia {{ day.day }}{% if not loop.first %} · continuação{% endif %}</p>
+            <h2>{{ day.title }}</h2>
+            {% if day.theme %}
+              <p class="journey-day-theme">{{ day.theme }}</p>
+            {% endif %}
+            <ol class="journey-stop-grid">
+              {% for stop in stop_batch %}
+                <li class="journey-stop-item">
+                  <span>{{ loop.index + ((loop.index0 // 12) * 12) }}</span>
+                  <div>
+                    <strong>{{ stop.name }}</strong>
+                    {% if stop.destination_id %}
+                      <small>{{ stop.destination_id }}</small>
+                    {% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ol>
+          </section>
+        {% endfor %}
+      {% endfor %}
+
+      {% for stop_batch in itinerary.unplanned_stops|batch(12) %}
+        <section class="page journey-plan-page journey-day-page phase-during">
+          <div class="phase-badge">Durante a viagem</div>
+          <p class="page-kicker">paradas sem dia definido</p>
+          <h2>Também queremos visitar</h2>
+          <p class="journey-day-theme">Estes lugares estão confirmados, mas continuam livres para encaixar no melhor dia.</p>
+          <ol class="journey-stop-grid">
+            {% for stop in stop_batch %}
+              <li class="journey-stop-item">
+                <span>{{ loop.index }}</span>
+                <div>
+                  <strong>{{ stop.name }}</strong>
+                  {% if stop.destination_id %}
+                    <small>{{ stop.destination_id }}</small>
+                  {% endif %}
+                </div>
+              </li>
+            {% endfor %}
+          </ol>
+        </section>
+      {% endfor %}
+    {% endif %}
+
     {% set summary_items = guide.summary_landmarks %}
     <section class="page trip-summary-page summary-density-{{ guide.summary_density }}" data-summary-count="{{ summary_items|length }}">
       <div class="summary-infographic-layout">
         <div class="summary-map-card">
-          {% if guide.summary_image %}
-            <img class="summary-illustration-image" src="{{ guide.summary_image }}" alt="">
+          {% set summary_src = asset_src(guide.summary_image) %}
+          {% if summary_src %}
+            {# A ilustracao gerada por IA fala por si; rota pontilhada e badges
+               por cima dela viram ruido visual. #}
+            <img class="summary-illustration-image" src="{{ summary_src }}" alt="Ilustracao do roteiro da viagem">
+          {% else %}
+            <div class="summary-terminal summary-terminal-start">Inicio</div>
+            <svg class="summary-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path
+                class="summary-route-shell"
+                d="M 45 7 C 28 18 31 30 52 39 S 74 57 49 66 S 28 81 54 93"
+                fill="none"
+                stroke="#ffffff"
+                stroke-linecap="round"
+                stroke-width="7"
+              />
+              <path
+                class="summary-route-core"
+                d="M 45 7 C 28 18 31 30 52 39 S 74 57 49 66 S 28 81 54 93"
+                fill="none"
+                stroke="#0f766e"
+                stroke-dasharray="1.2 2"
+                stroke-linecap="round"
+                stroke-width="1.35"
+              />
+            </svg>
+            <div class="summary-map-markers">
+              {% for summary in summary_items %}
+                <div class="summary-map-marker summary-route-marker">
+                  <span>{{ summary.number }}</span>
+                </div>
+              {% endfor %}
+            </div>
+            <div class="summary-terminal summary-terminal-finish">Fim</div>
           {% endif %}
-          <div class="summary-terminal summary-terminal-start">Inicio</div>
-          <svg class="summary-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <path
-              class="summary-route-shell"
-              d="M 45 7 C 28 18 31 30 52 39 S 74 57 49 66 S 28 81 54 93"
-              fill="none"
-              stroke="#ffffff"
-              stroke-linecap="round"
-              stroke-width="7"
-            />
-            <path
-              class="summary-route-core"
-              d="M 45 7 C 28 18 31 30 52 39 S 74 57 49 66 S 28 81 54 93"
-              fill="none"
-              stroke="#0f766e"
-              stroke-dasharray="1.2 2"
-              stroke-linecap="round"
-              stroke-width="1.35"
-            />
-          </svg>
-          <div class="summary-map-markers">
-            {% for summary in summary_items %}
-              <div class="summary-map-marker summary-route-marker">
-                <span>{{ summary.number }}</span>
-              </div>
-            {% endfor %}
-          </div>
-          <div class="summary-terminal summary-terminal-finish">Fim</div>
         </div>
 
         <div class="summary-details-panel">
@@ -72,7 +199,7 @@
                 <span class="summary-stop-number">{{ summary.number }}</span>
                 <div class="summary-stop-copy">
                   <strong>{{ summary.landmark.name }}</strong>
-                  <small>{{ summary.destination.city }}, {{ summary.destination.country }}</small>
+                  <small>{{ summary.destination.location_label }}</small>
                 </div>
               </li>
             {% endfor %}
@@ -81,30 +208,12 @@
       </div>
     </section>
 
-    <section class="page letter-page journey-phase-page phase-before">
-      <div class="phase-badge">Antes da viagem</div>
-      <div class="page-kicker">para ler antes de embarcar</div>
-      <h2>Nossa grande aventura</h2>
-      <div class="letter-card">
-        <p>{{ guide.request.children_display }}, este guia foi criado para acompanhar uma viagem cheia de descobertas.</p>
-        <p>Antes de chegar, voces podem olhar o mapa, descobrir palavras novas e escolher os lugares que mais dao curiosidade.</p>
-        <p class="callout">Atividade para o aviao: marque no mapa mental da aventura qual cidade voces vao conhecer primeiro.</p>
-      </div>
-      <div class="phase-grid">
-        {% for item in guide.destinations %}
-          <article class="phase-card">
-            <span>{{ loop.index }}</span>
-            <h3>{{ item.destination.city }}</h3>
-            <p>{{ item.destination.phase_activities.before }}</p>
-          </article>
-        {% endfor %}
-      </div>
-    </section>
-
     {% for item in guide.destinations %}
       <section class="page city-page">
         <div class="city-header">
-          <p class="page-kicker">{{ item.destination.country }}</p>
+          {% if item.destination.country %}
+            <p class="page-kicker">{{ item.destination.country }}</p>
+          {% endif %}
           <h2>{{ item.destination.city }}</h2>
           <p>{{ item.destination.display_title }}</p>
         </div>
@@ -115,14 +224,30 @@
           {% endfor %}
         </div>
 
-        <div class="overview-grid">
+        <div class="overview-grid{% if item.landmarks|length <= 2 %} overview-grid-featured{% endif %}">
           {% for landmark in item.landmarks[:6] %}
             <figure class="overview-card">
-              <img src="{{ landmark.image }}" alt="">
+              {% set overview_src = asset_src(landmark.image, landmark.lineart_image) %}
+              {% if overview_src %}
+                <img src="{{ overview_src }}" alt="{{ landmark.name }}">
+              {% else %}
+                <div class="image-fallback" role="img" aria-label="Imagem de {{ landmark.name }} indisponível"></div>
+              {% endif %}
               <figcaption>{{ landmark.name }}</figcaption>
             </figure>
           {% endfor %}
         </div>
+
+        {% if item.destination.curiosities %}
+          <div class="curiosity-card">
+            <p class="curiosity-title">Curiosidades para pequenos exploradores</p>
+            <ul class="curiosity-list">
+              {% for curiosity in item.destination.curiosities %}
+                <li>{{ curiosity }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
         <div class="stamp">diario de viagem</div>
       </section>
 
@@ -153,7 +278,7 @@
           </div>
 
           <div class="airplane-activity">
-            <p class="page-kicker">atividade para o aviao</p>
+            <p class="page-kicker">atividade para o avião</p>
             {% for activity in language_activities %}
               <p>{{ activity.prompt }}</p>
               {% if activity.extension_prompt %}
@@ -169,7 +294,12 @@
         <section class="page landmark-page">
           <div class="phase-badge landmark-phase-badge">Durante a viagem</div>
           <div class="landmark-hero">
-            <img class="landmark-image" src="{{ landmark.image }}" alt="">
+            {% set landmark_src = asset_src(landmark.image, landmark.lineart_image) %}
+            {% if landmark_src %}
+              <img class="landmark-image" src="{{ landmark_src }}" alt="{{ landmark.name }}">
+            {% else %}
+              <div class="image-fallback landmark-image" role="img" aria-label="Imagem de {{ landmark.name }} indisponível"></div>
+            {% endif %}
             <div class="image-number">{{ loop.index }}</div>
           </div>
 
@@ -180,14 +310,14 @@
               <p>{{ paragraph }}</p>
             {% endfor %}
             <div class="observation-card">
-              <p class="observation-title">Caca ao detalhe</p>
+              <p class="observation-title">Caça ao detalhe</p>
               <p>{{ item.destination.phase_activities.during }}</p>
               <div class="answer-line"></div>
             </div>
           </div>
 
           <div class="visit-row">
-            <span>JA VISITEI</span>
+            <span>JÁ VISITEI</span>
             <span class="checkbox"></span>
           </div>
           <div class="stamp">diario de viagem</div>
@@ -203,15 +333,30 @@
 
           {% if activity.type == "coloring" and activity.lineart_image %}
             <div class="activity-coloring-frame">
-              <img class="lineart-image" src="{{ activity.lineart_image }}" alt="">
+              {% set activity_lineart_src = asset_src(activity.lineart_image) %}
+              {% if activity_lineart_src %}
+                <img class="lineart-image" src="{{ activity_lineart_src }}" alt="Desenho para colorir">
+              {% else %}
+                <div class="image-fallback lineart-image" role="img" aria-label="Desenho para colorir indisponível"></div>
+              {% endif %}
             </div>
           {% elif activity.type == "word_search" %}
-            <div class="word-search-box">
+            {% if activity.word_search_grid %}
+              <div class="word-search-grid">
+                {% for row in activity.word_search_grid %}
+                  <div class="word-search-row">
+                    {% for letter in row %}
+                      <span class="word-search-cell">{{ letter }}</span>
+                    {% endfor %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="word-search-box word-search-legend">
               {% for word in activity.words %}
                 <span>{{ word }}</span>
               {% endfor %}
             </div>
-            <div class="writing-lines compact-lines"></div>
           {% elif activity.type == "spot_the_difference" %}
             <div class="difference-grid">
               <div></div>
@@ -247,7 +392,7 @@
           <p class="page-kicker">{{ item.destination.city }}</p>
           <h2>Onde comer perto do roteiro</h2>
           <p class="restaurant-freshness-note">
-            Confira horarios, reservas e funcionamento antes de visitar.
+            Confira horários, reservas e funcionamento antes de visitar.
           </p>
           <div class="restaurant-list">
             {% for restaurant in restaurant_items %}
@@ -279,7 +424,7 @@
 
         <div class="memory-boxes">
           <article>
-            <h3>Minha lembranca favorita</h3>
+            <h3>Minha lembrança favorita</h3>
             <div class="writing-lines compact-lines"></div>
           </article>
           <article>
@@ -289,17 +434,30 @@
           </article>
         </div>
 
-        <div class="stamp">memorias</div>
+        <div class="stamp">memórias</div>
       </section>
 
-      <section class="page coloring-page">
-        <p class="page-kicker">{{ item.destination.city }}</p>
-        <h2>{{ item.destination.coloring_title }}</h2>
-        <p>{{ item.destination.coloring_subtitle }}</p>
-        <div class="coloring-frame">
-          <img class="lineart-image" src="{{ item.landmarks[0].lineart_image }}" alt="">
-        </div>
-      </section>
+      {% set coloring_activities = guide.activity_plan
+        | selectattr("destination_id", "equalto", item.destination.id)
+        | selectattr("type", "equalto", "coloring")
+        | list %}
+      {% if not coloring_activities %}
+        {# So imprime a pagina de colorir padrao quando o plano de atividades
+           ainda nao trouxe uma atividade de colorir para este destino. #}
+        <section class="page coloring-page">
+          <p class="page-kicker">{{ item.destination.city }}</p>
+          <h2>{{ item.destination.coloring_title }}</h2>
+          <p>{{ item.destination.coloring_subtitle }}</p>
+          <div class="coloring-frame">
+            {% set coloring_src = asset_src(item.landmarks[0].lineart_image, item.landmarks[0].image) %}
+            {% if coloring_src %}
+              <img class="lineart-image" src="{{ coloring_src }}" alt="Desenho de {{ item.landmarks[0].name }} para colorir">
+            {% else %}
+              <div class="image-fallback lineart-image" role="img" aria-label="Desenho para colorir indisponível"></div>
+            {% endif %}
+          </div>
+        </section>
+      {% endif %}
     {% endfor %}
 
     <section class="page closing-page phase-after">
@@ -307,9 +465,9 @@
       <div class="closing-card">
         <p class="page-kicker">recordacoes da aventura</p>
         <h2>Nossa Grande Aventura</h2>
-        <p>{{ guide.request.children_display }}, nossa viagem chegou ao fim, mas as memorias vao ficar para sempre.</p>
-        <p>Agora este livro guarda os lugares visitados, as palavras novas, os desenhos, as descobertas e as historias que voces viveram juntos.</p>
-        <p>Que este livro lembre voces de como e bom explorar o mundo, fazer perguntas e se encantar com as pequenas e grandes coisas da vida.</p>
+        <p>{{ guide.request.children_display }}, nossa viagem chegou ao fim, mas as memórias vão ficar para sempre.</p>
+        <p>Agora este livro guarda os lugares visitados, as palavras novas, os desenhos, as descobertas e as histórias que vocês viveram juntos.</p>
+        <p>Que este livro lembre vocês de como é bom explorar o mundo, fazer perguntas e se encantar com as pequenas e grandes coisas da vida.</p>
         <p class="signature">Com todo o amor,<br>{{ guide.request.parents_display }}</p>
       </div>
     </section>
@@ -320,25 +478,25 @@
       <h2>Checklist da aventura</h2>
       <ul class="activity-checklist final-checklist">
         <li><span class="checkbox"></span>Escolhemos nosso lugar favorito</li>
-        <li><span class="checkbox"></span>Desenhamos uma lembranca importante</li>
-        <li><span class="checkbox"></span>Contamos uma historia da viagem para alguem</li>
-        <li><span class="checkbox"></span>Guardamos uma pergunta para a proxima aventura</li>
+        <li><span class="checkbox"></span>Desenhamos uma lembrança importante</li>
+        <li><span class="checkbox"></span>Contamos uma história da viagem para alguém</li>
+        <li><span class="checkbox"></span>Guardamos uma pergunta para a próxima aventura</li>
       </ul>
       <div class="writing-lines compact-lines"></div>
     </section>
 
     {% if guide.image_credits %}
       <section class="page credits-page">
-        <p class="page-kicker">fontes publicas</p>
-        <h2>Creditos das imagens</h2>
-        <p>Algumas imagens dos pontos turisticos foram obtidas de fontes publicas e mantem seus creditos abaixo.</p>
+        <p class="page-kicker">fontes públicas</p>
+        <h2>Créditos das imagens</h2>
+        <p>Algumas imagens dos pontos turísticos foram obtidas de fontes públicas e mantêm seus créditos abaixo.</p>
         <ul>
           {% for credit in guide.image_credits %}
             <li>
               <strong>{{ credit.landmark_name }}</strong>
               <span>{{ credit.credit }}</span>
-              <span>Licenca: {{ credit.license_short_name }}</span>
-              <span>Fonte: {{ credit.source_url }}</span>
+              <span>Licença: {{ credit.license_short_name }}</span>
+              <span class="credit-source">Fonte: {{ credit.source_url }}</span>
             </li>
           {% endfor %}
         </ul>

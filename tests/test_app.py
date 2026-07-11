@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
 from minerva_travel.app import (
+    LINEART_CANVAS_SIZE,
     app,
     create_local_lineart_fallbacks,
     custom_destinations_from_form,
@@ -15,37 +16,28 @@ from minerva_travel.app import (
     generate_selected_landmark_art,
 )
 from minerva_travel.models import RestaurantRecommendation
+from minerva_travel.persistence import guide_repository
 from minerva_travel.wikimedia_assets import WikimediaAsset
 
+TEST_FAMILY_PHOTO = Path("assets/landmarks/paris/eiffel-tower.png").read_bytes()
 
-def test_home_page_lists_reference_landmarks():
+
+def test_home_redirects_to_the_single_frontend_application():
     client = TestClient(app)
 
-    response = client.get("/")
+    response = client.get("/", follow_redirects=False)
 
-    assert response.status_code == 200
-    assert "Torre Eiffel" in response.text
-    assert "Comer Pastel de Belem" in response.text
+    assert response.status_code == 307
+    assert response.headers["location"] == "http://127.0.0.1:3000"
 
 
-def test_generate_creates_download_link(tmp_path, monkeypatch):
-    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+def test_legacy_generate_endpoint_cannot_bypass_the_durable_api():
     client = TestClient(app)
 
-    response = client.post(
-        "/generate",
-        data={
-            "title": "Pequenos Exploradores pela Europa",
-            "children_names": "Alice, Antonio",
-            "parents_names": "Ana, Otavio",
-            "year": "2026",
-            "selected_landmarks": ["paris:eiffel-tower"],
-        },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
-    )
+    response = client.post("/generate")
 
-    assert response.status_code == 200
-    assert "/download/" in response.text
+    assert response.status_code == 410
+    assert response.json()["detail"]["code"] == "legacy_generation_removed"
 
 
 def test_api_catalog_returns_destinations_and_landmarks():
@@ -133,7 +125,7 @@ def test_landmarks_parse_allows_browser_preflight_from_frontend_origin():
         headers={
             "Origin": "https://minerva-travel.hostingerapp.com",
             "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "content-type",
+            "Access-Control-Request-Headers": "authorization,content-type",
         },
     )
 
@@ -142,6 +134,9 @@ def test_landmarks_parse_allows_browser_preflight_from_frontend_origin():
         "*",
         "https://minerva-travel.hostingerapp.com",
     }
+    allowed_headers = response.headers["access-control-allow-headers"].lower()
+    assert "authorization" in allowed_headers
+    assert "content-type" in allowed_headers
 
 
 def test_resolve_custom_landmarks_structures_freeform_list():
@@ -406,17 +401,55 @@ def test_api_generate_returns_download_url(tmp_path, monkeypatch):
             "parents_names": "Ana, Otavio",
             "year": "2026",
             "selected_landmarks": ["paris:eiffel-tower"],
+            "itinerary_json": json.dumps(
+                {
+                    "mode": "known",
+                    "pace": "light",
+                    "interests": ["história"],
+                    "destinations": [
+                        {
+                            "id": "paris",
+                            "place": "Paris, França",
+                            "timing": "Julho de 2026",
+                            "days": 1,
+                            "order": 1,
+                        }
+                    ],
+                    "days": [
+                        {
+                            "day": 1,
+                            "title": "Paris em família",
+                            "stops": [
+                                {
+                                    "selection_id": "paris:eiffel-tower",
+                                    "name": "Torre Eiffel",
+                                    "destination_id": "paris",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ),
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["download_url"].startswith("/download/")
     assert payload["request_id"]
+    persisted = guide_repository().get_for_owner(payload["request_id"], "development-user")
+    assert persisted is not None
+    assert persisted.metadata["itinerary"]["pace"] == "light"
+    assert persisted.metadata["itinerary"]["days"][0]["stops"][0]["selection_id"] == (
+        "paris:eiffel-tower"
+    )
 
 
-def test_api_generate_passes_expected_family_member_count_to_cover_generation(tmp_path, monkeypatch):
+def test_api_generate_uses_safe_photo_fallback_when_people_validation_is_unavailable(
+    tmp_path,
+    monkeypatch,
+):
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
     captured_counts = []
 
@@ -464,16 +497,21 @@ def test_api_generate_passes_expected_family_member_count_to_cover_generation(tm
             "expected_visible_family_member_count": "4",
             "selected_landmarks": ["paris:eiffel-tower"],
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert captured_counts == [4]
+    assert captured_counts == []
     assert payload["cover_status"]["expected_visible_family_member_count"] == 4
+    assert payload["cover_status"]["fallback_used"] is True
+    assert payload["cover_status"]["attempts"] == 0
 
 
-def test_api_generate_without_expected_family_member_count_keeps_existing_flow(tmp_path, monkeypatch):
+def test_api_generate_without_expected_family_member_count_keeps_existing_flow(
+    tmp_path,
+    monkeypatch,
+):
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
     captured_counts = []
 
@@ -520,7 +558,7 @@ def test_api_generate_without_expected_family_member_count_keeps_existing_flow(t
             "year": "2026",
             "selected_landmarks": ["paris:eiffel-tower"],
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
@@ -544,7 +582,7 @@ def test_api_generate_accepts_child_ages(tmp_path, monkeypatch):
             "year": "2026",
             "selected_landmarks": ["paris:eiffel-tower"],
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
@@ -573,7 +611,7 @@ def test_api_generate_omits_restaurant_discovery_without_extra(tmp_path, monkeyp
             "year": "2026",
             "selected_landmarks": ["paris:eiffel-tower"],
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
@@ -616,9 +654,7 @@ def test_api_generate_runs_restaurant_discovery_with_extra(tmp_path, monkeypatch
 
     def fake_restaurant_discovery(guide_destinations, *, api_key=None):
         captured_anchors.extend(
-            landmark.name
-            for item in guide_destinations
-            for landmark in item.landmarks
+            landmark.name for item in guide_destinations for landmark in item.landmarks
         )
         return [
             RestaurantRecommendation(
@@ -636,7 +672,10 @@ def test_api_generate_runs_restaurant_discovery_with_extra(tmp_path, monkeypatch
         return output_path
 
     monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
-    monkeypatch.setattr("minerva_travel.app.discover_restaurants_for_guide", fake_restaurant_discovery)
+    monkeypatch.setattr(
+        "minerva_travel.app.discover_restaurants_for_guide",
+        fake_restaurant_discovery,
+    )
     monkeypatch.setattr("minerva_travel.app.write_pdf", fake_write_pdf)
     client = TestClient(app)
 
@@ -650,7 +689,7 @@ def test_api_generate_runs_restaurant_discovery_with_extra(tmp_path, monkeypatch
             "selected_landmarks": ["paris:eiffel-tower"],
             "restaurant_recommendations_extra": "true",
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
@@ -675,7 +714,7 @@ def test_api_generate_accepts_custom_landmarks_without_catalog_selection(
             "year": "2026",
             "custom_landmarks": "Colosseum, Rome, Italy\nTrevi Fountain, Rome, Italy",
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
@@ -764,14 +803,14 @@ def test_api_generate_uses_custom_landmark_image_url_when_wikimedia_is_missing(
             "year": "2026",
             "custom_landmarks": custom_landmarks,
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
     assert captured_images == [downloaded_image]
 
 
-def test_api_generate_creates_ai_lineart_from_custom_landmark_image_by_default(
+def test_api_generate_creates_local_lineart_from_custom_landmark_image_by_default(
     tmp_path,
     monkeypatch,
 ):
@@ -854,22 +893,16 @@ def test_api_generate_creates_ai_lineart_from_custom_landmark_image_by_default(
             "year": "2026",
             "custom_landmarks": custom_landmarks,
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
-    assert generated_lineart == [
-        (
-            "Museu da Tecnologia de Speyer",
-            "Speyer",
-            "Alemanha",
-            downloaded_image,
-        )
-    ]
+    assert generated_lineart == []
     assert len(captured_lineart_images) == 1
     assert captured_lineart_images[0] != Path("assets/lineart/paris/eiffel-tower.png")
     assert captured_lineart_images[0].exists()
-    assert captured_lineart_images[0].read_bytes() == b"premium-lineart"
+    with Image.open(captured_lineart_images[0]) as lineart:
+        assert lineart.size == LINEART_CANVAS_SIZE
 
 
 def test_create_local_lineart_fallbacks_writes_named_placeholder_without_reference(
@@ -877,9 +910,7 @@ def test_create_local_lineart_fallbacks_writes_named_placeholder_without_referen
     monkeypatch,
 ):
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
-    destinations, selected = custom_destinations_from_form(
-        "Les Pavillons de Bercy, Paris, Franca"
-    )
+    destinations, selected = custom_destinations_from_form("Les Pavillons de Bercy, Paris, Franca")
 
     lineart_images = create_local_lineart_fallbacks(
         destinations,
@@ -975,11 +1006,10 @@ def test_api_generate_uses_confirmed_landmarks_for_cover_prompt(
             "parents_names": "Ana",
             "year": "2026",
             "custom_landmarks": (
-                "Cristo Redentor, Rio de Janeiro, Brasil\n"
-                "Usina do Gasometro, Porto Alegre, Brasil"
+                "Cristo Redentor, Rio de Janeiro, Brasil\nUsina do Gasometro, Porto Alegre, Brasil"
             ),
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
@@ -1036,7 +1066,7 @@ def test_api_generate_passes_trip_summary_image_to_pdf(
             "year": "2026",
             "custom_landmarks": "Cristo Redentor, Rio de Janeiro, Brasil",
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
@@ -1093,11 +1123,10 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
             "parents_names": "Ana",
             "year": "2026",
             "custom_landmarks": (
-                "Cristo Redentor, Rio de Janeiro, Brasil\n"
-                "Usina do Gasometro, Porto Alegre, Brasil"
+                "Cristo Redentor, Rio de Janeiro, Brasil\nUsina do Gasometro, Porto Alegre, Brasil"
             ),
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
@@ -1107,10 +1136,7 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
             ("Usina do Gasometro", "Porto Alegre", "Brasil"),
         ]
     )
-    assert sorted(
-        (name, city, country)
-        for name, city, country, _ in generated_lineart
-    ) == sorted(
+    assert sorted((name, city, country) for name, city, country, _ in generated_lineart) == sorted(
         [
             ("Cristo Redentor", "Rio de Janeiro", "Brasil"),
             ("Usina do Gasometro", "Porto Alegre", "Brasil"),
@@ -1121,8 +1147,7 @@ def test_api_generate_creates_images_for_confirmed_landmarks(
         "usina-do-gasometro.png",
     ]
     assert all(
-        "runtime/generated/landmarks" in reference.as_posix()
-        for *_, reference in generated_lineart
+        "runtime/generated/landmarks" in reference.as_posix() for *_, reference in generated_lineart
     )
 
 
@@ -1134,7 +1159,7 @@ def test_api_generate_uses_wikimedia_image_before_generating_landmark_art(
     generated_lineart = []
     wikimedia_path = tmp_path / "wikimedia" / "rio" / "cristo.jpg"
     wikimedia_path.parent.mkdir(parents=True)
-    wikimedia_path.write_bytes(b"wikimedia")
+    Image.new("RGB", (320, 220), "#4f86b7").save(wikimedia_path)
 
     class FakeGenerator:
         def generate_cover(self, family_photo, output_path, title, destination_names):
@@ -1194,17 +1219,15 @@ def test_api_generate_uses_wikimedia_image_before_generating_landmark_art(
             "year": "2026",
             "custom_landmarks": "Cristo Redentor, Rio de Janeiro, Brasil",
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
     assert generated_landmarks == []
-    assert generated_lineart == [
-        ("Cristo Redentor", "Rio de Janeiro", "Brasil", wikimedia_path)
-    ]
+    assert generated_lineart == []
 
 
-def test_api_generate_uses_supabase_landmark_asset_url_in_pdf(
+def test_api_generate_keeps_local_landmark_asset_in_pdf_after_supabase_sync(
     tmp_path,
     monkeypatch,
 ):
@@ -1255,10 +1278,7 @@ def test_api_generate_uses_supabase_landmark_asset_url_in_pdf(
         return {
             selection_id: asset.model_copy(
                 update={
-                    "public_url": (
-                        "https://project.supabase.co/storage/v1/object/public/"
-                        f"landmark-assets/{selection_id}.jpg"
-                    ),
+                    "public_url": None,
                     "storage_path": f"{selection_id}.jpg",
                 }
             )
@@ -1287,14 +1307,11 @@ def test_api_generate_uses_supabase_landmark_asset_url_in_pdf(
             "year": "2026",
             "custom_landmarks": "Cristo Redentor, Rio de Janeiro, Brasil",
         },
-        files={"family_photo": ("family.png", Path("README.md").read_bytes(), "image/png")},
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
     )
 
     assert response.status_code == 200
-    assert captured_images == [
-        "https://project.supabase.co/storage/v1/object/public/"
-        "landmark-assets/custom-rio-de-janeiro:cristo-redentor.jpg"
-    ]
+    assert captured_images == [wikimedia_path]
 
 
 def _count_black_pixels(path: Path) -> int:
@@ -1339,8 +1356,7 @@ def test_fetch_custom_wikimedia_assets_skips_landmarks_with_provided_image(monke
 
 def test_selected_landmark_art_generates_multiple_landmarks_concurrently(monkeypatch):
     destinations, selected = custom_destinations_from_form(
-        "Cristo Redentor, Rio de Janeiro, Brasil\n"
-        "Usina do Gasometro, Porto Alegre, Brasil"
+        "Cristo Redentor, Rio de Janeiro, Brasil\nUsina do Gasometro, Porto Alegre, Brasil"
     )
     active_image_generations = 0
     max_active_image_generations = 0

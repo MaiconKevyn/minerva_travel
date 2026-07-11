@@ -13,7 +13,7 @@ def test_catalog_loads_reference_itinerary():
         "Lisboa",
     ]
     assert catalog.find_landmark("paris", "eiffel-tower").name == "Torre Eiffel"
-    assert catalog.find_landmark("lisbon", "pastel-de-belem").name == "Comer Pastel de Belem"
+    assert catalog.find_landmark("lisbon", "pastel-de-belem").name == "Comer Pastel de Belém"
     assert "clock" in catalog.find_landmark("london", "big-ben").required_terms
 
 
@@ -36,18 +36,18 @@ def test_catalog_loads_language_tips_and_phase_activities():
     cambridge = catalog.find_destination("cambridge")
     lisbon = catalog.find_destination("lisbon")
 
-    assert paris.language_name == "frances"
+    assert paris.language_name == "francês"
     assert [tip.phrase for tip in paris.language_tips] == [
         "Bonjour",
         "Merci",
-        "S'il vous plait",
+        "S'il vous plaît",
     ]
     assert paris.phase_activities.before == (
-        "No aviao, encontre Paris no mapa e circule o lugar que voce esta mais "
+        "No avião, encontre Paris no mapa e circule o lugar que você está mais "
         "curioso para visitar."
     )
 
-    assert london.language_name == "ingles"
+    assert london.language_name == "inglês"
     assert [tip.phrase for tip in london.language_tips] == [
         "Hello",
         "Thank you",
@@ -55,18 +55,18 @@ def test_catalog_loads_language_tips_and_phase_activities():
         "Excuse me",
     ]
     assert london.phase_activities.during == (
-        "Procure uma placa, um onibus vermelho ou um relogio grande e desenhe o "
-        "detalhe que chamou sua atencao."
+        "Procure uma placa, um ônibus vermelho ou um relógio grande e desenhe o "
+        "detalhe que chamou sua atenção."
     )
 
-    assert cambridge.language_name == "ingles"
+    assert cambridge.language_name == "inglês"
     assert cambridge.phase_activities.after == (
-        "Escreva ou desenhe uma coisa que voce aprendeu em Cambridge."
+        "Escreva ou desenhe uma coisa que você aprendeu em Cambridge."
     )
 
-    assert lisbon.language_name == "portugues de Portugal"
+    assert lisbon.language_name == "português de Portugal"
     assert [tip.phrase for tip in lisbon.language_tips] == [
-        "Ola",
+        "Olá",
         "Bom dia",
         "Por favor",
         "Obrigado/obrigada",
@@ -87,7 +87,7 @@ def test_catalog_loads_recommendation_metadata_for_landmarks():
 
     assert eiffel.categories == ["icons", "views", "architecture"]
     assert eiffel.duration_minutes == 90
-    assert eiffel.family_tip == "Bom para abrir a viagem com um simbolo que as criancas reconhecem."
+    assert eiffel.family_tip == "Bom para abrir a viagem com um símbolo que as crianças reconhecem."
 
     assert "museums" in louvre.categories
     assert "art" in louvre.categories

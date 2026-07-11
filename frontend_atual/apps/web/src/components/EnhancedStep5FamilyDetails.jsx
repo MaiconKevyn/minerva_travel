@@ -2,14 +2,28 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Users, Baby, Calendar, Home, Plus, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { validGuideChildren } from '@/utils/guide-form.js';
+import {
+  createGuideItemId,
+  MAX_GUIDE_CHILDREN,
+  MAX_GUIDE_PARENTS,
+  validGuideChildren,
+} from '@/utils/guide-form.js';
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
+const generateId = () => createGuideItemId('family-member');
+const childInputId = (childId, field) => `child-${childId}-${field}`;
+const parentInputId = (parentId) => `parent-${parentId}-name`;
+
+const validationMessages = {
+  familyName: 'Adicione o nome da família.',
+  children: 'Adicione pelo menos uma criança com nome e idade.',
+  incompleteChildren: 'Informe nome e idade de cada criança adicionada.',
+  parents: 'Adicione pelo menos um responsável.',
+};
 
 const EnhancedStep5FamilyDetails = () => {
   const {
@@ -24,66 +38,86 @@ const EnhancedStep5FamilyDetails = () => {
     nextStep
   } = useConversationalGuide();
 
-  const { toast } = useToast();
   const [localFamilyName, setLocalFamilyName] = useState(familyName || '');
+  const [validationError, setValidationError] = useState('');
 
   // Initialize local state with context data or defaults
-  const [children, setChildren] = useState(
+  const [children, setChildren] = useState(() => (
     contextChildren.length > 0
-      ? contextChildren.map(child =>
+      ? contextChildren.slice(0, MAX_GUIDE_CHILDREN).map(child =>
           typeof child === 'string'
             ? { id: generateId(), name: child, age: '' }
             : { id: child.id || generateId(), name: child.name || '', age: child.age || '' }
         )
       : [{ id: generateId(), name: '', age: '' }]
-  );
+  ));
 
-  const [parents, setParents] = useState(
+  const [parents, setParents] = useState(() => (
     contextParents.length > 0
-      ? contextParents.map(name => ({ id: generateId(), name }))
+      ? contextParents
+        .slice(0, MAX_GUIDE_PARENTS)
+        .map(name => ({ id: generateId(), name }))
       : [{ id: generateId(), name: '' }]
-  );
+  ));
+
+  const clearValidationError = () => setValidationError('');
+
+  const showValidationError = (message, focusTargetId) => {
+    setValidationError(message);
+    document.getElementById(focusTargetId)?.focus();
+  };
 
   const handleAddChild = () => {
-    if (children.length < 10) {
-      setChildren([...children, { id: generateId(), name: '', age: '' }]);
+    if (children.length < MAX_GUIDE_CHILDREN) {
+      setChildren((current) => [
+        ...current,
+        { id: generateId(), name: '', age: '' },
+      ]);
+      clearValidationError();
     }
   };
 
   const handleRemoveChild = (id) => {
     if (children.length > 1) {
-      setChildren(children.filter(c => c.id !== id));
-      toast({
-        title: "Criança removida",
-        description: "A lista foi atualizada.",
+      setChildren((current) => current.filter(c => c.id !== id));
+      clearValidationError();
+      toast.success('Criança removida', {
+        description: 'A lista foi atualizada.',
         duration: 2000,
       });
     }
   };
 
   const handleChildChange = (id, field, value) => {
-    setChildren(children.map(c => c.id === id ? { ...c, [field]: value } : c));
+    setChildren((current) => (
+      current.map(c => c.id === id ? { ...c, [field]: value } : c)
+    ));
+    clearValidationError();
   };
 
   const handleAddParent = () => {
-    if (parents.length < 10) {
-      setParents([...parents, { id: generateId(), name: '' }]);
+    if (parents.length < MAX_GUIDE_PARENTS) {
+      setParents((current) => [...current, { id: generateId(), name: '' }]);
+      clearValidationError();
     }
   };
 
   const handleRemoveParent = (id) => {
     if (parents.length > 1) {
-      setParents(parents.filter(p => p.id !== id));
-      toast({
-        title: "Responsável removido",
-        description: "A lista foi atualizada.",
+      setParents((current) => current.filter(p => p.id !== id));
+      clearValidationError();
+      toast.success('Responsável removido', {
+        description: 'A lista foi atualizada.',
         duration: 2000,
       });
     }
   };
 
   const handleParentChange = (id, value) => {
-    setParents(parents.map(p => p.id === id ? { ...p, name: value } : p));
+    setParents((current) => (
+      current.map(p => p.id === id ? { ...p, name: value } : p)
+    ));
+    clearValidationError();
   };
 
   const handleSubmit = (e) => {
@@ -95,38 +129,34 @@ const EnhancedStep5FamilyDetails = () => {
     const validParents = parents.filter(p => p.name.trim() !== '');
 
     if (!normalizedFamilyName) {
-      toast({
-        variant: "destructive",
-        title: "Atenção",
-        description: "Adicione o nome da família.",
-      });
+      showValidationError(validationMessages.familyName, 'familyName');
       return;
     }
 
     if (validChildren.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Atenção",
-        description: "Adicione pelo menos uma criança com nome e idade.",
-      });
+      const firstIncompleteChild = touchedChildren[0] || children[0];
+      const firstIncompleteField = firstIncompleteChild.name.trim() ? 'age' : 'name';
+      showValidationError(
+        validationMessages.children,
+        childInputId(firstIncompleteChild.id, firstIncompleteField),
+      );
       return;
     }
 
     if (touchedChildren.length !== validChildren.length) {
-      toast({
-        variant: "destructive",
-        title: "Atenção",
-        description: "Informe nome e idade de cada criança adicionada.",
-      });
+      const incompleteChild = touchedChildren.find((child) => (
+        !child.name.trim() || !(Number.parseInt(child.age, 10) > 0)
+      ));
+      const incompleteField = incompleteChild?.name.trim() ? 'age' : 'name';
+      showValidationError(
+        validationMessages.incompleteChildren,
+        childInputId(incompleteChild?.id || children[0].id, incompleteField),
+      );
       return;
     }
 
     if (validParents.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Atenção",
-        description: "Adicione pelo menos um responsável.",
-      });
+      showValidationError(validationMessages.parents, parentInputId(parents[0].id));
       return;
     }
 
@@ -135,6 +165,7 @@ const EnhancedStep5FamilyDetails = () => {
     setChildrenList(validChildren);
     setParentsList(validParents.map(p => p.name.trim()));
 
+    clearValidationError();
     nextStep();
   };
 
@@ -161,10 +192,29 @@ const EnhancedStep5FamilyDetails = () => {
           <Input
             id="familyName"
             value={localFamilyName}
-            onChange={(e) => setLocalFamilyName(e.target.value)}
+            onChange={(e) => {
+              setLocalFamilyName(e.target.value);
+              clearValidationError();
+            }}
             placeholder="Ex: Silva, Oliveira, The Smiths..."
+            aria-invalid={validationError === validationMessages.familyName}
+            aria-describedby={
+              validationError === validationMessages.familyName
+                ? 'family-name-error'
+                : undefined
+            }
             className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-accent sm:text-lg"
           />
+          {validationError === validationMessages.familyName && (
+            <p
+              id="family-name-error"
+              role="alert"
+              aria-live="assertive"
+              className="mt-3 text-sm font-bold text-destructive"
+            >
+              {validationError}
+            </p>
+          )}
         </div>
 
         {/* Children Section */}
@@ -177,7 +227,7 @@ const EnhancedStep5FamilyDetails = () => {
               Crianças
             </Label>
             <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
-              {children.length} de 10
+              {children.length} de {MAX_GUIDE_CHILDREN}
             </span>
           </div>
 
@@ -193,12 +243,26 @@ const EnhancedStep5FamilyDetails = () => {
                   className="grid grid-cols-[1fr_110px_auto] items-center gap-3"
                 >
                   <Input
+                    id={childInputId(child.id, 'name')}
                     value={child.name}
                     onChange={(e) => handleChildChange(child.id, 'name', e.target.value)}
                     placeholder={`Nome da criança ${index + 1}`}
+                    aria-label={`Nome da criança ${index + 1}`}
+                    aria-invalid={Boolean(
+                      (validationError === validationMessages.children ||
+                        validationError === validationMessages.incompleteChildren) &&
+                      !child.name.trim()
+                    )}
+                    aria-describedby={
+                      validationError === validationMessages.children ||
+                      validationError === validationMessages.incompleteChildren
+                        ? 'children-error'
+                        : undefined
+                    }
                     className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-primary sm:text-lg"
                   />
                   <Input
+                    id={childInputId(child.id, 'age')}
                     type="number"
                     min="1"
                     max="17"
@@ -206,6 +270,17 @@ const EnhancedStep5FamilyDetails = () => {
                     onChange={(e) => handleChildChange(child.id, 'age', e.target.value)}
                     placeholder="Idade"
                     aria-label={`Idade da criança ${index + 1}`}
+                    aria-invalid={Boolean(
+                      (validationError === validationMessages.children ||
+                        validationError === validationMessages.incompleteChildren) &&
+                      !(Number.parseInt(child.age, 10) > 0)
+                    )}
+                    aria-describedby={
+                      validationError === validationMessages.children ||
+                      validationError === validationMessages.incompleteChildren
+                        ? 'children-error'
+                        : undefined
+                    }
                     className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-primary sm:text-lg"
                   />
                   {children.length > 1 && (
@@ -215,7 +290,7 @@ const EnhancedStep5FamilyDetails = () => {
                       size="icon"
                       onClick={() => handleRemoveChild(child.id)}
                       className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl h-12 w-12"
-                      aria-label="Remover criança"
+                      aria-label={`Remover criança ${index + 1}`}
                     >
                       <X className="w-5 h-5" />
                     </Button>
@@ -225,11 +300,23 @@ const EnhancedStep5FamilyDetails = () => {
             </AnimatePresence>
           </div>
 
+          {(validationError === validationMessages.children ||
+            validationError === validationMessages.incompleteChildren) && (
+            <p
+              id="children-error"
+              role="alert"
+              aria-live="assertive"
+              className="mt-3 text-sm font-bold text-destructive"
+            >
+              {validationError}
+            </p>
+          )}
+
           <Button
             type="button"
             variant="outline"
             onClick={handleAddChild}
-            disabled={children.length >= 10}
+            disabled={children.length >= MAX_GUIDE_CHILDREN}
             className="w-full mt-4 py-6 rounded-xl border-dashed border-2 hover:border-primary hover:bg-primary/5 text-muted-foreground hover:text-primary transition-colors"
           >
             <Plus className="w-5 h-5 mr-2" />
@@ -247,7 +334,7 @@ const EnhancedStep5FamilyDetails = () => {
               Responsáveis
             </Label>
             <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
-              {parents.length} de 10
+              {parents.length} de {MAX_GUIDE_PARENTS}
             </span>
           </div>
 
@@ -263,9 +350,19 @@ const EnhancedStep5FamilyDetails = () => {
                   className="flex items-center gap-3"
                 >
                   <Input
+                    id={parentInputId(parent.id)}
                     value={parent.name}
                     onChange={(e) => handleParentChange(parent.id, e.target.value)}
                     placeholder={`Nome do responsável ${index + 1}`}
+                    aria-label={`Nome do responsável ${index + 1}`}
+                    aria-invalid={Boolean(
+                      validationError === validationMessages.parents && !parent.name.trim()
+                    )}
+                    aria-describedby={
+                      validationError === validationMessages.parents
+                        ? 'parents-error'
+                        : undefined
+                    }
                     className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-secondary sm:text-lg"
                   />
                   {parents.length > 1 && (
@@ -275,7 +372,7 @@ const EnhancedStep5FamilyDetails = () => {
                       size="icon"
                       onClick={() => handleRemoveParent(parent.id)}
                       className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl h-12 w-12"
-                      aria-label="Remover responsável"
+                      aria-label={`Remover responsável ${index + 1}`}
                     >
                       <X className="w-5 h-5" />
                     </Button>
@@ -285,11 +382,22 @@ const EnhancedStep5FamilyDetails = () => {
             </AnimatePresence>
           </div>
 
+          {validationError === validationMessages.parents && (
+            <p
+              id="parents-error"
+              role="alert"
+              aria-live="assertive"
+              className="mt-3 text-sm font-bold text-destructive"
+            >
+              {validationError}
+            </p>
+          )}
+
           <Button
             type="button"
             variant="outline"
             onClick={handleAddParent}
-            disabled={parents.length >= 10}
+            disabled={parents.length >= MAX_GUIDE_PARENTS}
             className="w-full mt-4 py-6 rounded-xl border-dashed border-2 hover:border-secondary hover:bg-secondary/5 text-muted-foreground hover:text-secondary transition-colors"
           >
             <Plus className="w-5 h-5 mr-2" />

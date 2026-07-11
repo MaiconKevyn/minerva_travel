@@ -8,9 +8,9 @@ from minerva_travel.image_generation import (
     CoverValidationResult,
     PlaceholderImageGenerator,
     ReplicateImageGenerator,
-    generate_cover_with_guardrails,
     _write_replicate_output,
     cover_prompt,
+    generate_cover_with_guardrails,
     landmark_lineart_prompt,
     simplify_child_coloring_lineart,
     trip_summary_prompt,
@@ -157,6 +157,32 @@ def test_cover_guardrail_keeps_generated_cover_when_validation_passes(tmp_path):
     assert result.fallback_used is False
     assert result.validation.status == "passed"
     assert output.read_bytes() == b"generated-cover"
+
+
+def test_cover_guardrail_skips_paid_generation_when_validator_is_unavailable(tmp_path):
+    source = tmp_path / "family.png"
+    output = tmp_path / "cover.png"
+    Image.new("RGB", (640, 480), "#90c4df").save(source)
+
+    class GeneratorThatMustNotRun:
+        def generate_cover(self, *args, **kwargs):
+            raise AssertionError("generation should be skipped without a validator")
+
+    result = generate_cover_with_guardrails(
+        generator=GeneratorThatMustNotRun(),
+        family_photo=source,
+        output_path=output,
+        title="Família Silva",
+        destination_names=["Paris"],
+        expected_visible_family_member_count=4,
+        validator=None,
+    )
+
+    assert result.fallback_used is True
+    assert result.validation.status == "unavailable"
+    assert result.attempts == 0
+    with Image.open(output) as cover:
+        assert cover.convert("RGB").getpixel((600, 500)) == (144, 196, 223)
 
 
 def test_cover_guardrail_keeps_backward_compatible_generation_without_expected_count(tmp_path):
@@ -364,3 +390,24 @@ def _count_black_pixels(path):
     with Image.open(path) as image:
         grayscale = image.convert("L")
         return sum(1 for pixel in grayscale.getdata() if pixel < 128)
+
+
+def test_family_cover_fallback_preserves_sanitized_family_photo(tmp_path):
+    from minerva_travel.image_generation import write_family_cover_fallback
+
+    source = tmp_path / "family.png"
+    output = tmp_path / "cover.png"
+    Image.new("RGB", (640, 480), "#90c4df").save(source)
+
+    result = write_family_cover_fallback(
+        family_photo=source,
+        output_path=output,
+        title="Familia Moraes",
+        destination_names=["Torre Eiffel"],
+        expected_visible_family_member_count=3,
+    )
+
+    assert result == output
+    with Image.open(output) as cover:
+        assert cover.size == (1200, 1600)
+        assert cover.convert("RGB").getpixel((600, 500)) == (144, 196, 223)

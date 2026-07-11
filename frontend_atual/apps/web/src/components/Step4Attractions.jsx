@@ -91,7 +91,7 @@ const Step4Attractions = () => {
     const mapped = mapParsedLandmarksToParsedData(parsedLandmarks);
 
     if (mapped.landmarks.length === 0) {
-      throw new Error('Nao encontrei pontos turisticos claros no roteiro informado.');
+      throw new Error('Não encontrei pontos turísticos claros no roteiro informado.');
     }
 
     return mapped;
@@ -110,7 +110,7 @@ const Step4Attractions = () => {
       applyParsedResult(mapped, 'manual', null);
     } catch (err) {
       console.error('Error parsing manual landmarks:', err);
-      setError(err.message || 'Nao foi possivel organizar o roteiro informado.');
+      setError(err.message || 'Não foi possível organizar o roteiro informado.');
     } finally {
       setIsLoadingLandmarks(false);
     }
@@ -134,13 +134,13 @@ const Step4Attractions = () => {
       const mapped = mapParsedLandmarksToParsedData(data);
 
       if (mapped.landmarks.length === 0) {
-        throw new Error('Nao conseguimos organizar os pontos turisticos informados.');
+        throw new Error('Não conseguimos organizar os pontos turísticos informados.');
       }
 
       applyParsedResult(mapped, 'manual', null);
     } catch (err) {
       console.error('Error resolving structured landmarks:', err);
-      setError(err.message || 'Nao foi possivel organizar os pontos turisticos informados.');
+      setError(err.message || 'Não foi possível organizar os pontos turísticos informados.');
     } finally {
       setIsLoadingLandmarks(false);
     }
@@ -182,7 +182,7 @@ const Step4Attractions = () => {
       }
 
       console.error('Error fetching landmarks:', err);
-      setError(err.message || 'Nao foi possivel montar o roteiro.');
+      setError(err.message || 'Não foi possível montar o roteiro.');
     } finally {
       setIsLoadingLandmarks(false);
     }
@@ -253,11 +253,11 @@ const Step4Attractions = () => {
       setMapExploreNotice(
         newItemsCount > 0
           ? `${newItemsCount} ${newItemsCount === 1 ? 'novo ponto encontrado' : 'novos pontos encontrados'} para considerar.`
-          : 'Nao encontramos pontos novos agora. Tente ajustar as preferencias ou detalhar mais o destino.'
+          : 'Não encontramos pontos novos agora. Tente ajustar as preferências ou detalhar mais o destino.'
       );
     } catch (err) {
       console.error('Error exploring more map places:', err);
-      setMapExploreError(err.message || 'Nao foi possivel buscar mais pontos agora.');
+      setMapExploreError(err.message || 'Não foi possível buscar mais pontos agora.');
     } finally {
       setIsMapExploringMore(false);
     }
@@ -301,11 +301,11 @@ const Step4Attractions = () => {
       setMapLocationNotice(
         resolvedCount > 0
           ? `${resolvedCount} ${resolvedCount === 1 ? 'local confirmado foi localizado' : 'locais confirmados foram localizados'} no mapa.`
-          : 'Tentamos novamente, mas alguns locais ainda nao retornaram coordenadas.'
+          : 'Tentamos novamente, mas alguns locais ainda não retornaram coordenadas.'
       );
     } catch (err) {
       console.error('Error resolving confirmed map locations:', err);
-      setMapLocationError(err.message || 'Nao foi possivel validar os locais no mapa agora.');
+      setMapLocationError(err.message || 'Não foi possível validar os locais no mapa agora.');
     } finally {
       setIsResolvingMapLocations(false);
     }
@@ -491,10 +491,10 @@ const Step4Attractions = () => {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.2em] text-primary">
-                Locais citados por voce
+                Locais citados por você
               </p>
               <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
-                Pontos que ja estavam no seu roteiro
+                Pontos que já estavam no seu roteiro
               </h3>
             </div>
             <div className="rounded-full bg-muted px-4 py-2 text-sm font-bold text-muted-foreground w-fit">
@@ -522,7 +522,7 @@ const Step4Attractions = () => {
         <section className="pt-6 space-y-5 border-t border-border/60">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
-              Sugestoes para a familia
+              Sugestões para a família
             </p>
             <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
               Locais que podem combinar com a viagem
@@ -604,10 +604,10 @@ const Step4Attractions = () => {
               </h2>
               <p className="text-lg text-muted-foreground font-medium animate-pulse">
                 {loadingMode === 'manual'
-                  ? 'Separando os locais que voce ja informou.'
+                  ? 'Separando os locais que você já informou.'
                   : loadingMode === 'quick'
-                    ? 'Combinando pontos citados com sugestoes relacionadas.'
-                    : 'Selecionando paradas com ritmo de familia.'}
+                    ? 'Combinando pontos citados com sugestões relacionadas.'
+                    : 'Selecionando paradas com ritmo de família.'}
               </p>
             </div>
           </motion.div>
@@ -674,7 +674,7 @@ const Step4Attractions = () => {
             <div className="text-center space-y-3 mb-12">
               <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
                 {itineraryMode
-                  ? 'Roteiro sugerido para a sua familia'
+                  ? 'Roteiro sugerido para a sua família'
                   : manualMode
                     ? 'Seu roteiro informado'
                     : 'Locais encontrados para sua viagem'}
@@ -684,9 +684,9 @@ const Step4Attractions = () => {
                   ? recommendedItinerary.summary
                   : manualMode
                     ? knownItineraryMode
-                      ? 'Confira as fotos dos pontos que voce informou e veja o mapa da viagem. Desmarque o que nao entrar no guia.'
-                      : 'Organizamos os pontos que voce ja citou. Selecione os locais que farao parte do guia da sua familia.'
-                    : 'Inclui pontos que voce citou e sugestoes baseadas no seu texto. Selecione o que entra no guia.'}
+                      ? 'Confira as fotos dos pontos que você informou e veja o mapa da viagem. Desmarque o que não entrar no guia.'
+                      : 'Organizamos os pontos que você já citou. Selecione os locais que farão parte do guia da sua família.'
+                    : 'Inclui pontos que você citou e sugestões baseadas no seu texto. Selecione o que entra no guia.'}
               </p>
               {renderCategoryFilters()}
               <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
@@ -796,7 +796,7 @@ const Step4Attractions = () => {
           >
             <h2 className="text-3xl font-serif font-bold text-foreground mb-4">Nenhum ponto especifico encontrado</h2>
             <p className="text-lg text-muted-foreground font-medium mb-8 max-w-md mx-auto">
-              Nao conseguimos extrair monumentos exatos do seu texto. Deseja adicionar mais detalhes?
+              Não conseguimos extrair monumentos exatos do seu texto. Deseja adicionar mais detalhes?
             </p>
             <Button onClick={goBack} variant="outline" className="rounded-full px-8 py-6 text-lg">
               <ArrowLeft className="w-5 h-5 mr-2" /> Editar destino

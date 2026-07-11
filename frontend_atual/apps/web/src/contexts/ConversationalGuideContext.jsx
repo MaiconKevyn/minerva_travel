@@ -1,11 +1,25 @@
 
-import React, { createContext, useContext, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   createGuideDestination,
   normalizeFamilyMemberCount,
   normalizeGuideDestinations,
   serializeGuideDestinations,
 } from '@/utils/guide-form.js';
+import {
+  createGuideDraft,
+  discardGuideDraft,
+  getCurrentGuideDraft,
+  updateGuideDraft,
+} from '@/utils/minerva-api.js';
 
 const ConversationalGuideContext = createContext();
 
@@ -23,8 +37,12 @@ export const ConversationalGuideProvider = ({ children }) => {
   const [coverPhoto, setCoverPhoto] = useState(null);
   const [coverPhotoUrl, setCoverPhotoUrl] = useState('');
   const [expectedCoverFamilyMemberCount, setExpectedCoverFamilyMemberCount] = useState(0);
+  const [photoProcessingConsent, setPhotoProcessingConsent] = useState(false);
+  const [privacyConsentAt, setPrivacyConsentAt] = useState('');
   const [destination, setDestination] = useState('');
-  const [destinationsList, setDestinationsListState] = useState([createGuideDestination()]);
+  const [destinationsList, setDestinationsListState] = useState(
+    () => [createGuideDestination()]
+  );
   const [itineraryMode, setItineraryMode] = useState('known');
 
   // Family Details State
@@ -44,6 +62,179 @@ export const ConversationalGuideProvider = ({ children }) => {
   });
   const [isLoadingLandmarks, setIsLoadingLandmarks] = useState(false);
   const [hasSearchedLandmarks, setHasSearchedLandmarks] = useState(false);
+  const [draftId, setDraftId] = useState(null);
+  const [restoredDraftId, setRestoredDraftId] = useState(null);
+  const [restoredDestinationsList, setRestoredDestinationsList] = useState(null);
+  const [draftResetKey, setDraftResetKey] = useState(0);
+  const [draftRevision, setDraftRevision] = useState(null);
+  const [draftStatus, setDraftStatus] = useState('loading');
+  const [draftError, setDraftError] = useState('');
+  const [draftReady, setDraftReady] = useState(false);
+  const lastSavedDraftPayload = useRef('');
+  const saveInFlight = useRef(false);
+
+  const guideDraftPayload = useMemo(() => ({
+    current_step: currentStep,
+    family_name: familyName,
+    destination,
+    destinations_list: destinationsList,
+    itinerary_mode: itineraryMode,
+    children_list: childrenList,
+    parents_list: parentsList,
+    year,
+    parsed_data: parsedData,
+    selected_landmarks: selectedLandmarks,
+    recommended_itinerary: recommendedItinerary,
+    restaurant_recommendations_extra: restaurantRecommendationsExtra,
+    itinerary_preferences: itineraryPreferences,
+    has_searched_landmarks: hasSearchedLandmarks,
+  }), [
+    childrenList,
+    currentStep,
+    destination,
+    destinationsList,
+    familyName,
+    hasSearchedLandmarks,
+    itineraryMode,
+    itineraryPreferences,
+    parentsList,
+    parsedData,
+    recommendedItinerary,
+    restaurantRecommendationsExtra,
+    selectedLandmarks,
+    year,
+  ]);
+
+  const hasMeaningfulDraftContent = (payload) => Boolean(
+    payload.family_name ||
+    payload.destination ||
+    payload.children_list?.length ||
+    payload.parents_list?.length ||
+    payload.selected_landmarks?.length ||
+    payload.destinations_list?.some((item) => item.place || item.timing || item.landmarks?.some(Boolean))
+  );
+
+  useEffect(() => {
+    let active = true;
+    getCurrentGuideDraft()
+      .then((draft) => {
+        if (!active || !draft?.payload) return;
+        const payload = draft.payload;
+        setCurrentStep(Number(payload.current_step) || 1);
+        setFamilyName(String(payload.family_name || ''));
+        setDestination(String(payload.destination || ''));
+        const restoredDestinations = Array.isArray(payload.destinations_list) && payload.destinations_list.length
+          ? normalizeGuideDestinations(payload.destinations_list)
+          : [createGuideDestination()];
+        setDestinationsListState(restoredDestinations);
+        setRestoredDestinationsList(restoredDestinations);
+        setItineraryMode(['known', 'freeform', 'suggested'].includes(payload.itinerary_mode)
+          ? payload.itinerary_mode
+          : 'known');
+        setChildrenList(Array.isArray(payload.children_list) ? payload.children_list : []);
+        setParentsList(Array.isArray(payload.parents_list) ? payload.parents_list : []);
+        setYear(Number(payload.year) || 2026);
+        setParsedData(payload.parsed_data && typeof payload.parsed_data === 'object'
+          ? payload.parsed_data
+          : { destinations: [], landmarks: [] });
+        setSelectedLandmarks(Array.isArray(payload.selected_landmarks) ? payload.selected_landmarks : []);
+        setRecommendedItinerary(payload.recommended_itinerary || null);
+        setRestaurantRecommendationsExtra(Boolean(payload.restaurant_recommendations_extra));
+        setItineraryPreferences(payload.itinerary_preferences && typeof payload.itinerary_preferences === 'object'
+          ? payload.itinerary_preferences
+          : { days: 3, interests: [], pace: 'balanced' });
+        setHasSearchedLandmarks(Boolean(payload.has_searched_landmarks));
+        setDraftId(draft.id);
+        setRestoredDraftId(draft.id);
+        setDraftRevision(draft.revision);
+        lastSavedDraftPayload.current = JSON.stringify(payload);
+        setDraftStatus('saved');
+      })
+      .catch(() => {
+        if (active) {
+          setDraftStatus('error');
+          setDraftError('Não foi possível recuperar seu rascunho. Seus novos dados continuam neste dispositivo até serem salvos.');
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setDraftReady(true);
+          setDraftStatus((status) => (status === 'loading' ? 'idle' : status));
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!draftReady || saveInFlight.current || !hasMeaningfulDraftContent(guideDraftPayload)) {
+      return undefined;
+    }
+    const serialized = JSON.stringify(guideDraftPayload);
+    if (serialized === lastSavedDraftPayload.current) return undefined;
+
+    const timer = window.setTimeout(async () => {
+      saveInFlight.current = true;
+      setDraftStatus('saving');
+      setDraftError('');
+      try {
+        const saved = draftId && draftRevision
+          ? await updateGuideDraft(
+              draftId,
+              { title: 'Rascunho de guia', payload: guideDraftPayload, revision: draftRevision },
+            )
+          : await createGuideDraft({ title: 'Rascunho de guia', payload: guideDraftPayload });
+        lastSavedDraftPayload.current = serialized;
+        setDraftId(saved.id);
+        setDraftRevision(saved.revision);
+        setDraftStatus('saved');
+      } catch (error) {
+        setDraftStatus('error');
+        setDraftError(error.message || 'Não foi possível salvar o rascunho. Tente novamente.');
+      } finally {
+        saveInFlight.current = false;
+      }
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [draftId, draftReady, draftRevision, guideDraftPayload]);
+
+  const discardDraft = async () => {
+    try {
+      if (draftId) await discardGuideDraft(draftId);
+    } catch (error) {
+      setDraftStatus('error');
+      setDraftError(error.message || 'Não foi possível descartar o rascunho.');
+      return false;
+    }
+    setDraftId(null);
+    setRestoredDraftId(null);
+    setRestoredDestinationsList(null);
+    setDraftRevision(null);
+    setDraftStatus('idle');
+    setDraftError('');
+    lastSavedDraftPayload.current = '';
+    setCurrentStep(1);
+    setFamilyName('');
+    updateCoverPhoto(null);
+    setExpectedCoverFamilyMemberCount(0);
+    setPhotoProcessingConsent(false);
+    setPrivacyConsentAt('');
+    setDestination('');
+    setDestinationsListState([createGuideDestination()]);
+    setItineraryMode('known');
+    setChildrenList([]);
+    setParentsList([]);
+    setYear(2026);
+    setParsedData({ destinations: [], landmarks: [] });
+    setSelectedLandmarks([]);
+    setRecommendedItinerary(null);
+    setRestaurantRecommendationsExtra(false);
+    setItineraryPreferences({ days: 3, interests: [], pace: 'balanced' });
+    setHasSearchedLandmarks(false);
+    setDraftResetKey((value) => value + 1);
+    return true;
+  };
 
   const setStep = (step) => {
     setCurrentStep(step);
@@ -66,39 +257,40 @@ export const ConversationalGuideProvider = ({ children }) => {
 
   const updateCoverPhoto = (file) => {
     setCoverPhoto(file);
-    if (file) {
-      setCoverPhotoUrl(URL.createObjectURL(file));
-    } else {
-      setCoverPhotoUrl('');
-    }
+    setCoverPhotoUrl((previousUrl) => {
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
+      return file ? URL.createObjectURL(file) : '';
+    });
+  };
+
+  const updatePhotoProcessingConsent = (granted) => {
+    const accepted = Boolean(granted);
+    setPhotoProcessingConsent(accepted);
+    setPrivacyConsentAt(accepted ? new Date().toISOString() : '');
   };
 
   const updateExpectedCoverFamilyMemberCount = (count) => {
     setExpectedCoverFamilyMemberCount(normalizeFamilyMemberCount(count));
   };
 
-  const resetRouteData = (nextDestination = '') => {
+  const resetRouteData = useCallback((nextDestination = '') => {
     setDestination(nextDestination);
     setHasSearchedLandmarks(false);
     setParsedData({ destinations: [], landmarks: [] });
     setSelectedLandmarks([]);
     setRecommendedItinerary(null);
-  };
+  }, []);
 
-  const updateDestination = (dest) => {
+  const updateDestination = useCallback((dest) => {
     resetRouteData(dest);
-  };
+  }, [resetRouteData]);
 
-  const updateDestinationsList = (destinations) => {
+  const updateDestinationsList = useCallback((destinations) => {
     const normalized = normalizeGuideDestinations(destinations);
     const summary = serializeGuideDestinations(normalized);
     setDestinationsListState(normalized);
-    if (summary !== destination) {
-      resetRouteData(summary);
-    } else {
-      setDestination(summary);
-    }
-  };
+    resetRouteData(summary);
+  }, [resetRouteData]);
 
   const setParsedDataState = (data) => {
     setParsedData(data);
@@ -127,6 +319,9 @@ export const ConversationalGuideProvider = ({ children }) => {
         updateCoverPhoto,
         expectedCoverFamilyMemberCount,
         updateExpectedCoverFamilyMemberCount,
+        photoProcessingConsent,
+        privacyConsentAt,
+        updatePhotoProcessingConsent,
         destination,
         updateDestination,
         destinationsList,
@@ -157,7 +352,18 @@ export const ConversationalGuideProvider = ({ children }) => {
         isLoadingLandmarks,
         setIsLoadingLandmarks,
         hasSearchedLandmarks,
-        setHasSearchedLandmarks
+        setHasSearchedLandmarks,
+
+        // Drafts are saved server-side for the authenticated owner. Photo
+        // bytes and photo consent deliberately stay ephemeral and are asked
+        // again before generation.
+        draftId,
+        restoredDraftId,
+        restoredDestinationsList,
+        draftResetKey,
+        draftStatus,
+        draftError,
+        discardDraft,
       }}
     >
       {children}

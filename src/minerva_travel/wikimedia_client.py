@@ -2,6 +2,7 @@ import time
 import unicodedata
 from pathlib import Path
 from string import punctuation
+from typing import Any
 from urllib.parse import quote
 
 import httpx
@@ -220,7 +221,7 @@ def fetch_file_metadata(client: httpx.Client, title: str) -> dict[str, str] | No
     )
     response.raise_for_status()
     pages = response.json().get("query", {}).get("pages", {})
-    page = next(iter(pages.values()), {})
+    page: dict[str, Any] = next(iter(pages.values()), {})
     image_info = (page.get("imageinfo") or [{}])[0]
     image_url = image_info.get("thumburl") or image_info.get("url")
     if not image_url:
@@ -256,7 +257,7 @@ def download_file(client: httpx.Client, url: str, path: Path) -> None:
     path.write_bytes(response.content)
 
 
-def request_with_retry(client: httpx.Client, url: str, **kwargs: object) -> httpx.Response:
+def request_with_retry(client: httpx.Client, url: str, **kwargs: Any) -> httpx.Response:
     last_response: httpx.Response | None = None
     time.sleep(0.8)
     for attempt in range(6):

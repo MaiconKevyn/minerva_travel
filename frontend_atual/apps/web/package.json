@@ -8,8 +8,10 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
+    "check:bundle": "node tools/check-build-budget.mjs",
     "start": "vite preview --host 0.0.0.0 --port 3000",
     "test": "node --test src/**/*.test.js tools/**/*.test.js",
+    "test:e2e": "playwright test",
     "lint": "eslint . --quiet",
     "lint:warn": "eslint ."
   },
@@ -53,7 +55,6 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.469.0",
     "next-themes": "^0.4.6",
-    "pocketbase": "^0.27.0",
     "react": "^18.3.1",
     "react-day-picker": "^9.14.0",
     "react-dom": "^18.3.1",
@@ -69,10 +70,12 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "@babel/generator": "^7.26.3",
     "@babel/parser": "^7.26.3",
     "@babel/traverse": "^7.26.4",
     "@babel/types": "^7.26.3",
+    "@playwright/test": "^1.55.1",
     "@types/node": "^20.17.10",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
