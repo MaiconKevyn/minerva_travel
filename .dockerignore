@@ -22,7 +22,8 @@ runtime
 output
 docs
 tests
-scripts
+scripts/*
+!scripts/run_guide_worker.py
 openspec
 
 *.log

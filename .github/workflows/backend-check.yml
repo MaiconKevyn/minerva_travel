@@ -94,6 +94,7 @@ jobs:
             libpangoft2-1.0-0 \
             poppler-utils \
             qpdf \
+            ripgrep \
             shared-mime-info
 
       - name: Setup Python

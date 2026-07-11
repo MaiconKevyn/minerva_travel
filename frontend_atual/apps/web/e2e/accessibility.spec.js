@@ -26,6 +26,11 @@ for (const route of publicRoutes) {
 
 test('skip link is the first keyboard destination', async ({ page }) => {
   await page.goto('/');
+  await page.locator('body').evaluate((body) => {
+    body.tabIndex = -1;
+    body.focus();
+  });
+  await expect(page.locator('body')).toBeFocused();
   await page.keyboard.press('Tab');
 
   const skipLink = page.getByRole('link', { name: 'Pular para o conteúdo principal' });
