@@ -311,15 +311,29 @@ jobs:
 
       - name: Show container logs on failure
         if: ${{ failure() }}
-        run: docker logs minerva-travel-ci
+        run: |
+          if docker inspect minerva-travel-ci >/dev/null 2>&1; then
+            docker logs minerva-travel-ci
+          else
+            printf '%s\n' 'Container was not started; no runtime logs are available.'
+          fi
 
       - name: Capture sanitized container logs
         if: ${{ always() }}
-        run: docker logs minerva-travel-ci > runtime/ci/container-smoke.log 2>&1
+        run: |
+          mkdir --parents runtime/ci
+          if docker inspect minerva-travel-ci >/dev/null 2>&1; then
+            docker logs minerva-travel-ci > runtime/ci/container-smoke.log 2>&1
+          else
+            printf '%s\n' 'Container was not started.' > runtime/ci/container-smoke.log
+          fi
 
       - name: Stop container
         if: ${{ always() }}
-        run: docker rm --force minerva-travel-ci
+        run: |
+          if docker inspect minerva-travel-ci >/dev/null 2>&1; then
+            docker rm --force minerva-travel-ci
+          fi
 
       - name: Upload container smoke artifacts
         if: ${{ always() }}

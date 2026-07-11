@@ -55,6 +55,10 @@ RUN apt-get update \
     && useradd --uid "${APP_UID}" --gid "${APP_GID}" --create-home \
         --shell /usr/sbin/nologin app
 
+# Build tooling is unnecessary at runtime. Removing it also removes vendored
+# package metadata that would otherwise expose fixed HIGH vulnerabilities.
+RUN python -m pip uninstall --yes setuptools wheel
+
 WORKDIR /app
 
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
