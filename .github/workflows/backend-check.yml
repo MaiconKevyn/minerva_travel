@@ -305,13 +305,10 @@ jobs:
             "http://127.0.0.1:8000${download_url}" \
             --output runtime/ci/container-smoke.pdf
           test "$(head -c 4 runtime/ci/container-smoke.pdf)" = "%PDF"
-          docker cp runtime/ci/container-smoke.pdf \
-            minerva-travel-ci:/tmp/container-smoke.pdf
-          docker exec minerva-travel-ci \
-            pdfinfo /tmp/container-smoke.pdf | tee runtime/ci/container-smoke-pdfinfo.txt
+          pdfinfo runtime/ci/container-smoke.pdf | tee runtime/ci/container-smoke-pdfinfo.txt
           grep --fixed-strings "Page size:       595.276 x 841.89 pts (A4)" \
             runtime/ci/container-smoke-pdfinfo.txt
-          docker exec minerva-travel-ci qpdf --check /tmp/container-smoke.pdf
+          qpdf --check runtime/ci/container-smoke.pdf
 
       - name: Show container logs on failure
         if: ${{ failure() }}
