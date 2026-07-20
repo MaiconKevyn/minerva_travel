@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" role="img" aria-labelledby="title desc">
+  <title id="title">Exemplo da atividade Minha pintura</title>
+  <desc id="desc">Tela branca com moldura de viagem, uma paleta colorida e pincéis para a criança criar sua pintura.</desc>
+  <rect width="600" height="400" rx="32" fill="#fff4e8"/>
+  <rect x="104" y="70" width="392" height="258" rx="18" fill="#fff" stroke="#173f59" stroke-width="8"/>
+  <path d="M88 60h424M88 340h424" stroke="#ef7651" stroke-width="9" stroke-linecap="round"/>
+  <g transform="translate(38 198) scale(.72)">
+    <path d="M82 6c49 0 82 29 82 66 0 22-15 33-35 27-14-4-24 2-25 14-2 16-16 25-34 22-45-7-70-33-70-67C0 33 34 6 82 6Z" fill="#f7c65b" stroke="#173f59" stroke-width="6"/>
+    <circle cx="43" cy="56" r="11" fill="#ef7651"/>
+    <circle cx="76" cy="35" r="11" fill="#81b7ba"/>
+    <circle cx="111" cy="48" r="11" fill="#7657a8"/>
+    <circle cx="127" cy="77" r="11" fill="#4e9f65"/>
+  </g>
+  <g transform="translate(475 205) rotate(12)">
+    <rect x="0" y="0" width="16" height="126" rx="8" fill="#d59a54" stroke="#173f59" stroke-width="4"/>
+    <path d="M0 0 8-35 16 0Z" fill="#81b7ba" stroke="#173f59" stroke-width="4"/>
+    <rect x="27" y="18" width="16" height="108" rx="8" fill="#ef7651" stroke="#173f59" stroke-width="4"/>
+    <path d="M27 18 35-13 43 18Z" fill="#7657a8" stroke="#173f59" stroke-width="4"/>
+  </g>
+  <rect x="22" y="18" width="118" height="42" rx="21" fill="#173f59"/>
+  <text x="81" y="47" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="22" font-weight="700">EXEMPLO</text>
+  <text x="300" y="374" text-anchor="middle" fill="#173f59" font-family="Arial,sans-serif" font-size="27" font-weight="700">MINHA PINTURA DO LUGAR</text>
+</svg>
