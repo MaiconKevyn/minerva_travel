@@ -519,6 +519,26 @@ test('appendGuideLandmarks sends catalog ids and custom fallback separately', ()
   );
 });
 
+test('appendGuideLandmarks forwards place_id so the backend can reuse cached art', () => {
+  const formData = new FormData();
+
+  appendGuideLandmarks(formData, {
+    landmarks: [
+      {
+        id: 'custom-paris:torre-eiffel',
+        is_catalog_landmark: false,
+        name: 'Torre Eiffel',
+        city: 'Paris',
+        country: 'França',
+        place_id: 'ChIJLU7jZClu5kcR4PcOOO6p3I0',
+      },
+    ],
+  });
+
+  const payload = JSON.parse(formData.get('custom_landmarks'));
+  assert.equal(payload[0].place_id, 'ChIJLU7jZClu5kcR4PcOOO6p3I0');
+});
+
 test('selectGuideLandmarks preserves only selected attractions in guide order', () => {
   const landmarks = [
     { id: 'suggested-park', name: 'Parque sugerido' },

@@ -156,3 +156,14 @@ def test_preview_render_never_serializes_model_path_outside_approved_roots(tmp_p
     assert str(secret) not in html
     assert all(image.get("src") for image in parser.images)
     assert all(image["src"].startswith("data:image/") for image in parser.images)
+
+
+def test_default_pdf_asset_roots_include_shared_stylized_art_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    stylized = tmp_path / "landmark-art" / "stylized" / "v1" / "torre-eiffel-paris.png"
+    stylized.parent.mkdir(parents=True)
+    Image.new("RGB", (60, 40), "#4f86b7").save(stylized)
+
+    resolved = resolve_approved_asset_path(stylized)
+
+    assert resolved == stylized.resolve()

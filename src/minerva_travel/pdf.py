@@ -78,6 +78,9 @@ def default_pdf_asset_roots() -> tuple[Path, ...]:
         runtime_dir / "generated",
         runtime_dir / "custom-images",
         runtime_dir / "wikimedia",
+        # Cache global da arte estilizada dos pontos turisticos (por place_id);
+        # derivado de referencias ja aprovadas, compartilhado entre pedidos.
+        runtime_dir / "landmark-art",
         TEMPLATE_DIR,
     )
 

@@ -86,6 +86,23 @@ class SupabaseStorageClient:
         )
         response.raise_for_status()
 
+    def download_file(self, bucket: str, storage_path: str, local_path: Path) -> bool:
+        """Baixa um objeto do bucket privado para o disco. False quando nao existe."""
+        path = quote(storage_path, safe="/")
+        response = self._client.get(
+            f"{self.config.url}/storage/v1/object/{bucket}/{path}",
+            headers={
+                "Authorization": f"Bearer {self.config.service_role_key}",
+                "apikey": self.config.service_role_key,
+            },
+        )
+        if response.status_code == 404:
+            return False
+        response.raise_for_status()
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_bytes(response.content)
+        return True
+
 
 def sync_wikimedia_asset_to_storage(
     client: SupabaseStorageClient,
