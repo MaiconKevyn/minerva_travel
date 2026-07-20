@@ -98,6 +98,13 @@
   blank response space.
 - [x] 8.3 Review the final diff for secrets, user PDFs/uploads, paid-test artifacts, runtime files,
   and unrelated changes.
-- [ ] 8.4 Commit and push the implementation to `main`, build from pushed `main`, preserve Hostinger
+- [x] 8.4 Commit and push the implementation to `main`, build from pushed `main`, preserve Hostinger
   production configuration, and publish `hostinger-frontend`.
-- [ ] 8.5 Confirm both remote branch heads and record delivery completion in this change.
+- [x] 8.5 Confirm both remote branch heads and record delivery completion in this change.
+
+### Delivery record
+
+- `main` implementation: `6bb3c05` (`Implement landmark activity pages`).
+- `hostinger-frontend` static deployment: `731b24a` (`Deploy landmark activity pages`).
+- Remote branch heads were confirmed after both pushes on 2026-07-20.
+- Production `config.js` and `.htaccess` were preserved in both the root and `public_html` copy.
