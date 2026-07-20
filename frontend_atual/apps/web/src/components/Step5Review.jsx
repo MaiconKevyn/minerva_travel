@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Camera,
@@ -66,7 +66,31 @@ const Step5Review = () => {
   const [previewHtml, setPreviewHtml] = useState('');
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState('');
+  const [previewPageIndex, setPreviewPageIndex] = useState(0);
   const generationIdempotencyKey = useRef(null);
+
+  // Divide o HTML canônico do guia em páginas individuais para navegar
+  // uma a uma, como no PDF. Cada página vira um documento autocontido
+  // com o mesmo CSS, então o render continua idêntico ao arquivo final.
+  const previewPages = useMemo(() => {
+    if (!previewHtml) return [];
+    try {
+      const parsed = new DOMParser().parseFromString(previewHtml, 'text/html');
+      const css = [...parsed.querySelectorAll('style')]
+        .map((style) => style.textContent)
+        .join('\n');
+      const bodyClass = parsed.body?.className || '';
+      return [...parsed.querySelectorAll('.page')].map(
+        (page) =>
+          `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>${css}</style></head>` +
+          `<body class="${bodyClass}"><main class="guide-shell">${page.outerHTML}</main></body></html>`
+      );
+    } catch (error) {
+      console.error('Erro ao dividir a prévia em páginas:', error);
+      return [];
+    }
+  }, [previewHtml]);
+  const currentPreviewPage = Math.min(previewPageIndex, Math.max(previewPages.length - 1, 0));
 
   const loadGuidePreview = async (previewUrl) => {
     if (!previewUrl) return;
@@ -143,7 +167,7 @@ const Step5Review = () => {
         setCoverStatus(result.cover_status || null);
         setIsSuccess(true);
         loadGuidePreview(result.preview_url);
-        toast.success('Guia de viagem gerado com sucesso!');
+        toast.success('Guia ilustrado gerado com sucesso!');
         if (result.cover_status?.fallback_used) {
           toast.info('Usamos uma capa segura com a foto original para preservar todos na imagem.');
         }
@@ -160,7 +184,7 @@ const Step5Review = () => {
 
     } catch (error) {
       console.error(error);
-      toast.error('Não foi possível gerar o PDF.');
+      toast.error('Não foi possível gerar o guia.');
     } finally {
       setIsGenerating(false);
       setGenerationStatus('');
@@ -216,13 +240,51 @@ const Step5Review = () => {
 
         {/* Prévia página a página: o MESMO HTML que o WeasyPrint transforma em PDF. */}
         <div className="rounded-[2rem] border-2 border-border/70 bg-card p-3 text-left shadow-sm sm:p-4">
-          <div className="mb-3 flex items-center justify-between px-2">
+          <div className="mb-3 flex items-center justify-between gap-3 px-2">
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">
               Prévia do guia
             </p>
-            {isLoadingPreview && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+            {isLoadingPreview ? (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            ) : previewPages.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPreviewPage === 0}
+                  onClick={() => setPreviewPageIndex(Math.max(currentPreviewPage - 1, 0))}
+                  className="rounded-full px-4 font-bold"
+                >
+                  Anterior
+                </Button>
+                <span className="whitespace-nowrap text-sm font-bold text-muted-foreground">
+                  Página {currentPreviewPage + 1} de {previewPages.length}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPreviewPage >= previewPages.length - 1}
+                  onClick={() =>
+                    setPreviewPageIndex(Math.min(currentPreviewPage + 1, previewPages.length - 1))
+                  }
+                  className="rounded-full px-4 font-bold"
+                >
+                  Próxima
+                </Button>
+              </div>
+            ) : null}
           </div>
-          {previewHtml ? (
+          {previewPages.length > 0 ? (
+            <iframe
+              key={currentPreviewPage}
+              title={`Página ${currentPreviewPage + 1} do guia`}
+              sandbox=""
+              srcDoc={previewPages[currentPreviewPage]}
+              className="h-[75vh] w-full rounded-2xl border border-border/60 bg-white"
+            />
+          ) : previewHtml ? (
             <iframe
               title="Prévia do guia"
               sandbox=""
@@ -290,7 +352,7 @@ const Step5Review = () => {
         <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
           Perfeito! Aqui está o resumo do seu roteiro
         </h2>
-        <p className="text-lg text-muted-foreground font-medium">Revise as informações antes de gerarmos o PDF oficial.</p>
+        <p className="text-lg text-muted-foreground font-medium">Revise as informações antes de gerarmos o guia ilustrado da família.</p>
       </div>
 
       <div className="rounded-[2rem] border-2 border-border/50 bg-card p-5 shadow-storybook dark:border-slate-700 dark:bg-slate-800 sm:p-8 md:rounded-[40px] md:p-12">
@@ -469,7 +531,7 @@ const Step5Review = () => {
           {isGenerating ? (
             <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Criando a Magia...</>
           ) : (
-            <><Sparkles className="w-6 h-6 mr-3 inline-block" /> Gerar PDF do Guia</>
+            <><Sparkles className="w-6 h-6 mr-3 inline-block" /> Gerar guia da família</>
           )}
         </Button>
       </div>
