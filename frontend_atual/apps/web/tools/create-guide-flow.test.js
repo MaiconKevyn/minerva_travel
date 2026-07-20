@@ -83,7 +83,7 @@ test('cover photo step comes after route confirmation and stays before review', 
   assert.match(photoStep, /Quantas pessoas aparecem/);
   assert.match(context, /expectedCoverFamilyMemberCount/);
   assert.match(review, /expectedVisibleFamilyMemberCount/);
-  assert.match(review, /cover_status/);
+  assert.match(review, /createGuideBuilder/);
 });
 
 test('preferences are a fixed step before attractions', () => {
@@ -129,25 +129,34 @@ test('review step offers restaurant recommendations under the explicit pilot con
   assert.match(review, /restaurantRecommendationsExtra/);
 });
 
-test('success screen shows the canonical guide preview before the download', () => {
-  const api = readProjectFile('src/utils/minerva-api.js');
+test('review starts a page session without triggering legacy PDF generation', () => {
   const review = readProjectFile('src/components/Step5Review.jsx');
 
-  assert.match(api, /fetchGuidePreviewHtml/);
-  assert.match(api, /safeGuidePreviewUrl/);
-  assert.match(review, /fetchGuidePreviewHtml/);
-  assert.match(review, /loadGuidePreview\(result\.preview_url\)/);
-  assert.match(review, /sandbox=""/);
-  assert.match(review, /Prévia do guia/);
+  assert.match(review, /Começar pelas páginas/);
+  assert.match(review, /Nenhuma imagem será gerada sem sua confirmação/);
+  assert.match(review, /createGuideBuilder/);
+  assert.match(review, /<GuideAssembly session=\{builderSession\}/);
+  assert.doesNotMatch(review, /generatePDF|downloadGuidePdf|fetchGuidePreviewHtml|legacyGenerate/);
 });
 
-test('generation is guide-first with a page-by-page preview pager', () => {
+test('progressive assembly generates, versions, approves and completes page images', () => {
+  const api = readProjectFile('src/utils/minerva-api.js');
   const review = readProjectFile('src/components/Step5Review.jsx');
+  const assembly = readProjectFile('src/components/GuideAssembly.jsx');
 
-  assert.match(review, /Gerar guia da família/);
-  assert.doesNotMatch(review, /Gerar PDF do Guia/);
-  assert.match(review, /previewPages/);
-  assert.match(review, /Página \{currentPreviewPage \+ 1\} de \{previewPages\.length\}/);
-  assert.match(review, /Anterior/);
-  assert.match(review, /Próxima/);
+  assert.match(api, /createGuideBuilder/);
+  assert.match(api, /generateBuilderPageAttempt/);
+  assert.match(api, /selectBuilderPageAttempt/);
+  assert.match(api, /approveBuilderPage/);
+  assert.match(api, /completeGuideBuilder/);
+  assert.match(api, /fetchBuilderAssetObjectUrl/);
+  assert.match(api, /Idempotency-Key/);
+  assert.match(review, /GuideAssembly/);
+  assert.doesNotMatch(review, /legacyGenerate/);
+  assert.match(assembly, /Gerar página/);
+  assert.match(assembly, /Gerar outra versão/);
+  assert.match(assembly, /Aprovar e continuar/);
+  assert.match(assembly, /Concluir revisão das imagens/);
+  assert.match(assembly, /Nenhum PDF foi gerado/);
+  assert.match(assembly, /required_copy/);
 });

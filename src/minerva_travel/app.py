@@ -40,6 +40,25 @@ from minerva_travel.asset_policy import (
     asset_provenance_required,
 )
 from minerva_travel.auth import CurrentUser
+from minerva_travel.builder import (
+    BuilderAttemptInProgress,
+    BuilderAttemptLimitReached,
+    BuilderAttemptNotFound,
+    BuilderIncomplete,
+    BuilderPage,
+    BuilderPageOutOfOrder,
+    BuilderSessionNotFound,
+    approve_page_attempt,
+    builder_asset_dir,
+    builder_session_lock,
+    commit_page_attempt,
+    create_builder_session,
+    delete_builder_sessions_for_owner,
+    load_builder_session,
+    reserve_page_attempt,
+    rollback_page_attempt,
+    select_page_attempt,
+)
 from minerva_travel.catalog import load_catalog
 from minerva_travel.config import (
     app_environment,
@@ -105,6 +124,11 @@ from minerva_travel.models import (
     StrictRequestModel,
 )
 from minerva_travel.observability import emit_event
+from minerva_travel.page_generation import (
+    PageGenerationConfigurationError,
+    PageGenerationError,
+    get_guide_page_generator,
+)
 from minerva_travel.pdf import render_guide_html, write_pdf
 from minerva_travel.persistence import (
     GuideJobRecord,
@@ -362,6 +386,60 @@ class GuideGenerationCompletedResponse(BaseModel):
     preview_url: str | None = None
     filename: str
     cover_status: CoverStatusResponse
+
+
+class BuilderAttemptResponse(BaseModel):
+    id: str
+    asset_url: str
+    created_at: str
+
+
+class BuilderPageResponse(BaseModel):
+    id: str
+    kind: str
+    title: str
+    position: int
+    status: Literal["ready", "generating", "awaiting_approval", "approved", "error"]
+    required_copy: list[str]
+    attempts: list[BuilderAttemptResponse]
+    selected_attempt_id: str | None = None
+    attempts_left: int
+    approved_at: str | None = None
+    error: str | None = None
+
+
+class BuilderSessionResponse(BaseModel):
+    session_id: str
+    created_at: str
+    expires_at: str
+    title: str
+    active_page_id: str | None = None
+    is_complete: bool
+    pages: list[BuilderPageResponse]
+
+
+class BuilderAttemptSelectionRequest(StrictRequestModel):
+    attempt_id: str = Field(min_length=1, max_length=120)
+
+
+class BuilderPageApprovalRequest(StrictRequestModel):
+    attempt_id: str | None = Field(default=None, max_length=120)
+
+
+class BuilderApprovedPageResponse(BaseModel):
+    page_id: str
+    kind: str
+    title: str
+    position: int
+    attempt_id: str
+    asset_url: str
+    approved_at: str
+    required_copy: list[str]
+
+
+class BuilderCompletionResponse(BaseModel):
+    session_id: str
+    pages: list[BuilderApprovedPageResponse]
 
 
 class GuideGenerationQueuedResponse(BaseModel):
@@ -1659,12 +1737,13 @@ def export_account_data(current_user: CurrentUser) -> JSONResponse:
 
 @app.delete("/api/account/data", response_model=AccountDeletionResponse)
 def delete_account_data(current_user: CurrentUser) -> JSONResponse:
+    builder_files_deleted = delete_builder_sessions_for_owner(current_user.id)
     result = purge_all_data_for_owner(guide_repository(), current_user.id)
     return JSONResponse(
         content={
             "deleted": True,
             "guides_deleted": result.guides_deleted,
-            "private_files_deleted": result.private_files_deleted,
+            "private_files_deleted": result.private_files_deleted + builder_files_deleted,
         },
         headers={
             "Cache-Control": "private, no-store, max-age=0",
@@ -1712,6 +1791,371 @@ def guide_preview(guide_id: str, current_user: CurrentUser) -> FileResponse:
             "Content-Security-Policy": (
                 "default-src 'none'; img-src data:; style-src 'unsafe-inline'"
             ),
+        },
+    )
+
+
+def _builder_session_or_404(session_id: str, current_user):
+    try:
+        return load_builder_session(session_id, current_user.id)
+    except BuilderSessionNotFound as error:
+        raise HTTPException(status_code=404, detail="Builder session not found") from error
+
+
+def _builder_catalog_and_selected_from_form(form: dict[str, Any]):
+    catalog = load_catalog()
+    custom_destinations, custom_selected = custom_destinations_from_form(
+        form.get("custom_landmarks")
+    )
+    selected = [*form.get("selected_landmarks", []), *custom_selected]
+    if custom_destinations:
+        catalog = catalog.model_copy(
+            update={
+                "destinations": merge_custom_destinations(catalog.destinations, custom_destinations)
+            }
+        )
+    return catalog, custom_destinations, selected
+
+
+def _builder_trip_date(form: dict[str, Any]) -> str:
+    raw_itinerary = form.get("itinerary_json")
+    if isinstance(raw_itinerary, str) and raw_itinerary.strip():
+        try:
+            payload = json.loads(raw_itinerary)
+            timings = [
+                str(item.get("timing", "")).strip()
+                for item in payload.get("destinations", [])
+                if isinstance(item, dict) and str(item.get("timing", "")).strip()
+            ]
+            unique_timings = list(dict.fromkeys(timings))
+            if len(unique_timings) == 1:
+                return unique_timings[0]
+        except (AttributeError, json.JSONDecodeError, TypeError):
+            pass
+    return str(form.get("year") or "")
+
+
+def _selected_builder_landmarks(destinations: list[Destination], selected: list[str]) -> list[dict]:
+    landmark_by_selection_id: dict[str, dict] = {}
+    for destination in destinations:
+        for landmark in destination.landmarks:
+            selection_id = f"{destination.id}:{landmark.id}"
+            landmark_by_selection_id[selection_id] = {
+                "selection_id": selection_id,
+                "name": landmark.name,
+                "city": destination.city,
+                "country": destination.country,
+            }
+    ordered: list[dict] = []
+    seen: set[str] = set()
+    for selected_id in selected:
+        if selected_id in seen or selected_id not in landmark_by_selection_id:
+            continue
+        ordered.append(landmark_by_selection_id[selected_id])
+        seen.add(selected_id)
+    return ordered
+
+
+def _builder_page_plan(form: dict[str, Any], destinations: list[Destination], selected: list[str]):
+    family_title = str(form.get("title") or "Guia da família")
+    trip_date = _builder_trip_date(form)
+    landmarks = _selected_builder_landmarks(destinations, selected)
+    names = [item["name"] for item in landmarks]
+    pages = [
+        BuilderPage(
+            id="cover",
+            kind="cover",
+            title="Capa da família",
+            position=1,
+            required_copy=[family_title, trip_date],
+            metadata={"trip_date": trip_date, "landmark_names": names},
+        ),
+        BuilderPage(
+            id="summary",
+            kind="trip_summary",
+            title="Resumo ilustrado do roteiro",
+            position=2,
+            required_copy=["Nosso roteiro", family_title, trip_date, *names],
+            metadata={"trip_date": trip_date, "landmark_names": names},
+        ),
+    ]
+    for index, landmark in enumerate(landmarks, start=3):
+        location = ", ".join(part for part in (landmark["city"], landmark["country"]) if part)
+        pages.append(
+            BuilderPage(
+                id=f"landmark-{index - 2}",
+                kind="landmark",
+                title=landmark["name"],
+                position=index,
+                required_copy=[landmark["name"], location, f"{family_title} • {trip_date}"],
+                metadata={**landmark, "trip_date": trip_date},
+            )
+        )
+    return pages
+
+
+@app.post("/api/guide-builder", response_model=BuilderSessionResponse, status_code=201)
+async def create_guide_builder(
+    form: Annotated[GuideGenerationFormRequest, Depends(parse_guide_generation_form)],
+    family_photo: Annotated[UploadFile, File()],
+    current_user: CurrentUser,
+) -> BuilderSessionResponse:
+    try:
+        privacy_consent = validate_photo_processing_consent(
+            granted=form.photo_processing_consent,
+            version=form.privacy_consent_version,
+            granted_at=form.privacy_consent_at,
+        )
+    except PrivacyConsentError as error:
+        raise HTTPException(status_code=422, detail=error.as_detail()) from error
+
+    form_payload = form.model_dump(mode="json")
+    catalog, _custom, selected = _builder_catalog_and_selected_from_form(form_payload)
+    if not selected:
+        raise HTTPException(
+            status_code=400,
+            detail="Selecione ou informe pelo menos um ponto turistico.",
+        )
+    pages = _builder_page_plan(form_payload, catalog.destinations, selected)
+    photo_path = await storage.save_upload(family_photo)
+    session = create_builder_session(
+        owner_id=current_user.id,
+        form=form_payload,
+        photo_path=photo_path,
+        pages=pages,
+        privacy_consent=privacy_consent.metadata() if privacy_consent else None,
+    )
+    return BuilderSessionResponse.model_validate(session.public_payload())
+
+
+@app.get("/api/guide-builder/{session_id}", response_model=BuilderSessionResponse)
+def get_guide_builder(session_id: str, current_user: CurrentUser) -> BuilderSessionResponse:
+    session = _builder_session_or_404(session_id, current_user)
+    return BuilderSessionResponse.model_validate(session.public_payload())
+
+
+@app.post(
+    "/api/guide-builder/{session_id}/pages/{page_id}/attempts",
+    response_model=BuilderSessionResponse,
+)
+def generate_builder_page_attempt(
+    session_id: str,
+    page_id: str,
+    request: Request,
+    response: Response,
+    current_user: CurrentUser,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> BuilderSessionResponse:
+    key = (idempotency_key or "").strip()
+    if not key:
+        raise IdempotencyKeyRequiredError()
+    if len(key) > 200:
+        raise HTTPException(status_code=422, detail="Idempotency-Key inválida.")
+
+    lease: ConcurrencyLease | None = None
+    output: Path | None = None
+    attempt_id = ""
+    try:
+        lease = admit_expensive_request(
+            request=request,
+            user_id=current_user.id,
+            scope="guide_page_generate",
+            provider="openai",
+            default_user_limit=4,
+            default_ip_limit=12,
+            default_window_seconds=10 * 60,
+            default_user_concurrency=1,
+            default_user_quota=24,
+        )
+        with builder_session_lock(session_id):
+            session = _builder_session_or_404(session_id, current_user)
+            attempt_id, replayed = reserve_page_attempt(session, page_id, key)
+            if replayed:
+                response.headers["Idempotency-Replayed"] = "true"
+                return BuilderSessionResponse.model_validate(session.public_payload())
+            page = session.page(page_id)
+            if page is None:
+                raise BuilderPageOutOfOrder(page_id)
+            page_kind = page.kind
+            metadata = dict(page.metadata)
+            family_title = str(session.form.get("title") or "Guia da família")
+            photo_path = Path(session.photo_filename)
+            expected_people = session.form.get("expected_visible_family_member_count")
+
+        output = builder_asset_dir(session_id) / f"{attempt_id}.png"
+        generator = get_guide_page_generator()
+        if page_kind == "cover":
+            if not photo_path.is_file():
+                raise PageGenerationError("A foto da família não está mais disponível.")
+            generator.generate_cover_page(
+                family_photo=photo_path,
+                output_path=output,
+                family_title=family_title,
+                trip_date=str(metadata["trip_date"]),
+                landmark_names=list(metadata["landmark_names"]),
+                expected_visible_family_member_count=expected_people,
+            )
+        elif page_kind == "trip_summary":
+            generator.generate_summary_page(
+                output_path=output,
+                family_title=family_title,
+                trip_date=str(metadata["trip_date"]),
+                landmark_names=list(metadata["landmark_names"]),
+            )
+        elif page_kind == "landmark":
+            generator.generate_landmark_page(
+                output_path=output,
+                family_title=family_title,
+                trip_date=str(metadata["trip_date"]),
+                landmark_name=str(metadata["name"]),
+                city=str(metadata["city"]),
+                country=str(metadata["country"]),
+            )
+        else:
+            raise PageGenerationError("Tipo de página ainda não suportado.")
+
+        with builder_session_lock(session_id):
+            session = _builder_session_or_404(session_id, current_user)
+            commit_page_attempt(session, page_id, attempt_id, output.name)
+            response.headers["Idempotency-Replayed"] = "false"
+            emit_event(
+                "guide_page_generated",
+                request_id=getattr(request.state, "request_id", None),
+                user_id=current_user.id,
+                stage=page_kind,
+                outcome="succeeded",
+            )
+            return BuilderSessionResponse.model_validate(session.public_payload())
+    except BuilderAttemptLimitReached as error:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "page_attempt_limit_reached", "message": "Limite de versões atingido."},
+        ) from error
+    except BuilderAttemptInProgress as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "page_generation_in_progress",
+                "message": "Esta página já está sendo gerada.",
+            },
+        ) from error
+    except BuilderPageOutOfOrder as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "page_out_of_order",
+                "message": "Aprove a página atual antes de continuar.",
+            },
+        ) from error
+    except (PageGenerationConfigurationError, PageGenerationError) as error:
+        if attempt_id:
+            with builder_session_lock(session_id):
+                session = _builder_session_or_404(session_id, current_user)
+                rollback_page_attempt(session, page_id, attempt_id, str(error))
+        if output is not None:
+            output.unlink(missing_ok=True)
+        status_code = 503 if isinstance(error, PageGenerationConfigurationError) else 502
+        code = "page_provider_unavailable" if status_code == 503 else "page_generation_failed"
+        raise HTTPException(
+            status_code=status_code,
+            detail={"code": code, "message": str(error)},
+        ) from error
+    except BaseException:
+        if attempt_id:
+            with builder_session_lock(session_id):
+                try:
+                    session = _builder_session_or_404(session_id, current_user)
+                    rollback_page_attempt(
+                        session, page_id, attempt_id, "Não foi possível gerar esta página."
+                    )
+                except HTTPException:
+                    pass
+        if output is not None:
+            output.unlink(missing_ok=True)
+        raise
+    finally:
+        if lease is not None:
+            lease.release()
+
+
+@app.patch(
+    "/api/guide-builder/{session_id}/pages/{page_id}/selection",
+    response_model=BuilderSessionResponse,
+)
+def select_builder_page_attempt(
+    session_id: str,
+    page_id: str,
+    payload: BuilderAttemptSelectionRequest,
+    current_user: CurrentUser,
+) -> BuilderSessionResponse:
+    try:
+        with builder_session_lock(session_id):
+            session = _builder_session_or_404(session_id, current_user)
+            select_page_attempt(session, page_id, payload.attempt_id)
+            return BuilderSessionResponse.model_validate(session.public_payload())
+    except BuilderAttemptNotFound as error:
+        raise HTTPException(status_code=422, detail="Versão de página desconhecida.") from error
+    except BuilderPageOutOfOrder as error:
+        raise HTTPException(status_code=409, detail="Esta página já foi aprovada.") from error
+
+
+@app.post(
+    "/api/guide-builder/{session_id}/pages/{page_id}/approve",
+    response_model=BuilderSessionResponse,
+)
+def approve_builder_page(
+    session_id: str,
+    page_id: str,
+    payload: BuilderPageApprovalRequest,
+    current_user: CurrentUser,
+) -> BuilderSessionResponse:
+    try:
+        with builder_session_lock(session_id):
+            session = _builder_session_or_404(session_id, current_user)
+            approve_page_attempt(session, page_id, payload.attempt_id)
+            return BuilderSessionResponse.model_validate(session.public_payload())
+    except BuilderAttemptNotFound as error:
+        raise HTTPException(
+            status_code=422,
+            detail="Gere e escolha uma versão antes de aprovar.",
+        ) from error
+    except BuilderPageOutOfOrder as error:
+        raise HTTPException(
+            status_code=409,
+            detail="Aprove as páginas na ordem do guia.",
+        ) from error
+
+
+@app.post(
+    "/api/guide-builder/{session_id}/complete",
+    response_model=BuilderCompletionResponse,
+)
+def complete_guide_builder(session_id: str, current_user: CurrentUser) -> BuilderCompletionResponse:
+    session = _builder_session_or_404(session_id, current_user)
+    try:
+        pages = session.approved_manifest()
+    except BuilderIncomplete as error:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "builder_incomplete", "message": "Aprove todas as páginas primeiro."},
+        ) from error
+    return BuilderCompletionResponse.model_validate({"session_id": session.id, "pages": pages})
+
+
+@app.get("/guide-builder/{session_id}/assets/{filename}", include_in_schema=False)
+def builder_asset(session_id: str, filename: str, current_user: CurrentUser) -> FileResponse:
+    session = _builder_session_or_404(session_id, current_user)
+    if filename not in session.allowed_asset_filenames():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    path = builder_asset_dir(session.id) / filename
+    if path.name != filename or not path.is_file():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return FileResponse(
+        path,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "private, no-store, max-age=0",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 

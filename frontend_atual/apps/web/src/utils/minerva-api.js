@@ -1027,6 +1027,97 @@ export const generatePDF = async (guideData, { idempotencyKey } = {}) => {
   }
 };
 
+const builderRequest = async (path, { method = 'POST', body } = {}) => {
+  const response = await authenticatedFetch(`${apiBaseUrl()}${path}`, {
+    method,
+    ...(body
+      ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      : {}),
+  });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível montar o guia'));
+  }
+  return response.json();
+};
+
+export const createGuideBuilder = async (guideData) => {
+  const formData = new FormData();
+  appendGuideMetadata(formData, guideData);
+  if (guideData.familyPhoto) {
+    formData.append('family_photo', guideData.familyPhoto);
+  }
+  appendGuideLandmarks(formData, guideData);
+
+  const response = await authenticatedFetch(`${apiBaseUrl()}/api/guide-builder`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível iniciar a montagem'));
+  }
+  return response.json();
+};
+
+export const generateBuilderPageAttempt = async (sessionId, pageId, idempotencyKey) => {
+  const response = await authenticatedFetch(
+    `${apiBaseUrl()}/api/guide-builder/${encodeURIComponent(sessionId)}/pages/${encodeURIComponent(pageId)}/attempts`,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey || createIdempotencyKey() },
+    },
+  );
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível gerar esta página'));
+  }
+  return response.json();
+};
+
+export const selectBuilderPageAttempt = async (sessionId, pageId, attemptId) =>
+  builderRequest(
+    `/api/guide-builder/${encodeURIComponent(sessionId)}/pages/${encodeURIComponent(pageId)}/selection`,
+    {
+      method: 'PATCH',
+      body: { attempt_id: attemptId },
+    },
+  );
+
+export const approveBuilderPage = async (sessionId, pageId, attemptId) =>
+  builderRequest(
+    `/api/guide-builder/${encodeURIComponent(sessionId)}/pages/${encodeURIComponent(pageId)}/approve`,
+    {
+      body: { attempt_id: attemptId },
+    },
+  );
+
+export const completeGuideBuilder = async (sessionId) =>
+  builderRequest(`/api/guide-builder/${encodeURIComponent(sessionId)}/complete`, {
+    method: 'POST',
+  });
+
+const safeBuilderAssetUrl = (assetUrl) => {
+  const browserOrigin = globalThis.location?.origin || DEFAULT_API_BASE_URL;
+  const baseUrl = new URL(
+    `${apiBaseUrl().replace(/\/$/, '')}/`,
+    `${browserOrigin.replace(/\/$/, '')}/`,
+  );
+  const resolvedUrl = new URL(String(assetUrl || ''), baseUrl);
+  const validPath = /^\/guide-builder\/[A-Za-z0-9]+\/assets\/[\w.-]+$/.test(resolvedUrl.pathname);
+  if (resolvedUrl.origin !== baseUrl.origin || !validPath) {
+    throw new Error('Link de imagem inválido.');
+  }
+  return resolvedUrl.toString();
+};
+
+export const fetchBuilderAssetObjectUrl = async (assetUrl) => {
+  const response = await authenticatedFetch(safeBuilderAssetUrl(assetUrl), {
+    headers: { Accept: 'image/png' },
+  });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível carregar a imagem'));
+  }
+  return URL.createObjectURL(await response.blob());
+};
+
 export const getGuideJob = async (jobId, { signal } = {}) => {
   const safeJobId = String(jobId || '').trim();
   if (!safeJobId) {

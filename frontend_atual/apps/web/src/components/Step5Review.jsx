@@ -1,10 +1,8 @@
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Camera,
-  Download,
-  ExternalLink,
   Loader2,
   MapPin,
   Navigation,
@@ -17,13 +15,9 @@ import { Button } from '@/components/ui/button';
 import {
   categoryLabelForAttraction,
   buildGuideItineraryPayload,
-  createIdempotencyKey,
-  downloadGuidePdf,
-  fetchGuidePreviewHtml,
-  generatePDF,
+  createGuideBuilder,
   RESTAURANT_RECOMMENDATIONS_EXTRA,
   selectGuideLandmarks,
-  waitForGuideJob,
 } from '@/utils/minerva-api.js';
 import {
   deriveChildAges,
@@ -31,8 +25,8 @@ import {
   PRIVACY_CONSENT_VERSION,
   serializeGuideDestinations,
 } from '@/utils/guide-form.js';
+import GuideAssembly from '@/components/GuideAssembly.jsx';
 import { toast } from 'sonner';
-import confetti from 'canvas-confetti';
 
 const Step5Review = () => {
   const {
@@ -57,54 +51,7 @@ const Step5Review = () => {
   } = useConversationalGuide();
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState('');
-  const [pdfFilename, setPdfFilename] = useState('guia-minerva-travel.pdf');
-  const [coverStatus, setCoverStatus] = useState(null);
-  const [isRetrievingPdf, setIsRetrievingPdf] = useState(false);
-  const [generationStatus, setGenerationStatus] = useState('');
-  const [previewHtml, setPreviewHtml] = useState('');
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [previewError, setPreviewError] = useState('');
-  const [previewPageIndex, setPreviewPageIndex] = useState(0);
-  const generationIdempotencyKey = useRef(null);
-
-  // Divide o HTML canônico do guia em páginas individuais para navegar
-  // uma a uma, como no PDF. Cada página vira um documento autocontido
-  // com o mesmo CSS, então o render continua idêntico ao arquivo final.
-  const previewPages = useMemo(() => {
-    if (!previewHtml) return [];
-    try {
-      const parsed = new DOMParser().parseFromString(previewHtml, 'text/html');
-      const css = [...parsed.querySelectorAll('style')]
-        .map((style) => style.textContent)
-        .join('\n');
-      const bodyClass = parsed.body?.className || '';
-      return [...parsed.querySelectorAll('.page')].map(
-        (page) =>
-          `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>${css}</style></head>` +
-          `<body class="${bodyClass}"><main class="guide-shell">${page.outerHTML}</main></body></html>`
-      );
-    } catch (error) {
-      console.error('Erro ao dividir a prévia em páginas:', error);
-      return [];
-    }
-  }, [previewHtml]);
-  const currentPreviewPage = Math.min(previewPageIndex, Math.max(previewPages.length - 1, 0));
-
-  const loadGuidePreview = async (previewUrl) => {
-    if (!previewUrl) return;
-    setIsLoadingPreview(true);
-    setPreviewError('');
-    try {
-      setPreviewHtml(await fetchGuidePreviewHtml(previewUrl));
-    } catch (error) {
-      console.error('Erro ao carregar a prévia do guia:', error);
-      setPreviewError(error.message || 'Não foi possível carregar a prévia.');
-    } finally {
-      setIsLoadingPreview(false);
-    }
-  };
+  const [builderSession, setBuilderSession] = useState(null);
 
   // Derive the rich data from the IDs
   const finalLandmarks = selectGuideLandmarks(parsedData.landmarks, selectedLandmarks);
@@ -121,220 +68,48 @@ const Step5Review = () => {
     .filter((day) => day.landmarks.length > 0);
   const extraLandmarks = finalLandmarks.filter((landmark) => !landmark.itinerary_day);
 
+  const buildGuideData = () => {
+    const itinerary = buildGuideItineraryPayload({
+      itineraryMode,
+      destinationsList,
+      itineraryPreferences,
+      recommendedDays,
+      extraLandmarks,
+    });
+    return {
+      title: `Família ${familyName}`,
+      childrenNames,
+      childrenAges,
+      parentsNames,
+      year,
+      familyPhoto: coverPhoto, // Pass the actual File object
+      expectedVisibleFamilyMemberCount: expectedCoverFamilyMemberCount,
+      photoProcessingConsent,
+      privacyConsentVersion: PRIVACY_CONSENT_VERSION,
+      privacyConsentAt,
+      landmarks: finalLandmarks,
+      selectedLandmarks,
+      itinerary,
+      restaurantRecommendationsExtra,
+    };
+  };
+
   const handleGenerate = async () => {
     setIsGenerating(true);
+    const guideData = buildGuideData();
     try {
-      const itinerary = buildGuideItineraryPayload({
-        itineraryMode,
-        destinationsList,
-        itineraryPreferences,
-        recommendedDays,
-        extraLandmarks,
-      });
-      const guideData = {
-        title: `Família ${familyName}`,
-        childrenNames,
-        childrenAges,
-        parentsNames,
-        year,
-        familyPhoto: coverPhoto, // Pass the actual File object
-        expectedVisibleFamilyMemberCount: expectedCoverFamilyMemberCount,
-        photoProcessingConsent,
-        privacyConsentVersion: PRIVACY_CONSENT_VERSION,
-        privacyConsentAt,
-        landmarks: finalLandmarks,
-        selectedLandmarks,
-        itinerary,
-        restaurantRecommendationsExtra,
-      };
-
-      generationIdempotencyKey.current ||= createIdempotencyKey();
-      const submitted = await generatePDF(guideData, {
-        idempotencyKey: generationIdempotencyKey.current,
-      });
-      const result = submitted.job_id
-        ? await waitForGuideJob(submitted.job_id, {
-          onUpdate: (job) => {
-            const stage = String(job.stage || 'preparando').replaceAll('_', ' ');
-            setGenerationStatus(`Etapa: ${stage} (${job.progress || 0}%).`);
-          },
-        })
-        : submitted;
-
-      if (result.download_url) {
-        setPdfUrl(result.download_url);
-        setPdfFilename(result.filename || 'guia-minerva-travel.pdf');
-        setCoverStatus(result.cover_status || null);
-        setIsSuccess(true);
-        loadGuidePreview(result.preview_url);
-        toast.success('Guia ilustrado gerado com sucesso!');
-        if (result.cover_status?.fallback_used) {
-          toast.info('Usamos uma capa segura com a foto original para preservar todos na imagem.');
-        }
-
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#f1613b', '#489cc8', '#69b482', '#fdfbf7']
-        });
-      } else {
-        throw new Error('URL de download não encontrada na resposta.');
-      }
-
+      const session = await createGuideBuilder(guideData);
+      setBuilderSession(session);
     } catch (error) {
-      console.error(error);
-      toast.error('Não foi possível gerar o guia.');
+      console.error('Não foi possível iniciar a criação por páginas:', error);
+      toast.error(error.message || 'Não foi possível iniciar as páginas do guia.');
     } finally {
       setIsGenerating(false);
-      setGenerationStatus('');
     }
   };
 
-  const handlePdfAction = async ({ open = false } = {}) => {
-    setIsRetrievingPdf(true);
-    try {
-      const { blob, filename } = await downloadGuidePdf(pdfUrl);
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      if (open) {
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-      } else {
-        link.download = filename || pdfFilename;
-      }
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
-    } catch (error) {
-      toast.error(error.message || 'Não foi possível acessar o PDF.');
-    } finally {
-      setIsRetrievingPdf(false);
-    }
-  };
-
-  if (isSuccess) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-4xl mx-auto text-center space-y-8 py-12"
-      >
-        <div className="w-24 h-24 bg-accent/20 rounded-full flex items-center justify-center mx-auto text-accent">
-          <Sparkles className="w-12 h-12" />
-        </div>
-        <h2 className="text-4xl md:text-5xl font-serif font-bold text-foreground">
-          Guia Gerado com Sucesso!
-        </h2>
-        <p className="text-xl text-muted-foreground font-medium">
-          O Livro de Aventuras da Família {familyName} está pronto. Confira cada página abaixo
-          antes de baixar.
-        </p>
-        {coverStatus?.fallback_used && (
-          <p className="rounded-2xl border border-border/70 bg-card px-5 py-4 text-sm text-muted-foreground">
-            A capa foi protegida com a foto original porque a ilustração não pôde ser validada com segurança.
-          </p>
-        )}
-
-        {/* Prévia página a página: o MESMO HTML que o WeasyPrint transforma em PDF. */}
-        <div className="rounded-[2rem] border-2 border-border/70 bg-card p-3 text-left shadow-sm sm:p-4">
-          <div className="mb-3 flex items-center justify-between gap-3 px-2">
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              Prévia do guia
-            </p>
-            {isLoadingPreview ? (
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            ) : previewPages.length > 0 ? (
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPreviewPage === 0}
-                  onClick={() => setPreviewPageIndex(Math.max(currentPreviewPage - 1, 0))}
-                  className="rounded-full px-4 font-bold"
-                >
-                  Anterior
-                </Button>
-                <span className="whitespace-nowrap text-sm font-bold text-muted-foreground">
-                  Página {currentPreviewPage + 1} de {previewPages.length}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPreviewPage >= previewPages.length - 1}
-                  onClick={() =>
-                    setPreviewPageIndex(Math.min(currentPreviewPage + 1, previewPages.length - 1))
-                  }
-                  className="rounded-full px-4 font-bold"
-                >
-                  Próxima
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          {previewPages.length > 0 ? (
-            <iframe
-              key={currentPreviewPage}
-              title={`Página ${currentPreviewPage + 1} do guia`}
-              sandbox=""
-              srcDoc={previewPages[currentPreviewPage]}
-              className="h-[75vh] w-full rounded-2xl border border-border/60 bg-white"
-            />
-          ) : previewHtml ? (
-            <iframe
-              title="Prévia do guia"
-              sandbox=""
-              srcDoc={previewHtml}
-              className="h-[70vh] w-full rounded-2xl border border-border/60 bg-white"
-            />
-          ) : previewError ? (
-            <p className="rounded-2xl bg-destructive/10 px-4 py-6 text-center text-sm font-bold text-destructive">
-              {previewError}
-            </p>
-          ) : (
-            <p className="px-4 py-10 text-center text-sm font-medium text-muted-foreground">
-              {isLoadingPreview
-                ? 'Montando a prévia com todas as imagens geradas...'
-                : 'A prévia ficará disponível em instantes.'}
-            </p>
-          )}
-        </div>
-
-        <div className="pt-4 flex flex-col sm:flex-row gap-4 justify-center">
-          <Button
-            onClick={() => handlePdfAction({ open: true })}
-            disabled={isRetrievingPdf}
-            variant="outline"
-            className="rounded-full px-10 py-6 font-bold text-lg hover:-translate-y-1 transition-all"
-          >
-            {isRetrievingPdf ? (
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            ) : (
-              <ExternalLink className="w-5 h-5 mr-2" />
-            )}
-            Abrir PDF
-          </Button>
-          <Button
-            onClick={() => handlePdfAction()}
-            disabled={isRetrievingPdf}
-            className="rounded-full px-10 py-6 bg-primary hover:bg-primary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all"
-          >
-            <Download className="w-5 h-5 mr-2" /> Baixar PDF
-          </Button>
-          <Button
-            onClick={() => window.location.href = '/'}
-            variant="outline"
-            className="rounded-full px-10 py-6 font-bold text-lg hover:-translate-y-1 transition-all"
-          >
-            Voltar ao Início
-          </Button>
-        </div>
-      </motion.div>
-    );
+  if (builderSession) {
+    return <GuideAssembly session={builderSession} />;
   }
 
   // Group final landmarks by destination id
@@ -529,15 +304,15 @@ const Step5Review = () => {
           className="w-full max-w-md rounded-full bg-primary px-6 py-6 text-base font-bold text-white shadow-[0_8px_30px_rgb(241,97,59,0.3)] transition-all hover:-translate-y-1 hover:bg-primary/90 disabled:opacity-70 disabled:hover:translate-y-0 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
         >
           {isGenerating ? (
-            <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Criando a Magia...</>
+            <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Preparando as páginas...</>
           ) : (
-            <><Sparkles className="w-6 h-6 mr-3 inline-block" /> Gerar guia da família</>
+            <><Sparkles className="w-6 h-6 mr-3 inline-block" /> Começar pelas páginas</>
           )}
         </Button>
       </div>
       {isGenerating && (
         <p className="mt-4 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
-          {generationStatus || 'Enviamos seu guia para a fila de geração.'}
+          Preparando a ordem das páginas. Nenhuma imagem será gerada sem sua confirmação.
         </p>
       )}
     </div>

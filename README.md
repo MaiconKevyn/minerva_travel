@@ -209,6 +209,27 @@ Depois abra:
 http://127.0.0.1:3000
 ```
 
+## Geracao progressiva das paginas
+
+Na etapa final, o frontend cria uma sessao privada e mostra uma pagina por vez.
+Nada e gerado automaticamente: a familia solicita a capa, confere a imagem
+completa e os textos, pode gerar ate quatro versoes e escolhe uma antes de
+aprovar. Somente entao o fluxo libera o sumario ilustrado e, depois, as paginas
+dos pontos turisticos. A conclusao retorna o manifesto das imagens aprovadas;
+esse fluxo nao cria PDF.
+
+A capa usa a foto enviada em `/v1/images/edits`, preservando sua composicao no prompt.
+O sumario e as paginas seguintes usam `/v1/images/generations`. Todas as paginas
+sao PNG verticais de 1024x1536, e os nomes/datas fazem parte do contrato do
+prompt para serem renderizados dentro da propria imagem. Falhas da OpenAI ficam
+visiveis e permitem nova tentativa; nao existe fallback para placeholder, foto
+bruta ou geracao legada de PDF.
+
+As sessoes, uploads e tentativas ficam no runtime privado, associados ao dono,
+e seguem `GUIDE_DRAFT_RETENTION_DAYS`. O script de limpeza de guias tambem
+remove sessoes expiradas. A implantacao atual deve usar uma unica instancia da
+API enquanto essa persistencia estiver em disco local.
+
 ## Variaveis de ambiente
 
 Backend `.env`:
@@ -222,6 +243,10 @@ IMAGE_GENERATION_CONCURRENCY=2
 REPLICATE_API_TOKEN=sua_chave_aqui
 OPENAI_API_KEY=sua_chave_openai_aqui
 OPENAI_LANDMARK_MODEL=gpt-4o-2024-08-06
+OPENAI_IMAGE_MODEL=gpt-image-2
+OPENAI_IMAGE_QUALITY=medium
+OPENAI_IMAGE_TIMEOUT_SECONDS=180
+# OPENAI_BASE_URL=https://api.openai.com/v1
 GOOGLE_MAPS_API_KEY=sua_chave_google_maps_aqui
 SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=sb_secret_sua_chave_aqui

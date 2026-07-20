@@ -50,6 +50,36 @@ def image_provider() -> str:
     return os.getenv("IMAGE_PROVIDER", "placeholder")
 
 
+def openai_api_base_url() -> str:
+    load_project_env()
+    return os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+
+
+def openai_api_key() -> str:
+    load_project_env()
+    return os.getenv("OPENAI_API_KEY", "").strip()
+
+
+def openai_image_model() -> str:
+    load_project_env()
+    return os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2").strip() or "gpt-image-2"
+
+
+def openai_image_quality() -> str:
+    load_project_env()
+    quality = os.getenv("OPENAI_IMAGE_QUALITY", "medium").strip().lower()
+    return quality if quality in {"low", "medium", "high", "auto"} else "medium"
+
+
+def openai_image_timeout_seconds() -> float:
+    load_project_env()
+    try:
+        value = float(os.getenv("OPENAI_IMAGE_TIMEOUT_SECONDS", "180"))
+    except ValueError:
+        return 180.0
+    return min(max(value, 30.0), 600.0)
+
+
 def image_generation_concurrency() -> int:
     load_project_env()
     raw_value = os.getenv("IMAGE_GENERATION_CONCURRENCY", "2")

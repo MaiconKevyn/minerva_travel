@@ -32,7 +32,7 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: `node ../../../node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${port}`,
+        command: `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${port}`,
         env: {
           ...process.env,
           VITE_AUTH_MODE: 'local',
