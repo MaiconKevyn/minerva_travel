@@ -150,6 +150,7 @@ from minerva_travel.observability import emit_event
 from minerva_travel.page_generation import (
     PageGenerationConfigurationError,
     PageGenerationError,
+    PageGenerationRetryableError,
     get_guide_page_generator,
 )
 from minerva_travel.pdf import (
@@ -2712,25 +2713,18 @@ def generate_builder_page_attempt(
                     cover_attempt.filename,
                     "A capa aprovada da família não está mais disponível.",
                 )
-            approved_landmark_page: Path | None = None
+            landmark_page_reference: Path | None = None
             landmark_reference: Path | None = None
             if page_kind == "landmark_activity":
                 linked_page_id = str(metadata.get("linked_landmark_page_id") or "")
                 linked_page = session.page(linked_page_id)
-                linked_attempt = (
-                    linked_page.selected_attempt()
-                    if linked_page is not None and linked_page.approved_at
-                    else None
-                )
-                if linked_attempt is None:
-                    raise BuilderPageDependencyMissing(
-                        "A página aprovada do ponto turístico não está disponível."
+                linked_attempt = linked_page.selected_attempt() if linked_page is not None else None
+                if linked_attempt is not None:
+                    landmark_page_reference = _builder_reference_asset(
+                        session_id,
+                        linked_attempt.filename,
+                        "A versão gerada do ponto turístico não está mais disponível.",
                     )
-                approved_landmark_page = _builder_reference_asset(
-                    session_id,
-                    linked_attempt.filename,
-                    "A página aprovada do ponto turístico não está mais disponível.",
-                )
                 landmark_reference = _builder_local_landmark_reference(metadata.get("source_image"))
 
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
@@ -2803,15 +2797,11 @@ def generate_builder_page_attempt(
                 reference_page=reference_page,
             )
         elif page_kind == "landmark_activity":
-            if approved_landmark_page is None:
-                raise BuilderPageDependencyMissing(
-                    "A página aprovada do ponto turístico não está disponível."
-                )
             activity_type = str(metadata.get("activity_type") or "")
             common_activity_kwargs = {
                 "output_path": output,
                 "landmark_reference": landmark_reference,
-                "approved_landmark_page": approved_landmark_page,
+                "landmark_page_reference": landmark_page_reference,
                 "landmark_context": {
                     "selection_id": str(metadata["selection_id"]),
                     "name": str(metadata["name"]),
@@ -2908,6 +2898,22 @@ def generate_builder_page_attempt(
         raise HTTPException(
             status_code=409,
             detail={"code": "page_dependency_missing", "message": str(error)},
+        ) from error
+    except PageGenerationRetryableError as error:
+        if attempt_id:
+            with builder_session_lock(session_id):
+                session = _builder_session_or_404(session_id, current_user)
+                rollback_page_attempt(session, page_id, attempt_id, str(error))
+        if output is not None:
+            output.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "page_provider_rate_limited",
+                "message": str(error),
+                "retry_after_seconds": error.retry_after_seconds,
+            },
+            headers={"Retry-After": str(error.retry_after_seconds)},
         ) from error
     except (PageGenerationConfigurationError, PageGenerationError) as error:
         if attempt_id:

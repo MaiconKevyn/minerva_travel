@@ -9,6 +9,7 @@ from minerva_travel.page_generation import (
     OpenAIGuidePageGenerator,
     PageGenerationConfigurationError,
     PageGenerationError,
+    PageGenerationRetryableError,
     activity_artwork_prompt,
     best_memory_artwork_prompt,
     cover_page_prompt,
@@ -46,12 +47,85 @@ def _response(image_bytes: bytes) -> httpx.Response:
     )
 
 
+def _error_response(status: int, *, retry_after: str = "") -> httpx.Response:
+    request = httpx.Request("POST", "https://api.openai.com/v1/images/generations")
+    headers = {"Retry-After": retry_after} if retry_after else {}
+    return httpx.Response(
+        status,
+        request=request,
+        headers=headers,
+        json={"error": {"code": "rate_limit_exceeded", "type": "requests"}},
+    )
+
+
 def _family_references(tmp_path):
     photo = tmp_path / "family.png"
     photo.write_bytes(_png_bytes(size=(400, 300)))
     cover = tmp_path / "cover-approved.png"
     cover.write_bytes(_png_bytes(color="#315c96"))
     return photo, cover
+
+
+def test_openai_rate_limit_retries_with_bounded_exponential_backoff(tmp_path):
+    responses = iter([_error_response(429), _error_response(429), _response(_png_bytes())])
+    sleeps = []
+    calls = 0
+
+    def transport(_method, _url, **_kwargs):
+        nonlocal calls
+        calls += 1
+        return next(responses)
+
+    generator = OpenAIGuidePageGenerator(
+        api_key="test-key",
+        transport=transport,
+        retry_sleep=sleeps.append,
+        retry_random=lambda: 0.5,
+    )
+    output = generator.generate_destination_intro_page(
+        output_path=tmp_path / "destination.png",
+        title="Roma",
+        city="Roma",
+        country="Itália",
+        learning_points=["Uma cidade cheia de história."],
+        curiosity="Observe as formas dos prédios antigos.",
+        curiosity_label="Missão de observação",
+        landmark_names=["Pantheon"],
+    )
+
+    assert calls == 3
+    assert sleeps == [1.0, 2.0]
+    assert output.exists()
+
+
+def test_openai_long_rate_limit_is_returned_as_retryable_without_holding_request(tmp_path):
+    sleeps = []
+
+    def transport(_method, _url, **_kwargs):
+        return _error_response(429, retry_after="75")
+
+    generator = OpenAIGuidePageGenerator(
+        api_key="test-key",
+        transport=transport,
+        retry_sleep=sleeps.append,
+        retry_random=lambda: 0.5,
+    )
+
+    with pytest.raises(PageGenerationRetryableError) as raised:
+        generator.generate_destination_intro_page(
+            output_path=tmp_path / "destination.png",
+            title="Roma",
+            city="Roma",
+            country="Itália",
+            learning_points=["Uma cidade cheia de história."],
+            curiosity="Observe as formas dos prédios antigos.",
+            curiosity_label="Missão de observação",
+            landmark_names=["Pantheon"],
+        )
+
+    assert raised.value.retry_after_seconds == 75
+    assert sleeps == []
+    assert not (tmp_path / "destination.png").exists()
 
 
 def test_cover_prompt_requires_exact_family_copy_and_visible_people():
@@ -557,7 +631,7 @@ def test_coloring_generation_edits_landmark_refs_then_composites_printable_png(t
     generator.generate_coloring_page(
         output_path=output,
         landmark_reference=source,
-        approved_landmark_page=approved,
+        landmark_page_reference=approved,
         landmark_context={
             "selection_id": "paris:eiffel",
             "name": "Torre Eiffel",
@@ -618,7 +692,7 @@ def test_coloring_generation_edits_landmark_refs_then_composites_printable_png(t
         ),
     ],
 )
-def test_activity_generators_use_only_approved_landmark_reference_and_exact_subtype(
+def test_activity_generators_use_available_landmark_page_reference_and_exact_subtype(
     tmp_path, method_name, activity_spec, prompt_fragment
 ):
     calls = []
@@ -636,7 +710,7 @@ def test_activity_generators_use_only_approved_landmark_reference_and_exact_subt
     method(
         output_path=output,
         landmark_reference=None,
-        approved_landmark_page=approved,
+        landmark_page_reference=approved,
         landmark_context={
             "selection_id": "paris:eiffel",
             "name": "Torre Eiffel",
@@ -668,7 +742,7 @@ def test_word_search_revision_keeps_seeded_grid_identical(tmp_path):
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
     kwargs = {
         "landmark_reference": None,
-        "approved_landmark_page": approved,
+        "landmark_page_reference": approved,
         "landmark_context": {
             "selection_id": "paris:eiffel",
             "name": "Torre Eiffel",
@@ -817,26 +891,25 @@ def test_homecoming_prompt_requires_the_complete_existing_family_and_no_model_co
     assert "Uma coisa que quero contar" not in prompt
 
 
-def test_activity_generation_rejects_missing_local_reference_before_provider_call(tmp_path):
-    called = False
+def test_activity_generation_without_visual_reference_uses_prompt_generation(tmp_path):
+    calls = []
 
-    def transport(_method, _url, **_kwargs):
-        nonlocal called
-        called = True
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
         return _response(_png_bytes())
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
-    with pytest.raises(PageGenerationError, match="local"):
-        generator.generate_drawing_page(
-            output_path=tmp_path / "drawing.png",
-            landmark_reference=None,
-            approved_landmark_page=tmp_path / "outside-client-path.png",
-            landmark_context={"name": "Torre Eiffel", "city": "Paris", "country": "França"},
-            activity_spec={"prompt": "Desenhe."},
-        )
+    output = generator.generate_drawing_page(
+        output_path=tmp_path / "drawing.png",
+        landmark_reference=None,
+        landmark_page_reference=None,
+        landmark_context={"name": "Torre Eiffel", "city": "Paris", "country": "França"},
+        activity_spec={"prompt": "Desenhe."},
+    )
 
-    assert called is False
-    assert not (tmp_path / "drawing.png").exists()
+    assert calls[0][1].endswith("/images/generations")
+    assert "Torre Eiffel" in calls[0][2]["json"]["prompt"]
+    assert output.exists()
 
 
 def test_activity_generation_rejects_wrong_provider_output_without_partial_attempt(tmp_path):
@@ -852,7 +925,7 @@ def test_activity_generation_rejects_wrong_provider_output_without_partial_attem
         generator.generate_drawing_page(
             output_path=output,
             landmark_reference=None,
-            approved_landmark_page=approved,
+            landmark_page_reference=approved,
             landmark_context={"name": "Torre Eiffel", "city": "Paris", "country": "França"},
             activity_spec={"prompt": "Desenhe."},
         )

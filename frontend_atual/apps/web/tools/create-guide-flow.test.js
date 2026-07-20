@@ -197,6 +197,10 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(assembly, /setSelectedPageId\(page\.id\)/);
   assert.match(assembly, /aria-current=\{isSelected \? 'page'/);
   assert.match(assembly, /pageBusyActions/);
+  assert.match(assembly, /MAX_GENERATION_ATTEMPTS/);
+  assert.match(assembly, /Nova tentativa automática/);
+  assert.match(assembly, /builderGenerationRetryDelaySeconds/);
+  assert.match(assembly, /isRetryableBuilderGenerationError/);
   assert.match(assembly, /revisionInstructions/);
   assert.match(assembly, /includeFamilyByPage/);
   assert.match(assembly, /nextSession\.revision/);

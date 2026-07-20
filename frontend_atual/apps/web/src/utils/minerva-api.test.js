@@ -893,6 +893,86 @@ test('generatePDF sends the same caller-owned idempotency key with the authentic
   }
 });
 
+test('builder page generation preserves structured retry metadata from temporary limits', async () => {
+  const originalFetch = globalThis.fetch;
+  await authClient.signup('builder-retry@example.com', 'Senha123', 'Família Retry');
+  await authClient.login('builder-retry@example.com', 'Senha123');
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    code: 'rate_limit_exceeded',
+    message: 'Muitas solicitacoes. Aguarde antes de tentar novamente.',
+    detail: {
+      code: 'rate_limit_exceeded',
+      message: 'Muitas solicitacoes. Aguarde antes de tentar novamente.',
+      scope: 'guide_page_generate',
+      reason: 'user_rate_limit',
+      retry_after_seconds: 75,
+    },
+  }), {
+    status: 429,
+    headers: {
+      'Content-Type': 'application/json',
+      'Retry-After': '75',
+    },
+  });
+
+  try {
+    await assert.rejects(
+      () => minervaApi.generateBuilderPageAttempt(
+        'builder-1',
+        'activity-1-drawing',
+        'stable-generation-key',
+      ),
+      (error) => {
+        assert.equal(error.name, 'MinervaApiError');
+        assert.equal(error.status, 429);
+        assert.equal(error.code, 'rate_limit_exceeded');
+        assert.equal(error.retryAfterSeconds, 75);
+        assert.equal(error.scope, 'guide_page_generate');
+        assert.equal(minervaApi.isRetryableBuilderGenerationError(error), true);
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});
+
+test('builder retry policy respects Retry-After, backs off to minutes and excludes daily quota', () => {
+  const serverDelay = new minervaApi.MinervaApiError('Aguarde.', {
+    status: 429,
+    code: 'rate_limit_exceeded',
+    retryAfterSeconds: 91,
+    scope: 'guide_page_generate',
+  });
+  assert.equal(minervaApi.builderGenerationRetryDelaySeconds(serverDelay, 1, () => 0.5), 91);
+  assert.deepEqual(
+    [1, 2, 3].map((attempt) => minervaApi.builderGenerationRetryDelaySeconds(
+      new minervaApi.MinervaApiError('Temporário.', {
+        status: 503,
+        code: 'request_control_unavailable',
+      }),
+      attempt,
+      () => 0.5,
+    )),
+    [5, 30, 120],
+  );
+  const dailyQuota = new minervaApi.MinervaApiError('Limite diário.', {
+    status: 429,
+    code: 'rate_limit_exceeded',
+    retryAfterSeconds: 3600,
+    scope: 'quota:guide_page_generate',
+  });
+  assert.equal(minervaApi.isRetryableBuilderGenerationError(dailyQuota), false);
+  assert.equal(minervaApi.isRetryableBuilderGenerationError(
+    new minervaApi.MinervaApiError('OpenAI ocupada.', {
+      status: 503,
+      code: 'page_provider_rate_limited',
+      retryAfterSeconds: 75,
+    }),
+  ), true);
+});
+
 test('waitForGuideJob polls an owner-scoped job until its durable result is ready', async () => {
   const originalFetch = globalThis.fetch;
   const seen = [];

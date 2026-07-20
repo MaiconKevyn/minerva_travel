@@ -615,6 +615,61 @@ def test_custom_landmark_without_curiosity_or_source_uses_safe_observation():
     )
 
 
+def test_activity_can_generate_before_linked_landmark_without_any_visual_reference(
+    tmp_path,
+    monkeypatch,
+):
+    generator = RecordingPageGenerator()
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.get_guide_page_generator", lambda: generator)
+    client = TestClient(app)
+    response = _post_builder(
+        client,
+        {
+            "title": "Família Lima",
+            "children_names": "Bia",
+            "children_ages": "7",
+            "parents_names": "Ana",
+            "year": "2026",
+            "custom_landmarks": json.dumps(
+                [
+                    {
+                        "selection_id": "google:pantheon-123",
+                        "name": "Pantheon",
+                        "city": "Roma",
+                        "country": "Itália",
+                        "description": ["Um monumento histórico escolhido pela família."],
+                    }
+                ]
+            ),
+            "activity_selections_json": json.dumps(
+                [
+                    {
+                        "landmark_selection_id": "google:pantheon-123",
+                        "activity_type": "drawing",
+                        "order": 1,
+                    }
+                ]
+            ),
+        },
+    )
+    assert response.status_code == 201, response.text
+    session_id = response.json()["session_id"]
+
+    generated = client.post(
+        f"/api/guide-builder/{session_id}/pages/activity-1-drawing/attempts",
+        headers={"Idempotency-Key": "generate-pantheon-drawing"},
+        json={},
+    )
+
+    assert generated.status_code == 200, generated.text
+    activity_request = generator.requests[-1]
+    assert activity_request["kind"] == "drawing"
+    assert activity_request["landmark_reference"] is None
+    assert activity_request["landmark_page_reference"] is None
+    assert activity_request["landmark_context"]["name"] == "Pantheon"
+
+
 def test_activity_and_memory_dispatch_never_require_or_forward_family_photo(
     tmp_path,
     monkeypatch,
@@ -673,7 +728,7 @@ def test_activity_and_memory_dispatch_never_require_or_forward_family_photo(
     activity_request = generator.requests[-1]
     assert activity_request["kind"] == "coloring"
     assert activity_request["landmark_reference"] is None
-    assert activity_request["approved_landmark_page"].name == "landmark-1-1.png"
+    assert activity_request["landmark_page_reference"].name == "landmark-1-1.png"
     assert activity_request["landmark_context"]["name"] == "Farol da Ilha"
     assert "family_photo" not in activity_request
     assert activity_page["attempts"][-1]["include_family"] is False

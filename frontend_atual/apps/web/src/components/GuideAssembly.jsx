@@ -20,8 +20,10 @@ import {
   downloadGuidePdf,
   fetchBuilderAssetObjectUrl,
   fetchGuideBuilderSession,
+  builderGenerationRetryDelaySeconds,
   generateBuilderPdf,
   generateBuilderPageAttempt,
+  isRetryableBuilderGenerationError,
   selectBuilderPageAttempt,
 } from '@/utils/minerva-api.js';
 import { toast } from 'sonner';
@@ -35,6 +37,7 @@ const STATUS_LABELS = {
 };
 
 const MAX_REVISION_INSTRUCTION_LENGTH = 600;
+const MAX_GENERATION_ATTEMPTS = 4;
 
 const PAGE_KIND_LABELS = {
   cover: 'Capa',
@@ -57,6 +60,27 @@ const saveBlob = (blob, filename) => {
   URL.revokeObjectURL(objectUrl);
 };
 
+const formatRetryDelay = (seconds) => {
+  if (seconds < 60) return `${seconds} segundo${seconds === 1 ? '' : 's'}`;
+  const minutes = Math.ceil(seconds / 60);
+  return `${minutes} minuto${minutes === 1 ? '' : 's'}`;
+};
+
+const waitForRetry = (delayMs, signal) => new Promise((resolve, reject) => {
+  const abort = () => {
+    window.clearTimeout(timer);
+    const error = new Error('Geração cancelada.');
+    error.name = 'AbortError';
+    reject(error);
+  };
+  const timer = window.setTimeout(() => {
+    signal.removeEventListener('abort', abort);
+    resolve();
+  }, delayMs);
+  signal.addEventListener('abort', abort, { once: true });
+  if (signal.aborted) abort();
+});
+
 const GuideAssembly = ({ session: initialSession }) => {
   const [session, setSession] = useState(initialSession);
   const [selectedPageId, setSelectedPageId] = useState(
@@ -66,6 +90,7 @@ const GuideAssembly = ({ session: initialSession }) => {
   const [assetLoadErrors, setAssetLoadErrors] = useState({});
   const [pageBusyActions, setPageBusyActions] = useState({});
   const [pageErrors, setPageErrors] = useState({});
+  const [pageRetryNotices, setPageRetryNotices] = useState({});
   const [revisionInstructions, setRevisionInstructions] = useState({});
   const [includeFamilyByPage, setIncludeFamilyByPage] = useState({});
   const [busyAction, setBusyAction] = useState('');
@@ -75,6 +100,7 @@ const GuideAssembly = ({ session: initialSession }) => {
   const objectUrlsRef = useRef(new Set());
   const hydratedAssetUrlsRef = useRef(new Set());
   const generationKeysRef = useRef({});
+  const generationAbortControllersRef = useRef(new Map());
 
   const hydrateAssets = useCallback(async (nextSession) => {
     const urls = [...new Set(
@@ -119,11 +145,16 @@ const GuideAssembly = ({ session: initialSession }) => {
   }, []);
 
   useEffect(() => {
+    const objectUrls = objectUrlsRef.current;
+    const hydratedAssetUrls = hydratedAssetUrlsRef.current;
+    const generationAbortControllers = generationAbortControllersRef.current;
     hydrateAssets(initialSession);
     return () => {
-      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      objectUrlsRef.current.clear();
-      hydratedAssetUrlsRef.current.clear();
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls.clear();
+      hydratedAssetUrls.clear();
+      generationAbortControllers.forEach((controller) => controller.abort());
+      generationAbortControllers.clear();
     };
   }, [hydrateAssets, initialSession]);
 
@@ -136,6 +167,7 @@ const GuideAssembly = ({ session: initialSession }) => {
   );
   const activePageBusyAction = activePage ? pageBusyActions[activePage.id] || '' : '';
   const activePageError = activePage ? pageErrors[activePage.id] || '' : '';
+  const activePageRetryNotice = activePage ? pageRetryNotices[activePage.id] || '' : '';
   const revisionInstruction = activePage ? revisionInstructions[activePage.id] || '' : '';
   const includeFamily = activePage ? includeFamilyByPage[activePage.id] || false : false;
   const selectedAttempt = activePage?.attempts.find(
@@ -198,6 +230,15 @@ const GuideAssembly = ({ session: initialSession }) => {
     setPageErrors((current) => ({ ...current, [pageId]: message }));
   };
 
+  const setPageRetryNotice = (pageId, message) => {
+    setPageRetryNotices((current) => {
+      const next = { ...current };
+      if (message) next[pageId] = message;
+      else delete next[pageId];
+      return next;
+    });
+  };
+
   const handleGenerate = async () => {
     if (
       !activePage
@@ -211,22 +252,52 @@ const GuideAssembly = ({ session: initialSession }) => {
     const key = generationKeysRef.current[page.id] || createIdempotencyKey();
     generationKeysRef.current[page.id] = key;
     const requestedRevision = (revisionInstructions[page.id] || '').trim();
+    const controller = new AbortController();
+    generationAbortControllersRef.current.set(page.id, controller);
     try {
-      await updateSession(() =>
-        generateBuilderPageAttempt(
-          session.session_id,
-          page.id,
-          key,
-          requestedRevision,
-          page.kind === 'landmark' && Boolean(includeFamilyByPage[page.id]),
-        ),
-      );
+      let failedAttempts = 0;
+      while (failedAttempts < MAX_GENERATION_ATTEMPTS) {
+        try {
+          await updateSession(() =>
+            generateBuilderPageAttempt(
+              session.session_id,
+              page.id,
+              key,
+              requestedRevision,
+              page.kind === 'landmark' && Boolean(includeFamilyByPage[page.id]),
+              { signal: controller.signal },
+            ),
+          );
+          break;
+        } catch (error) {
+          failedAttempts += 1;
+          if (
+            controller.signal.aborted
+            || failedAttempts >= MAX_GENERATION_ATTEMPTS
+            || !isRetryableBuilderGenerationError(error)
+          ) throw error;
+          const delaySeconds = builderGenerationRetryDelaySeconds(error, failedAttempts);
+          setPageRetryNotice(
+            page.id,
+            `Limite temporário. Nova tentativa automática em ${formatRetryDelay(delaySeconds)} `
+              + `(${failedAttempts + 1} de ${MAX_GENERATION_ATTEMPTS}).`,
+          );
+          await waitForRetry(delaySeconds * 1000, controller.signal);
+          setPageRetryNotice(page.id, 'Tentando gerar esta página novamente...');
+        }
+      }
       delete generationKeysRef.current[page.id];
       setRevisionInstructions((current) => ({ ...current, [page.id]: '' }));
       toast.success(`${page.title} gerada. Confira todos os textos antes de aprovar.`);
     } catch (error) {
-      setPageError(page.id, error.message || 'Não foi possível gerar esta página.');
+      if (error.name !== 'AbortError') {
+        setPageError(page.id, error.message || 'Não foi possível gerar esta página.');
+      }
     } finally {
+      if (generationAbortControllersRef.current.get(page.id) === controller) {
+        generationAbortControllersRef.current.delete(page.id);
+      }
+      setPageRetryNotice(page.id, '');
       setPageBusy(page.id, '');
     }
   };
@@ -653,6 +724,17 @@ const GuideAssembly = ({ session: initialSession }) => {
                   </div>
                 )}
 
+                {activePageRetryNotice && (
+                  <div
+                    className="flex gap-3 rounded-2xl bg-amber-500/10 p-4 text-sm font-bold text-amber-800 dark:text-amber-200"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+                    <p>{activePageRetryNotice}</p>
+                  </div>
+                )}
+
                 {(activePageError || activePage.error || selectedAssetError) && (
                   <div className="flex gap-3 rounded-2xl bg-destructive/10 p-4 text-sm font-bold text-destructive">
                     <AlertCircle className="h-5 w-5 shrink-0" />
@@ -686,7 +768,9 @@ const GuideAssembly = ({ session: initialSession }) => {
                         <Sparkles className="mr-2 h-5 w-5" />
                       )}
                       {activePageBusyAction === 'generate'
-                        ? 'Gerando esta página...'
+                        ? activePageRetryNotice
+                          ? 'Aguardando nova tentativa...'
+                          : 'Gerando esta página...'
                         : selectedAttempt && revisionInstruction.trim()
                           ? 'Gerar versão com ajustes'
                           : selectedAttempt

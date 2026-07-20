@@ -9,7 +9,7 @@ from PIL import Image
 
 from minerva_travel.app import app
 from minerva_travel.auth import AuthenticatedUser, get_current_user
-from minerva_travel.page_generation import PageGenerationError
+from minerva_travel.page_generation import PageGenerationError, PageGenerationRetryableError
 
 FAMILY_PHOTO = Path("assets/landmarks/paris/eiffel-tower.png").read_bytes()
 
@@ -25,6 +25,7 @@ class FakePageGenerator:
         self.calls: list[str] = []
         self.requests: list[dict] = []
         self.fail_next = False
+        self.retry_after_next = 0
 
     def _write(self, kind: str, output_path: Path, request: dict) -> Path:
         self.calls.append(kind)
@@ -32,6 +33,13 @@ class FakePageGenerator:
         if self.fail_next:
             self.fail_next = False
             raise PageGenerationError("Falha simulada do provedor.")
+        if self.retry_after_next:
+            retry_after = self.retry_after_next
+            self.retry_after_next = 0
+            raise PageGenerationRetryableError(
+                "A OpenAI está com muitas solicitações.",
+                retry_after_seconds=retry_after,
+            )
         colors = {
             "cover": "#4f86b7",
             "summary": "#69b482",
@@ -366,6 +374,31 @@ def test_provider_failure_is_retryable_and_does_not_consume_attempt(tmp_path, mo
     assert state["pages"][0]["attempts_left"] == 4
 
     retried = _generate(client, session_id, "cover", "same-safe-key")
+    assert retried.status_code == 200
+    assert len(retried.json()["pages"][0]["attempts"]) == 1
+
+
+def test_provider_rate_limit_returns_retry_after_and_keeps_same_key_retryable(
+    tmp_path,
+    monkeypatch,
+):
+    client, generator = _setup(monkeypatch, tmp_path)
+    session_id = _create_session(client)["session_id"]
+    generator.retry_after_next = 75
+
+    failed = _generate(client, session_id, "cover", "provider-rate-key")
+    assert failed.status_code == 503
+    assert failed.headers["Retry-After"] == "75"
+    assert failed.json()["detail"] == {
+        "code": "page_provider_rate_limited",
+        "message": "A OpenAI está com muitas solicitações.",
+        "retry_after_seconds": 75,
+    }
+    state = client.get(f"/api/guide-builder/{session_id}").json()
+    assert state["pages"][0]["attempts"] == []
+    assert state["pages"][0]["attempts_left"] == 4
+
+    retried = _generate(client, session_id, "cover", "provider-rate-key")
     assert retried.status_code == 200
     assert len(retried.json()["pages"][0]["attempts"]) == 1
 

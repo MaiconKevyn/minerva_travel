@@ -675,6 +675,78 @@ const responseErrorMessage = async (response, fallbackMessage) => {
   return `${fallbackMessage} (${response.status})`;
 };
 
+export class MinervaApiError extends Error {
+  constructor(message, {
+    status = 0,
+    code = '',
+    retryAfterSeconds = 0,
+    scope = '',
+    reason = '',
+  } = {}) {
+    super(message);
+    this.name = 'MinervaApiError';
+    this.status = status;
+    this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
+    this.scope = scope;
+    this.reason = reason;
+  }
+}
+
+const responseApiError = async (response, fallbackMessage) => {
+  const payload = await response.json().catch(() => ({}));
+  const detail = payload?.detail;
+  const message = (
+    (typeof detail === 'string' && detail.trim())
+    || (typeof detail?.message === 'string' && detail.message.trim())
+    || (typeof payload?.message === 'string' && payload.message.trim())
+    || `${fallbackMessage} (${response.status})`
+  );
+  const headerRetryAfter = Number.parseInt(response.headers.get('Retry-After') || '', 10);
+  const detailRetryAfter = Number.parseInt(detail?.retry_after_seconds, 10);
+
+  return new MinervaApiError(message, {
+    status: response.status,
+    code: String(detail?.code || payload?.code || ''),
+    retryAfterSeconds: Number.isFinite(detailRetryAfter) && detailRetryAfter > 0
+      ? detailRetryAfter
+      : Number.isFinite(headerRetryAfter) && headerRetryAfter > 0
+        ? headerRetryAfter
+        : 0,
+    scope: String(detail?.scope || ''),
+    reason: String(detail?.reason || ''),
+  });
+};
+
+export const isRetryableBuilderGenerationError = (error) => {
+  if (!(error instanceof MinervaApiError)) return false;
+  if (error.scope.startsWith('quota:')) return false;
+  return (
+    error.code === 'rate_limit_exceeded'
+    || error.code === 'concurrency_limit_exceeded'
+    || error.code === 'request_control_unavailable'
+    || error.code === 'idempotency_in_progress'
+    || error.code === 'page_provider_rate_limited'
+  );
+};
+
+export const builderGenerationRetryDelaySeconds = (
+  error,
+  failedAttempt,
+  random = Math.random,
+) => {
+  if (Number.isFinite(error?.retryAfterSeconds) && error.retryAfterSeconds > 0) {
+    return Math.ceil(error.retryAfterSeconds);
+  }
+  const retrySchedule = [5, 30, 120];
+  const baseDelay = retrySchedule[Math.min(
+    Math.max(0, failedAttempt - 1),
+    retrySchedule.length - 1,
+  )];
+  const jitter = 0.8 + (Math.min(1, Math.max(0, random())) * 0.4);
+  return Math.max(1, Math.ceil(baseDelay * jitter));
+};
+
 const guideDetailsUrl = (guideId) => {
   const normalizedGuideId = String(guideId || '').trim();
   if (!normalizedGuideId) throw new Error('Identificador do guia inválido.');
@@ -1080,6 +1152,7 @@ export const generateBuilderPageAttempt = async (
   idempotencyKey,
   revisionInstruction = '',
   includeFamily = false,
+  { signal } = {},
 ) => {
   const response = await authenticatedFetch(
     `${apiBaseUrl()}/api/guide-builder/${encodeURIComponent(sessionId)}/pages/${encodeURIComponent(pageId)}/attempts`,
@@ -1093,10 +1166,11 @@ export const generateBuilderPageAttempt = async (
         revision_instruction: revisionInstruction.trim(),
         include_family: includeFamily,
       }),
+      signal,
     },
   );
   if (!response.ok) {
-    throw new Error(await responseErrorMessage(response, 'Não foi possível gerar esta página'));
+    throw await responseApiError(response, 'Não foi possível gerar esta página');
   }
   return response.json();
 };

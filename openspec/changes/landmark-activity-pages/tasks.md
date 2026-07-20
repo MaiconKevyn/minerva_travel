@@ -52,7 +52,7 @@
 
 - [x] 5.1 Extend the page-generator protocol and fake generator with explicit coloring, detail-hunt,
   word-search, drawing, and best-memory methods.
-- [x] 5.2 Resolve approved landmark attempts and sanitized local landmark references in a fixed,
+- [x] 5.2 Resolve available landmark attempts and sanitized local landmark references in a fixed,
   owner-safe order without accepting client paths or external URLs.
 - [x] 5.3 Implement coloring through OpenAI image edits, strict people/text removal prompts, and the
   existing line-art simplification pipeline.
@@ -131,3 +131,16 @@
   PDF sequence tests.
 - [x] 10.5 Run full backend/frontend verification, inspect synthetic and live rendered pages, and
   review the final implementation scope.
+
+## 11. Approval-Independent Activity Generation And Temporary-Limit Retry
+
+- [x] 11.1 Remove the approved-landmark dependency from activity dispatch while preserving
+  owner-safe reference resolution and immutable page order.
+- [x] 11.2 Fall back to prompt-only OpenAI generation when neither a local point image nor a
+  generated landmark attempt exists.
+- [x] 11.3 Preserve structured `Retry-After` metadata in the frontend and retry temporary request
+  control failures with the same idempotency key, bounded attempts, and visible waiting state.
+- [x] 11.4 Exclude daily quotas and permanent errors from automatic retries, allow other pages to
+  keep generating in parallel, and cancel pending timers on component unmount.
+- [ ] 11.5 Add backend and frontend regression tests, run full validation, and publish both target
+  branches.

@@ -165,14 +165,19 @@ Each `landmark` page receives two additional exact-copy fields:
 The server bounds and normalizes both strings before constructing the image prompt. They are part
 of `required_copy`, displayed to the parent during review, and kept stable across attempts.
 
-### Decision 6: Use the approved point page as the universal visual anchor
+### Decision 6: Use the best available point reference without imposing generation order
 
-A landmark activity can only become active after its associated landmark page is approved. The
-server resolves that approved attempt itself. Reference priority is:
+A landmark activity can be generated at any time, including before its associated landmark page.
+The server resolves every reference itself and uses the strongest material currently available:
 
 1. a sanitized local source photo/reference when one already exists for the selected place;
-2. the approved landmark page, authoritative for the selected place's established guide style;
+2. the selected generated landmark-page attempt, whether or not the parent has approved it yet;
 3. the selected current activity attempt for regeneration only.
+
+When none of these visual references exists, the activity uses prompt-only generation from the
+immutable server-resolved landmark name, city, country, description, and age complexity. This
+fallback preserves the free page-order workflow; later approval of the linked landmark does not
+reorder pages or mutate an already generated activity attempt.
 
 No external URL or client path reaches the OpenAI request. Reference order is fixed and tested.
 Activity prompts remove every person, family member, readable point-page text, logo, and watermark
@@ -188,7 +193,7 @@ Every activity page contains an OpenAI-generated visual layer and finishes as a 
   background, and no text or people. The final page adds exact heading/instructions and generous
   printable margins.
 - `detail_hunt`: the activity specification selects bounded observable details from trusted
-  landmark context and the approved page. OpenAI creates the landmark-specific visual layout;
+  landmark context and the available point references. OpenAI creates the landmark-specific visual layout;
   exact clues and checkboxes are rendered from the validated specification.
 - `word_search`: the existing seeded grid generator builds a solvable puzzle from normalized place,
   city, and activity vocabulary. OpenAI creates the decorative landmark vignette/background, while
@@ -280,6 +285,20 @@ title and closing copy, plus a large lined field labeled
 regenerate, approve, completion, cleanup, and one-image-per-PDF-page lifecycle. Existing persisted
 sessions are not replanned, preserving backward compatibility.
 
+### Decision 15: Retry temporary limits without duplicating a generation
+
+The API distinguishes the application's own rate/concurrency controls from provider-side OpenAI
+limits. Short OpenAI `429`/`5xx` responses receive a bounded exponential backoff with jitter in the
+backend. A long OpenAI `Retry-After` becomes a structured temporary API error instead of keeping an
+HTTP request open for minutes.
+
+The frontend preserves `code`, `scope`, and `Retry-After`, then performs at most three automatic
+retries after the initial request. Every attempt reuses the same idempotency key, keeps its waiting
+state attached to the requested page, and does not prevent other pages from generating. Server
+delays take precedence; otherwise the fallback schedule grows from seconds to minutes. Daily quota
+exhaustion and permanent errors never retry automatically, and unmounting the review cancels its
+pending timers and requests.
+
 ## Validation Strategy
 
 ### Backend and content tests
@@ -305,6 +324,8 @@ sessions are not replanned, preserving backward compatibility.
 - Assert the homecoming prompt preserves family identity and the deterministic compositor keeps
   the closing copy and writable area exact.
 - Assert invalid, oversized, malformed, or wrong-size provider output creates no attempt.
+- Assert OpenAI temporary limits back off, expose long `Retry-After` values, and leave the same
+  idempotency key reusable without consuming an attempt.
 
 ### Frontend and browser tests
 
@@ -315,6 +336,8 @@ sessions are not replanned, preserving backward compatibility.
   retry one failed activity generation, approve the mandatory memory page, and download the PDF.
 - Continuing with no optional activities still creates and requires the memory page.
 - Completion and PDF export also require approval of the final homecoming page.
+- Temporary-limit feedback remains page-local, visible, bounded, and compatible with parallel page
+  generation.
 
 ### PDF and live validation
 

@@ -5,7 +5,10 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import math
+import random
 import re
+import time
 from collections.abc import Callable
 from contextlib import ExitStack
 from io import BytesIO
@@ -46,6 +49,14 @@ class PageGenerationConfigurationError(RuntimeError):
 
 class PageGenerationError(RuntimeError):
     """The provider did not return a valid full-page image."""
+
+
+class PageGenerationRetryableError(PageGenerationError):
+    """The provider asked the caller to retry after a bounded delay."""
+
+    def __init__(self, message: str, *, retry_after_seconds: int) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = max(1, retry_after_seconds)
 
 
 class GuidePageGenerator(Protocol):
@@ -116,7 +127,7 @@ class GuidePageGenerator(Protocol):
         *,
         output_path: Path,
         landmark_reference: Path | None,
-        approved_landmark_page: Path,
+        landmark_page_reference: Path | None,
         landmark_context: dict[str, Any],
         activity_spec: dict[str, Any],
         revision_instruction: str = "",
@@ -128,7 +139,7 @@ class GuidePageGenerator(Protocol):
         *,
         output_path: Path,
         landmark_reference: Path | None,
-        approved_landmark_page: Path,
+        landmark_page_reference: Path | None,
         landmark_context: dict[str, Any],
         activity_spec: dict[str, Any],
         revision_instruction: str = "",
@@ -140,7 +151,7 @@ class GuidePageGenerator(Protocol):
         *,
         output_path: Path,
         landmark_reference: Path | None,
-        approved_landmark_page: Path,
+        landmark_page_reference: Path | None,
         landmark_context: dict[str, Any],
         activity_spec: dict[str, Any],
         revision_instruction: str = "",
@@ -152,7 +163,7 @@ class GuidePageGenerator(Protocol):
         *,
         output_path: Path,
         landmark_reference: Path | None,
-        approved_landmark_page: Path,
+        landmark_page_reference: Path | None,
         landmark_context: dict[str, Any],
         activity_spec: dict[str, Any],
         revision_instruction: str = "",
@@ -202,6 +213,8 @@ class OpenAIGuidePageGenerator:
         base_url: str | None = None,
         timeout_seconds: float | None = None,
         transport: Transport | None = None,
+        retry_sleep: Callable[[float], None] | None = None,
+        retry_random: Callable[[], float] | None = None,
     ) -> None:
         self.api_key = (api_key if api_key is not None else openai_api_key()).strip()
         if not self.api_key:
@@ -213,6 +226,8 @@ class OpenAIGuidePageGenerator:
         self.base_url = (base_url or openai_api_base_url()).rstrip("/")
         self.timeout_seconds = timeout_seconds or openai_image_timeout_seconds()
         self.transport = transport
+        self.retry_sleep = retry_sleep or time.sleep
+        self.retry_random = retry_random or random.random
 
     def generate_cover_page(
         self,
@@ -356,7 +371,7 @@ class OpenAIGuidePageGenerator:
         *,
         output_path: Path,
         landmark_reference: Path | None,
-        approved_landmark_page: Path,
+        landmark_page_reference: Path | None,
         landmark_context: dict[str, Any],
         activity_spec: dict[str, Any],
         revision_instruction: str = "",
@@ -369,15 +384,17 @@ class OpenAIGuidePageGenerator:
             city=city,
             country=country,
             age_complexity=age_complexity,
-            has_landmark_reference=landmark_reference is not None,
+            has_landmark_reference=(
+                landmark_reference is not None or landmark_page_reference is not None
+            ),
             has_revision_reference=reference_page is not None,
             revision_instruction=revision_instruction,
         )
         artwork = _provider_artwork_path(output_path)
         try:
-            response = self._edit_with_references(
+            response = self._generate_activity_artwork(
                 prompt,
-                _activity_references(landmark_reference, approved_landmark_page, reference_page),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
             )
             _persist_page_image(response, artwork)
             simplify_child_coloring_lineart(artwork)
@@ -396,7 +413,7 @@ class OpenAIGuidePageGenerator:
         *,
         output_path: Path,
         landmark_reference: Path | None,
-        approved_landmark_page: Path,
+        landmark_page_reference: Path | None,
         landmark_context: dict[str, Any],
         activity_spec: dict[str, Any],
         revision_instruction: str = "",
@@ -414,15 +431,17 @@ class OpenAIGuidePageGenerator:
             city=city,
             country=country,
             age_complexity=age_complexity,
-            has_landmark_reference=landmark_reference is not None,
+            has_landmark_reference=(
+                landmark_reference is not None or landmark_page_reference is not None
+            ),
             has_revision_reference=reference_page is not None,
             revision_instruction=revision_instruction,
         )
         artwork = _provider_artwork_path(output_path)
         try:
-            response = self._edit_with_references(
+            response = self._generate_activity_artwork(
                 prompt,
-                _activity_references(landmark_reference, approved_landmark_page, reference_page),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
             )
             _persist_page_image(response, artwork)
             return compose_detail_hunt_page(
@@ -442,7 +461,7 @@ class OpenAIGuidePageGenerator:
         *,
         output_path: Path,
         landmark_reference: Path | None,
-        approved_landmark_page: Path,
+        landmark_page_reference: Path | None,
         landmark_context: dict[str, Any],
         activity_spec: dict[str, Any],
         revision_instruction: str = "",
@@ -469,15 +488,17 @@ class OpenAIGuidePageGenerator:
             city=city,
             country=country,
             age_complexity=age_complexity,
-            has_landmark_reference=landmark_reference is not None,
+            has_landmark_reference=(
+                landmark_reference is not None or landmark_page_reference is not None
+            ),
             has_revision_reference=reference_page is not None,
             revision_instruction=revision_instruction,
         )
         artwork = _provider_artwork_path(output_path)
         try:
-            response = self._edit_with_references(
+            response = self._generate_activity_artwork(
                 prompt,
-                _activity_references(landmark_reference, approved_landmark_page, reference_page),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
             )
             _persist_page_image(response, artwork)
             return compose_word_search_page(
@@ -498,7 +519,7 @@ class OpenAIGuidePageGenerator:
         *,
         output_path: Path,
         landmark_reference: Path | None,
-        approved_landmark_page: Path,
+        landmark_page_reference: Path | None,
         landmark_context: dict[str, Any],
         activity_spec: dict[str, Any],
         revision_instruction: str = "",
@@ -515,15 +536,17 @@ class OpenAIGuidePageGenerator:
             city=city,
             country=country,
             age_complexity=age_complexity,
-            has_landmark_reference=landmark_reference is not None,
+            has_landmark_reference=(
+                landmark_reference is not None or landmark_page_reference is not None
+            ),
             has_revision_reference=reference_page is not None,
             revision_instruction=revision_instruction,
         )
         artwork = _provider_artwork_path(output_path)
         try:
-            response = self._edit_with_references(
+            response = self._generate_activity_artwork(
                 prompt,
-                _activity_references(landmark_reference, approved_landmark_page, reference_page),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
             )
             _persist_page_image(response, artwork)
             return compose_drawing_page(
@@ -625,6 +648,15 @@ class OpenAIGuidePageGenerator:
             },
         )
 
+    def _generate_activity_artwork(
+        self,
+        prompt: str,
+        references: list[Path],
+    ) -> httpx.Response:
+        if references:
+            return self._edit_with_references(prompt, references)
+        return self._generate_from_prompt(prompt)
+
     def _edit_with_references(self, prompt: str, references: list[Path]) -> httpx.Response:
         _validate_local_references(references)
         with ExitStack() as stack:
@@ -661,30 +693,54 @@ class OpenAIGuidePageGenerator:
 
     def _post(self, path: str, **kwargs: Any) -> httpx.Response:
         headers = {"Authorization": f"Bearer {self.api_key}"}
-        try:
-            if self.transport is not None:
-                response = self.transport(
-                    "POST",
-                    f"{self.base_url}{path}",
-                    headers=headers,
-                    timeout=self.timeout_seconds,
-                    **kwargs,
-                )
-            else:
-                with httpx.Client(timeout=self.timeout_seconds) as client:
-                    response = client.post(f"{self.base_url}{path}", headers=headers, **kwargs)
-            response.raise_for_status()
-        except httpx.TimeoutException as error:
-            raise PageGenerationError("A geração da página excedeu o tempo limite.") from error
-        except httpx.HTTPStatusError as error:
-            status = error.response.status_code
-            provider_detail = _provider_error_detail(error.response)
-            raise PageGenerationError(
-                f"A OpenAI recusou a geração da página (HTTP {status}{provider_detail})."
-            ) from error
-        except httpx.HTTPError as error:
-            raise PageGenerationError("Não foi possível acessar a geração de imagens.") from error
-        return response
+        maximum_attempts = 3
+        for attempt in range(1, maximum_attempts + 1):
+            _rewind_request_files(kwargs)
+            try:
+                if self.transport is not None:
+                    response = self.transport(
+                        "POST",
+                        f"{self.base_url}{path}",
+                        headers=headers,
+                        timeout=self.timeout_seconds,
+                        **kwargs,
+                    )
+                else:
+                    with httpx.Client(timeout=self.timeout_seconds) as client:
+                        response = client.post(f"{self.base_url}{path}", headers=headers, **kwargs)
+                response.raise_for_status()
+                return response
+            except httpx.TimeoutException as error:
+                raise PageGenerationError("A geração da página excedeu o tempo limite.") from error
+            except httpx.HTTPStatusError as error:
+                status = error.response.status_code
+                provider_detail = _provider_error_detail(error.response)
+                if status == 429:
+                    retry_after = _provider_retry_after_seconds(
+                        error.response,
+                        attempt=attempt,
+                        random_value=self.retry_random(),
+                    )
+                    if attempt < maximum_attempts and retry_after <= 8:
+                        self.retry_sleep(retry_after)
+                        continue
+                    raise PageGenerationRetryableError(
+                        f"A OpenAI está com muitas solicitações (HTTP 429{provider_detail}).",
+                        retry_after_seconds=retry_after,
+                    ) from error
+                if status >= 500 and attempt < maximum_attempts:
+                    self.retry_sleep(
+                        _provider_backoff_seconds(attempt, random_value=self.retry_random())
+                    )
+                    continue
+                raise PageGenerationError(
+                    f"A OpenAI recusou a geração da página (HTTP {status}{provider_detail})."
+                ) from error
+            except httpx.HTTPError as error:
+                raise PageGenerationError(
+                    "Não foi possível acessar a geração de imagens."
+                ) from error
+        raise PageGenerationError("Não foi possível acessar a geração de imagens.")
 
 
 def get_guide_page_generator() -> GuidePageGenerator:
@@ -1244,13 +1300,14 @@ def _context_value(mapping: dict[str, Any], *keys: str, default: str) -> str:
 
 def _activity_references(
     landmark_reference: Path | None,
-    approved_landmark_page: Path,
+    landmark_page_reference: Path | None,
     reference_page: Path | None,
 ) -> list[Path]:
     references = []
     if landmark_reference is not None:
         references.append(landmark_reference)
-    references.append(approved_landmark_page)
+    if landmark_page_reference is not None:
+        references.append(landmark_page_reference)
     if reference_page is not None:
         references.append(reference_page)
     return references
@@ -1373,6 +1430,46 @@ def _validate_local_references(references: list[Path]) -> None:
                     raise PageGenerationError("Uma referência visual possui formato inválido.")
         except (UnidentifiedImageError, OSError) as error:
             raise PageGenerationError("Uma referência visual local é inválida.") from error
+
+
+def _rewind_request_files(kwargs: dict[str, Any]) -> None:
+    files = kwargs.get("files")
+    if not isinstance(files, list):
+        return
+    for item in files:
+        if not isinstance(item, tuple) or len(item) != 2:
+            continue
+        file_data = item[1]
+        if not isinstance(file_data, tuple) or len(file_data) < 2:
+            continue
+        file_object = file_data[1]
+        seek = getattr(file_object, "seek", None)
+        if callable(seek):
+            seek(0)
+
+
+def _provider_backoff_seconds(attempt: int, *, random_value: float) -> float:
+    bounded_random = min(1.0, max(0.0, random_value))
+    jitter = 0.75 + (bounded_random * 0.5)
+    return min(8.0, (2 ** max(0, attempt - 1)) * jitter)
+
+
+def _provider_retry_after_seconds(
+    response: httpx.Response,
+    *,
+    attempt: int,
+    random_value: float,
+) -> int:
+    try:
+        header_delay = float(response.headers.get("Retry-After", ""))
+    except (TypeError, ValueError):
+        header_delay = 0
+    if math.isfinite(header_delay) and header_delay > 0:
+        return max(1, math.ceil(header_delay))
+    return max(
+        1,
+        math.ceil(_provider_backoff_seconds(attempt, random_value=random_value)),
+    )
 
 
 def _provider_error_detail(response: httpx.Response) -> str:
