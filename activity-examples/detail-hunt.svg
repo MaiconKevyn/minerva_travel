@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" role="img" aria-labelledby="title desc">
+  <title id="title">Exemplo de caça aos detalhes</title>
+  <desc id="desc">Ilustração de uma torre com lupa e três detalhes para observar.</desc>
+  <rect width="600" height="400" rx="32" fill="#fff8ed"/>
+  <circle cx="92" cy="80" r="54" fill="#f7c65b" opacity=".55"/>
+  <path d="M235 316h145l-18-57-24-40-8-116h-44l-9 116-24 40z" fill="#81b7ba" stroke="#173f59" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M275 220h72M258 263h107M285 102h45" stroke="#173f59" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="434" cy="134" r="62" fill="none" stroke="#ef7651" stroke-width="14"/>
+  <path d="M476 179l54 54" stroke="#ef7651" stroke-width="18" stroke-linecap="round"/>
+  <g fill="#173f59" font-family="Arial,sans-serif" font-size="24" font-weight="700">
+    <text x="46" y="345">□ janela</text><text x="224" y="345">□ arco</text><text x="392" y="345">□ topo</text>
+  </g>
+  <rect x="22" y="18" width="118" height="42" rx="21" fill="#173f59"/>
+  <text x="81" y="47" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="22" font-weight="700">EXEMPLO</text>
+</svg>

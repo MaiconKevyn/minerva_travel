@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" role="img" aria-labelledby="title desc">
+  <title id="title">Exemplo de caça-palavras</title>
+  <desc id="desc">Grade colorida com letras e palavras ligadas a uma viagem.</desc>
+  <rect width="600" height="400" rx="32" fill="#eef8f8"/>
+  <g fill="#173f59" font-family="monospace" font-size="34" font-weight="700">
+    <text x="92" y="114">T O R R E</text><text x="92" y="164">V I A G E</text>
+    <text x="92" y="214">P A R I S</text><text x="92" y="264">M A P A S</text>
+  </g>
+  <rect x="79" y="72" width="211" height="56" rx="12" fill="none" stroke="#ef7651" stroke-width="7"/>
+  <path d="M385 293h118l-14-45-20-34-7-94h-36l-7 94-20 34z" fill="#f7c65b" stroke="#173f59" stroke-width="7"/>
+  <path d="M407 217h74M422 120h40" stroke="#173f59" stroke-width="7" stroke-linecap="round"/>
+  <text x="373" y="340" fill="#173f59" font-family="Arial,sans-serif" font-size="22" font-weight="700">TORRE • PARIS</text>
+  <rect x="22" y="18" width="118" height="42" rx="21" fill="#173f59"/>
+  <text x="81" y="47" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="22" font-weight="700">EXEMPLO</text>
+</svg>

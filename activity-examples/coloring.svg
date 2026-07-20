@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" role="img" aria-labelledby="title desc">
+  <title id="title">Exemplo de página para colorir</title>
+  <desc id="desc">Desenho em linhas pretas de uma torre, árvores e nuvens.</desc>
+  <rect width="600" height="400" rx="32" fill="white"/>
+  <g fill="none" stroke="#17202a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M220 338h180l-22-64-31-47-12-139h-50l-12 139-31 47z"/>
+    <path d="M267 229h86M244 277h132M283 88h54M300 88V54l13-22 12 22v34"/>
+    <path d="M50 312c8-51 40-71 80-44 19-46 70-35 72 16M410 287c12-45 54-55 75-21 34-25 69-1 66 38"/>
+    <path d="M64 99c18-25 47-24 61 0 22-21 59-4 57 25M426 100c20-28 51-23 62 2 28-20 59 0 54 27"/>
+  </g>
+  <rect x="22" y="18" width="118" height="42" rx="21" fill="#173f59" stroke="none"/>
+  <text x="81" y="47" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="22" font-weight="700">EXEMPLO</text>
+  <text x="300" y="375" text-anchor="middle" fill="#173f59" font-family="Arial,sans-serif" font-size="24" font-weight="700">PRONTA PARA GANHAR CORES</text>
+</svg>
