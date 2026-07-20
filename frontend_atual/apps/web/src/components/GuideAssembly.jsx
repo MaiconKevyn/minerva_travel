@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   approveBuilderPage,
@@ -38,6 +39,7 @@ const GuideAssembly = ({ session: initialSession }) => {
   const [busyAction, setBusyAction] = useState('');
   const [actionError, setActionError] = useState('');
   const [revisionInstruction, setRevisionInstruction] = useState('');
+  const [includeFamily, setIncludeFamily] = useState(false);
   const [completion, setCompletion] = useState(null);
   const objectUrlsRef = useRef(new Set());
   const generationKeysRef = useRef({});
@@ -104,6 +106,7 @@ const GuideAssembly = ({ session: initialSession }) => {
 
   useEffect(() => {
     setRevisionInstruction('');
+    setIncludeFamily(false);
   }, [activePage?.id]);
 
   const updateSession = async (operation) => {
@@ -127,6 +130,7 @@ const GuideAssembly = ({ session: initialSession }) => {
           activePage.id,
           key,
           requestedRevision,
+          activePage.kind === 'landmark' && includeFamily,
         ),
       );
       delete generationKeysRef.current[activePage.id];
@@ -377,6 +381,11 @@ const GuideAssembly = ({ session: initialSession }) => {
                             <span className="absolute bottom-1 left-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold text-white">
                               Versão {index + 1}
                             </span>
+                            {activePage.kind === 'landmark' && (
+                              <span className="absolute bottom-1 right-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold text-white">
+                                {attempt.include_family ? 'Com família' : 'Sem família'}
+                              </span>
+                            )}
                             {selected && (
                               <span className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white">
                                 <Check className="h-4 w-4" />
@@ -413,6 +422,31 @@ const GuideAssembly = ({ session: initialSession }) => {
                       <span className="shrink-0" aria-live="polite">
                         {revisionInstruction.length}/{MAX_REVISION_INSTRUCTION_LENGTH}
                       </span>
+                    </div>
+                  </div>
+                )}
+
+                {activePage.kind === 'landmark' && (
+                  <div className="rounded-2xl border border-secondary/25 bg-secondary/5 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <label
+                          htmlFor={`include-family-${activePage.id}`}
+                          className="text-sm font-bold text-foreground"
+                        >
+                          Incluir família
+                        </label>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Desativado por padrão. Ative para usar a foto e a capa aprovada como referência.
+                        </p>
+                      </div>
+                      <Switch
+                        id={`include-family-${activePage.id}`}
+                        checked={includeFamily}
+                        onCheckedChange={setIncludeFamily}
+                        disabled={Boolean(busyAction)}
+                        aria-label="Incluir família"
+                      />
                     </div>
                   </div>
                 )}

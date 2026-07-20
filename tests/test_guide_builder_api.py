@@ -91,15 +91,17 @@ def _generate(
     page_id: str,
     key: str,
     revision_instruction: str | None = None,
+    include_family: bool | None = None,
 ):
+    payload = {}
+    if revision_instruction is not None:
+        payload["revision_instruction"] = revision_instruction
+    if include_family is not None:
+        payload["include_family"] = include_family
     return client.post(
         f"/api/guide-builder/{session_id}/pages/{page_id}/attempts",
         headers={"Idempotency-Key": key},
-        json=(
-            {"revision_instruction": revision_instruction}
-            if revision_instruction is not None
-            else None
-        ),
+        json=payload or None,
     )
 
 
@@ -167,10 +169,17 @@ def test_page_builder_generates_approves_and_completes_without_pdf(tmp_path, mon
         assert _approve(client, session_id, page_id, page["selected_attempt_id"]).status_code == 200
         assert generator.calls[-1] == kind
         request = generator.requests[-1]
-        assert request["family_photo"].is_file()
-        assert request["family_cover"].name == "cover-1.png"
         assert request["reference_page"] is None
         assert request["expected_visible_family_member_count"] == 2
+        if page_id == "summary":
+            assert request["family_photo"].is_file()
+            assert request["family_cover"].name == "cover-1.png"
+            assert page["attempts"][-1]["include_family"] is True
+        else:
+            assert request["family_photo"] is None
+            assert request["family_cover"] is None
+            assert request["include_family"] is False
+            assert page["attempts"][-1]["include_family"] is False
 
     completed = client.post(f"/api/guide-builder/{session_id}/complete")
     assert completed.status_code == 200, completed.text
@@ -273,6 +282,85 @@ def test_summary_regeneration_keeps_canonical_family_references(tmp_path, monkey
     assert revised_request["family_cover"].name == "cover-1.png"
     assert revised_request["reference_page"].name == "summary-1.png"
     assert revised_request["expected_visible_family_member_count"] == 2
+
+
+def test_landmark_can_opt_in_to_family_and_idempotent_replay_keeps_choice(tmp_path, monkeypatch):
+    client, generator = _setup(monkeypatch, tmp_path)
+    session_id = _create_session(client)["session_id"]
+    cover = _generate(client, session_id, "cover", "cover-first").json()
+    cover_attempt = cover["pages"][0]["selected_attempt_id"]
+    assert _approve(client, session_id, "cover", cover_attempt).status_code == 200
+    summary = _generate(client, session_id, "summary", "summary-first").json()
+    summary_attempt = next(page for page in summary["pages"] if page["id"] == "summary")[
+        "selected_attempt_id"
+    ]
+    assert _approve(client, session_id, "summary", summary_attempt).status_code == 200
+
+    generated = _generate(
+        client,
+        session_id,
+        "landmark-1",
+        "landmark-family",
+        include_family=True,
+    )
+    assert generated.status_code == 200, generated.text
+    request = generator.requests[-1]
+    assert request["include_family"] is True
+    assert request["family_photo"].is_file()
+    assert request["family_cover"].name == "cover-1.png"
+    landmark_page = next(page for page in generated.json()["pages"] if page["id"] == "landmark-1")
+    assert landmark_page["attempts"][-1]["include_family"] is True
+
+    replay = _generate(
+        client,
+        session_id,
+        "landmark-1",
+        "landmark-family",
+        include_family=False,
+    )
+    assert replay.status_code == 200
+    assert replay.headers["Idempotency-Replayed"] == "true"
+    assert generator.calls.count("landmark") == 1
+    replayed_page = next(page for page in replay.json()["pages"] if page["id"] == "landmark-1")
+    assert replayed_page["attempts"][-1]["include_family"] is True
+
+
+def test_landmark_without_family_does_not_require_cover_but_opt_in_does(tmp_path, monkeypatch):
+    client, generator = _setup(monkeypatch, tmp_path)
+    session_id = _create_session(client)["session_id"]
+    cover = _generate(client, session_id, "cover", "cover-first").json()
+    cover_attempt = cover["pages"][0]["selected_attempt_id"]
+    assert _approve(client, session_id, "cover", cover_attempt).status_code == 200
+    summary = _generate(client, session_id, "summary", "summary-first").json()
+    summary_attempt = next(page for page in summary["pages"] if page["id"] == "summary")[
+        "selected_attempt_id"
+    ]
+    assert _approve(client, session_id, "summary", summary_attempt).status_code == 200
+    (tmp_path / "generated" / "builder" / session_id / "cover-1.png").unlink()
+
+    generated = _generate(
+        client,
+        session_id,
+        "landmark-1",
+        "landmark-without-family",
+        include_family=False,
+    )
+    assert generated.status_code == 200, generated.text
+    assert generator.requests[-1]["family_photo"] is None
+    assert generator.requests[-1]["family_cover"] is None
+
+    failed = _generate(
+        client,
+        session_id,
+        "landmark-1",
+        "landmark-with-family",
+        include_family=True,
+    )
+    assert failed.status_code == 502
+    assert failed.json()["detail"]["message"] == (
+        "A capa aprovada da família não está mais disponível."
+    )
+    assert generator.calls.count("landmark") == 1
 
 
 def test_summary_fails_without_the_approved_cover_asset(tmp_path, monkeypatch):

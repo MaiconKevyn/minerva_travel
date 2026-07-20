@@ -51,6 +51,7 @@ class BuilderAttempt:
     created_at: str
     idempotency_key: str
     revision_instruction: str = ""
+    include_family: bool = False
 
 
 @dataclass
@@ -67,6 +68,7 @@ class BuilderPage:
     pending_attempt_id: str | None = None
     pending_idempotency_key: str | None = None
     pending_revision_instruction: str = ""
+    pending_include_family: bool = False
     error: str | None = None
 
     def selected_attempt(self) -> BuilderAttempt | None:
@@ -164,6 +166,7 @@ class BuilderSession:
                     "asset_url": self._asset_url(attempt.filename),
                     "created_at": attempt.created_at,
                     "revision_instruction": attempt.revision_instruction,
+                    "include_family": attempt.include_family,
                 }
                 for attempt in page.attempts
             ],
@@ -256,7 +259,10 @@ def _load_builder_session(session_id: str) -> BuilderSession:
                 BuilderPage(
                     **{
                         **page,
-                        "attempts": [BuilderAttempt(**item) for item in page.get("attempts", [])],
+                        "attempts": [
+                            BuilderAttempt(**{"include_family": True, **item})
+                            for item in page.get("attempts", [])
+                        ],
                     }
                 )
                 for page in payload["pages"]
@@ -271,6 +277,7 @@ def reserve_page_attempt(
     page_id: str,
     idempotency_key: str,
     revision_instruction: str = "",
+    include_family: bool = False,
 ) -> tuple[str, bool]:
     page = session.page(page_id)
     if page is None:
@@ -288,6 +295,7 @@ def reserve_page_attempt(
     page.pending_attempt_id = attempt_id
     page.pending_idempotency_key = idempotency_key
     page.pending_revision_instruction = normalize_revision_instruction(revision_instruction)
+    page.pending_include_family = include_family
     page.error = None
     save_builder_session(session)
     return attempt_id, False
@@ -305,12 +313,14 @@ def commit_page_attempt(
         created_at=datetime.now(UTC).isoformat(),
         idempotency_key=page.pending_idempotency_key,
         revision_instruction=page.pending_revision_instruction,
+        include_family=page.pending_include_family,
     )
     page.attempts.append(attempt)
     page.selected_attempt_id = attempt.id
     page.pending_attempt_id = None
     page.pending_idempotency_key = None
     page.pending_revision_instruction = ""
+    page.pending_include_family = False
     page.error = None
     save_builder_session(session)
     return attempt
@@ -325,6 +335,7 @@ def rollback_page_attempt(
     page.pending_attempt_id = None
     page.pending_idempotency_key = None
     page.pending_revision_instruction = ""
+    page.pending_include_family = False
     page.error = message
     save_builder_session(session)
 

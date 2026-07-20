@@ -15,6 +15,7 @@ FIXTURE_PATH = SMOKE_DIR / "synthetic-family.png"
 OUTPUT_PATH = SMOKE_DIR / "cover.png"
 REVISION_OUTPUT_PATH = SMOKE_DIR / "cover-revision.png"
 SUMMARY_OUTPUT_PATH = SMOKE_DIR / "summary.png"
+LANDMARK_OUTPUT_PATH = SMOKE_DIR / "landmark.png"
 
 
 def create_synthetic_family_fixture() -> Path:
@@ -55,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Generate a summary using the synthetic photo and approved cover references.",
     )
+    parser.add_argument(
+        "--landmark",
+        action="store_true",
+        help="Generate a people-free destination page without family references.",
+    )
     return parser.parse_args()
 
 
@@ -62,6 +68,20 @@ def main() -> None:
     args = parse_args()
     fixture = create_synthetic_family_fixture()
     generator = OpenAIGuidePageGenerator(quality="low")
+    if args.landmark:
+        generator.generate_landmark_page(
+            family_photo=None,
+            family_cover=None,
+            include_family=False,
+            output_path=LANDMARK_OUTPUT_PATH,
+            family_title="Família Aurora",
+            trip_date="Julho de 2026",
+            landmark_name="Torre Eiffel",
+            city="Paris",
+            country="França",
+        )
+        _report_output(LANDMARK_OUTPUT_PATH)
+        return
     if args.summary:
         if not OUTPUT_PATH.is_file():
             raise SystemExit(f"Generate the base smoke cover first: {OUTPUT_PATH}")

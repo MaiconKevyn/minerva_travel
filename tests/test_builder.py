@@ -109,7 +109,11 @@ def test_revision_instruction_is_normalized_persisted_and_old_sessions_remain_re
     )
 
     attempt_id, _ = reserve_page_attempt(
-        session, "cover", "request-one", "  Mude   para colagem\ncom tons azuis.  "
+        session,
+        "cover",
+        "request-one",
+        "  Mude   para colagem\ncom tons azuis.  ",
+        True,
     )
     commit_page_attempt(session, "cover", attempt_id, "cover-1.png")
     loaded = load_builder_session(session.id, "owner")
@@ -118,13 +122,19 @@ def test_revision_instruction_is_normalized_persisted_and_old_sessions_remain_re
         loaded.public_payload()["pages"][0]["attempts"][0]["revision_instruction"]
         == "Mude para colagem com tons azuis."
     )
+    assert loaded.pages[0].attempts[0].include_family is True
+    assert loaded.public_payload()["pages"][0]["attempts"][0]["include_family"] is True
 
     session_path = tmp_path / "builder" / f"{session.id}.json"
     legacy_payload = json.loads(session_path.read_text(encoding="utf-8"))
     legacy_payload["pages"][0].pop("pending_revision_instruction")
+    legacy_payload["pages"][0].pop("pending_include_family")
     legacy_payload["pages"][0]["attempts"][0].pop("revision_instruction")
+    legacy_payload["pages"][0]["attempts"][0].pop("include_family")
     session_path.write_text(json.dumps(legacy_payload), encoding="utf-8")
 
     legacy = load_builder_session(session.id, "owner")
     assert legacy.pages[0].pending_revision_instruction == ""
+    assert legacy.pages[0].pending_include_family is False
     assert legacy.pages[0].attempts[0].revision_instruction == ""
+    assert legacy.pages[0].attempts[0].include_family is True

@@ -16,8 +16,11 @@ The first experiment must also validate the current OpenAI image model's ability
 - Display generated page images directly in the authenticated UI without waiting for or producing a PDF.
 - Treat provider failures as visible retryable errors; never substitute a placeholder, raw family photo, or legacy PDF generation.
 - Preserve the exact approved image attempt so later export can reuse the same pixels.
-- Treat the approved cover and original family photo as canonical identity references for every
-  later illustrated page, preventing the model from inventing a different family.
+- Treat the approved cover and original family photo as canonical identity references for the
+  summary and for destination pages where the family is explicitly included, preventing the
+  model from inventing a different family.
+- Generate destination/landmark pages without people by default and expose an opt-in
+  `Incluir família` control for each attempt.
 - Apply owner isolation, attempt limits, request quotas, idempotency, retention, and account-deletion behavior to page-generation sessions and assets.
 
 ## Capabilities
@@ -25,7 +28,8 @@ The first experiment must also validate the current OpenAI image model's ability
 ### New Capabilities
 
 - `progressive-guide-page-generation`: Ordered full-page image generation, page attempts, approval, regeneration, and progressive UI review.
-- `openai-guide-page-art`: OpenAI image editing/generation for family cover and itinerary-summary pages with exact in-image copy.
+- `openai-guide-page-art`: OpenAI image editing/generation for family cover, itinerary summary,
+  and optional-family destination pages with exact in-image copy.
 
 ### Modified Capabilities
 

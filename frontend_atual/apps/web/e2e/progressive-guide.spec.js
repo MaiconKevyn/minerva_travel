@@ -6,11 +6,12 @@ const onePixelPng = Buffer.from(
   'base64',
 );
 
-const attempt = (id, filename, revisionInstruction = '') => ({
+const attempt = (id, filename, revisionInstruction = '', includeFamily = false) => ({
   id,
   asset_url: `/guide-builder/syntheticsession/assets/${filename}`,
   created_at: '2026-07-20T00:00:00+00:00',
   revision_instruction: revisionInstruction,
+  include_family: includeFamily,
 });
 
 const pageState = ({
@@ -36,7 +37,7 @@ const pageState = ({
   error: null,
 });
 
-test('family reviews versions and approves cover then summary directly in the UI', async ({
+test('family reviews pages and controls family inclusion on a landmark', async ({
   page,
 }) => {
   const consoleErrors = [];
@@ -52,14 +53,24 @@ test('family reviews versions and approves cover then summary directly in the UI
   let summaryAttempts = [];
   let summarySelected = null;
   let summaryApproved = false;
+  let landmarkAttempts = [];
+  const landmarkFamilyRequests = [];
+  let landmarkSelected = null;
+  let landmarkApproved = false;
 
   const sessionPayload = () => ({
     session_id: 'syntheticsession',
     created_at: '2026-07-20T00:00:00+00:00',
     expires_at: '2026-08-03T00:00:00+00:00',
     title: 'Família Aurora',
-    active_page_id: !coverApproved ? 'cover' : !summaryApproved ? 'summary' : null,
-    is_complete: coverApproved && summaryApproved,
+    active_page_id: !coverApproved
+      ? 'cover'
+      : !summaryApproved
+        ? 'summary'
+        : !landmarkApproved
+          ? 'landmark-1'
+          : null,
+    is_complete: coverApproved && summaryApproved && landmarkApproved,
     pages: [
       pageState({
         id: 'cover',
@@ -86,6 +97,16 @@ test('family reviews versions and approves cover then summary directly in the UI
         attempts: summaryAttempts,
         selectedAttemptId: summarySelected,
         approved: summaryApproved,
+      }),
+      pageState({
+        id: 'landmark-1',
+        kind: 'landmark',
+        title: 'Torre Eiffel, França',
+        position: 3,
+        requiredCopy: ['Torre Eiffel', 'Paris, França', 'Família Aurora • Julho de 2026'],
+        attempts: landmarkAttempts,
+        selectedAttemptId: landmarkSelected,
+        approved: landmarkApproved,
       }),
     ],
   });
@@ -187,6 +208,28 @@ test('family reviews versions and approves cover then summary directly in the UI
       summaryApproved = true;
       return route.fulfill({ status: 200, json: sessionPayload() });
     }
+    if (url.pathname.endsWith('/pages/landmark-1/attempts') && method === 'POST') {
+      const requestPayload = request.postDataJSON() || {};
+      const includeFamily = requestPayload.include_family === true;
+      landmarkFamilyRequests.push(includeFamily);
+      const next = landmarkAttempts.length + 1;
+      landmarkAttempts = [
+        ...landmarkAttempts,
+        attempt(
+          `landmark-1-${next}`,
+          `landmark-1-${next}.png`,
+          requestPayload.revision_instruction || '',
+          includeFamily,
+        ),
+      ];
+      landmarkSelected = `landmark-1-${next}`;
+      return route.fulfill({ status: 200, json: sessionPayload() });
+    }
+    if (url.pathname.endsWith('/pages/landmark-1/approve') && method === 'POST') {
+      landmarkSelected = request.postDataJSON().attempt_id;
+      landmarkApproved = true;
+      return route.fulfill({ status: 200, json: sessionPayload() });
+    }
     if (url.pathname.endsWith('/complete') && method === 'POST') {
       return route.fulfill({
         status: 200,
@@ -255,6 +298,18 @@ test('family reviews versions and approves cover then summary directly in the UI
   await expect(page.getByText('Torre Eiffel', { exact: true })).toBeVisible();
   await expect(page.getByText('Coliseu', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Gerar página' }).click();
+  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Torre Eiffel, França' })).toBeVisible();
+  const includeFamilySwitch = page.getByRole('switch', { name: 'Incluir família' });
+  await expect(includeFamilySwitch).not.toBeChecked();
+  await page.getByRole('button', { name: 'Gerar página' }).click();
+  await expect(page.getByText('Sem família', { exact: true })).toBeVisible();
+  await includeFamilySwitch.click();
+  await expect(includeFamilySwitch).toBeChecked();
+  await page.getByRole('button', { name: 'Gerar outra versão' }).click();
+  await expect(page.getByText('Com família', { exact: true })).toBeVisible();
+  expect(landmarkFamilyRequests).toEqual([false, true]);
   await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
   await page.getByRole('button', { name: 'Concluir revisão das imagens' }).click();
 

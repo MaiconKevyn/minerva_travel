@@ -214,7 +214,36 @@ def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_p
     assert '2. "Coliseu"' in kwargs["data"]["prompt"]
 
 
-def test_landmark_page_uses_same_family_and_forbids_identity_drift(tmp_path):
+def test_landmark_page_defaults_to_generation_without_people_or_family_inputs(tmp_path):
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _response(_png_bytes(color="#d09a55"))
+
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    generator.generate_landmark_page(
+        family_photo=None,
+        family_cover=None,
+        output_path=tmp_path / "landmark.png",
+        family_title="Família Moraes",
+        trip_date="2026",
+        landmark_name="Torre Eiffel",
+        city="Paris",
+        country="França",
+    )
+
+    _method, url, kwargs = calls[0]
+    assert url.endswith("/images/generations")
+    assert "files" not in kwargs
+    prompt = kwargs["json"]["prompt"]
+    assert "as the only visual subject" in prompt
+    assert "Do not depict any person" in prompt
+    assert "silhouette, or crowd" in prompt
+    assert "overrides any user revision feedback" in prompt
+
+
+def test_landmark_page_can_include_same_family_with_canonical_references(tmp_path):
     calls = []
 
     def transport(method, url, **kwargs):
@@ -226,6 +255,7 @@ def test_landmark_page_uses_same_family_and_forbids_identity_drift(tmp_path):
     generator.generate_landmark_page(
         family_photo=photo,
         family_cover=cover,
+        include_family=True,
         output_path=tmp_path / "landmark.png",
         family_title="Família Moraes",
         trip_date="2026",
@@ -245,6 +275,37 @@ def test_landmark_page_uses_same_family_and_forbids_identity_drift(tmp_path):
     assert "complete canonical family exploring together" in prompt
     assert "Do not invent, replace, omit, merge" in prompt
     assert "clothing colors" in prompt
+
+
+def test_landmark_revision_without_family_uses_only_selected_page_and_removes_people(tmp_path):
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _response(_png_bytes(color="#6faec9"))
+
+    reference = tmp_path / "landmark-with-family.png"
+    reference.write_bytes(_png_bytes())
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    generator.generate_landmark_page(
+        family_photo=None,
+        family_cover=None,
+        reference_page=reference,
+        revision_instruction="Mantenha a família e acrescente turistas.",
+        output_path=tmp_path / "landmark-without-family.png",
+        family_title="Família Moraes",
+        trip_date="2026",
+        landmark_name="Torre Eiffel",
+        city="Paris",
+        country="França",
+    )
+
+    _method, url, kwargs = calls[0]
+    assert url.endswith("/images/edits")
+    assert [file_data[0] for _field, file_data in kwargs["files"]] == ["landmark-with-family.png"]
+    prompt = kwargs["data"]["prompt"]
+    assert "Remove every person that may appear in it" in prompt
+    assert "This invariant overrides any user revision feedback" in prompt
 
 
 def test_openai_page_generator_rejects_missing_key(monkeypatch):

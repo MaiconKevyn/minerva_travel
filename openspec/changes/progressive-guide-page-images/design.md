@@ -82,10 +82,12 @@ attempt is resolved server-side from the owner-scoped session and supplied to th
 reference; clients never submit filesystem paths or arbitrary asset URLs.
 
 For a cover revision, the original sanitized family photo remains the first reference and the
-selected cover is the second reference. Other page types use the selected attempt as their
-revision reference in addition to the original photo and approved cover. The user instruction is
-quoted as design feedback and remains subordinate to the page's exact-copy, family-composition,
-safety, no-extra-text, and no-watermark contracts.
+selected cover is the second reference. The summary uses the selected attempt as its revision
+reference in addition to the original photo and approved cover. A destination page uses the
+selected attempt alone when `include_family=false`, or after the original photo and approved
+cover when `include_family=true`. The user instruction is quoted as design feedback and remains
+subordinate to the page's exact-copy, people/family, safety, no-extra-text, and no-watermark
+contracts.
 
 An empty field is valid. In that case the prompt explicitly requests a visibly different
 alternative by changing composition, palette, lighting, decorative treatment, and typography
@@ -95,22 +97,42 @@ empty instruction.
 
 ### Decision 9: The approved cover is the canonical illustrated-family design
 
-Once the cover is approved, every later page resolves that exact owner-allowlisted attempt on the
-server. Image input 1 is always the sanitized original photo and remains authoritative for family
-membership, recognizable traits, approximate ages, hair, glasses, and composition. Image input 2
-is always the approved cover and remains authoritative for the established illustrated character
-design, palette, and visual treatment. A selected attempt of the current page, when regenerating,
-is input 3 and controls only the requested page revision.
+Once the cover is approved, the summary and any destination attempt with `include_family=true`
+resolve that exact owner-allowlisted attempt on the server. Image input 1 is the sanitized original
+photo and remains authoritative for family membership, recognizable traits, approximate ages,
+hair, glasses, and composition. Image input 2 is the approved cover and remains authoritative for
+the established illustrated character design, palette, and visual treatment. A selected attempt
+of the current page, when regenerating, is input 3 and controls only the requested page revision.
 
-Later-page prompts require the same family in every prominent human vignette, with stable traits
-and clothing colors unless the user explicitly requests a safe clothing/style change. They forbid
-inventing, replacing, omitting, merging, or changing the apparent age of family members. Any
-incidental crowd must be abstract background detail rather than newly characterized people. The
-cover reference is used for identity/style only; its layout and text must not be copied into later
-pages.
+Summary and family-enabled destination prompts require the same family in every prominent human
+vignette, with stable traits and clothing colors unless the user explicitly requests a safe
+clothing/style change. They forbid inventing, replacing, omitting, merging, or changing the
+apparent age of family members. Any incidental crowd must be abstract background detail rather
+than newly characterized people. The cover reference is used for identity/style only; its layout
+and text must not be copied into later pages.
 
-Generation fails visibly if the approved cover or original photo is unavailable. There is no
-text-only fallback, because such a fallback would silently reintroduce identity drift.
+Summary generation and destination generation with the family enabled fail visibly if the
+approved cover or original photo is unavailable. There is no text-only fallback for those modes,
+because such a fallback would silently reintroduce identity drift.
+
+### Decision 10: Destination pages exclude people unless explicitly enabled
+
+Every `landmark` generation request accepts `include_family`, persisted on its immutable attempt,
+with missing request fields defaulting to `false`. Persisted attempts from before this change are
+read as `true`, matching the prior always-include behavior. The progressive UI shows an `Incluir
+família` toggle only for the active destination page and resets it to off when the workflow
+advances to another page.
+
+With the toggle off, a first attempt uses `/v1/images/generations` without the original photo or
+approved cover. A regeneration uses `/v1/images/edits` with only the selected attempt, so the
+requested page can be revised without disclosing or compositing the family references. Its prompt
+forbids every person, family member, child, tourist, portrait, face, body, silhouette, or crowd,
+including people inherited from a selected revision image. User revision feedback cannot override
+this invariant.
+
+With the toggle on, destination generation uses `/v1/images/edits` with the original photo and
+approved cover, followed by the selected current-page attempt when present. The family-continuity
+contract from Decision 9 remains mandatory. Cover and summary behavior does not change.
 
 ## Prompt Contracts
 
@@ -133,6 +155,15 @@ text-only fallback, because such a fallback would silently reintroduce identity 
 - Keep family membership, apparent ages, hair, glasses, facial traits, and character design stable
   across every vignette; do not introduce a different prominent person.
 
+### Destination / Landmark
+
+- Render the named landmark and supplied location as the only visual subjects by default.
+- With `include_family=false`, include no people, family, children, tourists, portraits, faces,
+  bodies, silhouettes, or crowds, even when revising an attempt that previously contained people.
+- With `include_family=true`, show only the canonical family from the original photo and approved
+  cover; do not invent or replace family members.
+- Include the exact landmark, location, family title, and date copy without adding facts.
+
 ## Failure Handling
 
 - Missing OpenAI configuration: `503` with a stable error code.
@@ -148,11 +179,11 @@ text-only fallback, because such a fallback would silently reintroduce identity 
 
 - Exact prompt strings contain canonical title/date/stop names and no legacy text-free instruction.
 - OpenAI request payload and multipart fields match the official endpoint contract.
-- Cover revisions send the original photo and selected cover as repeated multipart image inputs;
-  later pages send the original photo, approved cover, and optional selected page through the
+- Cover revisions send the original photo and selected cover as repeated multipart image inputs.
+- Summary attempts use the original photo, approved cover, and optional selected page through the
   edits endpoint.
-- First summary and landmark attempts use multipart edits rather than text-only generations and
-  assert the canonical family input order.
+- Destination attempts default to text-only generations; revisions without family use only the
+  selected page, while family-enabled attempts assert the canonical family input order.
 - User revision text and the empty-field variation directive are present without weakening exact
   copy or family-composition constraints.
 - Base64 output becomes a valid 1024x1536 PNG.
@@ -162,13 +193,16 @@ text-only fallback, because such a fallback would silently reintroduce identity 
 ### API/security tests
 
 - Full cover → approval → summary lifecycle.
-- Summary and landmark generation fail rather than proceeding without the approved cover, and
-  provider calls receive only server-resolved owner assets.
+- Summary and family-enabled landmark generation fail rather than proceeding without the approved
+  cover, while default landmark generation does not resolve family assets; provider calls receive
+  only server-resolved owner assets.
 - Assets require the owning user and are allowlisted.
 - No PDF or preview URL is returned by page generation or completion.
 - Repeated idempotency keys do not create duplicate attempts.
 - Revision instructions are length-bounded, persisted with the immutable attempt, and reference
   only an owner-allowlisted selected attempt.
+- `include_family` defaults to false for destination pages, is persisted per attempt, and is
+  idempotently replayed without changing the original request semantics.
 - Session expiry, cleanup, and account deletion remove photos, JSON, and page images.
 - Final approved manifest references the exact selected attempt bytes.
 
@@ -179,6 +213,8 @@ text-only fallback, because such a fallback would silently reintroduce identity 
 - Active-page status, regenerate, version selection, approval, retry, and completion states.
 - Optional revision text is submitted on regeneration, survives a failed request, and is cleared
   after a successful new attempt.
+- The `Incluir família` control appears only for destination pages, is off by default, and sends
+  the selected boolean on first generation and regeneration.
 - Object URLs are revoked on replacement/unmount.
 - The complete cover and summary are displayed using authenticated object URLs.
 
@@ -189,14 +225,17 @@ text-only fallback, because such a fallback would silently reintroduce identity 
 - Inspect image dimensions, format, family composition, exact visible title, and visible date.
 - Generate one low-quality summary from the synthetic photo and approved synthetic cover; inspect
   that the same four characters and established traits remain visible.
+- Generate one low-quality destination page with family disabled; inspect that the landmark and
+  required copy are visible and that no person, silhouette, or crowd appears.
 - Record the live test as manual evidence; do not make paid live calls part of CI.
 
 ## Risks / Trade-offs
 
 - Model-rendered text can still contain mistakes. Explicit copy constraints, versioning, and approval make the experiment measurable without hiding errors.
 - Full-page generation costs more than asset-only generation. Sequential generation, quotas, attempt caps, and lower quality for experiments bound cost.
-- Later pages now include two or three high-fidelity image inputs, increasing input-token cost in
-  exchange for materially stronger family continuity.
+- Summary pages and family-enabled destination pages include two or three high-fidelity image
+  inputs, increasing input-token cost in exchange for materially stronger family continuity.
+  Default destination pages avoid those inputs and their additional input-token cost.
 - Local runtime persistence is not multi-instance durable. The repository boundary keeps a later Postgres/object-storage migration possible; production must stay single-instance until that migration.
 - A summary with too many labels can become crowded. The first version caps the number of labels per summary page and will split summaries in a follow-up if needed.
 

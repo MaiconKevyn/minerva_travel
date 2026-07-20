@@ -1063,6 +1063,7 @@ export const generateBuilderPageAttempt = async (
   pageId,
   idempotencyKey,
   revisionInstruction = '',
+  includeFamily = false,
 ) => {
   const response = await authenticatedFetch(
     `${apiBaseUrl()}/api/guide-builder/${encodeURIComponent(sessionId)}/pages/${encodeURIComponent(pageId)}/attempts`,
@@ -1072,7 +1073,10 @@ export const generateBuilderPageAttempt = async (
         'Content-Type': 'application/json',
         'Idempotency-Key': idempotencyKey || createIdempotencyKey(),
       },
-      body: JSON.stringify({ revision_instruction: revisionInstruction.trim() }),
+      body: JSON.stringify({
+        revision_instruction: revisionInstruction.trim(),
+        include_family: includeFamily,
+      }),
     },
   );
   if (!response.ok) {

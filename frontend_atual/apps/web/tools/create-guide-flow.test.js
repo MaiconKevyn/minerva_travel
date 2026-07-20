@@ -159,6 +159,11 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(assembly, /Gerar versão com ajustes/);
   assert.match(assembly, /alternativa visivelmente diferente/);
   assert.match(api, /revision_instruction: revisionInstruction\.trim\(\)/);
+  assert.match(api, /include_family: includeFamily/);
+  assert.match(assembly, /Incluir família/);
+  assert.match(assembly, /activePage\.kind === 'landmark'/);
+  assert.match(assembly, /setIncludeFamily\(false\)/);
+  assert.match(assembly, /attempt\.include_family \? 'Com família' : 'Sem família'/);
   assert.match(assembly, /Aprovar e continuar/);
   assert.match(assembly, /Concluir revisão das imagens/);
   assert.match(assembly, /Nenhum PDF foi gerado/);

@@ -68,3 +68,11 @@
 - [x] 9.3 Strengthen summary and landmark prompts against family-member invention, replacement, omission, and trait drift.
 - [x] 9.4 Add provider and API coverage for first-generation and regeneration reference order, missing assets, and prompt constraints.
 - [x] 9.5 Run complete automated and synthetic live summary validation, then publish `main` and `hostinger-frontend`.
+
+## 10. Optional Family On Destination Pages
+
+- [x] 10.1 Extend request, attempt, and persisted-session contracts with backward-compatible `include_family=false` semantics.
+- [x] 10.2 Branch destination generation between people-free generation/editing and canonical-family referenced editing.
+- [x] 10.3 Add an off-by-default `Incluir família` control only to destination-page generation in the progressive UI.
+- [x] 10.4 Add provider, API, persistence, frontend-contract, and browser coverage for both modes.
+- [ ] 10.5 Run complete automated and synthetic live destination validation, then publish `main` and `hostinger-frontend`.

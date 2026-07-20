@@ -394,6 +394,7 @@ class BuilderAttemptResponse(BaseModel):
     asset_url: str
     created_at: str
     revision_instruction: str = ""
+    include_family: bool = False
 
 
 class BuilderPageResponse(BaseModel):
@@ -426,6 +427,7 @@ class BuilderAttemptSelectionRequest(StrictRequestModel):
 
 class BuilderPageGenerationRequest(StrictRequestModel):
     revision_instruction: str = Field(default="", max_length=MAX_REVISION_INSTRUCTION_LENGTH)
+    include_family: bool = False
 
 
 class BuilderPageApprovalRequest(StrictRequestModel):
@@ -1988,15 +1990,25 @@ def generate_builder_page_attempt(
         )
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
-            revision_instruction = payload.revision_instruction if payload else ""
-            attempt_id, replayed = reserve_page_attempt(session, page_id, key, revision_instruction)
-            if replayed:
-                response.headers["Idempotency-Replayed"] = "true"
-                return BuilderSessionResponse.model_validate(session.public_payload())
             page = session.page(page_id)
             if page is None:
                 raise BuilderPageOutOfOrder(page_id)
+            revision_instruction = payload.revision_instruction if payload else ""
+            include_family = page.kind != "landmark" or bool(
+                payload.include_family if payload else False
+            )
+            attempt_id, replayed = reserve_page_attempt(
+                session,
+                page_id,
+                key,
+                revision_instruction,
+                include_family,
+            )
+            if replayed:
+                response.headers["Idempotency-Replayed"] = "true"
+                return BuilderSessionResponse.model_validate(session.public_payload())
             revision_instruction = page.pending_revision_instruction
+            include_family = page.pending_include_family
             page_kind = page.kind
             metadata = dict(page.metadata)
             family_title = str(session.form.get("title") or "Guia da família")
@@ -2013,7 +2025,7 @@ def generate_builder_page_attempt(
                 else None
             )
             family_cover: Path | None = None
-            if page_kind != "cover":
+            if page_kind == "trip_summary" or (page_kind == "landmark" and include_family):
                 cover_page = session.page("cover")
                 cover_attempt = (
                     cover_page.selected_attempt()
@@ -2032,7 +2044,7 @@ def generate_builder_page_attempt(
 
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
         generator = get_guide_page_generator()
-        if not photo_path.is_file():
+        if (page_kind != "landmark" or include_family) and not photo_path.is_file():
             raise PageGenerationError("A foto da família não está mais disponível.")
         if page_kind == "cover":
             generator.generate_cover_page(
@@ -2060,11 +2072,12 @@ def generate_builder_page_attempt(
                 reference_page=reference_page,
             )
         elif page_kind == "landmark":
-            if family_cover is None:
+            if include_family and family_cover is None:
                 raise PageGenerationError("A capa aprovada da família não está disponível.")
             generator.generate_landmark_page(
-                family_photo=photo_path,
+                family_photo=photo_path if include_family else None,
                 family_cover=family_cover,
+                include_family=include_family,
                 output_path=output,
                 family_title=family_title,
                 trip_date=str(metadata["trip_date"]),

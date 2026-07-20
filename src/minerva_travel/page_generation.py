@@ -67,8 +67,9 @@ class GuidePageGenerator(Protocol):
     def generate_landmark_page(
         self,
         *,
-        family_photo: Path,
-        family_cover: Path,
+        family_photo: Path | None,
+        family_cover: Path | None,
+        include_family: bool = False,
         output_path: Path,
         family_title: str,
         trip_date: str,
@@ -164,8 +165,9 @@ class OpenAIGuidePageGenerator:
     def generate_landmark_page(
         self,
         *,
-        family_photo: Path,
-        family_cover: Path,
+        family_photo: Path | None,
+        family_cover: Path | None,
+        include_family: bool = False,
         output_path: Path,
         family_title: str,
         trip_date: str,
@@ -182,15 +184,35 @@ class OpenAIGuidePageGenerator:
             landmark_name=landmark_name,
             city=city,
             country=country,
+            include_family=include_family,
             expected_visible_family_member_count=expected_visible_family_member_count,
             revision_instruction=revision_instruction,
             has_revision_reference=reference_page is not None,
         )
-        references = [family_photo, family_cover]
-        if reference_page is not None:
-            references.append(reference_page)
-        response = self._edit_with_references(prompt, references)
+        if include_family:
+            if family_photo is None or family_cover is None:
+                raise PageGenerationError("As referências da família não estão disponíveis.")
+            references = [family_photo, family_cover]
+            if reference_page is not None:
+                references.append(reference_page)
+            response = self._edit_with_references(prompt, references)
+        elif reference_page is not None:
+            response = self._edit_with_references(prompt, [reference_page])
+        else:
+            response = self._generate_from_prompt(prompt)
         return _persist_page_image(response, output_path)
+
+    def _generate_from_prompt(self, prompt: str) -> httpx.Response:
+        return self._post(
+            "/images/generations",
+            json={
+                "model": self.model,
+                "prompt": prompt,
+                "size": PAGE_IMAGE_SIZE_PARAM,
+                "quality": self.quality,
+                "output_format": "png",
+            },
+        )
 
     def _edit_with_references(self, prompt: str, references: list[Path]) -> httpx.Response:
         with ExitStack() as stack:
@@ -349,20 +371,30 @@ def landmark_page_prompt(
     landmark_name: str,
     city: str,
     country: str,
+    include_family: bool = False,
     expected_visible_family_member_count: int | None = None,
     revision_instruction: str = "",
     has_revision_reference: bool = False,
 ) -> str:
     location = ", ".join(part for part in (city, country) if part)
-    family = _family_continuity_directive(
-        expected_visible_family_member_count, has_revision_reference
+    people_contract = (
+        _family_continuity_directive(expected_visible_family_member_count, has_revision_reference)
+        if include_family
+        else _landmark_without_people_directive(has_revision_reference)
+    )
+    subject = (
+        "with the complete canonical family exploring together and generous readable space"
+        if include_family
+        else (
+            "as the only visual subject, surrounded by beautiful scenery and generous "
+            "readable space"
+        )
     )
     revision = _revision_directive(revision_instruction, has_revision_reference)
     return f"""
 Create a complete vertical page for a premium children's illustrated family travel guide.
 Show a recognizable, accurate watercolor-and-gouache storybook illustration of {landmark_name}
-in {location}, with the complete canonical family exploring together and generous readable space.
-{family}
+in {location}, {subject}.
 
 TEXT CONTRACT — render exactly these strings, verbatim, once each:
 "{landmark_name}"
@@ -373,6 +405,23 @@ Typography must be highly legible, correctly accented and high contrast. Do not 
 claims that were not provided. No other readable text, logos, prices, watermark, signature,
 mockup border or UI. Output the finished flat guide page.
 {revision}
+{people_contract}
+""".strip()
+
+
+def _landmark_without_people_directive(has_revision_reference: bool) -> str:
+    revision = (
+        "The supplied input image is only the selected current-page revision reference. Remove "
+        "every person that may appear in it."
+        if has_revision_reference
+        else "No family or people reference image is supplied for this first attempt."
+    )
+    return f"""
+PEOPLE-FREE LANDMARK CONTRACT — {revision}
+Do not depict any person, family member, child, tourist, portrait, selfie, face, body, human
+silhouette, or crowd anywhere in the page, including in distant backgrounds or reflections. The
+landmark, architecture, landscape, sky, plants, and decorative scenery must be the only visual
+subjects. This invariant overrides any user revision feedback that asks to add or preserve people.
 """.strip()
 
 
