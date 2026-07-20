@@ -159,5 +159,12 @@
   point-specific instruction, blank white canvas, painting title, and date fields.
 - [x] 12.3 Replace the drawing preview with an accessible painting preview and clearly distinguish
   blank-canvas painting from the ready-to-color activity.
-- [ ] 12.4 Run backend/frontend regression tests, inspect the preview/build, and publish both target
+- [x] 12.4 Run backend/frontend regression tests, inspect the preview/build, and publish both target
   branches.
+
+### `Minha pintura` delivery record
+
+- `main` implementation: `cbca3fc` (`Replace drawing activity with painting`).
+- `hostinger-frontend` static deployment: `2fdc2b8` (`Deploy painting activity`).
+- Preview, composed worksheet, remote heads, production `config.js`, and `.htaccess` copies were
+  confirmed on 2026-07-20.
