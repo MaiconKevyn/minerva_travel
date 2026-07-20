@@ -33,6 +33,7 @@ class FakePageGenerator:
         colors = {
             "cover": "#4f86b7",
             "summary": "#69b482",
+            "destination": "#6f9fb8",
             "landmark": "#c9a94d",
             "activity": "#8f79b8",
             "memory": "#d69b79",
@@ -46,6 +47,9 @@ class FakePageGenerator:
 
     def generate_summary_page(self, *, output_path, **kwargs):
         return self._write("summary", output_path, kwargs)
+
+    def generate_destination_intro_page(self, *, output_path, **kwargs):
+        return self._write("destination", output_path, kwargs)
 
     def generate_landmark_page(self, *, output_path, **kwargs):
         return self._write("landmark", output_path, kwargs)
@@ -143,7 +147,9 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
     assert [page["kind"] for page in created["pages"]] == [
         "cover",
         "trip_summary",
+        "destination_intro",
         "landmark",
+        "destination_intro",
         "landmark",
         "best_memory",
     ]
@@ -182,7 +188,9 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
 
     for page_id, kind in (
         ("summary", "summary"),
+        ("destination-1", "destination"),
         ("landmark-1", "landmark"),
+        ("destination-2", "destination"),
         ("landmark-2", "landmark"),
         ("best-memory", "memory"),
     ):
@@ -193,7 +201,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         assert generator.calls[-1] == kind
         request = generator.requests[-1]
         assert request["reference_page"] is None
-        if page_id != "best-memory":
+        if page_id == "summary" or page_id.startswith("landmark-"):
             assert request["expected_visible_family_member_count"] == 2
         if page_id == "summary":
             assert request["family_photo"].is_file()
@@ -204,6 +212,10 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
             assert request["family_cover"] is None
             assert request["include_family"] is False
             assert page["attempts"][-1]["include_family"] is False
+        elif page_id.startswith("destination-"):
+            assert "family_photo" not in request
+            assert "family_cover" not in request
+            assert page["attempts"][-1]["include_family"] is False
         else:
             assert page["attempts"][-1]["include_family"] is False
             assert "family_photo" not in request
@@ -211,7 +223,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
     completed = client.post(f"/api/guide-builder/{session_id}/complete")
     assert completed.status_code == 200, completed.text
     payload = completed.json()
-    assert len(payload["pages"]) == 5
+    assert len(payload["pages"]) == 7
     assert all(page["asset_url"].startswith("/guide-builder/") for page in payload["pages"])
     assert "download_url" not in payload
     assert "preview_url" not in payload
@@ -227,7 +239,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         "session_id": session_id,
         "download_url": f"/guide-builder/{session_id}/pdf",
         "filename": "familia-moraes-minerva-travel.pdf",
-        "page_count": 5,
+        "page_count": 7,
     }
     pdf_path = tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf"
     first_bytes = pdf_path.read_bytes()
@@ -350,6 +362,11 @@ def test_landmark_can_opt_in_to_family_and_idempotent_replay_keeps_choice(tmp_pa
         "selected_attempt_id"
     ]
     assert _approve(client, session_id, "summary", summary_attempt).status_code == 200
+    destination = _generate(client, session_id, "destination-1", "destination-first").json()
+    destination_attempt = next(
+        page for page in destination["pages"] if page["id"] == "destination-1"
+    )["selected_attempt_id"]
+    assert _approve(client, session_id, "destination-1", destination_attempt).status_code == 200
 
     generated = _generate(
         client,
@@ -392,6 +409,29 @@ def test_landmark_without_family_does_not_require_cover_but_opt_in_does(tmp_path
     ]
     assert _approve(client, session_id, "summary", summary_attempt).status_code == 200
     (tmp_path / "generated" / "builder" / session_id / "cover-1.png").unlink()
+
+    destination = _generate(
+        client,
+        session_id,
+        "destination-1",
+        "destination-without-family",
+        include_family=True,
+    )
+    assert destination.status_code == 200, destination.text
+    destination_page = next(
+        page for page in destination.json()["pages"] if page["id"] == "destination-1"
+    )
+    assert destination_page["attempts"][-1]["include_family"] is False
+    assert "family_photo" not in generator.requests[-1]
+    assert (
+        _approve(
+            client,
+            session_id,
+            "destination-1",
+            destination_page["selected_attempt_id"],
+        ).status_code
+        == 200
+    )
 
     generated = _generate(
         client,
@@ -471,7 +511,15 @@ def test_account_deletion_removes_builder_session_photo_and_pages(tmp_path, monk
     client, _generator = _setup(monkeypatch, tmp_path)
     created = _create_session(client)
     session_id = created["session_id"]
-    for page_id in ("cover", "summary", "landmark-1", "landmark-2", "best-memory"):
+    for page_id in (
+        "cover",
+        "summary",
+        "destination-1",
+        "landmark-1",
+        "destination-2",
+        "landmark-2",
+        "best-memory",
+    ):
         generated = _generate(client, session_id, page_id, f"delete-{page_id}")
         assert generated.status_code == 200
         page = next(item for item in generated.json()["pages"] if item["id"] == page_id)

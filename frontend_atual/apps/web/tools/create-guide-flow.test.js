@@ -197,6 +197,8 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(assembly, /Baixar PDF novamente/);
   assert.match(assembly, /PDF pronto com/);
   assert.match(assembly, /required_copy/);
+  assert.match(assembly, /destination_intro: 'Destino e curiosidades'/);
+  assert.match(assembly, /País: \{activePage\.metadata\.country\}/);
   assert.match(assembly, /activePage\.metadata\?\.activity_label/);
   assert.match(assembly, /Ligada a/);
   assert.match(assembly, /hydratedAssetUrlsRef/);

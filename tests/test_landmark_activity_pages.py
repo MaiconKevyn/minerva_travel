@@ -72,6 +72,9 @@ class RecordingPageGenerator:
     def generate_summary_page(self, *, output_path, **kwargs):
         return self._write("summary", output_path, kwargs)
 
+    def generate_destination_intro_page(self, *, output_path, **kwargs):
+        return self._write("destination_intro", output_path, kwargs)
+
     def generate_landmark_page(self, *, output_path, **kwargs):
         return self._write("landmark", output_path, kwargs)
 
@@ -166,7 +169,7 @@ def test_activity_selection_parser_is_strict_and_backward_compatible():
 
 
 def test_default_generation_quota_covers_the_largest_first_attempt_page_plan():
-    assert MAX_PROGRESSIVE_BUILDER_PAGES == 41
+    assert MAX_PROGRESSIVE_BUILDER_PAGES == 51
     assert DEFAULT_BUILDER_PAGE_GENERATION_QUOTA >= MAX_PROGRESSIVE_BUILDER_PAGES
 
 
@@ -397,6 +400,7 @@ def test_page_plan_interleaves_activities_and_appends_one_memory_page(tmp_path, 
     assert [page["id"] for page in payload["pages"]] == [
         "cover",
         "summary",
+        "destination-1",
         "landmark-1",
         "activity-1-word-search",
         "activity-1-coloring",
@@ -404,18 +408,29 @@ def test_page_plan_interleaves_activities_and_appends_one_memory_page(tmp_path, 
         "activity-2-drawing",
         "best-memory",
     ]
-    assert [page["position"] for page in payload["pages"]] == list(range(1, 9))
+    assert [page["position"] for page in payload["pages"]] == list(range(1, 10))
     assert sum(page["kind"] == "best_memory" for page in payload["pages"]) == 1
     assert payload["pages"][-1]["kind"] == "best_memory"
 
-    eiffel = payload["pages"][2]
+    destination = next(page for page in payload["pages"] if page["id"] == "destination-1")
+    assert destination["metadata"]["destination_title"] == "Paris"
+    assert destination["metadata"]["country"] == "França"
+    assert len(destination["metadata"]["learning_points"]) == 2
+    assert destination["metadata"]["curiosity_kind"] == "trusted"
+    assert destination["metadata"]["curiosity"] in destination["required_copy"]
+    assert "Descubra este destino" in destination["required_copy"]
+
+    eiffel = next(page for page in payload["pages"] if page["id"] == "landmark-1")
     assert eiffel["metadata"]["curiosity_kind"] == "trusted"
     assert eiffel["metadata"]["source_image_available"] is True
     assert eiffel["metadata"]["description"] in eiffel["required_copy"]
     assert eiffel["metadata"]["curiosity"] in eiffel["required_copy"]
+    assert "Conheça o lugar" in eiffel["required_copy"]
+    assert "Você sabia?" in eiffel["required_copy"]
+    assert "Já visitei" in eiffel["required_copy"]
     assert "source_image" not in eiffel["metadata"]
 
-    activity = payload["pages"][3]
+    activity = next(page for page in payload["pages"] if page["id"] == "activity-1-word-search")
     assert activity["metadata"]["activity_type"] == "word_search"
     assert activity["metadata"]["linked_landmark_page_id"] == "landmark-1"
     assert activity["metadata"]["instruction"] in activity["required_copy"]
@@ -473,6 +488,70 @@ def test_page_plan_accepts_exact_total_activity_boundary():
     assert pages[-1].kind == "best_memory"
 
 
+def test_page_plan_adds_one_learning_page_before_each_selected_destination():
+    catalog = load_catalog()
+    pages, activities = _builder_page_plan(
+        {
+            "title": "Família Lima",
+            "year": 2026,
+            "children_ages": [7],
+            "activity_selections": [],
+        },
+        catalog.destinations,
+        ["paris:eiffel-tower", "paris:louvre", "london:tower-bridge"],
+    )
+
+    assert activities == []
+    assert [(page.id, page.kind) for page in pages] == [
+        ("cover", "cover"),
+        ("summary", "trip_summary"),
+        ("destination-1", "destination_intro"),
+        ("landmark-1", "landmark"),
+        ("landmark-2", "landmark"),
+        ("destination-2", "destination_intro"),
+        ("landmark-3", "landmark"),
+        ("best-memory", "best_memory"),
+    ]
+    destination_pages = [page for page in pages if page.kind == "destination_intro"]
+    assert [page.metadata["destination_title"] for page in destination_pages] == [
+        "Paris",
+        "Londres",
+    ]
+    assert [page.metadata["country"] for page in destination_pages] == [
+        "França",
+        "Inglaterra",
+    ]
+    assert destination_pages[0].metadata["landmark_names"] == [
+        "Torre Eiffel",
+        "Museu do Louvre",
+    ]
+
+
+def test_unknown_destination_uses_observation_instead_of_invented_fact():
+    destinations, selected = build_custom_destinations(
+        [
+            CustomLandmarkInput(
+                selection_id="google:farol-atlantida-456",
+                name="Farol de Atlântida",
+                city="Atlântida",
+                country="País Imaginário",
+            )
+        ]
+    )
+    pages, _activities = _builder_page_plan(
+        {"title": "Família Lima", "year": 2026, "activity_selections": []},
+        destinations,
+        selected,
+    )
+
+    destination_page = next(page for page in pages if page.kind == "destination_intro")
+    assert destination_page.metadata["curiosity_kind"] == "observation"
+    assert destination_page.metadata["curiosity_label"] == "Missão de observação"
+    assert destination_page.metadata["curiosity"] == (
+        "Em Atlântida, procure uma forma, cor ou detalhe que ajude você a reconhecer este destino."
+    )
+
+
 def test_custom_landmark_without_curiosity_or_source_uses_safe_observation():
     destinations, selected = build_custom_destinations(
         [
@@ -510,6 +589,7 @@ def test_custom_landmark_without_curiosity_or_source_uses_safe_observation():
     assert landmark_page.metadata["source_image"] is None
     assert landmark_page.metadata["source_image_available"] is False
     assert landmark_page.metadata["curiosity_kind"] == "observation"
+    assert landmark_page.metadata["curiosity_label"] == "Missão de observação"
     assert landmark_page.metadata["curiosity"] == (
         "Observe os detalhes de Farol da Ilha e descubra qual deles mais chama sua atenção."
     )
@@ -557,8 +637,14 @@ def test_activity_and_memory_dispatch_never_require_or_forward_family_photo(
     assert response.status_code == 201, response.text
     session_id = response.json()["session_id"]
 
-    for page_id in ("cover", "summary", "landmark-1"):
+    for page_id in ("cover", "summary", "destination-1", "landmark-1"):
         _generate_and_approve(client, session_id, page_id)
+
+    destination_request = next(
+        request for request in generator.requests if request["kind"] == "destination_intro"
+    )
+    assert "family_photo" not in destination_request
+    assert "family_cover" not in destination_request
 
     session = load_builder_session(session_id, "development-user")
     Path(session.photo_filename).unlink()
@@ -580,7 +666,7 @@ def test_activity_and_memory_dispatch_never_require_or_forward_family_photo(
 
     exported = client.post(f"/api/guide-builder/{session_id}/pdf")
     assert exported.status_code == 200, exported.text
-    assert exported.json()["page_count"] == 5
+    assert exported.json()["page_count"] == 6
     assert (tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf").is_file()
 
     deleted = client.delete("/api/account/data")

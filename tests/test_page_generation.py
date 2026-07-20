@@ -12,6 +12,7 @@ from minerva_travel.page_generation import (
     activity_artwork_prompt,
     best_memory_artwork_prompt,
     cover_page_prompt,
+    destination_intro_page_prompt,
     landmark_page_prompt,
     summary_page_prompt,
 )
@@ -78,6 +79,76 @@ def test_summary_prompt_lists_every_stop_as_exact_copy():
     assert '2. "Museu do Louvre"' in prompt
     assert '"Nosso roteiro"' in prompt
     assert "Do not invent, merge or omit stops" in prompt
+
+
+def test_destination_intro_prompt_keeps_exact_learning_copy_and_forbids_people():
+    prompt = destination_intro_page_prompt(
+        title="Londres",
+        city="Londres",
+        country="Inglaterra",
+        learning_points=[
+            "Londres é uma cidade cheia de história.",
+            "O Rio Tâmisa passa por lugares importantes da cidade.",
+        ],
+        curiosity="O Big Ben é o nome do sino que fica dentro da torre.",
+        curiosity_label="Você sabia?",
+        landmark_names=["Tower Bridge", "Big Ben"],
+    )
+
+    for exact_copy in (
+        '"Londres"',
+        '"Inglaterra"',
+        '"Descubra este destino"',
+        '"Londres é uma cidade cheia de história."',
+        '"O Rio Tâmisa passa por lugares importantes da cidade."',
+        '"Você sabia?"',
+        '"O Big Ben é o nome do sino que fica dentro da torre."',
+    ):
+        assert exact_copy in prompt
+    assert "Do not add or infer any fact" in prompt
+    assert "Do not depict any person" in prompt
+    assert "Do not render their names" in prompt
+
+
+def test_destination_intro_uses_generation_then_only_selected_page_for_revision(tmp_path):
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _response(_png_bytes(color="#6f9fb8"))
+
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    first = tmp_path / "destination-1.png"
+    generator.generate_destination_intro_page(
+        output_path=first,
+        title="Paris",
+        city="Paris",
+        country="França",
+        learning_points=["Paris é cheia de história.", "A cidade reúne arte e jardins."],
+        curiosity="A Torre Eiffel foi inaugurada em 1889.",
+        curiosity_label="Você sabia?",
+        landmark_names=["Torre Eiffel"],
+    )
+    generator.generate_destination_intro_page(
+        output_path=tmp_path / "destination-2.png",
+        reference_page=first,
+        revision_instruction="Use tons azuis e uma ilustração maior.",
+        title="Paris",
+        city="Paris",
+        country="França",
+        learning_points=["Paris é cheia de história.", "A cidade reúne arte e jardins."],
+        curiosity="A Torre Eiffel foi inaugurada em 1889.",
+        curiosity_label="Você sabia?",
+        landmark_names=["Torre Eiffel"],
+    )
+
+    assert calls[0][1].endswith("/images/generations")
+    assert "files" not in calls[0][2]
+    assert calls[1][1].endswith("/images/edits")
+    assert [file_data[0] for _field, file_data in calls[1][2]["files"]] == ["destination-1.png"]
+    revision_prompt = calls[1][2]["data"]["prompt"]
+    assert '"Use tons azuis e uma ilustração maior."' in revision_prompt
+    assert "Remove every person that may appear in it" in revision_prompt
 
 
 def test_openai_cover_uses_official_edit_contract_and_persists_png(tmp_path):
@@ -237,10 +308,11 @@ def test_landmark_page_defaults_to_generation_without_people_or_family_inputs(tm
         return _response(_png_bytes(color="#d09a55"))
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    output = tmp_path / "landmark.png"
     generator.generate_landmark_page(
         family_photo=None,
         family_cover=None,
-        output_path=tmp_path / "landmark.png",
+        output_path=output,
         family_title="Família Moraes",
         trip_date="2026",
         landmark_name="Torre Eiffel",
@@ -260,6 +332,12 @@ def test_landmark_page_defaults_to_generation_without_people_or_family_inputs(tm
     assert "overrides any user revision feedback" in prompt
     assert '"Uma torre de ferro que virou símbolo de Paris."' in prompt
     assert '"Observe as formas geométricas que se repetem."' in prompt
+    assert '"Conheça o lugar"' in prompt
+    assert '"Você sabia?"' in prompt
+    assert "bottom 10 percent" in prompt
+    assert "Do not draw any checkbox" in prompt
+    with Image.open(output) as image:
+        assert image.convert("RGB").getpixel((390, 1447)) == (255, 255, 255)
 
 
 def test_landmark_page_can_include_same_family_with_canonical_references(tmp_path):
@@ -403,6 +481,8 @@ def test_landmark_prompt_keeps_exact_description_and_curiosity_during_revision()
 
     assert '"Uma torre de ferro que virou símbolo de Paris."' in prompt
     assert '"Observe como as formas se repetem do chão até o topo."' in prompt
+    assert '"Conheça o lugar"' in prompt
+    assert '"Você sabia?"' in prompt
     assert '"Use tons mais quentes."' in prompt
     assert "render exactly these strings, verbatim, once each" in prompt
 

@@ -669,6 +669,17 @@
             ],
             "title": "Curiosity Kind"
           },
+          "curiosity_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Curiosity Label"
+          },
           "description": {
             "anyOf": [
               {
@@ -679,6 +690,28 @@
               }
             ],
             "title": "Description"
+          },
+          "destination_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Id"
+          },
+          "destination_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Title"
           },
           "instruction": {
             "anyOf": [
@@ -726,6 +759,20 @@
               }
             ],
             "title": "Landmark Selection Id"
+          },
+          "learning_points": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learning Points"
           },
           "linked_landmark_page_id": {
             "anyOf": [
@@ -807,6 +854,7 @@
             "enum": [
               "cover",
               "trip_summary",
+              "destination_intro",
               "landmark",
               "landmark_activity",
               "best_memory"

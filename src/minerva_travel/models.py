@@ -64,6 +64,7 @@ class LandmarkActivitySelection(StrictRequestModel):
 class LandmarkActivityContext(BaseModel):
     """Immutable, private landmark context used by progressive activity pages."""
 
+    destination_id: str = Field(min_length=1, max_length=120)
     selection_id: str = Field(min_length=1, max_length=200)
     name: str = Field(min_length=1, max_length=200)
     city: str = Field(default="", max_length=160)
@@ -77,6 +78,22 @@ class LandmarkActivityContext(BaseModel):
     itinerary_order: int = Field(ge=1, le=MAX_GUIDE_LANDMARKS)
     landmark_page_id: str = Field(min_length=1, max_length=120)
     age_complexity: ActivityComplexity
+
+
+class DestinationLearningContext(BaseModel):
+    """Immutable, private copy contract for one progressive destination introduction."""
+
+    destination_id: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=160)
+    city: str = Field(default="", max_length=160)
+    country: str = Field(default="", max_length=160)
+    learning_points: list[str] = Field(min_length=1, max_length=2)
+    curiosity: str = Field(min_length=1, max_length=300)
+    curiosity_kind: Literal["trusted", "observation"]
+    curiosity_label: str = Field(min_length=1, max_length=80)
+    landmark_names: list[str] = Field(min_length=1, max_length=MAX_GUIDE_LANDMARKS)
+    itinerary_order: int = Field(ge=1, le=MAX_GUIDE_DESTINATIONS)
+    destination_page_id: str = Field(min_length=1, max_length=120)
 
 
 class GuideDestinationPlan(StrictRequestModel):

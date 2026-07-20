@@ -31,6 +31,9 @@ BEST_MEMORY_REQUIRED_COPY = (
     "Assinatura",
     "Data",
 )
+LANDMARK_VISITED_LABEL = "Já visitei"
+LANDMARK_VISITED_PANEL = (326, 1392, 698, 1500)
+LANDMARK_VISITED_CHECKBOX = (366, 1423, 414, 1471)
 
 # These inner rectangles intentionally exclude captions and borders.  They are
 # exported for semantic tests and for the final output validator.
@@ -40,6 +43,23 @@ MEMORY_BLANK_REGION = (106, 670, 918, 1190)
 
 class ActivityPageCompositionError(ValueError):
     """An activity specification or artwork cannot produce a usable page."""
+
+
+def compose_landmark_visited_checkbox(artwork_path: Path, output_path: Path) -> Path:
+    """Add the exact printable visit marker to a completed landmark page."""
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _panel(draw, LANDMARK_VISITED_PANEL, radius=20)
+    draw.rounded_rectangle(
+        LANDMARK_VISITED_CHECKBOX,
+        radius=5,
+        fill="white",
+        outline=INK,
+        width=4,
+    )
+    draw.text((438, 1424), LANDMARK_VISITED_LABEL, font=_font(30, bold=True), fill=INK)
+    return _atomic_save(image, output_path)
 
 
 def compose_coloring_page(

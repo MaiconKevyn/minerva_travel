@@ -21,6 +21,7 @@ from minerva_travel.activity_page_compositor import (
     compose_coloring_page,
     compose_detail_hunt_page,
     compose_drawing_page,
+    compose_landmark_visited_checkbox,
     compose_word_search_page,
 )
 from minerva_travel.config import (
@@ -74,6 +75,21 @@ class GuidePageGenerator(Protocol):
         reference_page: Path | None = None,
     ) -> Path: ...
 
+    def generate_destination_intro_page(
+        self,
+        *,
+        output_path: Path,
+        title: str,
+        city: str,
+        country: str,
+        learning_points: list[str],
+        curiosity: str,
+        curiosity_label: str,
+        landmark_names: list[str],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
     def generate_landmark_page(
         self,
         *,
@@ -88,6 +104,7 @@ class GuidePageGenerator(Protocol):
         country: str,
         description: str = "",
         curiosity: str = "",
+        curiosity_label: str = "Você sabia?",
         expected_visible_family_member_count: int | None = None,
         revision_instruction: str = "",
         reference_page: Path | None = None,
@@ -234,6 +251,38 @@ class OpenAIGuidePageGenerator:
         response = self._edit_with_references(prompt, references)
         return _persist_page_image(response, output_path)
 
+    def generate_destination_intro_page(
+        self,
+        *,
+        output_path: Path,
+        title: str,
+        city: str,
+        country: str,
+        learning_points: list[str],
+        curiosity: str,
+        curiosity_label: str,
+        landmark_names: list[str],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        prompt = destination_intro_page_prompt(
+            title=title,
+            city=city,
+            country=country,
+            learning_points=learning_points,
+            curiosity=curiosity,
+            curiosity_label=curiosity_label,
+            landmark_names=landmark_names,
+            revision_instruction=revision_instruction,
+            has_revision_reference=reference_page is not None,
+        )
+        response = (
+            self._edit_with_references(prompt, [reference_page])
+            if reference_page is not None
+            else self._generate_from_prompt(prompt)
+        )
+        return _persist_page_image(response, output_path)
+
     def generate_landmark_page(
         self,
         *,
@@ -248,6 +297,7 @@ class OpenAIGuidePageGenerator:
         country: str,
         description: str = "",
         curiosity: str = "",
+        curiosity_label: str = "Você sabia?",
         expected_visible_family_member_count: int | None = None,
         revision_instruction: str = "",
         reference_page: Path | None = None,
@@ -260,6 +310,7 @@ class OpenAIGuidePageGenerator:
             country=country,
             description=description,
             curiosity=curiosity,
+            curiosity_label=curiosity_label,
             include_family=include_family,
             expected_visible_family_member_count=expected_visible_family_member_count,
             revision_instruction=revision_instruction,
@@ -276,7 +327,13 @@ class OpenAIGuidePageGenerator:
             response = self._edit_with_references(prompt, [reference_page])
         else:
             response = self._generate_from_prompt(prompt)
-        return _persist_page_image(response, output_path)
+        _persist_page_image(response, output_path)
+        try:
+            return compose_landmark_visited_checkbox(output_path, output_path)
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError(
+                "Não foi possível adicionar o marcador Já visitei."
+            ) from error
 
     def generate_coloring_page(
         self,
@@ -670,6 +727,60 @@ Output the finished flat guide page.
 """.strip()
 
 
+def destination_intro_page_prompt(
+    *,
+    title: str,
+    city: str,
+    country: str,
+    learning_points: list[str],
+    curiosity: str,
+    curiosity_label: str,
+    landmark_names: list[str],
+    revision_instruction: str = "",
+    has_revision_reference: bool = False,
+) -> str:
+    normalized_points = [" ".join(point.split()) for point in learning_points if point.strip()]
+    normalized_curiosity = " ".join(curiosity.split())
+    normalized_label = " ".join(curiosity_label.split())
+    subtitle = country if country.strip().casefold() != title.strip().casefold() else ""
+    exact_copy = [
+        title,
+        subtitle,
+        "Descubra este destino",
+        *normalized_points,
+        normalized_label,
+        normalized_curiosity,
+    ]
+    quoted_copy = "\n".join(json.dumps(value, ensure_ascii=False) for value in exact_copy if value)
+    visual_anchors = ", ".join(landmark_names)
+    location = ", ".join(part for part in (city, country) if part)
+    revision = _revision_directive(revision_instruction, has_revision_reference)
+    people_contract = _destination_without_people_directive(has_revision_reference)
+    return f"""
+Create a complete vertical destination-introduction page for a premium children's illustrated
+family travel guide about {location}.
+
+Use an original child-friendly travel-journal hierarchy inspired by classic exploration books:
+a large destination title, two short learning notes with small decorative star icons, one
+recognizable watercolor-and-gouache destination scene, and a distinct curiosity card. Keep every
+text block short, high-contrast, correctly accented, and readable on a phone. Do not copy any
+reference-book characters, border, wording, page number, or layout.
+
+Use these confirmed places only as visual anchors for the destination scene: {visual_anchors}.
+Do not render their names unless they already appear in the exact text contract below.
+Do not add or infer any fact, date, number, historical claim, superlative, recommendation, or
+activity.
+
+TEXT CONTRACT — render every quoted string verbatim, exactly once, with no spelling changes:
+{quoted_copy}
+
+No other readable text, logos, prices, watermark, signature, mockup border or UI. Output the
+finished flat guide page.
+{revision}
+{people_contract}
+""".strip()
+
+
 def landmark_page_prompt(
     *,
     family_title: str,
@@ -679,6 +790,7 @@ def landmark_page_prompt(
     country: str,
     description: str = "",
     curiosity: str = "",
+    curiosity_label: str = "Você sabia?",
     include_family: bool = False,
     expected_visible_family_member_count: int | None = None,
     revision_instruction: str = "",
@@ -687,9 +799,15 @@ def landmark_page_prompt(
     location = ", ".join(part for part in (city, country) if part)
     normalized_description = " ".join(description.split())
     normalized_curiosity = " ".join(curiosity.split())
+    normalized_curiosity_label = " ".join(curiosity_label.split()) or "Você sabia?"
     enriched_copy = "\n".join(
         json.dumps(value, ensure_ascii=False)
-        for value in (normalized_description, normalized_curiosity)
+        for value in (
+            "Conheça o lugar",
+            normalized_description,
+            normalized_curiosity_label,
+            normalized_curiosity,
+        )
         if value
     )
     if enriched_copy:
@@ -712,6 +830,15 @@ def landmark_page_prompt(
 Create a complete vertical page for a premium children's illustrated family travel guide.
 Show a recognizable, accurate watercolor-and-gouache storybook illustration of {landmark_name}
 in {location}, {subject}.
+
+Use an original travel-journal hierarchy: a large landmark title, location subtitle, one concise
+`Conheça o lugar` learning block, one separate curiosity or observation card, and the recognizable
+illustration as the main visual. Decorative stars, route lines, and warm paper texture are welcome,
+but do not copy any reference-book characters, border, wording, page number, or layout.
+
+Keep the bottom 10 percent calm, pale, and free from text, people, or important illustration
+details. The application will place the exact printable `Já visitei` checkbox there after image
+generation. Do not draw any checkbox, visit marker, or `Já visitei` text yourself.
 
 TEXT CONTRACT — render exactly these strings, verbatim, once each:
 "{landmark_name}"
@@ -869,6 +996,23 @@ Do not depict any person, family member, child, tourist, portrait, selfie, face,
 silhouette, or crowd anywhere in the page, including in distant backgrounds or reflections. The
 landmark, architecture, landscape, sky, plants, and decorative scenery must be the only visual
 subjects. This invariant overrides any user revision feedback that asks to add or preserve people.
+""".strip()
+
+
+def _destination_without_people_directive(has_revision_reference: bool) -> str:
+    revision = (
+        "The supplied input image is only the selected destination-page revision reference. "
+        "Remove every person that may appear in it."
+        if has_revision_reference
+        else "No family or people reference image is supplied for this first attempt."
+    )
+    return f"""
+PEOPLE-FREE DESTINATION CONTRACT — {revision}
+Do not depict any person, family member, child, tourist, portrait, selfie, face, body, human
+silhouette, or crowd anywhere in the page, including in distant backgrounds or reflections. The
+architecture, landscape, sky, plants, transport without passengers, and decorative scenery must
+be the only visual subjects. This invariant overrides any user revision feedback that asks to add
+or preserve people.
 """.strip()
 
 

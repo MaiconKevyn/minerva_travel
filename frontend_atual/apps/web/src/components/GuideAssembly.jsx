@@ -38,6 +38,7 @@ const MAX_REVISION_INSTRUCTION_LENGTH = 600;
 const PAGE_KIND_LABELS = {
   cover: 'Capa',
   trip_summary: 'Resumo do roteiro',
+  destination_intro: 'Destino e curiosidades',
   landmark: 'Ponto turístico',
   landmark_activity: 'Atividade',
   best_memory: 'Página obrigatória',
@@ -388,6 +389,11 @@ const GuideAssembly = ({ session: initialSession }) => {
                   {activePage.kind === 'landmark_activity' && activePage.metadata?.landmark_name && (
                     <span className="rounded-full bg-muted px-3 py-1 text-muted-foreground">
                       Ligada a {activePage.metadata.landmark_name}
+                    </span>
+                  )}
+                  {activePage.kind === 'destination_intro' && activePage.metadata?.country && (
+                    <span className="rounded-full bg-muted px-3 py-1 text-muted-foreground">
+                      País: {activePage.metadata.country}
                     </span>
                   )}
                 </div>

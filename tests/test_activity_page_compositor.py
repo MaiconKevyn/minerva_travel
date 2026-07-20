@@ -9,6 +9,8 @@ from minerva_travel.activity_page_compositor import (
     DETAIL_HUNT_TITLE,
     DRAWING_BLANK_REGION,
     DRAWING_TITLE,
+    LANDMARK_VISITED_CHECKBOX,
+    LANDMARK_VISITED_LABEL,
     MEMORY_BLANK_REGION,
     WORD_SEARCH_TITLE,
     ActivityPageCompositionError,
@@ -16,6 +18,7 @@ from minerva_travel.activity_page_compositor import (
     compose_coloring_page,
     compose_detail_hunt_page,
     compose_drawing_page,
+    compose_landmark_visited_checkbox,
     compose_word_search_page,
     validate_activity_page,
 )
@@ -66,6 +69,23 @@ def test_compositor_exact_copy_contract_matches_builder_required_copy():
         "Assinatura",
         "Data",
     )
+    assert LANDMARK_VISITED_LABEL == "Já visitei"
+
+
+def test_landmark_compositor_adds_one_empty_printable_visited_checkbox(tmp_path):
+    output = tmp_path / "landmark.png"
+    compose_landmark_visited_checkbox(_artwork(tmp_path / "art.png"), output)
+
+    validate_activity_page(output)
+    left, top, right, bottom = LANDMARK_VISITED_CHECKBOX
+    with Image.open(output) as image:
+        rgb = image.convert("RGB")
+        assert rgb.getpixel(((left + right) // 2, (top + bottom) // 2)) == (255, 255, 255)
+        assert rgb.getpixel((left, (top + bottom) // 2)) == (21, 52, 81)
+        label_crop = rgb.crop((438, 1418, 650, 1480))
+        colors = label_crop.getcolors(maxcolors=label_crop.width * label_crop.height)
+        assert colors is not None
+        assert any(color == (21, 52, 81) for _count, color in colors)
 
 
 def test_coloring_compositor_outputs_binary_printable_page(tmp_path):

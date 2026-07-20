@@ -454,6 +454,8 @@ def normalize_revision_instruction(value: str) -> str:
 _PUBLIC_PAGE_METADATA_FIELDS = {
     "trip_date",
     "landmark_names",
+    "destination_id",
+    "destination_title",
     "landmark_selection_id",
     "landmark_name",
     "city",
@@ -461,6 +463,8 @@ _PUBLIC_PAGE_METADATA_FIELDS = {
     "description",
     "curiosity",
     "curiosity_kind",
+    "curiosity_label",
+    "learning_points",
     "activity_type",
     "activity_label",
     "instruction",

@@ -39,6 +39,7 @@ from minerva_travel.activity_page_compositor import (
     COLORING_TITLE,
     DETAIL_HUNT_TITLE,
     DRAWING_TITLE,
+    LANDMARK_VISITED_LABEL,
     WORD_SEARCH_TITLE,
 )
 from minerva_travel.asset_policy import (
@@ -101,6 +102,7 @@ from minerva_travel.custom_landmarks import (
     parse_custom_landmarks,
     slugify,
 )
+from minerva_travel.destination_facts import lookup_destination_facts
 from minerva_travel.guide_builder import build_guide_context
 from minerva_travel.image_generation import (
     CoverGenerationResult,
@@ -124,6 +126,7 @@ from minerva_travel.models import (
     MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE,
     OPTIONAL_LANDMARK_ACTIVITY_TYPES,
     Destination,
+    DestinationLearningContext,
     DynamicItineraryRequest,
     GuideDestinationPlan,
     GuideItineraryDayPlan,
@@ -204,7 +207,9 @@ CUSTOM_LANDMARK_IMAGE_HOSTS = {
 }
 CUSTOM_LANDMARK_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 LINEART_CANVAS_SIZE = (1200, 850)
-MAX_PROGRESSIVE_BUILDER_PAGES = 3 + MAX_GUIDE_LANDMARKS + MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE
+MAX_PROGRESSIVE_BUILDER_PAGES = (
+    3 + MAX_GUIDE_DESTINATIONS + MAX_GUIDE_LANDMARKS + MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE
+)
 DEFAULT_BUILDER_PAGE_GENERATION_QUOTA = max(64, MAX_PROGRESSIVE_BUILDER_PAGES)
 
 
@@ -426,6 +431,8 @@ class BuilderPageMetadataResponse(BaseModel):
 
     trip_date: str | None = None
     landmark_names: list[str] | None = None
+    destination_id: str | None = None
+    destination_title: str | None = None
     landmark_selection_id: str | None = None
     landmark_name: str | None = None
     city: str | None = None
@@ -433,6 +440,8 @@ class BuilderPageMetadataResponse(BaseModel):
     description: str | None = None
     curiosity: str | None = None
     curiosity_kind: Literal["trusted", "observation"] | None = None
+    curiosity_label: str | None = None
+    learning_points: list[str] | None = None
     activity_type: OptionalLandmarkActivityType | None = None
     activity_label: str | None = None
     instruction: str | None = None
@@ -443,7 +452,14 @@ class BuilderPageMetadataResponse(BaseModel):
 
 class BuilderPageResponse(BaseModel):
     id: str
-    kind: Literal["cover", "trip_summary", "landmark", "landmark_activity", "best_memory"]
+    kind: Literal[
+        "cover",
+        "trip_summary",
+        "destination_intro",
+        "landmark",
+        "landmark_activity",
+        "best_memory",
+    ]
     title: str
     position: int
     status: Literal["ready", "generating", "awaiting_approval", "approved", "error"]
@@ -2049,8 +2065,13 @@ def _bounded_builder_copy(value: str, *, limit: int, fallback: str) -> str:
 def _trusted_landmark_copy(
     landmark: Landmark,
 ) -> tuple[str, str, Literal["trusted", "observation"]]:
+    description_parts = [
+        _bounded_builder_copy(part, limit=260, fallback="")
+        for part in landmark.description
+        if str(part).strip()
+    ]
     description = _bounded_builder_copy(
-        " ".join(landmark.description),
+        " ".join(description_parts),
         limit=420,
         fallback=f"{landmark.name} faz parte do roteiro especial desta viagem.",
     )
@@ -2064,12 +2085,55 @@ def _trusted_landmark_copy(
             ),
             "trusted",
         )
+    if len(description_parts) > 1 and not description_parts[1].casefold().startswith(
+        "observe os detalhes"
+    ):
+        return description_parts[0], description_parts[1], "trusted"
     observation = _bounded_builder_copy(
         f"Observe os detalhes de {landmark.name} e descubra qual deles mais chama sua atenção.",
         limit=260,
         fallback="Observe as formas, cores e detalhes deste lugar durante a visita.",
     )
     return description, observation, "observation"
+
+
+def _destination_learning_copy(
+    destination: Destination,
+) -> tuple[list[str], str, Literal["trusted", "observation"], str]:
+    intro_points = list(
+        dict.fromkeys(
+            _bounded_builder_copy(point, limit=230, fallback="")
+            for point in destination.intro
+            if str(point).strip()
+        )
+    )
+    title = destination.city.strip() or destination.country.strip() or destination.display_title
+    if not intro_points:
+        intro_points = [f"{title} faz parte do roteiro especial desta viagem."]
+    learning_points = intro_points[:2]
+    if len(learning_points) == 1:
+        learning_points.append(
+            f"A família escolheu lugares especiais de {title} para observar e descobrir."
+        )
+
+    editorial_facts = lookup_destination_facts(destination.city, destination.country)
+    candidates = [
+        *destination.curiosities,
+        *(editorial_facts.curiosities if editorial_facts is not None else []),
+        *intro_points[2:],
+    ]
+    used = {point.casefold() for point in learning_points}
+    for candidate in candidates:
+        normalized = _bounded_builder_copy(candidate, limit=280, fallback="")
+        if normalized and normalized.casefold() not in used:
+            return learning_points, normalized, "trusted", "Você sabia?"
+
+    observation = _bounded_builder_copy(
+        f"Em {title}, procure uma forma, cor ou detalhe que ajude você a reconhecer este destino.",
+        limit=280,
+        fallback="Durante a visita, escolha um detalhe para observar com calma.",
+    )
+    return learning_points, observation, "observation", "Missão de observação"
 
 
 def _catalog_landmark_source_image(destination: Destination, landmark: Landmark) -> str | None:
@@ -2129,6 +2193,7 @@ def _selected_builder_landmarks(
         order = len(ordered) + 1
         ordered.append(
             LandmarkActivityContext(
+                destination_id=destination.id,
                 selection_id=canonical_selection_id,
                 name=landmark.name,
                 city=destination.city,
@@ -2147,6 +2212,47 @@ def _selected_builder_landmarks(
         seen.add(selected_id)
         canonical_seen.add(canonical_selection_id)
     return ordered
+
+
+def _selected_builder_destinations(
+    destinations: list[Destination],
+    landmarks: list[LandmarkActivityContext],
+) -> list[DestinationLearningContext]:
+    destination_by_id = {destination.id: destination for destination in destinations}
+    names_by_destination: dict[str, list[str]] = {}
+    ordered_destination_ids: list[str] = []
+    for landmark in landmarks:
+        if landmark.destination_id not in names_by_destination:
+            ordered_destination_ids.append(landmark.destination_id)
+            names_by_destination[landmark.destination_id] = []
+        names_by_destination[landmark.destination_id].append(landmark.name)
+
+    contexts: list[DestinationLearningContext] = []
+    for destination_id in ordered_destination_ids:
+        destination = destination_by_id.get(destination_id)
+        if destination is None:
+            continue
+        learning_points, curiosity, curiosity_kind, curiosity_label = _destination_learning_copy(
+            destination
+        )
+        order = len(contexts) + 1
+        title = destination.city.strip() or destination.country.strip() or destination.display_title
+        contexts.append(
+            DestinationLearningContext(
+                destination_id=destination.id,
+                title=title,
+                city=destination.city,
+                country=destination.country,
+                learning_points=learning_points,
+                curiosity=curiosity,
+                curiosity_kind=curiosity_kind,
+                curiosity_label=curiosity_label,
+                landmark_names=names_by_destination[destination_id],
+                itinerary_order=order,
+                destination_page_id=f"destination-{order}",
+            )
+        )
+    return contexts
 
 
 def normalize_landmark_activity_selections(
@@ -2254,6 +2360,10 @@ def _builder_page_plan(
     raw_ages = form.get("children_ages", [])
     children_ages = [age for age in raw_ages if isinstance(age, int)]
     landmarks = _selected_builder_landmarks(destinations, selected, children_ages)
+    destination_contexts = _selected_builder_destinations(destinations, landmarks)
+    destination_context_by_id = {
+        context.destination_id: context for context in destination_contexts
+    }
     names = [item.name for item in landmarks]
     raw_selections = form.get("activity_selections", [])
     try:
@@ -2300,10 +2410,60 @@ def _builder_page_plan(
         ),
     ]
     next_position = 3
+    introduced_destination_ids: set[str] = set()
     for landmark in landmarks:
+        if landmark.destination_id not in introduced_destination_ids:
+            destination_context = destination_context_by_id[landmark.destination_id]
+            destination_private_context = destination_context.model_dump(mode="json")
+            destination_public_context = {
+                "destination_id": destination_context.destination_id,
+                "destination_title": destination_context.title,
+                "city": destination_context.city,
+                "country": destination_context.country,
+                "learning_points": destination_context.learning_points,
+                "curiosity": destination_context.curiosity,
+                "curiosity_kind": destination_context.curiosity_kind,
+                "curiosity_label": destination_context.curiosity_label,
+                "landmark_names": destination_context.landmark_names,
+            }
+            destination_required_copy = list(
+                dict.fromkeys(
+                    item
+                    for item in (
+                        destination_context.title,
+                        destination_context.country,
+                        "Descubra este destino",
+                        *destination_context.learning_points,
+                        destination_context.curiosity_label,
+                        destination_context.curiosity,
+                    )
+                    if item
+                )
+            )
+            pages.append(
+                BuilderPage(
+                    id=destination_context.destination_page_id,
+                    kind="destination_intro",
+                    title=f"Descubra {destination_context.title}",
+                    position=next_position,
+                    required_copy=destination_required_copy,
+                    metadata={
+                        **destination_private_context,
+                        **destination_public_context,
+                        "trip_date": trip_date,
+                    },
+                )
+            )
+            next_position += 1
+            introduced_destination_ids.add(landmark.destination_id)
+
         location = ", ".join(part for part in (landmark.city, landmark.country) if part)
         private_context = landmark.model_dump(mode="json")
+        curiosity_label = (
+            "Você sabia?" if landmark.curiosity_kind == "trusted" else "Missão de observação"
+        )
         public_context = {
+            "destination_id": landmark.destination_id,
             "landmark_selection_id": landmark.selection_id,
             "landmark_name": landmark.name,
             "city": landmark.city,
@@ -2311,6 +2471,7 @@ def _builder_page_plan(
             "description": landmark.description,
             "curiosity": landmark.curiosity,
             "curiosity_kind": landmark.curiosity_kind,
+            "curiosity_label": curiosity_label,
             "age_complexity": landmark.age_complexity,
             "source_image_available": landmark.source_image_available,
             "linked_landmark_page_id": landmark.landmark_page_id,
@@ -2325,8 +2486,11 @@ def _builder_page_plan(
                     landmark.name,
                     location,
                     f"{family_title} • {trip_date}",
+                    "Conheça o lugar",
                     landmark.description,
+                    curiosity_label,
                     landmark.curiosity,
+                    LANDMARK_VISITED_LABEL,
                 ],
                 metadata={
                     **private_context,
@@ -2476,7 +2640,7 @@ def generate_builder_page_attempt(
             requested_include_family = bool(payload.include_family if payload else False)
             if page.kind == "landmark":
                 include_family = requested_include_family
-            elif page.kind in {"landmark_activity", "best_memory"}:
+            elif page.kind in {"destination_intro", "landmark_activity", "best_memory"}:
                 include_family = False
             else:
                 include_family = True
@@ -2577,6 +2741,19 @@ def generate_builder_page_attempt(
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )
+        elif page_kind == "destination_intro":
+            generator.generate_destination_intro_page(
+                output_path=output,
+                title=str(metadata["title"]),
+                city=str(metadata["city"]),
+                country=str(metadata["country"]),
+                learning_points=list(metadata["learning_points"]),
+                curiosity=str(metadata["curiosity"]),
+                curiosity_label=str(metadata["curiosity_label"]),
+                landmark_names=list(metadata["landmark_names"]),
+                revision_instruction=revision_instruction,
+                reference_page=reference_page,
+            )
         elif page_kind == "landmark":
             if include_family and family_cover is None:
                 raise PageGenerationError("A capa aprovada da família não está disponível.")
@@ -2592,6 +2769,7 @@ def generate_builder_page_attempt(
                 country=str(metadata["country"]),
                 description=str(metadata["description"]),
                 curiosity=str(metadata["curiosity"]),
+                curiosity_label=str(metadata["curiosity_label"]),
                 expected_visible_family_member_count=expected_people,
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
