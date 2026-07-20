@@ -84,6 +84,7 @@ test('activity selection comes after family details and before cover photo and r
   assert.equal(photoCaseIndex < reviewCaseIndex, true);
   assert.match(activitiesStep, /Atividades da aventura/);
   assert.match(activitiesStep, /Minha melhor memória/);
+  assert.match(activitiesStep, /Hora de voltar para casa/);
   assert.match(activitiesStep, /Nenhuma atividade opcional vem marcada automaticamente/);
   assert.match(activitiesStep, /MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK/);
   assert.match(activitiesStep, /MAX_OPTIONAL_ACTIVITIES_PER_GUIDE/);
@@ -95,6 +96,7 @@ test('activity selection comes after family details and before cover photo and r
   assert.match(context, /expectedCoverFamilyMemberCount/);
   assert.match(review, /expectedVisibleFamilyMemberCount/);
   assert.match(review, /createGuideBuilder/);
+  assert.match(review, /Hora de voltar para casa/);
 });
 
 test('activity choices stay linked to point ids and are sent to the progressive builder', () => {
@@ -183,6 +185,7 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(assembly, /Gerar página/);
   assert.match(assembly, /Gerar outra versão/);
   assert.match(assembly, /O que você quer mudar nesta versão\?/);
+  assert.match(assembly, /homecoming: 'Encerramento obrigatório'/);
   assert.match(assembly, /Gerar versão com ajustes/);
   assert.match(assembly, /alternativa visivelmente diferente/);
   assert.match(api, /revision_instruction: revisionInstruction\.trim\(\)/);

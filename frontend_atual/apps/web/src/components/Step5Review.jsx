@@ -10,6 +10,7 @@ import {
   Star,
   Users,
   BookHeart,
+  Plane,
   Puzzle,
 } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
@@ -311,8 +312,20 @@ const Step5Review = () => {
             <div>
               <h3 className="text-xl font-serif font-bold text-foreground">Minha melhor memória</h3>
               <p className="mt-1 text-sm font-medium text-muted-foreground">
-                Página obrigatória no final do guia, com espaço para registrar a descoberta favorita,
-                fazer um desenho, assinar e datar.
+                Página obrigatória depois dos passeios, com espaço para registrar a descoberta
+                favorita, fazer um desenho, assinar e datar.
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 flex items-start gap-4 border-t border-secondary/20 pt-5">
+            <Plane className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
+            <div>
+              <h3 className="text-xl font-serif font-bold text-foreground">
+                Hora de voltar para casa
+              </h3>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
+                Página final obrigatória com a família no retorno e espaço para a criança escrever
+                o que quer contar quando chegar em casa.
               </p>
             </div>
           </div>

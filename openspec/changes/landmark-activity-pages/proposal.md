@@ -19,6 +19,8 @@ previously unknown places.
   and coloring page.
 - Add one mandatory `Minha melhor memória` page after every tourist point and its selected
   activities.
+- Add one mandatory `Hora de voltar para casa` closing page after `Minha melhor memória`, with the
+  same family established on the approved cover and a writable homecoming reflection prompt.
 - Add a short child-friendly description and a safe curiosity or observation prompt to every
   tourist-point page.
 - Generate the visual layer of every activity page through the configured OpenAI Image API and
@@ -38,12 +40,12 @@ previously unknown places.
 - `landmark-activity-selection`: Parent-facing visual selection, draft persistence, validation,
   and age-aware optional activity configuration per selected tourist point.
 - `landmark-activity-page-generation`: OpenAI-backed, tourist-point-specific activity pages plus
-  the mandatory trip-memory page.
+  the mandatory trip-memory and homecoming pages.
 
 ### Modified Capabilities
 
-- `progressive-guide-page-generation`: The ordered page plan includes selected activity pages and
-  a mandatory final memory page before PDF export.
+- `progressive-guide-page-generation`: The ordered page plan includes selected activity pages, a
+  mandatory memory page, and a mandatory closing page before PDF export.
 - `openai-guide-page-art`: Activity pages can edit server-resolved landmark references while
   preserving the exact selected place and removing people when required.
 - `guide-content-generation`: Tourist-point pages gain child-friendly description and curiosity

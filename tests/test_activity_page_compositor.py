@@ -12,6 +12,8 @@ from minerva_travel.activity_page_compositor import (
     DETAIL_HUNT_TITLE,
     DRAWING_BLANK_REGION,
     DRAWING_TITLE,
+    HOMECOMING_REQUIRED_COPY,
+    HOMECOMING_WRITING_BLANK_REGIONS,
     LANDMARK_VISITED_CHECKBOX,
     LANDMARK_VISITED_LABEL,
     MEMORY_BLANK_REGION,
@@ -22,6 +24,7 @@ from minerva_travel.activity_page_compositor import (
     compose_coloring_page,
     compose_detail_hunt_page,
     compose_drawing_page,
+    compose_homecoming_page,
     compose_landmark_visited_checkbox,
     compose_word_search_page,
     validate_activity_page,
@@ -74,6 +77,13 @@ def test_compositor_exact_copy_contract_matches_builder_required_copy():
         "Data",
     )
     assert LANDMARK_VISITED_LABEL == "Já visitei"
+    assert HOMECOMING_REQUIRED_COPY == (
+        "Hora de voltar para casa",
+        "Nossa grande aventura está chegando ao fim.",
+        "Depois de conhecer lugares incríveis, chegou a hora de voltar para casa.",
+        "Mas todas essas lembranças vão continuar com a gente.",
+        "Uma coisa que quero contar quando chegar em casa:",
+    )
     assert COLORING_INSTRUCTION_TEMPLATE == (
         "Agora é a vez de colorir {landmark_name} do seu jeito."
     )
@@ -232,6 +242,20 @@ def test_drawing_and_memory_preserve_measurable_blank_response_areas(tmp_path):
         assert memory_image.convert("RGB").getpixel((65, 1265)) == (255, 253, 248)
     validate_activity_page(drawing, blank_regions=[DRAWING_BLANK_REGION])
     validate_activity_page(memory, blank_regions=[MEMORY_BLANK_REGION])
+
+
+def test_homecoming_compositor_adds_exact_closing_copy_and_blank_writing_lines(tmp_path):
+    output = tmp_path / "homecoming.png"
+    compose_homecoming_page(_artwork(tmp_path / "homecoming-art.png"), output)
+
+    validate_activity_page(output, blank_regions=HOMECOMING_WRITING_BLANK_REGIONS)
+    with Image.open(output) as image:
+        rgb = image.convert("RGB")
+        assert rgb.size == (1024, 1536)
+        assert rgb.getpixel((80, 1200)) == (255, 253, 248)
+        assert rgb.getpixel((200, 1340)) == (21, 52, 81)
+        for left, top, right, bottom in HOMECOMING_WRITING_BLANK_REGIONS:
+            assert rgb.getpixel(((left + right) // 2, (top + bottom) // 2)) == (255, 253, 248)
 
 
 def test_compositor_rejects_wrong_size_provider_artwork(tmp_path):

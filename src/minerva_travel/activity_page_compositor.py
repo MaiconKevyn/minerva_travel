@@ -32,6 +32,13 @@ BEST_MEMORY_REQUIRED_COPY = (
     "Assinatura",
     "Data",
 )
+HOMECOMING_REQUIRED_COPY = (
+    "Hora de voltar para casa",
+    "Nossa grande aventura está chegando ao fim.",
+    "Depois de conhecer lugares incríveis, chegou a hora de voltar para casa.",
+    "Mas todas essas lembranças vão continuar com a gente.",
+    "Uma coisa que quero contar quando chegar em casa:",
+)
 LANDMARK_VISITED_LABEL = "Já visitei"
 LANDMARK_VISITED_PANEL = (326, 1392, 698, 1500)
 LANDMARK_VISITED_CHECKBOX = (366, 1423, 414, 1471)
@@ -42,6 +49,11 @@ COLORING_MIN_WHITE_FRACTION = 0.72
 # exported for semantic tests and for the final output validator.
 DRAWING_BLANK_REGION = (106, 366, 918, 1260)
 MEMORY_BLANK_REGION = (106, 670, 918, 1190)
+HOMECOMING_WRITING_BLANK_REGIONS = (
+    (92, 1295, 932, 1330),
+    (92, 1350, 932, 1394),
+    (92, 1415, 932, 1459),
+)
 
 
 class ActivityPageCompositionError(ValueError):
@@ -261,6 +273,56 @@ def compose_best_memory_page(
     _panel(draw, (170, 1370, 854, 1465), radius=20)
     _draw_centered(draw, "Uma lembrança para guardar para sempre.", 1400, 23, bold=True)
     return _atomic_save(image, output_path, blank_regions=[MEMORY_BLANK_REGION])
+
+
+def compose_homecoming_page(artwork_path: Path, output_path: Path) -> Path:
+    """Add exact closing copy and a writable reflection field to homecoming artwork."""
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _panel(draw, (38, 34, 986, 388))
+    _draw_centered(draw, HOMECOMING_REQUIRED_COPY[0], 54, 50, bold=True)
+    _draw_wrapped(
+        draw,
+        HOMECOMING_REQUIRED_COPY[1],
+        (82, 132, 942, 178),
+        font=_font(25, bold=True),
+        fill=INK,
+        align="center",
+    )
+    _draw_wrapped(
+        draw,
+        HOMECOMING_REQUIRED_COPY[2],
+        (82, 194, 942, 270),
+        font=_font(23),
+        fill=INK,
+        align="center",
+    )
+    _draw_wrapped(
+        draw,
+        HOMECOMING_REQUIRED_COPY[3],
+        (82, 286, 942, 354),
+        font=_font(24, bold=True),
+        fill=INK,
+        align="center",
+    )
+
+    _panel(draw, (54, 1172, 970, 1492))
+    _draw_wrapped(
+        draw,
+        HOMECOMING_REQUIRED_COPY[4],
+        (84, 1203, 940, 1282),
+        font=_font(25, bold=True),
+        fill=INK,
+        align="center",
+    )
+    for y in (1340, 1405, 1470):
+        draw.line((92, y, 932, y), fill=INK, width=3)
+    return _atomic_save(
+        image,
+        output_path,
+        blank_regions=HOMECOMING_WRITING_BLANK_REGIONS,
+    )
 
 
 def validate_activity_page(

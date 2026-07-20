@@ -857,7 +857,8 @@
               "destination_intro",
               "landmark",
               "landmark_activity",
-              "best_memory"
+              "best_memory",
+              "homecoming"
             ],
             "title": "Kind",
             "type": "string"

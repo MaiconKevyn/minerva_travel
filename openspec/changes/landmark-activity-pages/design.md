@@ -23,7 +23,8 @@ memory page can use generation for its first attempt and editing for revisions.
 - Make all optional activity selection explicit and understandable through visual examples.
 - Generate activity artwork that visibly belongs to the selected tourist point and guide style.
 - Produce usable, printable activities rather than merely decorative activity-like images.
-- Always append one child-writable `Minha melhor memória` page after all tourist-point content.
+- Always append one child-writable `Minha melhor memória` page after all tourist-point content and
+  one family-consistent `Hora de voltar para casa` page as the final page.
 - Preserve the existing page review, regeneration, approval, privacy, cleanup, and PDF contracts.
 
 **Non-Goals:**
@@ -42,8 +43,8 @@ memory page can use generation for its first attempt and editing for revisions.
 4. Each point shows its name, city/country, source image when available, and a grid of visual
    activity examples. No optional activity starts selected.
 5. The parent can select up to two activity types per point, or continue with none. The screen
-   shows the resulting optional-page count and explains that `Minha melhor memória` is always
-   included.
+   shows the resulting optional-page count and explains that `Minha melhor memória` and
+   `Hora de voltar para casa` are always included.
 6. Photo and final review show the selected activities beside their linked point.
 7. The progressive builder generates and approves every page in sequence.
 8. The existing PDF action packages the approved sequence without special activity-PDF logic.
@@ -58,6 +59,7 @@ For each newly created builder session, page order is deterministic:
    1. `landmark`
    2. zero or more selected `landmark_activity` pages in the parent's selection order
 4. exactly one `best_memory` page
+5. exactly one `homecoming` page
 
 Example:
 
@@ -70,6 +72,7 @@ activity-landmark-1-word-search
 landmark-2
 activity-landmark-2-detail-hunt
 best-memory
+homecoming
 ```
 
 The final PDF compositor needs no new layout branch because it already consumes the exact
@@ -201,8 +204,8 @@ instructions.
 ### Decision 8: Always append `Minha melhor memória`
 
 `best_memory` is server-created and never appears as an optional selection. Every new session gets
-exactly one page after all tourist points and optional activities. It contains stable exact copy
-for:
+exactly one page after all tourist points and optional activities, immediately before the closing
+page. It contains stable exact copy for:
 
 - `Minha melhor memória`;
 - favorite place;
@@ -217,10 +220,10 @@ export and remains people-free to maximize writable space.
 
 ### Decision 9: Extend the generic page state machine
 
-`GuidePageGenerator` gains explicit activity and memory generation methods. The builder endpoint
-dispatches `landmark_activity` by its strict activity subtype and `best_memory` separately. Existing
-attempt reservation, idempotency, four-version budget, selection, approval, error recovery,
-private asset serving, cleanup, and PDF export remain shared.
+`GuidePageGenerator` gains explicit activity, memory, and homecoming generation methods. The
+builder endpoint dispatches `landmark_activity` by its strict activity subtype, `best_memory`, and
+`homecoming` separately. Existing attempt reservation, idempotency, four-version budget,
+selection, approval, error recovery, private asset serving, cleanup, and PDF export remain shared.
 
 The UI shows an activity badge and linked landmark in `GuideAssembly`. `Incluir família` remains
 available only for `landmark`; activity and memory pages never inherit the current default that
@@ -263,6 +266,20 @@ the page. The instruction is derived from the server-resolved landmark name rath
 from the client or delegated to the image model. Final monochrome validation requires generous
 white space so overly dense artwork fails instead of becoming a frustrating coloring activity.
 
+### Decision 14: Finish every new guide with a family-consistent homecoming page
+
+Every new builder session appends exactly one mandatory `homecoming` page after
+`best_memory`. Its OpenAI artwork uses the original family photo and approved cover as fixed
+identity references, depicts the same family preparing to return home in a warm airport or travel
+terminal scene, and never invents readable signs, airline brands, flags, or a destination-specific
+home country.
+
+The model creates only the decorative illustration. Trusted code composites the exact Portuguese
+title and closing copy, plus a large lined field labeled
+`Uma coisa que quero contar quando chegar em casa:`. The page remains part of the normal generate,
+regenerate, approve, completion, cleanup, and one-image-per-PDF-page lifecycle. Existing persisted
+sessions are not replanned, preserving backward compatibility.
+
 ## Validation Strategy
 
 ### Backend and content tests
@@ -272,7 +289,8 @@ white space so overly dense artwork fails instead of becoming a frustrating colo
 - Prove point description/curiosity fallback never invents unsupported facts.
 - Prove page order for no optional activities, several points, several activity types, and custom
   landmarks.
-- Prove every new session has exactly one final `best_memory` page.
+- Prove every new session has exactly one `best_memory` page followed by exactly one final
+  `homecoming` page.
 - Prove old persisted sessions still load unchanged.
 
 ### Provider and image tests
@@ -284,6 +302,8 @@ white space so overly dense artwork fails instead of becoming a frustrating colo
   `Agora é a vez de colorir <ponto turístico> do seu jeito.` instruction.
 - Assert word-search grids and solutions survive compositing exactly.
 - Assert drawing/memory pages preserve minimum blank writable areas.
+- Assert the homecoming prompt preserves family identity and the deterministic compositor keeps
+  the closing copy and writable area exact.
 - Assert invalid, oversized, malformed, or wrong-size provider output creates no attempt.
 
 ### Frontend and browser tests
@@ -294,6 +314,7 @@ white space so overly dense artwork fails instead of becoming a frustrating colo
 - A family can select different activities for two points, approve the entire ordered sequence,
   retry one failed activity generation, approve the mandatory memory page, and download the PDF.
 - Continuing with no optional activities still creates and requires the memory page.
+- Completion and PDF export also require approval of the final homecoming page.
 
 ### PDF and live validation
 

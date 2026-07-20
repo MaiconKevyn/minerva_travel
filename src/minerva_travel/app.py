@@ -39,6 +39,7 @@ from minerva_travel.activity_page_compositor import (
     COLORING_TITLE,
     DETAIL_HUNT_TITLE,
     DRAWING_TITLE,
+    HOMECOMING_REQUIRED_COPY,
     LANDMARK_VISITED_LABEL,
     WORD_SEARCH_TITLE,
     coloring_instruction_for,
@@ -209,7 +210,7 @@ CUSTOM_LANDMARK_IMAGE_HOSTS = {
 CUSTOM_LANDMARK_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 LINEART_CANVAS_SIZE = (1200, 850)
 MAX_PROGRESSIVE_BUILDER_PAGES = (
-    3 + MAX_GUIDE_DESTINATIONS + MAX_GUIDE_LANDMARKS + MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE
+    4 + MAX_GUIDE_DESTINATIONS + MAX_GUIDE_LANDMARKS + MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE
 )
 DEFAULT_BUILDER_PAGE_GENERATION_QUOTA = max(64, MAX_PROGRESSIVE_BUILDER_PAGES)
 
@@ -460,6 +461,7 @@ class BuilderPageResponse(BaseModel):
         "landmark",
         "landmark_activity",
         "best_memory",
+        "homecoming",
     ]
     title: str
     position: int
@@ -2545,6 +2547,21 @@ def _builder_page_plan(
             },
         )
     )
+    next_position += 1
+    pages.append(
+        BuilderPage(
+            id="homecoming",
+            kind="homecoming",
+            title=HOMECOMING_REQUIRED_COPY[0],
+            position=next_position,
+            required_copy=list(HOMECOMING_REQUIRED_COPY),
+            metadata={
+                "trip_date": trip_date,
+                "landmark_names": names,
+                "age_complexity": complexity,
+            },
+        )
+    )
     return pages, activity_selections
 
 
@@ -2673,7 +2690,9 @@ def generate_builder_page_attempt(
                 else None
             )
             family_cover: Path | None = None
-            if page_kind == "trip_summary" or (page_kind == "landmark" and include_family):
+            if page_kind in {"trip_summary", "homecoming"} or (
+                page_kind == "landmark" and include_family
+            ):
                 cover_page = session.page("cover")
                 cover_attempt = (
                     cover_page.selected_attempt()
@@ -2712,7 +2731,7 @@ def generate_builder_page_attempt(
 
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
         generator = get_guide_page_generator()
-        family_photo_required = page_kind in {"cover", "trip_summary"} or (
+        family_photo_required = page_kind in {"cover", "trip_summary", "homecoming"} or (
             page_kind == "landmark" and include_family
         )
         if family_photo_required and not photo_path.is_file():
@@ -2817,6 +2836,21 @@ def generate_builder_page_attempt(
                 trip_date=str(metadata["trip_date"]),
                 landmark_names=list(metadata["landmark_names"]),
                 age_complexity=str(metadata["age_complexity"]),
+                revision_instruction=revision_instruction,
+                reference_page=reference_page,
+            )
+        elif page_kind == "homecoming":
+            if family_cover is None:
+                raise PageGenerationError("A capa aprovada da família não está disponível.")
+            generator.generate_homecoming_page(
+                family_photo=photo_path,
+                family_cover=family_cover,
+                output_path=output,
+                family_title=family_title,
+                trip_date=str(metadata["trip_date"]),
+                landmark_names=list(metadata["landmark_names"]),
+                age_complexity=str(metadata["age_complexity"]),
+                expected_visible_family_member_count=expected_people,
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )

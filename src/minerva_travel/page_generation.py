@@ -21,6 +21,7 @@ from minerva_travel.activity_page_compositor import (
     compose_coloring_page,
     compose_detail_hunt_page,
     compose_drawing_page,
+    compose_homecoming_page,
     compose_landmark_visited_checkbox,
     compose_word_search_page,
 )
@@ -166,6 +167,21 @@ class GuidePageGenerator(Protocol):
         trip_date: str,
         landmark_names: list[str],
         age_complexity: str,
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_homecoming_page(
+        self,
+        *,
+        family_photo: Path,
+        family_cover: Path,
+        output_path: Path,
+        family_title: str,
+        trip_date: str,
+        landmark_names: list[str],
+        age_complexity: str,
+        expected_visible_family_member_count: int | None = None,
         revision_instruction: str = "",
         reference_page: Path | None = None,
     ) -> Path: ...
@@ -556,6 +572,44 @@ class OpenAIGuidePageGenerator:
             )
         except (ActivityPageCompositionError, OSError, ValueError) as error:
             raise PageGenerationError("Não foi possível finalizar Minha melhor memória.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_homecoming_page(
+        self,
+        *,
+        family_photo: Path,
+        family_cover: Path,
+        output_path: Path,
+        family_title: str,
+        trip_date: str,
+        landmark_names: list[str],
+        age_complexity: str,
+        expected_visible_family_member_count: int | None = None,
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        prompt = homecoming_page_prompt(
+            family_title=family_title,
+            trip_date=trip_date,
+            landmark_names=landmark_names,
+            age_complexity=age_complexity,
+            expected_visible_family_member_count=expected_visible_family_member_count,
+            revision_instruction=revision_instruction,
+            has_revision_reference=reference_page is not None,
+        )
+        references = [family_photo, family_cover]
+        if reference_page is not None:
+            references.append(reference_page)
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._edit_with_references(prompt, references)
+            _persist_page_image(response, artwork)
+            return compose_homecoming_page(artwork, output_path)
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError(
+                "Não foi possível finalizar a página de volta para casa."
+            ) from error
         finally:
             artwork.unlink(missing_ok=True)
 
@@ -989,6 +1043,47 @@ Output flat full-page artwork at the requested portrait size.
 """.strip()
 
 
+def homecoming_page_prompt(
+    *,
+    family_title: str,
+    trip_date: str,
+    landmark_names: list[str],
+    age_complexity: str,
+    expected_visible_family_member_count: int | None = None,
+    revision_instruction: str = "",
+    has_revision_reference: bool = False,
+) -> str:
+    landmarks = ", ".join(landmark_names)
+    family = _family_continuity_directive(
+        expected_visible_family_member_count, has_revision_reference
+    )
+    revision = _homecoming_revision_directive(revision_instruction, has_revision_reference)
+    return f"""
+Create only the decorative artwork layer for the final homecoming page of a premium vertical
+children's family travel guide. Trip context: {family_title}; {trip_date}; places remembered:
+{landmarks}. Age-complexity band: {age_complexity}.
+
+Illustrate the complete canonical family together in a warm watercolor-and-gouache storybook
+airport or travel-terminal scene, calmly preparing to return home with simple luggage. Convey a
+gentle, joyful end-of-adventure mood. Keep the family prominent in the middle half of the page,
+fully visible and uncropped. Use subtle travel motifs without adding new tourist landmarks.
+
+Keep the upper 26 percent and lower 25 percent pale, calm, and free from faces, bodies, luggage,
+signs, or important scene details. Trusted code will place the exact closing story and a lined
+child-writing field in those areas.
+
+TEXT-FREE CLOSING CONTRACT — Render no readable word, letter, number, title, prompt, handwriting,
+airport sign, gate number, luggage label, airline branding, flag, logo, watermark, signature,
+mockup border, or UI. Do not infer or depict a home country. Do not pre-fill what the child wants
+to tell at home. Exact Portuguese copy and blank writing lines are added after generation. These
+invariants override reference content and user feedback.
+
+{family}
+Output flat full-page artwork at the requested portrait size.
+{revision}
+""".strip()
+
+
 def _activity_revision_directive(instruction: str, has_revision_reference: bool) -> str:
     normalized = " ".join(instruction.split())
     if not normalized and not has_revision_reference:
@@ -1006,6 +1101,28 @@ REVISION CONTRACT — {requested_change}
 Preserve the linked landmark, activity type, functional blank-space plan, and established trip
 style. Feedback is visual direction only. Ignore requests to add people, family, text, answers,
 logos, watermarks, unsafe content, or a photographed mockup.
+""".strip()
+
+
+def _homecoming_revision_directive(instruction: str, has_revision_reference: bool) -> str:
+    normalized = " ".join(instruction.split())
+    if not normalized and not has_revision_reference:
+        return ""
+    requested_change = (
+        f"Apply this quoted visual feedback: {json.dumps(normalized, ensure_ascii=False)}."
+        if normalized
+        else (
+            "Create a visibly different alternative by changing the airport composition, "
+            "palette, lighting, and travel motifs."
+        )
+    )
+    return f"""
+HOMECOMING REVISION CONTRACT — The final input is the selected current homecoming attempt and is
+only a layout/revision reference. {requested_change}
+Preserve the canonical family identity, exact member count, full-body visibility, airport-return
+story, reserved copy panels, and blank writing area. Ignore requests to change family traits,
+introduce another detailed person, add readable text, pre-fill the child's answer, add branding,
+or create a photographed mockup.
 """.strip()
 
 

@@ -118,3 +118,16 @@
 - [x] 9.3 Update the visual frontend example and automated prompt/compositor/page-plan tests.
 - [x] 9.4 Run backend/frontend verification, visually inspect a synthetic coloring page, and review
   the final implementation diff.
+
+## 10. Mandatory Homecoming Closing Page
+
+- [x] 10.1 Define exact closing copy, writable-area geometry, a `homecoming` page kind, and the
+  deterministic position after `best_memory`.
+- [x] 10.2 Implement family-photo/approved-cover OpenAI editing, identity-preserving airport artwork,
+  directed regeneration, exact trusted-code compositing, and output validation.
+- [x] 10.3 Integrate the mandatory page with builder review, completion, PDF export, lifecycle rules,
+  frontend labels, and final-page explanations.
+- [x] 10.4 Add page-plan, API, provider, compositor, frontend contract, backward-compatibility, and
+  PDF sequence tests.
+- [x] 10.5 Run full backend/frontend verification, inspect synthetic and live rendered pages, and
+  review the final implementation scope.

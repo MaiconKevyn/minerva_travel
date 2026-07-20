@@ -42,6 +42,7 @@ const PAGE_KIND_LABELS = {
   landmark: 'Ponto turístico',
   landmark_activity: 'Atividade',
   best_memory: 'Página obrigatória',
+  homecoming: 'Encerramento obrigatório',
 };
 
 const saveBlob = (blob, filename) => {

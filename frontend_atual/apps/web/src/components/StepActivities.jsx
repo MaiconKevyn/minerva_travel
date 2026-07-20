@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BookHeart, Check, Clock3, Palette, Pencil, Sparkles } from 'lucide-react';
+import { BookHeart, Check, Clock3, Palette, Pencil, Plane, Sparkles } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import { selectGuideLandmarks } from '@/utils/minerva-api.js';
@@ -66,16 +66,29 @@ const StepActivities = () => {
         <p className="text-sm font-bold text-primary">{ageSummary}</p>
       </div>
 
-      <section className="rounded-[2rem] border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6" aria-labelledby="memory-page-title">
+      <section className="rounded-[2rem] border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6" aria-labelledby="mandatory-pages-title">
+        <h3 id="mandatory-pages-title" className="sr-only">Páginas finais obrigatórias</h3>
         <div className="flex items-start gap-4">
           <BookHeart className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
           <div>
-            <h3 id="memory-page-title" className="text-xl font-serif font-bold text-foreground">
+            <h4 className="text-xl font-serif font-bold text-foreground">
               Minha melhor memória
-            </h3>
+            </h4>
             <p className="mt-1 font-medium text-muted-foreground">
-              Esta página é obrigatória e será incluída no final do guia, com espaço para desenho,
-              descoberta favorita, assinatura e data.
+              Página obrigatória depois dos passeios, com espaço para desenho, descoberta favorita,
+              assinatura e data.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 flex items-start gap-4 border-t border-secondary/20 pt-5">
+          <Plane className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
+          <div>
+            <h4 className="text-xl font-serif font-bold text-foreground">
+              Hora de voltar para casa
+            </h4>
+            <p className="mt-1 font-medium text-muted-foreground">
+              Página final obrigatória, com a mesma família da capa e linhas para a criança contar
+              algo especial quando chegar em casa.
             </p>
           </div>
         </div>

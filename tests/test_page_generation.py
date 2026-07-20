@@ -13,6 +13,7 @@ from minerva_travel.page_generation import (
     best_memory_artwork_prompt,
     cover_page_prompt,
     destination_intro_page_prompt,
+    homecoming_page_prompt,
     landmark_page_prompt,
     summary_page_prompt,
 )
@@ -745,6 +746,75 @@ def test_best_memory_prompt_contains_trip_context_but_no_family_reference_contra
     assert "Família Moraes" in prompt
     assert "PEOPLE-FREE, TEXT-FREE, ANSWER-FREE" in prompt
     assert "This first version has no input image" in prompt
+
+
+def test_homecoming_generation_preserves_family_reference_order_and_revision(tmp_path):
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _response(_png_bytes(color="#e7c78e"))
+
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    family_photo, family_cover = _family_references(tmp_path)
+    first = tmp_path / "homecoming-1.png"
+    generator.generate_homecoming_page(
+        family_photo=family_photo,
+        family_cover=family_cover,
+        output_path=first,
+        family_title="Família Moraes",
+        trip_date="Julho de 2026",
+        landmark_names=["Torre Eiffel", "Coliseu"],
+        age_complexity="early_reader",
+        expected_visible_family_member_count=2,
+    )
+    generator.generate_homecoming_page(
+        family_photo=family_photo,
+        family_cover=family_cover,
+        output_path=tmp_path / "homecoming-2.png",
+        family_title="Família Moraes",
+        trip_date="Julho de 2026",
+        landmark_names=["Torre Eiffel", "Coliseu"],
+        age_complexity="early_reader",
+        expected_visible_family_member_count=2,
+        revision_instruction="Mostre uma janela maior do aeroporto.",
+        reference_page=first,
+    )
+
+    assert calls[0][1].endswith("/images/edits")
+    assert [file_data[0] for _field, file_data in calls[0][2]["files"]] == [
+        "family.png",
+        "cover-approved.png",
+    ]
+    assert [file_data[0] for _field, file_data in calls[1][2]["files"]] == [
+        "family.png",
+        "cover-approved.png",
+        "homecoming-1.png",
+    ]
+    prompt = calls[1][2]["data"]["prompt"]
+    assert "FAMILY CONTINUITY CONTRACT" in prompt
+    assert "Input image 3 is the selected current-page attempt" in prompt
+    assert "Keep the upper 26 percent and lower 25 percent pale" in prompt
+    assert "TEXT-FREE CLOSING CONTRACT" in prompt
+    assert "Do not infer or depict a home country" in prompt
+    assert '"Mostre uma janela maior do aeroporto."' in prompt
+
+
+def test_homecoming_prompt_requires_the_complete_existing_family_and_no_model_copy():
+    prompt = homecoming_page_prompt(
+        family_title="Família Moraes",
+        trip_date="Julho de 2026",
+        landmark_names=["Torre Eiffel", "Coliseu"],
+        age_complexity="preschool",
+        expected_visible_family_member_count=4,
+    )
+
+    assert "Show exactly 4 family members together" in prompt
+    assert "original family photo" in prompt
+    assert "approved cover" in prompt
+    assert "same family" in prompt
+    assert "Render no readable word, letter, number" in prompt
+    assert "Uma coisa que quero contar" not in prompt
 
 
 def test_activity_generation_rejects_missing_local_reference_before_provider_call(tmp_path):

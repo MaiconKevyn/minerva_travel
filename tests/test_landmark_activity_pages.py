@@ -93,6 +93,9 @@ class RecordingPageGenerator:
     def generate_best_memory_page(self, *, output_path, **kwargs):
         return self._write("best_memory", output_path, kwargs)
 
+    def generate_homecoming_page(self, *, output_path, **kwargs):
+        return self._write("homecoming", output_path, kwargs)
+
 
 def _generate_and_approve(client: TestClient, session_id: str, page_id: str):
     generated = client.post(
@@ -169,7 +172,7 @@ def test_activity_selection_parser_is_strict_and_backward_compatible():
 
 
 def test_default_generation_quota_covers_the_largest_first_attempt_page_plan():
-    assert MAX_PROGRESSIVE_BUILDER_PAGES == 51
+    assert MAX_PROGRESSIVE_BUILDER_PAGES == 52
     assert DEFAULT_BUILDER_PAGE_GENERATION_QUOTA >= MAX_PROGRESSIVE_BUILDER_PAGES
 
 
@@ -407,10 +410,16 @@ def test_page_plan_interleaves_activities_and_appends_one_memory_page(tmp_path, 
         "landmark-2",
         "activity-2-drawing",
         "best-memory",
+        "homecoming",
     ]
-    assert [page["position"] for page in payload["pages"]] == list(range(1, 10))
+    assert [page["position"] for page in payload["pages"]] == list(range(1, 11))
     assert sum(page["kind"] == "best_memory" for page in payload["pages"]) == 1
-    assert payload["pages"][-1]["kind"] == "best_memory"
+    assert sum(page["kind"] == "homecoming" for page in payload["pages"]) == 1
+    assert payload["pages"][-2]["kind"] == "best_memory"
+    assert payload["pages"][-1]["kind"] == "homecoming"
+    assert payload["pages"][-1]["required_copy"][-1] == (
+        "Uma coisa que quero contar quando chegar em casa:"
+    )
 
     destination = next(page for page in payload["pages"] if page["id"] == "destination-1")
     assert destination["metadata"]["destination_title"] == "Paris"
@@ -485,7 +494,8 @@ def test_page_plan_accepts_exact_total_activity_boundary():
 
     assert len(normalized) == 8
     assert sum(page.kind == "landmark_activity" for page in pages) == 8
-    assert pages[-1].kind == "best_memory"
+    assert pages[-2].kind == "best_memory"
+    assert pages[-1].kind == "homecoming"
 
 
 def test_page_plan_adds_one_learning_page_before_each_selected_destination():
@@ -511,6 +521,7 @@ def test_page_plan_adds_one_learning_page_before_each_selected_destination():
         ("destination-2", "destination_intro"),
         ("landmark-3", "landmark"),
         ("best-memory", "best_memory"),
+        ("homecoming", "homecoming"),
     ]
     destination_pages = [page for page in pages if page.kind == "destination_intro"]
     assert [page.metadata["destination_title"] for page in destination_pages] == [
@@ -673,9 +684,18 @@ def test_activity_and_memory_dispatch_never_require_or_forward_family_photo(
     assert "family_photo" not in memory_request
     assert memory_page["attempts"][-1]["include_family"] is False
 
+    Path(session.photo_filename).write_bytes(_family_photo())
+    homecoming_page = _generate_and_approve(client, session_id, "homecoming")
+    homecoming_request = generator.requests[-1]
+    assert homecoming_request["kind"] == "homecoming"
+    assert homecoming_request["family_photo"].is_file()
+    assert homecoming_request["family_cover"].name == "cover-1.png"
+    assert homecoming_request["expected_visible_family_member_count"] is None
+    assert homecoming_page["attempts"][-1]["include_family"] is True
+
     exported = client.post(f"/api/guide-builder/{session_id}/pdf")
     assert exported.status_code == 200, exported.text
-    assert exported.json()["page_count"] == 6
+    assert exported.json()["page_count"] == 7
     assert (tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf").is_file()
 
     deleted = client.delete("/api/account/data")
@@ -726,3 +746,4 @@ def test_old_persisted_builder_session_is_not_replanned(tmp_path, monkeypatch):
     loaded: BuilderSession = load_builder_session("legacybuilder1", "owner-1")
     assert [page.kind for page in loaded.pages] == ["cover", "trip_summary", "landmark"]
     assert all(page.id != "best-memory" for page in loaded.pages)
+    assert all(page.id != "homecoming" for page in loaded.pages)

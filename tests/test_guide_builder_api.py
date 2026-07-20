@@ -37,6 +37,7 @@ class FakePageGenerator:
             "landmark": "#c9a94d",
             "activity": "#8f79b8",
             "memory": "#d69b79",
+            "homecoming": "#d9a45f",
         }
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(_png_bytes(colors[kind]))
@@ -68,6 +69,9 @@ class FakePageGenerator:
 
     def generate_best_memory_page(self, *, output_path, **kwargs):
         return self._write("memory", output_path, kwargs)
+
+    def generate_homecoming_page(self, *, output_path, **kwargs):
+        return self._write("homecoming", output_path, kwargs)
 
 
 CUSTOM_LANDMARKS = json.dumps(
@@ -152,6 +156,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         "destination_intro",
         "landmark",
         "best_memory",
+        "homecoming",
     ]
     assert created["pages"][0]["required_copy"] == ["Família Moraes", "Julho de 2026"]
     assert "Torre Eiffel" in created["pages"][1]["required_copy"]
@@ -193,6 +198,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         ("destination-2", "destination"),
         ("landmark-2", "landmark"),
         ("best-memory", "memory"),
+        ("homecoming", "homecoming"),
     ):
         generated = _generate(client, session_id, page_id, f"{page_id}-request")
         assert generated.status_code == 200, generated.text
@@ -201,7 +207,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         assert generator.calls[-1] == kind
         request = generator.requests[-1]
         assert request["reference_page"] is None
-        if page_id == "summary" or page_id.startswith("landmark-"):
+        if page_id in {"summary", "homecoming"} or page_id.startswith("landmark-"):
             assert request["expected_visible_family_member_count"] == 2
         if page_id == "summary":
             assert request["family_photo"].is_file()
@@ -216,6 +222,10 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
             assert "family_photo" not in request
             assert "family_cover" not in request
             assert page["attempts"][-1]["include_family"] is False
+        elif page_id == "homecoming":
+            assert request["family_photo"].is_file()
+            assert request["family_cover"].name == "cover-1.png"
+            assert page["attempts"][-1]["include_family"] is True
         else:
             assert page["attempts"][-1]["include_family"] is False
             assert "family_photo" not in request
@@ -223,7 +233,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
     completed = client.post(f"/api/guide-builder/{session_id}/complete")
     assert completed.status_code == 200, completed.text
     payload = completed.json()
-    assert len(payload["pages"]) == 7
+    assert len(payload["pages"]) == 8
     assert all(page["asset_url"].startswith("/guide-builder/") for page in payload["pages"])
     assert "download_url" not in payload
     assert "preview_url" not in payload
@@ -239,7 +249,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         "session_id": session_id,
         "download_url": f"/guide-builder/{session_id}/pdf",
         "filename": "familia-moraes-minerva-travel.pdf",
-        "page_count": 7,
+        "page_count": 8,
     }
     pdf_path = tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf"
     first_bytes = pdf_path.read_bytes()
@@ -519,6 +529,7 @@ def test_account_deletion_removes_builder_session_photo_and_pages(tmp_path, monk
         "destination-2",
         "landmark-2",
         "best-memory",
+        "homecoming",
     ):
         generated = _generate(client, session_id, page_id, f"delete-{page_id}")
         assert generated.status_code == 200
