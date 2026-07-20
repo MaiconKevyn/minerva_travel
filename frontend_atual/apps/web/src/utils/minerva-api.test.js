@@ -506,6 +506,7 @@ test('appendGuideLandmarks sends catalog ids and custom fallback separately', ()
     formData.get('custom_landmarks'),
     JSON.stringify([
       {
+        selection_id: 'custom-rome:colosseum',
         name: 'Colosseum',
         city: 'Rome',
         country: 'Italy',
@@ -536,6 +537,7 @@ test('appendGuideLandmarks forwards place_id so the backend can reuse cached art
   });
 
   const payload = JSON.parse(formData.get('custom_landmarks'));
+  assert.equal(payload[0].selection_id, 'custom-paris:torre-eiffel');
   assert.equal(payload[0].place_id, 'ChIJLU7jZClu5kcR4PcOOO6p3I0');
 });
 
@@ -551,6 +553,17 @@ test('selectGuideLandmarks preserves only selected attractions in guide order', 
       .map((item) => item.id),
     ['selected-square', 'selected-museum'],
   );
+});
+
+test('selectGuideLandmarks resolves both card ids and canonical selection ids', () => {
+  const landmark = {
+    id: 'eiffel-card',
+    selection_id: 'paris:eiffel',
+    name: 'Torre Eiffel',
+  };
+
+  assert.deepEqual(minervaApi.selectGuideLandmarks([landmark], ['eiffel-card']), [landmark]);
+  assert.deepEqual(minervaApi.selectGuideLandmarks([landmark], ['paris:eiffel']), [landmark]);
 });
 
 test('appendGuideLandmarks filters unselected attraction suggestions from payload', () => {
@@ -595,6 +608,7 @@ test('appendGuideLandmarks filters unselected attraction suggestions from payloa
     formData.get('custom_landmarks'),
     JSON.stringify([
       {
+        selection_id: 'selected-custom',
         name: 'Loja local selecionada',
         city: 'Lisboa',
         country: 'Portugal',
@@ -822,6 +836,24 @@ test('appendGuideMetadata serializes the itinerary reviewed by the family', () =
   });
 
   assert.deepEqual(JSON.parse(formData.get('itinerary_json')), itinerary);
+});
+
+test('appendGuideMetadata sends normalized optional activities linked to canonical landmark ids', () => {
+  const formData = new FormData();
+
+  appendGuideMetadata(formData, {
+    landmarkActivitySelections: [
+      { landmark_selection_id: 'paris:eiffel', activity_type: 'coloring' },
+      { landmark_selection_id: 'paris:eiffel', activity_type: 'word_search' },
+      { landmark_selection_id: 'paris:eiffel', activity_type: 'drawing' },
+      { landmark_selection_id: 'paris:louvre', activity_type: 'invalid' },
+    ],
+  });
+
+  assert.deepEqual(JSON.parse(formData.get('activity_selections_json')), [
+    { landmark_selection_id: 'paris:eiffel', activity_type: 'coloring', order: 1 },
+    { landmark_selection_id: 'paris:eiffel', activity_type: 'word_search', order: 2 },
+  ]);
 });
 
 test('restaurant recommendations extra is explicit about the no-charge pilot contract', () => {

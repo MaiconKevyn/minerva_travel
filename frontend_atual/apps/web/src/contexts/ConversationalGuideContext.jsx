@@ -20,6 +20,10 @@ import {
   getCurrentGuideDraft,
   updateGuideDraft,
 } from '@/utils/minerva-api.js';
+import {
+  normalizeLandmarkActivitySelections,
+  pruneLandmarkActivitySelections,
+} from '@/utils/landmark-activities.js';
 
 const ConversationalGuideContext = createContext();
 
@@ -53,6 +57,7 @@ export const ConversationalGuideProvider = ({ children }) => {
   // Minerva API Integration State
   const [parsedData, setParsedData] = useState({ destinations: [], landmarks: [] });
   const [selectedLandmarks, setSelectedLandmarks] = useState([]); // Array of IDs
+  const [landmarkActivitySelections, setLandmarkActivitySelections] = useState([]);
   const [recommendedItinerary, setRecommendedItinerary] = useState(null);
   const [restaurantRecommendationsExtra, setRestaurantRecommendationsExtra] = useState(false);
   const [itineraryPreferences, setItineraryPreferences] = useState({
@@ -84,6 +89,7 @@ export const ConversationalGuideProvider = ({ children }) => {
     year,
     parsed_data: parsedData,
     selected_landmarks: selectedLandmarks,
+    landmark_activity_selections: landmarkActivitySelections,
     recommended_itinerary: recommendedItinerary,
     restaurant_recommendations_extra: restaurantRecommendationsExtra,
     itinerary_preferences: itineraryPreferences,
@@ -97,6 +103,7 @@ export const ConversationalGuideProvider = ({ children }) => {
     hasSearchedLandmarks,
     itineraryMode,
     itineraryPreferences,
+    landmarkActivitySelections,
     parentsList,
     parsedData,
     recommendedItinerary,
@@ -138,6 +145,9 @@ export const ConversationalGuideProvider = ({ children }) => {
           ? payload.parsed_data
           : { destinations: [], landmarks: [] });
         setSelectedLandmarks(Array.isArray(payload.selected_landmarks) ? payload.selected_landmarks : []);
+        setLandmarkActivitySelections(
+          normalizeLandmarkActivitySelections(payload.landmark_activity_selections),
+        );
         setRecommendedItinerary(payload.recommended_itinerary || null);
         setRestaurantRecommendationsExtra(Boolean(payload.restaurant_recommendations_extra));
         setItineraryPreferences(payload.itinerary_preferences && typeof payload.itinerary_preferences === 'object'
@@ -228,6 +238,7 @@ export const ConversationalGuideProvider = ({ children }) => {
     setYear(2026);
     setParsedData({ destinations: [], landmarks: [] });
     setSelectedLandmarks([]);
+    setLandmarkActivitySelections([]);
     setRecommendedItinerary(null);
     setRestaurantRecommendationsExtra(false);
     setItineraryPreferences({ days: 3, interests: [], pace: 'balanced' });
@@ -245,7 +256,7 @@ export const ConversationalGuideProvider = ({ children }) => {
   // ja informou os pontos turisticos e vai direto para a confirmacao com fotos.
   const nextStep = () => {
     const skipPreferences = itineraryMode === 'known' && currentStep === 1;
-    setStep(Math.min(skipPreferences ? 3 : currentStep + 1, 6));
+    setStep(Math.min(skipPreferences ? 3 : currentStep + 1, 7));
   };
 
   const goBack = () => {
@@ -278,6 +289,7 @@ export const ConversationalGuideProvider = ({ children }) => {
     setHasSearchedLandmarks(false);
     setParsedData({ destinations: [], landmarks: [] });
     setSelectedLandmarks([]);
+    setLandmarkActivitySelections([]);
     setRecommendedItinerary(null);
   }, []);
 
@@ -304,6 +316,23 @@ export const ConversationalGuideProvider = ({ children }) => {
       return [...prev, landmarkId];
     });
   };
+
+  useEffect(() => {
+    const selectedIds = new Set(selectedLandmarks.map((id) => String(id)));
+    const selectedCanonicalIds = (parsedData.landmarks || [])
+      .filter((landmark) =>
+        selectedIds.has(String(landmark.id)) ||
+        selectedIds.has(String(landmark.selection_id)),
+      )
+      .map((landmark) => landmark.selection_id || landmark.id);
+    setLandmarkActivitySelections((current) => {
+      const next = pruneLandmarkActivitySelections(
+        current,
+        selectedCanonicalIds.length > 0 ? selectedCanonicalIds : selectedLandmarks,
+      );
+      return JSON.stringify(next) === JSON.stringify(current) ? current : next;
+    });
+  }, [parsedData.landmarks, selectedLandmarks]);
 
   return (
     <ConversationalGuideContext.Provider
@@ -343,6 +372,8 @@ export const ConversationalGuideProvider = ({ children }) => {
         selectedLandmarks,
         setSelectedLandmarks,
         toggleLandmarkSelection,
+        landmarkActivitySelections,
+        setLandmarkActivitySelections,
         recommendedItinerary,
         setRecommendedItinerary,
         restaurantRecommendationsExtra,

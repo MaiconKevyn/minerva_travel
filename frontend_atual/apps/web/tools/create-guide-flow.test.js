@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const readProjectFile = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('create guide wizard asks for structured destination first and uses six steps', () => {
+test('create guide wizard asks for structured destination first and uses seven steps', () => {
   const page = readProjectFile('src/pages/CreateGuidePage.jsx');
   const context = readProjectFile('src/contexts/ConversationalGuideContext.jsx');
 
@@ -13,9 +13,10 @@ test('create guide wizard asks for structured destination first and uses six ste
   assert.match(page, /case 2: return <StepTripPreferences \/>;/);
   assert.match(page, /case 3: return <Step4Attractions \/>;/);
   assert.match(page, /case 4: return <EnhancedStep5FamilyDetails \/>;/);
-  assert.match(page, /case 5: return <Step2CoverPhoto \/>;/);
-  assert.match(page, /case 6: return <Step5Review \/>;/);
-  assert.match(page, /\[1, 2, 3, 4, 5, 6\]/);
+  assert.match(page, /case 5: return <StepActivities \/>;/);
+  assert.match(page, /case 6: return <Step2CoverPhoto \/>;/);
+  assert.match(page, /case 7: return <Step5Review \/>;/);
+  assert.match(page, /\[1, 2, 3, 4, 5, 6, 7\]/);
   assert.match(page, /Passo \{currentStepPosition \+ 1\} de \{visibleSteps\.length\}/);
 });
 
@@ -26,7 +27,7 @@ test('known itinerary mode skips the preferences step and collects landmarks upf
   const attractionsStep = readProjectFile('src/components/Step4Attractions.jsx');
   const api = readProjectFile('src/utils/minerva-api.js');
 
-  assert.match(page, /itineraryMode === 'known' \? \[1, 3, 4, 5, 6\] : \[1, 2, 3, 4, 5, 6\]/);
+  assert.match(page, /itineraryMode === 'known' \? \[1, 3, 4, 5, 6, 7\] : \[1, 2, 3, 4, 5, 6, 7\]/);
   assert.match(context, /itineraryMode === 'known' && currentStep === 1/);
   assert.match(context, /itineraryMode === 'known' && currentStep === 3/);
   assert.match(destinationStep, /Adicionar ponto tur.stico/);
@@ -66,17 +67,27 @@ test('family details step captures the family name together with parents and chi
   assert.match(details, /Respons.veis/);
 });
 
-test('cover photo step comes after route confirmation and stays before review', () => {
+test('activity selection comes after family details and before cover photo and review', () => {
   const page = readProjectFile('src/pages/CreateGuidePage.jsx');
+  const activitiesStep = readProjectFile('src/components/StepActivities.jsx');
   const photoStep = readProjectFile('src/components/Step2CoverPhoto.jsx');
   const context = readProjectFile('src/contexts/ConversationalGuideContext.jsx');
   const review = readProjectFile('src/components/Step5Review.jsx');
-  const photoCaseIndex = page.indexOf('case 5: return <Step2CoverPhoto />;');
-  const reviewCaseIndex = page.indexOf('case 6: return <Step5Review />;');
+  const activityCaseIndex = page.indexOf('case 5: return <StepActivities />;');
+  const photoCaseIndex = page.indexOf('case 6: return <Step2CoverPhoto />;');
+  const reviewCaseIndex = page.indexOf('case 7: return <Step5Review />;');
 
+  assert.notEqual(activityCaseIndex, -1);
   assert.notEqual(photoCaseIndex, -1);
   assert.notEqual(reviewCaseIndex, -1);
+  assert.equal(activityCaseIndex < photoCaseIndex, true);
   assert.equal(photoCaseIndex < reviewCaseIndex, true);
+  assert.match(activitiesStep, /Atividades da aventura/);
+  assert.match(activitiesStep, /Minha melhor memória/);
+  assert.match(activitiesStep, /Nenhuma atividade opcional vem marcada automaticamente/);
+  assert.match(activitiesStep, /MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK/);
+  assert.match(activitiesStep, /MAX_OPTIONAL_ACTIVITIES_PER_GUIDE/);
+  assert.match(activitiesStep, /activity\.preview/);
   assert.match(photoStep, /foto de capa/i);
   assert.match(photoStep, /roteiro/i);
   assert.match(photoStep, /expectedCoverFamilyMemberCount/);
@@ -84,6 +95,20 @@ test('cover photo step comes after route confirmation and stays before review', 
   assert.match(context, /expectedCoverFamilyMemberCount/);
   assert.match(review, /expectedVisibleFamilyMemberCount/);
   assert.match(review, /createGuideBuilder/);
+});
+
+test('activity choices stay linked to point ids and are sent to the progressive builder', () => {
+  const context = readProjectFile('src/contexts/ConversationalGuideContext.jsx');
+  const review = readProjectFile('src/components/Step5Review.jsx');
+  const api = readProjectFile('src/utils/minerva-api.js');
+
+  assert.match(context, /landmarkActivitySelections/);
+  assert.match(context, /landmark_activity_selections/);
+  assert.match(context, /pruneLandmarkActivitySelections/);
+  assert.match(review, /landmarkActivitySelections/);
+  assert.match(review, /activityOptionForType/);
+  assert.match(api, /activity_selections_json/);
+  assert.match(api, /normalizeLandmarkActivitySelections/);
 });
 
 test('preferences are a fixed step before attractions', () => {
@@ -172,4 +197,7 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(assembly, /Baixar PDF novamente/);
   assert.match(assembly, /PDF pronto com/);
   assert.match(assembly, /required_copy/);
+  assert.match(assembly, /activePage\.metadata\?\.activity_label/);
+  assert.match(assembly, /Ligada a/);
+  assert.match(assembly, /hydratedAssetUrlsRef/);
 });

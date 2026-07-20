@@ -38,6 +38,7 @@ STOPWORDS = {
 
 
 class CustomLandmarkInput(BaseModel):
+    selection_id: str | None = Field(default=None, min_length=1, max_length=200)
     name: str = Field(min_length=2, max_length=120)
     city: str = Field(default=DEFAULT_CITY, max_length=80)
     country: str = Field(default=DEFAULT_COUNTRY, max_length=80)
@@ -86,6 +87,7 @@ def build_custom_destinations(
             destination_landmarks.append(
                 Landmark(
                     id=landmark_id,
+                    selection_id=(custom.selection_id or "").strip() or None,
                     name=custom.name.strip(),
                     description=custom.description or default_description(custom.name),
                     image=image or PLACEHOLDER_IMAGE,

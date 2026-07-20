@@ -25,10 +25,58 @@ ActivityType = Literal[
     "language_learning",
 ]
 ActivityComplexity = Literal["preschool", "early_reader", "older_child", "family"]
+OptionalLandmarkActivityType = Literal[
+    "coloring",
+    "detail_hunt",
+    "word_search",
+    "drawing",
+]
+
+OPTIONAL_LANDMARK_ACTIVITY_TYPES: tuple[OptionalLandmarkActivityType, ...] = (
+    "coloring",
+    "detail_hunt",
+    "word_search",
+    "drawing",
+)
+MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2
+MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE = 8
+MAX_ACTIVITY_SELECTIONS_JSON_BYTES = 20_000
 
 
 class StrictRequestModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class LandmarkActivitySelection(StrictRequestModel):
+    """One explicit optional page selected for one server-resolved landmark."""
+
+    landmark_selection_id: Annotated[
+        str,
+        Field(strict=True, min_length=1, max_length=200),
+    ]
+    activity_type: OptionalLandmarkActivityType
+    order: Annotated[
+        int,
+        Field(strict=True, ge=1, le=MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK),
+    ]
+
+
+class LandmarkActivityContext(BaseModel):
+    """Immutable, private landmark context used by progressive activity pages."""
+
+    selection_id: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+    city: str = Field(default="", max_length=160)
+    country: str = Field(default="", max_length=160)
+    description: str = Field(min_length=1, max_length=500)
+    curiosity: str = Field(min_length=1, max_length=300)
+    curiosity_kind: Literal["trusted", "observation"]
+    place_id: str | None = Field(default=None, max_length=256)
+    source_image: str | None = Field(default=None, max_length=1000)
+    source_image_available: bool = False
+    itinerary_order: int = Field(ge=1, le=MAX_GUIDE_LANDMARKS)
+    landmark_page_id: str = Field(min_length=1, max_length=120)
+    age_complexity: ActivityComplexity
 
 
 class GuideDestinationPlan(StrictRequestModel):
@@ -121,6 +169,7 @@ class GuideRequest(StrictRequestModel):
 
 class Landmark(BaseModel):
     id: str
+    selection_id: str | None = Field(default=None, min_length=1, max_length=200)
     name: str
     description: list[str] = Field(min_length=1)
     image: Path | str
@@ -133,6 +182,7 @@ class Landmark(BaseModel):
     categories: list[str] = Field(default_factory=list)
     duration_minutes: int = Field(default=60, ge=15, le=240)
     family_tip: str | None = None
+    curiosity: str | None = Field(default=None, max_length=300)
 
 
 class LanguageTip(BaseModel):

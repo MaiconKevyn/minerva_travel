@@ -50,6 +50,7 @@
             "A Torre Eiffel é uma torre muito alta e famosa.",
             "Ela é o símbolo de Paris e, do alto dela, dá para ver a cidade inteira."
           ],
+          "curiosity": "A Torre Eiffel foi inaugurada em 1889 para uma grande exposição realizada em Paris.",
           "image": "assets/landmarks/paris/eiffel-tower.png",
           "lineart_image": "assets/lineart/paris/eiffel-tower.png",
           "sort_order": 1,

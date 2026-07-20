@@ -182,6 +182,7 @@ class BuilderSession:
             "attempts_left": MAX_ATTEMPTS_PER_PAGE - len(page.attempts),
             "approved_at": page.approved_at,
             "error": page.error,
+            "metadata": _public_page_metadata(page.metadata),
         }
 
     def _asset_url(self, filename: str) -> str:
@@ -448,3 +449,32 @@ def normalize_revision_instruction(value: str) -> str:
     """Normalize bounded human design feedback before storing or prompting."""
 
     return " ".join(value.split())[:MAX_REVISION_INSTRUCTION_LENGTH]
+
+
+_PUBLIC_PAGE_METADATA_FIELDS = {
+    "trip_date",
+    "landmark_names",
+    "landmark_selection_id",
+    "landmark_name",
+    "city",
+    "country",
+    "description",
+    "curiosity",
+    "curiosity_kind",
+    "activity_type",
+    "activity_label",
+    "instruction",
+    "age_complexity",
+    "source_image_available",
+    "linked_landmark_page_id",
+}
+
+
+def _public_page_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Expose review copy while keeping private paths and provider specs server-side."""
+
+    return {
+        key: value
+        for key, value in metadata.items()
+        if key in _PUBLIC_PAGE_METADATA_FIELDS and value is not None
+    }

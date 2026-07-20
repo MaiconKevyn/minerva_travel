@@ -34,6 +34,13 @@ from pydantic import BaseModel, Field, ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from minerva_travel import storage
+from minerva_travel.activity_page_compositor import (
+    BEST_MEMORY_REQUIRED_COPY,
+    COLORING_TITLE,
+    DETAIL_HUNT_TITLE,
+    DRAWING_TITLE,
+    WORD_SEARCH_TITLE,
+)
 from minerva_travel.asset_policy import (
     AssetProvenanceError,
     assert_selected_asset_provenance,
@@ -112,6 +119,10 @@ from minerva_travel.landmark_art_cache import (
 )
 from minerva_travel.landmark_parser import ParsedLandmark, parse_landmarks_from_message
 from minerva_travel.models import (
+    MAX_ACTIVITY_SELECTIONS_JSON_BYTES,
+    MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
+    MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE,
+    OPTIONAL_LANDMARK_ACTIVITY_TYPES,
     Destination,
     DynamicItineraryRequest,
     GuideDestinationPlan,
@@ -122,6 +133,9 @@ from minerva_travel.models import (
     ItineraryRecommendation,
     ItineraryRecommendationRequest,
     Landmark,
+    LandmarkActivityContext,
+    LandmarkActivitySelection,
+    OptionalLandmarkActivityType,
     RouteSuggestionRequest,
     RouteSuggestionResponse,
     StrictRequestModel,
@@ -190,6 +204,8 @@ CUSTOM_LANDMARK_IMAGE_HOSTS = {
 }
 CUSTOM_LANDMARK_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 LINEART_CANVAS_SIZE = (1200, 850)
+MAX_PROGRESSIVE_BUILDER_PAGES = 3 + MAX_GUIDE_LANDMARKS + MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE
+DEFAULT_BUILDER_PAGE_GENERATION_QUOTA = max(64, MAX_PROGRESSIVE_BUILDER_PAGES)
 
 
 class ApiErrorResponse(BaseModel):
@@ -209,6 +225,7 @@ class CatalogLandmarkResponse(BaseModel):
     categories: list[str]
     duration_minutes: int
     family_tip: str | None = None
+    curiosity: str | None = None
 
 
 class CatalogDestinationResponse(BaseModel):
@@ -404,9 +421,29 @@ class BuilderAttemptResponse(BaseModel):
     include_family: bool = False
 
 
+class BuilderPageMetadataResponse(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    trip_date: str | None = None
+    landmark_names: list[str] | None = None
+    landmark_selection_id: str | None = None
+    landmark_name: str | None = None
+    city: str | None = None
+    country: str | None = None
+    description: str | None = None
+    curiosity: str | None = None
+    curiosity_kind: Literal["trusted", "observation"] | None = None
+    activity_type: OptionalLandmarkActivityType | None = None
+    activity_label: str | None = None
+    instruction: str | None = None
+    age_complexity: Literal["preschool", "early_reader", "older_child", "family"] | None = None
+    source_image_available: bool | None = None
+    linked_landmark_page_id: str | None = None
+
+
 class BuilderPageResponse(BaseModel):
     id: str
-    kind: str
+    kind: Literal["cover", "trip_summary", "landmark", "landmark_activity", "best_memory"]
     title: str
     position: int
     status: Literal["ready", "generating", "awaiting_approval", "approved", "error"]
@@ -416,6 +453,7 @@ class BuilderPageResponse(BaseModel):
     attempts_left: int
     approved_at: str | None = None
     error: str | None = None
+    metadata: BuilderPageMetadataResponse
 
 
 class BuilderSessionResponse(BaseModel):
@@ -497,7 +535,14 @@ API_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
 class MinervaFastAPI(FastAPI):
     def openapi(self) -> dict[str, Any]:
         schema = super().openapi()
-        schema["x-minerva-contract-limits"] = public_contract_limits()
+        schema["x-minerva-contract-limits"] = {
+            **public_contract_limits(),
+            "max_optional_activities_per_landmark": MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
+            "max_optional_activity_pages_per_guide": MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE,
+        }
+        schema["x-minerva-optional-landmark-activity-types"] = list(
+            OPTIONAL_LANDMARK_ACTIVITY_TYPES
+        )
         return schema
 
 
@@ -800,10 +845,80 @@ class GuideGenerationFormRequest(StrictRequestModel):
     )
     custom_landmarks: str | None = Field(default=None, max_length=20_000)
     itinerary_json: str | None = Field(default=None, max_length=100_000)
+    activity_selections: list[LandmarkActivitySelection] = Field(
+        default_factory=list,
+        max_length=MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE,
+    )
     restaurant_recommendations_extra: bool = False
     photo_processing_consent: bool = False
     privacy_consent_version: str | None = Field(default=None, max_length=100)
     privacy_consent_at: str | None = Field(default=None, max_length=100)
+
+
+class ActivitySelectionInputError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+    def as_detail(self) -> dict[str, str]:
+        return {"code": self.code, "message": self.message}
+
+
+def parse_landmark_activity_selections(
+    raw: str | None,
+) -> list[LandmarkActivitySelection]:
+    """Parse the bounded multipart JSON field without accepting coerced records."""
+
+    if raw is None or not raw.strip():
+        return []
+    if len(raw.encode("utf-8")) > MAX_ACTIVITY_SELECTIONS_JSON_BYTES:
+        raise ActivitySelectionInputError(
+            "activity_selections_too_large",
+            "A seleção de atividades excede o limite permitido.",
+        )
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise ActivitySelectionInputError(
+            "activity_selections_json_invalid",
+            "A seleção de atividades precisa ser um JSON válido.",
+        ) from error
+    if not isinstance(payload, list):
+        raise ActivitySelectionInputError(
+            "activity_selections_not_a_list",
+            "A seleção de atividades precisa ser uma lista.",
+        )
+    if len(payload) > MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE:
+        raise ActivitySelectionInputError(
+            "activity_selection_guide_limit",
+            f"Escolha no máximo {MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE} atividades por guia.",
+        )
+    try:
+        return [LandmarkActivitySelection.model_validate(item) for item in payload]
+    except ValidationError as error:
+        raise ActivitySelectionInputError(
+            "activity_selection_record_invalid",
+            "Revise os pontos, tipos e a ordem das atividades selecionadas.",
+        ) from error
+
+
+def _activity_selection_snapshot(
+    selections: list[LandmarkActivitySelection],
+) -> list[dict[str, Any]]:
+    """Canonical JSON representation used by durable snapshots and request hashing."""
+
+    return [
+        selection.model_dump(mode="json")
+        for selection in sorted(
+            selections,
+            key=lambda item: (
+                item.landmark_selection_id,
+                item.order,
+                item.activity_type,
+            ),
+        )
+    ]
 
 
 @app.get("/", include_in_schema=False)
@@ -836,6 +951,7 @@ def api_catalog() -> CatalogResponse:
                         categories=landmark.categories,
                         duration_minutes=landmark.duration_minutes,
                         family_tip=landmark.family_tip,
+                        curiosity=landmark.curiosity,
                     )
                     for landmark in destination.landmarks
                 ],
@@ -1223,12 +1339,14 @@ def parse_guide_generation_form(
     selected_landmarks: Annotated[list[str] | None, Form()] = None,
     custom_landmarks: Annotated[str | None, Form()] = None,
     itinerary_json: Annotated[str | None, Form()] = None,
+    activity_selections_json: Annotated[str | None, Form()] = None,
     restaurant_recommendations_extra: Annotated[bool | None, Form()] = None,
     photo_processing_consent: Annotated[bool, Form()] = False,
     privacy_consent_version: Annotated[str | None, Form()] = None,
     privacy_consent_at: Annotated[str | None, Form()] = None,
 ) -> GuideGenerationFormRequest:
     try:
+        activity_selections = parse_landmark_activity_selections(activity_selections_json)
         return GuideGenerationFormRequest(
             title=title,
             children_names=children_names,
@@ -1239,11 +1357,14 @@ def parse_guide_generation_form(
             selected_landmarks=selected_landmarks or [],
             custom_landmarks=custom_landmarks,
             itinerary_json=itinerary_json,
+            activity_selections=activity_selections,
             restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
             photo_processing_consent=photo_processing_consent,
             privacy_consent_version=privacy_consent_version,
             privacy_consent_at=privacy_consent_at,
         )
+    except ActivitySelectionInputError as error:
+        raise HTTPException(status_code=422, detail=error.as_detail()) from error
     except ValidationError as error:
         raise RequestValidationError(error.errors()) from error
 
@@ -1266,6 +1387,7 @@ async def api_generate(
     selected_landmarks = form.selected_landmarks
     custom_landmarks = form.custom_landmarks
     itinerary_json = form.itinerary_json
+    activity_selections = form.activity_selections
     restaurant_recommendations_extra = form.restaurant_recommendations_extra
     photo_processing_consent = form.photo_processing_consent
     privacy_consent_version = form.privacy_consent_version
@@ -1291,6 +1413,7 @@ async def api_generate(
             selected_landmarks=selected_landmarks or [],
             custom_landmarks=custom_landmarks,
             itinerary_json=itinerary_json,
+            activity_selections=activity_selections,
             restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
             photo_processing_consent=photo_processing_consent,
             privacy_consent_version=privacy_consent_version,
@@ -1352,6 +1475,7 @@ async def api_generate(
                 selected_landmarks=selected_landmarks or [],
                 custom_landmarks=custom_landmarks,
                 itinerary_json=itinerary_json,
+                activity_selections=activity_selections,
                 restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
                 photo_processing_consent=photo_processing_consent,
                 privacy_consent_version=privacy_consent_version,
@@ -1494,6 +1618,7 @@ def validate_queued_generation_submission(
     selected_landmarks: list[str],
     custom_landmarks: str | None,
     itinerary_json: str | None,
+    activity_selections: list[LandmarkActivitySelection],
     restaurant_recommendations_extra: bool,
     photo_processing_consent: bool,
     privacy_consent_version: str | None,
@@ -1548,6 +1673,7 @@ def validate_queued_generation_submission(
         "selected_landmarks": selected_landmarks,
         "custom_landmarks": custom_landmarks,
         "itinerary_json": itinerary_json,
+        "activity_selections": _activity_selection_snapshot(activity_selections),
         "restaurant_recommendations_extra": restaurant_recommendations_extra,
         "photo_processing_consent": photo_processing_consent,
         "privacy_consent_version": privacy_consent_version,
@@ -1566,6 +1692,7 @@ async def generation_request_hash(
     selected_landmarks: list[str],
     custom_landmarks: str | None,
     itinerary_json: str | None,
+    activity_selections: list[LandmarkActivitySelection],
     restaurant_recommendations_extra: bool,
     photo_processing_consent: bool,
     privacy_consent_version: str | None,
@@ -1584,6 +1711,7 @@ async def generation_request_hash(
             "selected_landmarks": selected_landmarks,
             "custom_landmarks": custom_landmarks,
             "itinerary_json": itinerary_json,
+            "activity_selections": _activity_selection_snapshot(activity_selections),
             "restaurant_recommendations_extra": restaurant_recommendations_extra,
             "photo_processing_consent": photo_processing_consent,
             "privacy_consent_version": privacy_consent_version,
@@ -1836,6 +1964,25 @@ def _builder_reference_asset(session_id: str, filename: str, unavailable_message
     return candidate
 
 
+def _builder_local_landmark_reference(raw_path: object) -> Path | None:
+    """Resolve only immutable repository landmark assets stored in private page metadata."""
+
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None
+    project_root = Path(__file__).resolve().parents[2]
+    assets_root = (project_root / "assets").resolve()
+    candidate = Path(raw_path)
+    if not candidate.is_absolute():
+        candidate = project_root / candidate
+    try:
+        candidate = candidate.resolve()
+    except OSError:
+        return None
+    if not candidate.is_file() or assets_root not in candidate.parents:
+        return None
+    return candidate
+
+
 def _builder_catalog_and_selected_from_form(form: dict[str, Any]):
     catalog = load_catalog()
     custom_destinations, custom_selected = custom_destinations_from_form(
@@ -1869,32 +2016,271 @@ def _builder_trip_date(form: dict[str, Any]) -> str:
     return str(form.get("year") or "")
 
 
-def _selected_builder_landmarks(destinations: list[Destination], selected: list[str]) -> list[dict]:
-    landmark_by_selection_id: dict[str, dict] = {}
+_ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
+    "coloring": COLORING_TITLE,
+    "detail_hunt": DETAIL_HUNT_TITLE,
+    "word_search": WORD_SEARCH_TITLE,
+    "drawing": DRAWING_TITLE,
+}
+
+
+def _activity_complexity_for_ages(
+    children_ages: list[int],
+) -> Literal["preschool", "early_reader", "older_child", "family"]:
+    valid_ages = [age for age in children_ages if age > 0]
+    if not valid_ages:
+        return "family"
+    youngest = min(valid_ages)
+    if youngest <= 5:
+        return "preschool"
+    if youngest <= 8:
+        return "early_reader"
+    return "older_child"
+
+
+def _bounded_builder_copy(value: str, *, limit: int, fallback: str) -> str:
+    normalized = " ".join(str(value).split()) or fallback
+    if len(normalized) <= limit:
+        return normalized
+    shortened = normalized[:limit].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return (shortened or normalized[:limit]).rstrip() + "."
+
+
+def _trusted_landmark_copy(
+    landmark: Landmark,
+) -> tuple[str, str, Literal["trusted", "observation"]]:
+    description = _bounded_builder_copy(
+        " ".join(landmark.description),
+        limit=420,
+        fallback=f"{landmark.name} faz parte do roteiro especial desta viagem.",
+    )
+    if landmark.curiosity and landmark.curiosity.strip():
+        return (
+            description,
+            _bounded_builder_copy(
+                landmark.curiosity,
+                limit=260,
+                fallback="",
+            ),
+            "trusted",
+        )
+    observation = _bounded_builder_copy(
+        f"Observe os detalhes de {landmark.name} e descubra qual deles mais chama sua atenção.",
+        limit=260,
+        fallback="Observe as formas, cores e detalhes deste lugar durante a visita.",
+    )
+    return description, observation, "observation"
+
+
+def _catalog_landmark_source_image(destination: Destination, landmark: Landmark) -> str | None:
+    """Return only an existing repository asset, never a URL or custom placeholder."""
+
+    if destination.id.startswith("custom-"):
+        return None
+    raw = str(landmark.image or "").strip()
+    if not raw or urlparse(raw).scheme or raw.startswith("//"):
+        return None
+    project_root = Path(__file__).resolve().parents[2]
+    assets_root = (project_root / "assets").resolve()
+    candidate = Path(raw)
+    if not candidate.is_absolute():
+        candidate = project_root / candidate
+    try:
+        candidate = candidate.resolve()
+    except OSError:
+        return None
+    if not candidate.is_file() or assets_root not in candidate.parents:
+        return None
+    return str(candidate)
+
+
+def _selected_builder_landmarks(
+    destinations: list[Destination],
+    selected: list[str],
+    children_ages: list[int] | None = None,
+) -> list[LandmarkActivityContext]:
+    complexity = _activity_complexity_for_ages(children_ages or [])
+    landmark_by_selection_id: dict[str, tuple[Destination, Landmark]] = {}
     for destination in destinations:
         for landmark in destination.landmarks:
             selection_id = f"{destination.id}:{landmark.id}"
-            landmark_by_selection_id[selection_id] = {
-                "selection_id": selection_id,
-                "name": landmark.name,
-                "city": destination.city,
-                "country": destination.country,
-            }
-    ordered: list[dict] = []
+            landmark_by_selection_id[selection_id] = (destination, landmark)
+    ordered: list[LandmarkActivityContext] = []
     seen: set[str] = set()
+    canonical_seen: set[str] = set()
     for selected_id in selected:
-        if selected_id in seen or selected_id not in landmark_by_selection_id:
+        resolved = landmark_by_selection_id.get(selected_id)
+        if selected_id in seen or resolved is None:
             continue
-        ordered.append(landmark_by_selection_id[selected_id])
+        destination, landmark = resolved
+        canonical_selection_id = (landmark.selection_id or "").strip() or selected_id
+        if canonical_selection_id in canonical_seen:
+            raise ActivitySelectionInputError(
+                "landmark_selection_id_duplicate",
+                "Dois pontos turísticos usam o mesmo identificador de seleção.",
+            )
+        if len(ordered) >= MAX_GUIDE_LANDMARKS:
+            raise ActivitySelectionInputError(
+                "landmark_selection_limit",
+                f"Selecione no máximo {MAX_GUIDE_LANDMARKS} pontos turísticos por guia.",
+            )
+        description, curiosity, curiosity_kind = _trusted_landmark_copy(landmark)
+        source_image = _catalog_landmark_source_image(destination, landmark)
+        order = len(ordered) + 1
+        ordered.append(
+            LandmarkActivityContext(
+                selection_id=canonical_selection_id,
+                name=landmark.name,
+                city=destination.city,
+                country=destination.country,
+                description=description,
+                curiosity=curiosity,
+                curiosity_kind=curiosity_kind,
+                place_id=landmark.place_id,
+                source_image=source_image,
+                source_image_available=source_image is not None,
+                itinerary_order=order,
+                landmark_page_id=f"landmark-{order}",
+                age_complexity=complexity,
+            )
+        )
         seen.add(selected_id)
+        canonical_seen.add(canonical_selection_id)
     return ordered
 
 
-def _builder_page_plan(form: dict[str, Any], destinations: list[Destination], selected: list[str]):
+def normalize_landmark_activity_selections(
+    selections: list[LandmarkActivitySelection],
+    *,
+    selected_landmarks: list[LandmarkActivityContext],
+    all_landmark_ids: set[str],
+) -> list[LandmarkActivitySelection]:
+    """Validate associations and return deterministic itinerary/page order."""
+
+    if len(selections) > MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE:
+        raise ActivitySelectionInputError(
+            "activity_selection_guide_limit",
+            f"Escolha no máximo {MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE} atividades por guia.",
+        )
+    selected_by_id = {item.selection_id: item for item in selected_landmarks}
+    seen_types: set[tuple[str, str]] = set()
+    seen_orders: set[tuple[str, int]] = set()
+    count_by_landmark: dict[str, int] = {}
+    for selection in selections:
+        selection_id = selection.landmark_selection_id
+        if selection_id not in all_landmark_ids:
+            raise ActivitySelectionInputError(
+                "activity_landmark_unknown",
+                "Uma atividade está vinculada a um ponto turístico desconhecido.",
+            )
+        if selection_id not in selected_by_id:
+            raise ActivitySelectionInputError(
+                "activity_landmark_not_selected",
+                "Uma atividade está vinculada a um ponto que não faz parte deste guia.",
+            )
+        count_by_landmark[selection_id] = count_by_landmark.get(selection_id, 0) + 1
+        if count_by_landmark[selection_id] > MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK:
+            raise ActivitySelectionInputError(
+                "activity_selection_landmark_limit",
+                (
+                    "Escolha no máximo "
+                    f"{MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK} atividades por ponto turístico."
+                ),
+            )
+        type_key = (selection_id, selection.activity_type)
+        if type_key in seen_types:
+            raise ActivitySelectionInputError(
+                "activity_selection_duplicate",
+                "Cada tipo de atividade pode aparecer apenas uma vez por ponto turístico.",
+            )
+        order_key = (selection_id, selection.order)
+        if order_key in seen_orders:
+            raise ActivitySelectionInputError(
+                "activity_selection_order_duplicate",
+                "A ordem das atividades de um mesmo ponto turístico não pode se repetir.",
+            )
+        seen_types.add(type_key)
+        seen_orders.add(order_key)
+    itinerary_order = {
+        landmark.selection_id: landmark.itinerary_order for landmark in selected_landmarks
+    }
+    return sorted(
+        selections,
+        key=lambda item: (itinerary_order[item.landmark_selection_id], item.order),
+    )
+
+
+def _activity_spec(
+    activity_type: OptionalLandmarkActivityType,
+    landmark: LandmarkActivityContext,
+) -> dict[str, Any]:
+    instructions = {
+        "coloring": f"Pinte {landmark.name} com suas cores favoritas.",
+        "detail_hunt": f"Observe {landmark.name} e marque cada detalhe que encontrar.",
+        "word_search": f"Encontre no quadro as palavras ligadas a {landmark.name}.",
+        "drawing": f"Desenhe sua própria versão de {landmark.name}.",
+    }
+    spec: dict[str, Any] = {
+        "instruction": instructions[activity_type],
+        "prompt": instructions[activity_type],
+    }
+    if activity_type == "detail_hunt":
+        spec["clues"] = [
+            "Uma forma geométrica interessante",
+            "Um detalhe que você não tinha percebido",
+            "A parte mais alta ou mais distante que conseguir observar",
+            "Algo que você gostaria de desenhar depois",
+        ]
+    elif activity_type == "word_search":
+        candidates = [
+            *re.findall(r"[A-Za-zÀ-ÿ]{3,}", landmark.name),
+            *re.findall(r"[A-Za-zÀ-ÿ]{3,}", landmark.city),
+            *re.findall(r"[A-Za-zÀ-ÿ]{3,}", landmark.country),
+            "VIAGEM",
+            "DESCOBERTA",
+        ]
+        spec["words"] = list(dict.fromkeys(word.upper() for word in candidates))[:8]
+        spec["seed"] = landmark.selection_id
+    return spec
+
+
+def _builder_page_plan(
+    form: dict[str, Any],
+    destinations: list[Destination],
+    selected: list[str],
+) -> tuple[list[BuilderPage], list[LandmarkActivitySelection]]:
     family_title = str(form.get("title") or "Guia da família")
     trip_date = _builder_trip_date(form)
-    landmarks = _selected_builder_landmarks(destinations, selected)
-    names = [item["name"] for item in landmarks]
+    raw_ages = form.get("children_ages", [])
+    children_ages = [age for age in raw_ages if isinstance(age, int)]
+    landmarks = _selected_builder_landmarks(destinations, selected, children_ages)
+    names = [item.name for item in landmarks]
+    raw_selections = form.get("activity_selections", [])
+    try:
+        activity_selections = [
+            item
+            if isinstance(item, LandmarkActivitySelection)
+            else LandmarkActivitySelection.model_validate(item)
+            for item in raw_selections
+        ]
+    except ValidationError as error:
+        raise ActivitySelectionInputError(
+            "activity_selection_record_invalid",
+            "Revise os pontos, tipos e a ordem das atividades selecionadas.",
+        ) from error
+    all_landmark_ids = {
+        ((landmark.selection_id or "").strip() or f"{destination.id}:{landmark.id}")
+        for destination in destinations
+        for landmark in destination.landmarks
+    }
+    activity_selections = normalize_landmark_activity_selections(
+        activity_selections,
+        selected_landmarks=landmarks,
+        all_landmark_ids=all_landmark_ids,
+    )
+    activities_by_landmark: dict[str, list[LandmarkActivitySelection]] = {}
+    for selection in activity_selections:
+        activities_by_landmark.setdefault(selection.landmark_selection_id, []).append(selection)
     pages = [
         BuilderPage(
             id="cover",
@@ -1913,19 +2299,88 @@ def _builder_page_plan(form: dict[str, Any], destinations: list[Destination], se
             metadata={"trip_date": trip_date, "landmark_names": names},
         ),
     ]
-    for index, landmark in enumerate(landmarks, start=3):
-        location = ", ".join(part for part in (landmark["city"], landmark["country"]) if part)
+    next_position = 3
+    for landmark in landmarks:
+        location = ", ".join(part for part in (landmark.city, landmark.country) if part)
+        private_context = landmark.model_dump(mode="json")
+        public_context = {
+            "landmark_selection_id": landmark.selection_id,
+            "landmark_name": landmark.name,
+            "city": landmark.city,
+            "country": landmark.country,
+            "description": landmark.description,
+            "curiosity": landmark.curiosity,
+            "curiosity_kind": landmark.curiosity_kind,
+            "age_complexity": landmark.age_complexity,
+            "source_image_available": landmark.source_image_available,
+            "linked_landmark_page_id": landmark.landmark_page_id,
+        }
         pages.append(
             BuilderPage(
-                id=f"landmark-{index - 2}",
+                id=landmark.landmark_page_id,
                 kind="landmark",
-                title=landmark["name"],
-                position=index,
-                required_copy=[landmark["name"], location, f"{family_title} • {trip_date}"],
-                metadata={**landmark, "trip_date": trip_date},
+                title=landmark.name,
+                position=next_position,
+                required_copy=[
+                    landmark.name,
+                    location,
+                    f"{family_title} • {trip_date}",
+                    landmark.description,
+                    landmark.curiosity,
+                ],
+                metadata={
+                    **private_context,
+                    **public_context,
+                    "trip_date": trip_date,
+                },
             )
         )
-    return pages
+        next_position += 1
+        for activity in activities_by_landmark.get(landmark.selection_id, []):
+            activity_type = activity.activity_type
+            spec = _activity_spec(activity_type, landmark)
+            activity_label = _ACTIVITY_LABELS[activity_type]
+            pages.append(
+                BuilderPage(
+                    id=(f"activity-{landmark.itinerary_order}-{activity_type.replace('_', '-')}"),
+                    kind="landmark_activity",
+                    title=f"{activity_label}: {landmark.name}",
+                    position=next_position,
+                    required_copy=[
+                        activity_label,
+                        landmark.name,
+                        str(spec["instruction"]),
+                    ],
+                    metadata={
+                        **private_context,
+                        **public_context,
+                        "activity_type": activity_type,
+                        "activity_label": activity_label,
+                        "instruction": spec["instruction"],
+                        "activity_spec": spec,
+                        "linked_landmark_page_id": landmark.landmark_page_id,
+                        "trip_date": trip_date,
+                    },
+                )
+            )
+            next_position += 1
+    complexity = _activity_complexity_for_ages(children_ages)
+    memory_copy = list(BEST_MEMORY_REQUIRED_COPY)
+    pages.append(
+        BuilderPage(
+            id="best-memory",
+            kind="best_memory",
+            title="Minha melhor memória",
+            position=next_position,
+            required_copy=memory_copy,
+            metadata={
+                "trip_date": trip_date,
+                "landmark_names": names,
+                "age_complexity": complexity,
+            },
+        )
+    )
+    return pages, activity_selections
 
 
 @app.post("/api/guide-builder", response_model=BuilderSessionResponse, status_code=201)
@@ -1950,7 +2405,17 @@ async def create_guide_builder(
             status_code=400,
             detail="Selecione ou informe pelo menos um ponto turistico.",
         )
-    pages = _builder_page_plan(form_payload, catalog.destinations, selected)
+    try:
+        pages, normalized_activities = _builder_page_plan(
+            form_payload,
+            catalog.destinations,
+            selected,
+        )
+    except ActivitySelectionInputError as error:
+        raise HTTPException(status_code=422, detail=error.as_detail()) from error
+    form_payload["activity_selections"] = [
+        selection.model_dump(mode="json") for selection in normalized_activities
+    ]
     photo_path = await storage.save_upload(family_photo)
     session = create_builder_session(
         owner_id=current_user.id,
@@ -2000,7 +2465,7 @@ def generate_builder_page_attempt(
             default_ip_limit=12,
             default_window_seconds=10 * 60,
             default_user_concurrency=1,
-            default_user_quota=24,
+            default_user_quota=DEFAULT_BUILDER_PAGE_GENERATION_QUOTA,
         )
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
@@ -2008,9 +2473,13 @@ def generate_builder_page_attempt(
             if page is None:
                 raise BuilderPageOutOfOrder(page_id)
             revision_instruction = payload.revision_instruction if payload else ""
-            include_family = page.kind != "landmark" or bool(
-                payload.include_family if payload else False
-            )
+            requested_include_family = bool(payload.include_family if payload else False)
+            if page.kind == "landmark":
+                include_family = requested_include_family
+            elif page.kind in {"landmark_activity", "best_memory"}:
+                include_family = False
+            else:
+                include_family = True
             attempt_id, replayed = reserve_page_attempt(
                 session,
                 page_id,
@@ -2055,10 +2524,33 @@ def generate_builder_page_attempt(
                     cover_attempt.filename,
                     "A capa aprovada da família não está mais disponível.",
                 )
+            approved_landmark_page: Path | None = None
+            landmark_reference: Path | None = None
+            if page_kind == "landmark_activity":
+                linked_page_id = str(metadata.get("linked_landmark_page_id") or "")
+                linked_page = session.page(linked_page_id)
+                linked_attempt = (
+                    linked_page.selected_attempt()
+                    if linked_page is not None and linked_page.approved_at
+                    else None
+                )
+                if linked_attempt is None:
+                    raise PageGenerationError(
+                        "A página aprovada do ponto turístico não está disponível."
+                    )
+                approved_landmark_page = _builder_reference_asset(
+                    session_id,
+                    linked_attempt.filename,
+                    "A página aprovada do ponto turístico não está mais disponível.",
+                )
+                landmark_reference = _builder_local_landmark_reference(metadata.get("source_image"))
 
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
         generator = get_guide_page_generator()
-        if (page_kind != "landmark" or include_family) and not photo_path.is_file():
+        family_photo_required = page_kind in {"cover", "trip_summary"} or (
+            page_kind == "landmark" and include_family
+        )
+        if family_photo_required and not photo_path.is_file():
             raise PageGenerationError("A foto da família não está mais disponível.")
         if page_kind == "cover":
             generator.generate_cover_page(
@@ -2098,7 +2590,54 @@ def generate_builder_page_attempt(
                 landmark_name=str(metadata["name"]),
                 city=str(metadata["city"]),
                 country=str(metadata["country"]),
+                description=str(metadata["description"]),
+                curiosity=str(metadata["curiosity"]),
                 expected_visible_family_member_count=expected_people,
+                revision_instruction=revision_instruction,
+                reference_page=reference_page,
+            )
+        elif page_kind == "landmark_activity":
+            if approved_landmark_page is None:
+                raise PageGenerationError(
+                    "A página aprovada do ponto turístico não está disponível."
+                )
+            activity_type = str(metadata.get("activity_type") or "")
+            common_activity_kwargs = {
+                "output_path": output,
+                "landmark_reference": landmark_reference,
+                "approved_landmark_page": approved_landmark_page,
+                "landmark_context": {
+                    "selection_id": str(metadata["selection_id"]),
+                    "name": str(metadata["name"]),
+                    "landmark_name": str(metadata["name"]),
+                    "city": str(metadata["city"]),
+                    "country": str(metadata["country"]),
+                    "description": str(metadata["description"]),
+                    "curiosity": str(metadata["curiosity"]),
+                    "curiosity_kind": str(metadata["curiosity_kind"]),
+                    "age_complexity": str(metadata["age_complexity"]),
+                },
+                "activity_spec": dict(metadata.get("activity_spec") or {}),
+                "revision_instruction": revision_instruction,
+                "reference_page": reference_page,
+            }
+            if activity_type == "coloring":
+                generator.generate_coloring_page(**common_activity_kwargs)
+            elif activity_type == "detail_hunt":
+                generator.generate_detail_hunt_page(**common_activity_kwargs)
+            elif activity_type == "word_search":
+                generator.generate_word_search_page(**common_activity_kwargs)
+            elif activity_type == "drawing":
+                generator.generate_drawing_page(**common_activity_kwargs)
+            else:
+                raise PageGenerationError("Tipo de atividade não suportado.")
+        elif page_kind == "best_memory":
+            generator.generate_best_memory_page(
+                output_path=output,
+                family_title=family_title,
+                trip_date=str(metadata["trip_date"]),
+                landmark_names=list(metadata["landmark_names"]),
+                age_complexity=str(metadata["age_complexity"]),
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )

@@ -6,6 +6,7 @@ import {
   totalTripDays,
 } from './guide-form.js';
 import { authenticatedFetch } from '../lib/authFetch.js';
+import { normalizeLandmarkActivitySelections } from './landmark-activities.js';
 
 export { authorizationHeaders } from '../lib/authFetch.js';
 
@@ -461,6 +462,9 @@ export const selectGuideLandmarks = (landmarks = [], selectedLandmarks = []) => 
     if (selectionId) {
       acc[selectionId] = landmark;
     }
+    if (landmark.id) {
+      acc[landmark.id] = landmark;
+    }
     return acc;
   }, {});
   return selectedLandmarks.map((selectionId) => byId[selectionId]).filter(Boolean);
@@ -488,6 +492,7 @@ export const appendGuideLandmarks = (formData, guideData) => {
     const customLandmarksPayload = JSON.stringify(
       customLandmarks.map((landmark) => {
         const payload = {
+          selection_id: landmark.selection_id || landmark.id,
           name: landmark.name,
           city: landmark.city,
           country: landmark.country,
@@ -539,6 +544,10 @@ export const appendGuideMetadata = (formData, guideData = {}) => {
   if (guideData.itinerary) {
     formData.append('itinerary_json', JSON.stringify(guideData.itinerary));
   }
+  formData.append(
+    'activity_selections_json',
+    JSON.stringify(normalizeLandmarkActivitySelections(guideData.landmarkActivitySelections)),
+  );
   if (guideData.photoProcessingConsent) {
     formData.append('photo_processing_consent', 'true');
   }

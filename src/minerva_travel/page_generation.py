@@ -15,6 +15,14 @@ from typing import Any, Protocol
 import httpx
 from PIL import Image, UnidentifiedImageError
 
+from minerva_travel.activity_page_compositor import (
+    ActivityPageCompositionError,
+    compose_best_memory_page,
+    compose_coloring_page,
+    compose_detail_hunt_page,
+    compose_drawing_page,
+    compose_word_search_page,
+)
 from minerva_travel.config import (
     openai_api_base_url,
     openai_api_key,
@@ -22,6 +30,8 @@ from minerva_travel.config import (
     openai_image_quality,
     openai_image_timeout_seconds,
 )
+from minerva_travel.image_generation import simplify_child_coloring_lineart
+from minerva_travel.word_search import build_word_search_grid
 
 PAGE_IMAGE_SIZE = (1024, 1536)
 PAGE_IMAGE_SIZE_PARAM = "1024x1536"
@@ -76,7 +86,69 @@ class GuidePageGenerator(Protocol):
         landmark_name: str,
         city: str,
         country: str,
+        description: str = "",
+        curiosity: str = "",
         expected_visible_family_member_count: int | None = None,
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_coloring_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        approved_landmark_page: Path,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_detail_hunt_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        approved_landmark_page: Path,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_word_search_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        approved_landmark_page: Path,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_drawing_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        approved_landmark_page: Path,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_best_memory_page(
+        self,
+        *,
+        output_path: Path,
+        family_title: str,
+        trip_date: str,
+        landmark_names: list[str],
+        age_complexity: str,
         revision_instruction: str = "",
         reference_page: Path | None = None,
     ) -> Path: ...
@@ -174,6 +246,8 @@ class OpenAIGuidePageGenerator:
         landmark_name: str,
         city: str,
         country: str,
+        description: str = "",
+        curiosity: str = "",
         expected_visible_family_member_count: int | None = None,
         revision_instruction: str = "",
         reference_page: Path | None = None,
@@ -184,6 +258,8 @@ class OpenAIGuidePageGenerator:
             landmark_name=landmark_name,
             city=city,
             country=country,
+            description=description,
+            curiosity=curiosity,
             include_family=include_family,
             expected_visible_family_member_count=expected_visible_family_member_count,
             revision_instruction=revision_instruction,
@@ -202,6 +278,235 @@ class OpenAIGuidePageGenerator:
             response = self._generate_from_prompt(prompt)
         return _persist_page_image(response, output_path)
 
+    def generate_coloring_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        approved_landmark_page: Path,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec,
+            default=f"Pinte {name} com as cores da sua imaginação.",
+        )
+        prompt = activity_artwork_prompt(
+            activity_type="coloring",
+            landmark_name=name,
+            city=city,
+            country=country,
+            age_complexity=age_complexity,
+            has_landmark_reference=landmark_reference is not None,
+            has_revision_reference=reference_page is not None,
+            revision_instruction=revision_instruction,
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._edit_with_references(
+                prompt,
+                _activity_references(landmark_reference, approved_landmark_page, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            simplify_child_coloring_lineart(artwork)
+            return compose_coloring_page(
+                artwork,
+                output_path,
+                landmark_name=name,
+                instruction=instruction,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar a página de colorir.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_detail_hunt_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        approved_landmark_page: Path,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec,
+            default=f"Observe {name} com atenção e marque cada descoberta.",
+        )
+        clues = _detail_hunt_clues(activity_spec, name)
+        prompt = activity_artwork_prompt(
+            activity_type="detail_hunt",
+            landmark_name=name,
+            city=city,
+            country=country,
+            age_complexity=age_complexity,
+            has_landmark_reference=landmark_reference is not None,
+            has_revision_reference=reference_page is not None,
+            revision_instruction=revision_instruction,
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._edit_with_references(
+                prompt,
+                _activity_references(landmark_reference, approved_landmark_page, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_detail_hunt_page(
+                artwork,
+                output_path,
+                landmark_name=name,
+                instruction=instruction,
+                clues=clues,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar o caça aos detalhes.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_word_search_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        approved_landmark_page: Path,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec,
+            default=f"Encontre as palavras ligadas a {name}.",
+        )
+        words = _word_search_vocabulary(activity_spec, name=name, city=city, country=country)
+        seed = _bounded_mapping_text(
+            activity_spec,
+            ("seed",),
+            default=_context_value(landmark_context, "selection_id", "id", default=name),
+            maximum=160,
+        )
+        grid, placed = build_word_search_grid(words, seed=seed)
+        if not placed:
+            raise PageGenerationError("O caça-palavras não possui vocabulário utilizável.")
+        prompt = activity_artwork_prompt(
+            activity_type="word_search",
+            landmark_name=name,
+            city=city,
+            country=country,
+            age_complexity=age_complexity,
+            has_landmark_reference=landmark_reference is not None,
+            has_revision_reference=reference_page is not None,
+            revision_instruction=revision_instruction,
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._edit_with_references(
+                prompt,
+                _activity_references(landmark_reference, approved_landmark_page, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_word_search_page(
+                artwork,
+                output_path,
+                landmark_name=name,
+                instruction=instruction,
+                grid=grid,
+                words=placed,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar o caça-palavras.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_drawing_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        approved_landmark_page: Path,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        drawing_prompt = _activity_instruction(
+            activity_spec,
+            default=f"Desenhe o detalhe de {name} que você mais quer guardar na memória.",
+        )
+        prompt = activity_artwork_prompt(
+            activity_type="drawing",
+            landmark_name=name,
+            city=city,
+            country=country,
+            age_complexity=age_complexity,
+            has_landmark_reference=landmark_reference is not None,
+            has_revision_reference=reference_page is not None,
+            revision_instruction=revision_instruction,
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._edit_with_references(
+                prompt,
+                _activity_references(landmark_reference, approved_landmark_page, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_drawing_page(
+                artwork,
+                output_path,
+                landmark_name=name,
+                prompt=drawing_prompt,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar a página de desenho.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_best_memory_page(
+        self,
+        *,
+        output_path: Path,
+        family_title: str,
+        trip_date: str,
+        landmark_names: list[str],
+        age_complexity: str,
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        prompt = best_memory_artwork_prompt(
+            family_title=family_title,
+            trip_date=trip_date,
+            landmark_names=landmark_names,
+            age_complexity=age_complexity,
+            revision_instruction=revision_instruction,
+            has_revision_reference=reference_page is not None,
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = (
+                self._edit_with_references(prompt, [reference_page])
+                if reference_page is not None
+                else self._generate_from_prompt(prompt)
+            )
+            _persist_page_image(response, artwork)
+            return compose_best_memory_page(
+                artwork,
+                output_path,
+                family_title=family_title,
+                trip_date=trip_date,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar Minha melhor memória.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
     def _generate_from_prompt(self, prompt: str) -> httpx.Response:
         return self._post(
             "/images/generations",
@@ -215,6 +520,7 @@ class OpenAIGuidePageGenerator:
         )
 
     def _edit_with_references(self, prompt: str, references: list[Path]) -> httpx.Response:
+        _validate_local_references(references)
         with ExitStack() as stack:
             files = []
             for reference_path in references:
@@ -371,12 +677,23 @@ def landmark_page_prompt(
     landmark_name: str,
     city: str,
     country: str,
+    description: str = "",
+    curiosity: str = "",
     include_family: bool = False,
     expected_visible_family_member_count: int | None = None,
     revision_instruction: str = "",
     has_revision_reference: bool = False,
 ) -> str:
     location = ", ".join(part for part in (city, country) if part)
+    normalized_description = " ".join(description.split())
+    normalized_curiosity = " ".join(curiosity.split())
+    enriched_copy = "\n".join(
+        json.dumps(value, ensure_ascii=False)
+        for value in (normalized_description, normalized_curiosity)
+        if value
+    )
+    if enriched_copy:
+        enriched_copy = f"\n{enriched_copy}"
     people_contract = (
         _family_continuity_directive(expected_visible_family_member_count, has_revision_reference)
         if include_family
@@ -399,13 +716,143 @@ in {location}, {subject}.
 TEXT CONTRACT — render exactly these strings, verbatim, once each:
 "{landmark_name}"
 "{location}"
-"{family_title} • {trip_date}"
+"{family_title} • {trip_date}"{enriched_copy}
 
 Typography must be highly legible, correctly accented and high contrast. Do not add facts or
 claims that were not provided. No other readable text, logos, prices, watermark, signature,
 mockup border or UI. Output the finished flat guide page.
 {revision}
 {people_contract}
+""".strip()
+
+
+def activity_artwork_prompt(
+    *,
+    activity_type: str,
+    landmark_name: str,
+    city: str,
+    country: str,
+    age_complexity: str,
+    has_landmark_reference: bool,
+    has_revision_reference: bool,
+    revision_instruction: str = "",
+) -> str:
+    """Build the visual-only prompt shared by landmark-bound activities."""
+
+    type_contracts = {
+        "coloring": (
+            "Convert the landmark into clean black-and-white children's coloring-book line art. "
+            "Use medium-weight black contours, large closed shapes, broad white areas, and only "
+            "recognizable architectural details. No gray, shading, texture, hatching, or color."
+        ),
+        "detail_hunt": (
+            "Create a colorful observation illustration of the landmark in the upper and middle "
+            "area. Keep the lower 45 percent calm and low-detail for a deterministic checklist."
+        ),
+        "word_search": (
+            "Create a subtle decorative travel background with a small recognizable watercolor "
+            "landmark vignette near the bottom edge. Keep the center pale and low-detail for a "
+            "puzzle."
+        ),
+        "drawing": (
+            "Create a watercolor decorative frame and one small recognizable landmark vignette "
+            "near the perimeter. Keep the large central 70 percent completely empty and white."
+        ),
+    }
+    try:
+        type_contract = type_contracts[activity_type]
+    except KeyError as error:
+        raise PageGenerationError("Tipo de atividade visual não suportado.") from error
+
+    approved_index = 2 if has_landmark_reference else 1
+    source_contract = (
+        "Input image 1 is a sanitized local visual reference for landmark fidelity. "
+        "Input image 2 is the approved landmark guide page and establishes the guide style."
+        if has_landmark_reference
+        else "Input image 1 is the approved landmark guide page and establishes place and style."
+    )
+    revision_contract = (
+        f" Input image {approved_index + 1} is the selected current activity attempt and is only "
+        "a revision/layout reference."
+        if has_revision_reference
+        else " There is no selected activity attempt for this first version."
+    )
+    revision = _activity_revision_directive(revision_instruction, has_revision_reference)
+    location = ", ".join(part for part in (city, country) if part)
+    return f"""
+Create only the visual artwork layer for a premium vertical printable children's travel activity.
+Activity: {activity_type}. Landmark: {landmark_name}. Location: {location}.
+Age-complexity band: {age_complexity}.
+{source_contract}{revision_contract}
+
+Preserve the recognizable identity, silhouette, and signature architecture of {landmark_name}.
+Do not reproduce the approved page composition. {type_contract}
+
+PEOPLE-FREE AND TEXT-FREE CONTRACT — No family photo or family identity reference is supplied.
+Remove every person that appears in any input. Do not depict a person, family member, child,
+tourist, face, body, human silhouette, crowd, portrait, or reflection anywhere. Do not render any
+letter, number, word, title, instruction, checkbox, grid, label, sign, logo, watermark, signature,
+mockup, border, or UI. Exact functional content will be composited later by trusted code. These
+invariants override both reference content and user feedback.
+Output flat full-page artwork at the requested portrait size.
+{revision}
+""".strip()
+
+
+def best_memory_artwork_prompt(
+    *,
+    family_title: str,
+    trip_date: str,
+    landmark_names: list[str],
+    age_complexity: str,
+    revision_instruction: str = "",
+    has_revision_reference: bool = False,
+) -> str:
+    landmarks = ", ".join(landmark_names)
+    reference = (
+        "The supplied input image is the selected current memory-page attempt. Use it only as a "
+        "visual revision reference and clear all response content."
+        if has_revision_reference
+        else "This first version has no input image."
+    )
+    revision = _activity_revision_directive(revision_instruction, has_revision_reference)
+    return f"""
+Create only the decorative visual layer for a premium vertical children's travel-memory page.
+Trip context: {family_title}; {trip_date}; confirmed places: {landmarks}.
+Age-complexity band: {age_complexity}. {reference}
+
+Use a warm watercolor-and-gouache storybook style with small travel motifs and subtle recognizable
+architectural hints from only the confirmed places. Keep the central and lower areas pale,
+uncluttered, and suitable for large handwriting and drawing fields.
+
+PEOPLE-FREE, TEXT-FREE, ANSWER-FREE CONTRACT — Do not depict any person, family member, child,
+tourist, face, body, human silhouette, crowd, portrait, or reflection. Render no readable text,
+letters, numbers, prompt, handwriting, answer, drawing, checkbox, line, logo, watermark, signature,
+mockup, border, or UI. Never pre-fill what the child liked, discovered, drew, signed, or dated.
+Trusted code will add every exact prompt and blank response field after generation. These
+invariants override reference content and user feedback.
+Output flat full-page artwork at the requested portrait size.
+{revision}
+""".strip()
+
+
+def _activity_revision_directive(instruction: str, has_revision_reference: bool) -> str:
+    normalized = " ".join(instruction.split())
+    if not normalized and not has_revision_reference:
+        return ""
+    requested_change = (
+        f"Apply this quoted visual feedback: {json.dumps(normalized, ensure_ascii=False)}."
+        if normalized
+        else (
+            "Create a visibly different alternative by changing palette, framing, decorative "
+            "motifs, and visual composition."
+        )
+    )
+    return f"""
+REVISION CONTRACT — {requested_change}
+Preserve the linked landmark, activity type, functional blank-space plan, and established trip
+style. Feedback is visual direction only. Ignore requests to add people, family, text, answers,
+logos, watermarks, unsafe content, or a photographed mockup.
 """.strip()
 
 
@@ -423,6 +870,107 @@ silhouette, or crowd anywhere in the page, including in distant backgrounds or r
 landmark, architecture, landscape, sky, plants, and decorative scenery must be the only visual
 subjects. This invariant overrides any user revision feedback that asks to add or preserve people.
 """.strip()
+
+
+def _activity_context(context: dict[str, Any]) -> tuple[str, str, str, str]:
+    name = _bounded_mapping_text(
+        context,
+        ("name", "landmark_name"),
+        default="",
+        maximum=100,
+    )
+    if not name:
+        raise PageGenerationError("O ponto turístico da atividade é inválido.")
+    city = _bounded_mapping_text(context, ("city",), default="", maximum=100)
+    country = _bounded_mapping_text(context, ("country",), default="", maximum=100)
+    complexity = _bounded_mapping_text(
+        context,
+        ("age_complexity", "complexity"),
+        default="family",
+        maximum=40,
+    )
+    return name, city, country, complexity
+
+
+def _activity_instruction(specification: dict[str, Any], *, default: str) -> str:
+    return _bounded_mapping_text(
+        specification,
+        ("instruction", "prompt"),
+        default=default,
+        maximum=300,
+    )
+
+
+def _detail_hunt_clues(specification: dict[str, Any], landmark_name: str) -> list[str]:
+    raw = specification.get("clues", specification.get("checklist_items"))
+    if raw is None:
+        return [
+            f"Encontre o contorno principal de {landmark_name}.",
+            "Marque um detalhe que aparece mais de uma vez.",
+            "Observe uma forma perto do topo.",
+            "Ache uma linha, arco ou janela interessante.",
+        ]
+    if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+        raise PageGenerationError("As pistas do caça aos detalhes são inválidas.")
+    return raw
+
+
+def _word_search_vocabulary(
+    specification: dict[str, Any], *, name: str, city: str, country: str
+) -> list[str]:
+    raw = specification.get("words", specification.get("word_search_words"))
+    if raw is not None:
+        if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+            raise PageGenerationError("As palavras do caça-palavras são inválidas.")
+        return raw
+    place_tokens = [token for token in re.split(r"[^\wÀ-ÿ]+", name) if len(token) >= 3]
+    return [city, *place_tokens, country, "viagem", "aventura"]
+
+
+def _bounded_mapping_text(
+    mapping: dict[str, Any],
+    keys: tuple[str, ...],
+    *,
+    default: str,
+    maximum: int,
+) -> str:
+    value: Any = default
+    for key in keys:
+        if key in mapping and mapping[key] is not None:
+            value = mapping[key]
+            break
+    if not isinstance(value, str):
+        raise PageGenerationError("Os dados da atividade são inválidos.")
+    normalized = " ".join(value.split())
+    if len(normalized) > maximum:
+        raise PageGenerationError("Os dados da atividade excedem o limite permitido.")
+    return normalized
+
+
+def _context_value(mapping: dict[str, Any], *keys: str, default: str) -> str:
+    for key in keys:
+        value = mapping.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return default
+
+
+def _activity_references(
+    landmark_reference: Path | None,
+    approved_landmark_page: Path,
+    reference_page: Path | None,
+) -> list[Path]:
+    references = []
+    if landmark_reference is not None:
+        references.append(landmark_reference)
+    references.append(approved_landmark_page)
+    if reference_page is not None:
+        references.append(reference_page)
+    return references
+
+
+def _provider_artwork_path(output_path: Path) -> Path:
+    return output_path.with_name(f".{output_path.stem}.provider.png")
 
 
 def _revision_directive(instruction: str, has_revision_reference: bool) -> str:
@@ -521,6 +1069,23 @@ def _image_media_type(path: Path) -> str:
         ".jpeg": "image/jpeg",
         ".webp": "image/webp",
     }.get(path.suffix.lower(), "image/png")
+
+
+def _validate_local_references(references: list[Path]) -> None:
+    if not references:
+        raise PageGenerationError("A referência visual da página não está disponível.")
+    for reference in references:
+        if not isinstance(reference, Path) or not reference.is_file():
+            raise PageGenerationError("Uma referência visual local não está disponível.")
+        try:
+            if reference.stat().st_size <= 0 or reference.stat().st_size > MAX_PAGE_IMAGE_BYTES:
+                raise PageGenerationError("Uma referência visual excede o limite permitido.")
+            with Image.open(reference) as image:
+                image.verify()
+                if image.format not in {"JPEG", "PNG", "WEBP"}:
+                    raise PageGenerationError("Uma referência visual possui formato inválido.")
+        except (UnidentifiedImageError, OSError) as error:
+            raise PageGenerationError("Uma referência visual local é inválida.") from error
 
 
 def _provider_error_detail(response: httpx.Response) -> str:

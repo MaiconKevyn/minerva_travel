@@ -9,6 +9,8 @@ import {
   Sparkles,
   Star,
   Users,
+  BookHeart,
+  Puzzle,
 } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -26,6 +28,7 @@ import {
   serializeGuideDestinations,
 } from '@/utils/guide-form.js';
 import GuideAssembly from '@/components/GuideAssembly.jsx';
+import { activityOptionForType } from '@/utils/landmark-activities.js';
 import { toast } from 'sonner';
 
 const Step5Review = () => {
@@ -37,6 +40,7 @@ const Step5Review = () => {
     destinationsList,
     parsedData,
     selectedLandmarks,
+    landmarkActivitySelections,
     childrenList,
     parentsList,
     expectedCoverFamilyMemberCount,
@@ -89,6 +93,7 @@ const Step5Review = () => {
       privacyConsentAt,
       landmarks: finalLandmarks,
       selectedLandmarks,
+      landmarkActivitySelections,
       itinerary,
       restaurantRecommendationsExtra,
     };
@@ -120,6 +125,31 @@ const Step5Review = () => {
     acc[landmark.destination_id].push(landmark);
     return acc;
   }, {});
+  const activitiesForLandmark = (landmark) => {
+    const landmarkSelectionId = String(landmark.selection_id || landmark.id || '');
+    return landmarkActivitySelections
+      .filter((selection) => selection.landmark_selection_id === landmarkSelectionId)
+      .map((selection) => activityOptionForType(selection.activity_type))
+      .filter(Boolean);
+  };
+
+  const LandmarkActivities = ({ landmark }) => {
+    const activities = activitiesForLandmark(landmark);
+    if (activities.length === 0) return null;
+    return (
+      <div className="mt-2 flex flex-wrap gap-2" aria-label={`Atividades escolhidas para ${landmark.name}`}>
+        {activities.map((activity) => (
+          <span
+            key={activity.type}
+            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary"
+          >
+            <Puzzle className="h-3 w-3" aria-hidden="true" />
+            {activity.label}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-12">
@@ -213,6 +243,7 @@ const Step5Review = () => {
                       <span className="text-muted-foreground text-sm leading-relaxed mt-1 line-clamp-2">
                         {landmark.description}
                       </span>
+                      <LandmarkActivities landmark={landmark} />
                     </li>
                   ))}
                 </ul>
@@ -240,6 +271,7 @@ const Step5Review = () => {
                         <span className="text-muted-foreground text-sm leading-relaxed mt-1 line-clamp-2">
                           {landmark.description}
                         </span>
+                        <LandmarkActivities landmark={landmark} />
                       </li>
                     ))}
                   </ul>
@@ -264,11 +296,25 @@ const Step5Review = () => {
                       <span className="text-muted-foreground text-sm leading-relaxed mt-1 line-clamp-2">
                         {landmark.description}
                       </span>
+                      <LandmarkActivities landmark={landmark} />
                     </li>
                   ))}
                 </ul>
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="mt-8 rounded-3xl border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6">
+          <div className="flex items-start gap-4">
+            <BookHeart className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
+            <div>
+              <h3 className="text-xl font-serif font-bold text-foreground">Minha melhor memória</h3>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
+                Página obrigatória no final do guia, com espaço para registrar a descoberta favorita,
+                fazer um desenho, assinar e datar.
+              </p>
+            </div>
           </div>
         </div>
       </div>

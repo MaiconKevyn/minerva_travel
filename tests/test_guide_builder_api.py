@@ -34,6 +34,8 @@ class FakePageGenerator:
             "cover": "#4f86b7",
             "summary": "#69b482",
             "landmark": "#c9a94d",
+            "activity": "#8f79b8",
+            "memory": "#d69b79",
         }
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(_png_bytes(colors[kind]))
@@ -47,6 +49,21 @@ class FakePageGenerator:
 
     def generate_landmark_page(self, *, output_path, **kwargs):
         return self._write("landmark", output_path, kwargs)
+
+    def generate_coloring_page(self, *, output_path, **kwargs):
+        return self._write("activity", output_path, kwargs)
+
+    def generate_detail_hunt_page(self, *, output_path, **kwargs):
+        return self._write("activity", output_path, kwargs)
+
+    def generate_word_search_page(self, *, output_path, **kwargs):
+        return self._write("activity", output_path, kwargs)
+
+    def generate_drawing_page(self, *, output_path, **kwargs):
+        return self._write("activity", output_path, kwargs)
+
+    def generate_best_memory_page(self, *, output_path, **kwargs):
+        return self._write("memory", output_path, kwargs)
 
 
 CUSTOM_LANDMARKS = json.dumps(
@@ -128,6 +145,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         "trip_summary",
         "landmark",
         "landmark",
+        "best_memory",
     ]
     assert created["pages"][0]["required_copy"] == ["Família Moraes", "Julho de 2026"]
     assert "Torre Eiffel" in created["pages"][1]["required_copy"]
@@ -166,6 +184,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         ("summary", "summary"),
         ("landmark-1", "landmark"),
         ("landmark-2", "landmark"),
+        ("best-memory", "memory"),
     ):
         generated = _generate(client, session_id, page_id, f"{page_id}-request")
         assert generated.status_code == 200, generated.text
@@ -174,21 +193,25 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         assert generator.calls[-1] == kind
         request = generator.requests[-1]
         assert request["reference_page"] is None
-        assert request["expected_visible_family_member_count"] == 2
+        if page_id != "best-memory":
+            assert request["expected_visible_family_member_count"] == 2
         if page_id == "summary":
             assert request["family_photo"].is_file()
             assert request["family_cover"].name == "cover-1.png"
             assert page["attempts"][-1]["include_family"] is True
-        else:
+        elif page_id.startswith("landmark-"):
             assert request["family_photo"] is None
             assert request["family_cover"] is None
             assert request["include_family"] is False
             assert page["attempts"][-1]["include_family"] is False
+        else:
+            assert page["attempts"][-1]["include_family"] is False
+            assert "family_photo" not in request
 
     completed = client.post(f"/api/guide-builder/{session_id}/complete")
     assert completed.status_code == 200, completed.text
     payload = completed.json()
-    assert len(payload["pages"]) == 4
+    assert len(payload["pages"]) == 5
     assert all(page["asset_url"].startswith("/guide-builder/") for page in payload["pages"])
     assert "download_url" not in payload
     assert "preview_url" not in payload
@@ -204,7 +227,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         "session_id": session_id,
         "download_url": f"/guide-builder/{session_id}/pdf",
         "filename": "familia-moraes-minerva-travel.pdf",
-        "page_count": 4,
+        "page_count": 5,
     }
     pdf_path = tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf"
     first_bytes = pdf_path.read_bytes()
@@ -448,7 +471,7 @@ def test_account_deletion_removes_builder_session_photo_and_pages(tmp_path, monk
     client, _generator = _setup(monkeypatch, tmp_path)
     created = _create_session(client)
     session_id = created["session_id"]
-    for page_id in ("cover", "summary", "landmark-1", "landmark-2"):
+    for page_id in ("cover", "summary", "landmark-1", "landmark-2", "best-memory"):
         generated = _generate(client, session_id, page_id, f"delete-{page_id}")
         assert generated.status_code == 200
         page = next(item for item in generated.json()["pages"] if item["id"] == page_id)

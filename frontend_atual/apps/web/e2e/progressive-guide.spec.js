@@ -23,6 +23,7 @@ const pageState = ({
   attempts = [],
   selectedAttemptId = null,
   approved = false,
+  metadata = {},
 }) => ({
   id,
   kind,
@@ -35,6 +36,88 @@ const pageState = ({
   attempts_left: 4 - attempts.length,
   approved_at: approved ? '2026-07-20T00:01:00+00:00' : null,
   error: null,
+  metadata,
+});
+
+test('restored activity step keeps the no-optional path and mandatory memory visible', async ({ page }) => {
+  await page.route('**/api/guides', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{"guides":[]}' }),
+  );
+  await page.route('**/api/drafts/current', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        draft: {
+          id: 'activity-draft',
+          revision: 1,
+          payload: {
+            current_step: 5,
+            family_name: 'Aurora',
+            destination: 'Paris em Julho de 2026',
+            destinations_list: [
+              { id: 'paris', place: 'Paris', timing: 'Julho de 2026', days: 3, landmarks: ['Torre Eiffel'] },
+            ],
+            itinerary_mode: 'known',
+            children_list: [{ id: 'child-1', name: 'Lia', age: 8 }],
+            parents_list: ['Ana', 'Caio'],
+            year: 2026,
+            parsed_data: {
+              destinations: [{ id: 'paris', city: 'Paris', country: 'França' }],
+              landmarks: [
+                {
+                  id: 'eiffel-card',
+                  selection_id: 'paris:eiffel',
+                  destination_id: 'paris',
+                  name: 'Torre Eiffel',
+                  city: 'Paris',
+                  country: 'França',
+                },
+              ],
+            },
+            selected_landmarks: ['paris:eiffel'],
+            landmark_activity_selections: [],
+            itinerary_preferences: { days: 3, interests: [], pace: 'balanced' },
+            has_searched_landmarks: true,
+          },
+        },
+      },
+    }),
+  );
+  await page.route('**/api/drafts/activity-draft', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        id: 'activity-draft',
+        revision: 2,
+        payload: route.request().postDataJSON()?.payload || {},
+      },
+    }),
+  );
+
+  const email = `atividades-${test.info().project.name}@example.test`;
+  const password = 'Aventura2026';
+  await page.goto('/signup');
+  await page.getByLabel('Nome da Família ou Responsável').fill('Família Aurora');
+  await page.getByLabel('Email Mágico').fill(email);
+  await page.getByLabel('Senha Secreta', { exact: true }).fill(password);
+  await page.getByLabel('Confirme a Senha').fill(password);
+  await page.getByRole('button', { name: 'Criar Minha Conta' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  const loginEmail = page.getByLabel('Email Mágico');
+  const loginPassword = page.getByLabel('Senha Secreta');
+  await loginPassword.fill(password);
+  await loginEmail.fill(email);
+  await expect(loginEmail).toHaveValue(email);
+  await expect(loginPassword).toHaveValue(password);
+  await page.getByRole('button', { name: 'Entrar na Aventura' }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto('/create');
+
+  await expect(page.getByRole('heading', { name: 'Atividades da aventura' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Minha melhor memória' })).toBeVisible();
+  await expect(page.getByText('0 de 8 páginas opcionais')).toBeVisible();
+  await page.getByRole('button', { name: 'Continuar sem atividades opcionais' }).click();
+  await expect(page.getByRole('heading', { name: /Escolha a foto de capa do PDF/ })).toBeVisible();
 });
 
 test('family reviews pages and controls family inclusion on a landmark', async ({
@@ -57,6 +140,13 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   const landmarkFamilyRequests = [];
   let landmarkSelected = null;
   let landmarkApproved = false;
+  const activityAttempts = { coloring: [], word_search: [] };
+  const activitySelected = { coloring: null, word_search: null };
+  const activityApproved = { coloring: false, word_search: false };
+  const activityRequestBodies = [];
+  let memoryAttempts = [];
+  let memorySelected = null;
+  let memoryApproved = false;
   let pdfExportRequests = 0;
 
   const sessionPayload = () => ({
@@ -70,8 +160,15 @@ test('family reviews pages and controls family inclusion on a landmark', async (
         ? 'summary'
         : !landmarkApproved
           ? 'landmark-1'
-          : null,
-    is_complete: coverApproved && summaryApproved && landmarkApproved,
+          : !activityApproved.coloring
+            ? 'activity-coloring'
+            : !activityApproved.word_search
+              ? 'activity-word-search'
+              : !memoryApproved
+                ? 'best-memory'
+                : null,
+    is_complete: coverApproved && summaryApproved && landmarkApproved &&
+      activityApproved.coloring && activityApproved.word_search && memoryApproved,
     pages: [
       pageState({
         id: 'cover',
@@ -108,6 +205,52 @@ test('family reviews pages and controls family inclusion on a landmark', async (
         attempts: landmarkAttempts,
         selectedAttemptId: landmarkSelected,
         approved: landmarkApproved,
+        metadata: { landmark_selection_id: 'eiffel', landmark_name: 'Torre Eiffel' },
+      }),
+      pageState({
+        id: 'activity-coloring',
+        kind: 'landmark_activity',
+        title: 'Página para colorir — Torre Eiffel',
+        position: 4,
+        requiredCopy: ['Torre Eiffel', 'Pinte sua aventura!'],
+        attempts: activityAttempts.coloring,
+        selectedAttemptId: activitySelected.coloring,
+        approved: activityApproved.coloring,
+        metadata: {
+          activity_type: 'coloring',
+          activity_label: 'Página para colorir',
+          landmark_selection_id: 'eiffel',
+          landmark_name: 'Torre Eiffel',
+          linked_landmark_page_id: 'landmark-1',
+        },
+      }),
+      pageState({
+        id: 'activity-word-search',
+        kind: 'landmark_activity',
+        title: 'Caça-palavras — Torre Eiffel',
+        position: 5,
+        requiredCopy: ['Torre Eiffel', 'Encontre as palavras'],
+        attempts: activityAttempts.word_search,
+        selectedAttemptId: activitySelected.word_search,
+        approved: activityApproved.word_search,
+        metadata: {
+          activity_type: 'word_search',
+          activity_label: 'Caça-palavras',
+          landmark_selection_id: 'eiffel',
+          landmark_name: 'Torre Eiffel',
+          linked_landmark_page_id: 'landmark-1',
+        },
+      }),
+      pageState({
+        id: 'best-memory',
+        kind: 'best_memory',
+        title: 'Minha melhor memória',
+        position: 6,
+        requiredCopy: ['Minha melhor memória', 'O que eu mais gostei', 'Data'],
+        attempts: memoryAttempts,
+        selectedAttemptId: memorySelected,
+        approved: memoryApproved,
+        metadata: { age_complexity: 'early_reader' },
       }),
     ],
   });
@@ -124,7 +267,7 @@ test('family reviews pages and controls family inclusion on a landmark', async (
           id: 'visual-draft',
           revision: 1,
           payload: {
-            current_step: 6,
+            current_step: 7,
             family_name: 'Aurora',
             destination: 'Paris e Roma em Julho de 2026',
             destinations_list: [
@@ -148,6 +291,10 @@ test('family reviews pages and controls family inclusion on a landmark', async (
               ],
             },
             selected_landmarks: ['eiffel', 'colosseum'],
+            landmark_activity_selections: [
+              { landmark_selection_id: 'eiffel', activity_type: 'coloring', order: 1 },
+              { landmark_selection_id: 'eiffel', activity_type: 'word_search', order: 2 },
+            ],
             itinerary_preferences: { days: 5, interests: [], pace: 'balanced' },
             has_searched_landmarks: true,
           },
@@ -231,6 +378,35 @@ test('family reviews pages and controls family inclusion on a landmark', async (
       landmarkApproved = true;
       return route.fulfill({ status: 200, json: sessionPayload() });
     }
+    for (const [activityKey, pageId] of [
+      ['coloring', 'activity-coloring'],
+      ['word_search', 'activity-word-search'],
+    ]) {
+      if (url.pathname.endsWith(`/pages/${pageId}/attempts`) && method === 'POST') {
+        const requestPayload = request.postDataJSON() || {};
+        activityRequestBodies.push(requestPayload);
+        activityAttempts[activityKey] = [
+          attempt(`${pageId}-1`, `${pageId}-1.png`, requestPayload.revision_instruction || ''),
+        ];
+        activitySelected[activityKey] = `${pageId}-1`;
+        return route.fulfill({ status: 200, json: sessionPayload() });
+      }
+      if (url.pathname.endsWith(`/pages/${pageId}/approve`) && method === 'POST') {
+        activityApproved[activityKey] = true;
+        return route.fulfill({ status: 200, json: sessionPayload() });
+      }
+    }
+    if (url.pathname.endsWith('/pages/best-memory/attempts') && method === 'POST') {
+      const requestPayload = request.postDataJSON() || {};
+      activityRequestBodies.push(requestPayload);
+      memoryAttempts = [attempt('best-memory-1', 'best-memory-1.png')];
+      memorySelected = 'best-memory-1';
+      return route.fulfill({ status: 200, json: sessionPayload() });
+    }
+    if (url.pathname.endsWith('/pages/best-memory/approve') && method === 'POST') {
+      memoryApproved = true;
+      return route.fulfill({ status: 200, json: sessionPayload() });
+    }
     if (url.pathname.endsWith('/complete') && method === 'POST') {
       return route.fulfill({
         status: 200,
@@ -262,7 +438,7 @@ test('family reviews pages and controls family inclusion on a landmark', async (
           session_id: 'syntheticsession',
           download_url: '/guide-builder/syntheticsession/pdf',
           filename: 'familia-aurora-minerva-travel.pdf',
-          page_count: 3,
+          page_count: 6,
         },
       });
     }
@@ -348,6 +524,25 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   await expect(page.getByText('Com família', { exact: true })).toBeVisible();
   expect(landmarkFamilyRequests).toEqual([false, true]);
   await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Página para colorir — Torre Eiffel' })).toBeVisible();
+  await expect(page.getByText('Ligada a Torre Eiffel')).toBeVisible();
+  await expect(page.getByRole('switch', { name: 'Incluir família' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Gerar página' }).click();
+  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Caça-palavras — Torre Eiffel' })).toBeVisible();
+  await expect(page.getByRole('switch', { name: 'Incluir família' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Gerar página' }).click();
+  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Minha melhor memória' })).toBeVisible();
+  await expect(page.locator('section span').getByText('Página obrigatória', { exact: true })).toBeVisible();
+  await expect(page.getByRole('switch', { name: 'Incluir família' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Gerar página' }).click();
+  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+  expect(activityRequestBodies).toHaveLength(3);
+  expect(activityRequestBodies.every((body) => body.include_family === false)).toBe(true);
   await page.getByRole('button', { name: 'Ver páginas aprovadas' }).click();
 
   await expect(page.getByRole('heading', { name: 'Páginas aprovadas!' })).toBeVisible();
@@ -356,7 +551,7 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   const firstDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Gerar PDF e baixar' }).click();
   expect((await firstDownload).suggestedFilename()).toBe('familia-aurora-minerva-travel.pdf');
-  await expect(page.getByText('PDF pronto com 3 páginas.')).toBeVisible();
+  await expect(page.getByText('PDF pronto com 6 páginas.')).toBeVisible();
   const secondDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Baixar PDF novamente' }).click();
   expect((await secondDownload).suggestedFilename()).toBe('familia-aurora-minerva-travel.pdf');

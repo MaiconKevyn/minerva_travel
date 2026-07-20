@@ -10,6 +10,7 @@ import Step3Destination from '@/components/Step3Destination.jsx';
 import StepTripPreferences from '@/components/StepTripPreferences.jsx';
 import Step4Attractions from '@/components/Step4Attractions.jsx';
 import EnhancedStep5FamilyDetails from '@/components/EnhancedStep5FamilyDetails.jsx';
+import StepActivities from '@/components/StepActivities.jsx';
 import Step5Review from '@/components/Step5Review.jsx';
 import { Button } from '@/components/ui/button';
 
@@ -24,7 +25,7 @@ const CreateGuidePageContent = () => {
     discardDraft,
   } = useConversationalGuide();
   // No modo "Ja sei o roteiro" a etapa de preferencias (2) e pulada.
-  const visibleSteps = itineraryMode === 'known' ? [1, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6];
+  const visibleSteps = itineraryMode === 'known' ? [1, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5, 6, 7];
   const currentStepPosition = Math.max(visibleSteps.indexOf(currentStep), 0);
 
   const renderStep = () => {
@@ -33,8 +34,9 @@ const CreateGuidePageContent = () => {
       case 2: return <StepTripPreferences />;
       case 3: return <Step4Attractions />;
       case 4: return <EnhancedStep5FamilyDetails />;
-      case 5: return <Step2CoverPhoto />;
-      case 6: return <Step5Review />;
+      case 5: return <StepActivities />;
+      case 6: return <Step2CoverPhoto />;
+      case 7: return <Step5Review />;
       default: return <Step3Destination />;
     }
   };
@@ -54,7 +56,7 @@ const CreateGuidePageContent = () => {
           {/* Top Bar with Progress and Back Button */}
           <div className="flex items-center justify-between gap-2 mb-8 md:mb-16">
             <div className="w-14 sm:w-24">
-              {currentStep > 1 && currentStep < 7 && (
+              {currentStep > 1 && currentStep <= 7 && (
                 <Button
                   variant="ghost"
                   onClick={goBack}

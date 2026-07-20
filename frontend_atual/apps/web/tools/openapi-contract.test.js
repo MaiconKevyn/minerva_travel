@@ -17,6 +17,11 @@ import {
   MAX_VISIBLE_FAMILY_MEMBERS,
   MIN_GUIDE_YEAR,
 } from '../src/utils/guide-form.js';
+import {
+  MAX_OPTIONAL_ACTIVITIES_PER_GUIDE,
+  MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
+  OPTIONAL_LANDMARK_ACTIVITY_TYPES,
+} from '../src/utils/landmark-activities.js';
 
 const projectRoot = dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
 const contract = JSON.parse(
@@ -87,6 +92,7 @@ test('frontend API operations and consumed response fields match the backend Ope
       'request_id',
       'download_url',
       'filename',
+      'preview_url',
       'cover_status',
       'job_id',
       'status',
@@ -119,7 +125,13 @@ test('frontend product limits match the backend contract source', () => {
     max_guide_landmarks: MAX_GUIDE_LANDMARKS,
     max_guide_parents: MAX_GUIDE_PARENTS,
     max_guide_year: MAX_GUIDE_YEAR,
+    max_optional_activities_per_landmark: MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
+    max_optional_activity_pages_per_guide: MAX_OPTIONAL_ACTIVITIES_PER_GUIDE,
     max_visible_family_members: MAX_VISIBLE_FAMILY_MEMBERS,
     min_guide_year: MIN_GUIDE_YEAR,
   });
+  assert.deepEqual(
+    new Set(contract['x-minerva-optional-landmark-activity-types']),
+    new Set(OPTIONAL_LANDMARK_ACTIVITY_TYPES),
+  );
 });

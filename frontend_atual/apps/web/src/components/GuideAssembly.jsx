@@ -35,6 +35,14 @@ const STATUS_LABELS = {
 
 const MAX_REVISION_INSTRUCTION_LENGTH = 600;
 
+const PAGE_KIND_LABELS = {
+  cover: 'Capa',
+  trip_summary: 'Resumo do roteiro',
+  landmark: 'Ponto turístico',
+  landmark_activity: 'Atividade',
+  best_memory: 'Página obrigatória',
+};
+
 const saveBlob = (blob, filename) => {
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -57,12 +65,14 @@ const GuideAssembly = ({ session: initialSession }) => {
   const [completion, setCompletion] = useState(null);
   const [pdfExport, setPdfExport] = useState(null);
   const objectUrlsRef = useRef(new Set());
+  const hydratedAssetUrlsRef = useRef(new Set());
   const generationKeysRef = useRef({});
 
   const hydrateAssets = useCallback(async (nextSession) => {
     const urls = [...new Set(
       nextSession.pages.flatMap((page) => page.attempts.map((attempt) => attempt.asset_url)),
-    )];
+    )].filter((url) => !hydratedAssetUrlsRef.current.has(url));
+    urls.forEach((url) => hydratedAssetUrlsRef.current.add(url));
     const failures = [];
     const loaded = await Promise.all(
       urls.map(async (url) => {
@@ -72,6 +82,7 @@ const GuideAssembly = ({ session: initialSession }) => {
           return [url, objectUrl];
         } catch (error) {
           console.error('Erro ao carregar página gerada:', error);
+          hydratedAssetUrlsRef.current.delete(url);
           failures.push(url);
           return null;
         }
@@ -104,6 +115,7 @@ const GuideAssembly = ({ session: initialSession }) => {
     return () => {
       objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       objectUrlsRef.current.clear();
+      hydratedAssetUrlsRef.current.clear();
     };
   }, [hydrateAssets, initialSession]);
 
@@ -314,6 +326,11 @@ const GuideAssembly = ({ session: initialSession }) => {
                   </span>
                   <div>
                     <p className="font-bold text-foreground">{page.title}</p>
+                    <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-primary">
+                      {page.kind === 'landmark_activity' && page.metadata?.activity_label
+                        ? page.metadata.activity_label
+                        : PAGE_KIND_LABELS[page.kind]}
+                    </p>
                     <p className="mt-1 text-xs font-medium text-muted-foreground">
                       {STATUS_LABELS[page.status]}
                     </p>
@@ -325,7 +342,7 @@ const GuideAssembly = ({ session: initialSession }) => {
         </ol>
       </aside>
 
-      <main className="space-y-6">
+      <section className="space-y-6">
         <div className="space-y-3 text-center lg:text-left">
           <h2 className="text-3xl font-serif font-bold text-foreground md:text-4xl">
             Gere e confira cada página
@@ -362,6 +379,18 @@ const GuideAssembly = ({ session: initialSession }) => {
                   Página {activePage.position} de {session.pages.length}
                 </p>
                 <h3 className="mt-1 text-2xl font-serif font-bold text-foreground">{activePage.title}</h3>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold">
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
+                    {activePage.kind === 'landmark_activity' && activePage.metadata?.activity_label
+                      ? activePage.metadata.activity_label
+                      : PAGE_KIND_LABELS[activePage.kind]}
+                  </span>
+                  {activePage.kind === 'landmark_activity' && activePage.metadata?.landmark_name && (
+                    <span className="rounded-full bg-muted px-3 py-1 text-muted-foreground">
+                      Ligada a {activePage.metadata.landmark_name}
+                    </span>
+                  )}
+                </div>
               </div>
               <span className="rounded-full bg-muted px-4 py-2 text-xs font-bold text-muted-foreground">
                 {activePage.attempts_left} versões disponíveis
@@ -552,7 +581,7 @@ const GuideAssembly = ({ session: initialSession }) => {
             </div>
           </section>
         ) : null}
-      </main>
+      </section>
     </motion.div>
   );
 };
