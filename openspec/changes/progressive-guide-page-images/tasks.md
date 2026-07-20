@@ -59,4 +59,4 @@
 - [x] 8.2 Regenerate from the selected attempt through the Image edits endpoint, preserving original family input and mandatory copy/composition rules.
 - [x] 8.3 Add the optional revision field, empty-field variation behavior, and clear retry states to the progressive UI.
 - [x] 8.4 Add provider, API, frontend-contract, and browser lifecycle coverage for directed revisions.
-- [ ] 8.5 Run complete automated and synthetic live visual validation, then publish `main` and `hostinger-frontend`.
+- [x] 8.5 Run complete automated and synthetic live visual validation, then publish `main` and `hostinger-frontend`.
