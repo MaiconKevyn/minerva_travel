@@ -39,7 +39,10 @@ The API only permits generation of the first non-approved page. This keeps the j
 
 The cover uses `/v1/images/edits` with `gpt-image-2`, the sanitized uploaded photo, `size=1024x1536`, and an exact-copy prompt. GPT Image 2 rejects the legacy `input_fidelity` request field, so family composition and resemblance are expressed in the prompt; that field is sent only for older compatible GPT Image models. The prompt includes only the canonical title/date strings and explicitly requires them verbatim once, with no other text.
 
-The summary uses `/v1/images/generations` with the same model and size. Its prompt lists the exact confirmed stops in order and requires one legible label for each. It requests a children's storybook infographic rather than a literal navigation map so visual interpretation does not imply geographic precision.
+The summary uses `/v1/images/edits` with the same model and size. It receives the sanitized
+original family photo and approved cover as high-fidelity inputs, lists the exact confirmed stops
+in order, and requires one legible label for each. It requests a children's storybook infographic
+rather than a literal navigation map so visual interpretation does not imply geographic precision.
 
 Model, quality, timeout, and API base URL are configuration values. Production requires a usable OpenAI key when the OpenAI page provider is enabled.
 
@@ -80,14 +83,34 @@ reference; clients never submit filesystem paths or arbitrary asset URLs.
 
 For a cover revision, the original sanitized family photo remains the first reference and the
 selected cover is the second reference. Other page types use the selected attempt as their
-revision reference. The user instruction is quoted as design feedback and remains subordinate to
-the page's exact-copy, family-composition, safety, no-extra-text, and no-watermark contracts.
+revision reference in addition to the original photo and approved cover. The user instruction is
+quoted as design feedback and remains subordinate to the page's exact-copy, family-composition,
+safety, no-extra-text, and no-watermark contracts.
 
 An empty field is valid. In that case the prompt explicitly requests a visibly different
 alternative by changing composition, palette, lighting, decorative treatment, and typography
 while preserving required copy and people. Every successful attempt stores the normalized
 revision instruction for auditability and idempotent replay; older persisted sessions load with an
 empty instruction.
+
+### Decision 9: The approved cover is the canonical illustrated-family design
+
+Once the cover is approved, every later page resolves that exact owner-allowlisted attempt on the
+server. Image input 1 is always the sanitized original photo and remains authoritative for family
+membership, recognizable traits, approximate ages, hair, glasses, and composition. Image input 2
+is always the approved cover and remains authoritative for the established illustrated character
+design, palette, and visual treatment. A selected attempt of the current page, when regenerating,
+is input 3 and controls only the requested page revision.
+
+Later-page prompts require the same family in every prominent human vignette, with stable traits
+and clothing colors unless the user explicitly requests a safe clothing/style change. They forbid
+inventing, replacing, omitting, merging, or changing the apparent age of family members. Any
+incidental crowd must be abstract background detail rather than newly characterized people. The
+cover reference is used for identity/style only; its layout and text must not be copied into later
+pages.
+
+Generation fails visibly if the approved cover or original photo is unavailable. There is no
+text-only fallback, because such a fallback would silently reintroduce identity drift.
 
 ## Prompt Contracts
 
@@ -106,6 +129,9 @@ empty instruction.
 - Include every confirmed stop name exactly once and in itinerary order.
 - Do not invent destinations or omit confirmed stops.
 - Include no prices, business claims, logos, watermarks, or signatures.
+- Show only the same canonical family established by the original photo and approved cover.
+- Keep family membership, apparent ages, hair, glasses, facial traits, and character design stable
+  across every vignette; do not introduce a different prominent person.
 
 ## Failure Handling
 
@@ -123,7 +149,10 @@ empty instruction.
 - Exact prompt strings contain canonical title/date/stop names and no legacy text-free instruction.
 - OpenAI request payload and multipart fields match the official endpoint contract.
 - Cover revisions send the original photo and selected cover as repeated multipart image inputs;
-  other page revisions send the selected page and use the edits endpoint.
+  later pages send the original photo, approved cover, and optional selected page through the
+  edits endpoint.
+- First summary and landmark attempts use multipart edits rather than text-only generations and
+  assert the canonical family input order.
 - User revision text and the empty-field variation directive are present without weakening exact
   copy or family-composition constraints.
 - Base64 output becomes a valid 1024x1536 PNG.
@@ -133,6 +162,8 @@ empty instruction.
 ### API/security tests
 
 - Full cover → approval → summary lifecycle.
+- Summary and landmark generation fail rather than proceeding without the approved cover, and
+  provider calls receive only server-resolved owner assets.
 - Assets require the owning user and are allowlisted.
 - No PDF or preview URL is returned by page generation or completion.
 - Repeated idempotency keys do not create duplicate attempts.
@@ -156,12 +187,16 @@ empty instruction.
 - Use a synthetic family fixture and fictional family copy, never a real retained user upload.
 - Generate one low-quality cover through the real OpenAI API to validate credentials and endpoint access.
 - Inspect image dimensions, format, family composition, exact visible title, and visible date.
+- Generate one low-quality summary from the synthetic photo and approved synthetic cover; inspect
+  that the same four characters and established traits remain visible.
 - Record the live test as manual evidence; do not make paid live calls part of CI.
 
 ## Risks / Trade-offs
 
 - Model-rendered text can still contain mistakes. Explicit copy constraints, versioning, and approval make the experiment measurable without hiding errors.
 - Full-page generation costs more than asset-only generation. Sequential generation, quotas, attempt caps, and lower quality for experiments bound cost.
+- Later pages now include two or three high-fidelity image inputs, increasing input-token cost in
+  exchange for materially stronger family continuity.
 - Local runtime persistence is not multi-instance durable. The repository boundary keeps a later Postgres/object-storage migration possible; production must stay single-instance until that migration.
 - A summary with too many labels can become crowded. The first version caps the number of labels per summary page and will split summaries in a follow-up if needed.
 

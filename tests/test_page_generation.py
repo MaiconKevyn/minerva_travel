@@ -29,6 +29,14 @@ def _response(image_bytes: bytes) -> httpx.Response:
     )
 
 
+def _family_references(tmp_path):
+    photo = tmp_path / "family.png"
+    photo.write_bytes(_png_bytes(size=(400, 300)))
+    cover = tmp_path / "cover-approved.png"
+    cover.write_bytes(_png_bytes(color="#315c96"))
+    return photo, cover
+
+
 def test_cover_prompt_requires_exact_family_copy_and_visible_people():
     prompt = cover_page_prompt(
         family_title="Família Moraes",
@@ -97,7 +105,7 @@ def test_openai_cover_uses_official_edit_contract_and_persists_png(tmp_path):
         assert image.format == "PNG"
 
 
-def test_openai_summary_uses_generation_contract(tmp_path):
+def test_openai_summary_uses_canonical_family_edit_contract(tmp_path):
     calls = []
 
     def transport(method, url, **kwargs):
@@ -105,17 +113,30 @@ def test_openai_summary_uses_generation_contract(tmp_path):
         return _response(_png_bytes(color="#69b482"))
 
     output = tmp_path / "summary.png"
+    photo, cover = _family_references(tmp_path)
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
     generator.generate_summary_page(
+        family_photo=photo,
+        family_cover=cover,
         output_path=output,
         family_title="Família Moraes",
         trip_date="2026",
         landmark_names=["Torre Eiffel", "Coliseu"],
+        expected_visible_family_member_count=4,
     )
     _method, url, kwargs = calls[0]
-    assert url.endswith("/images/generations")
-    assert kwargs["json"]["output_format"] == "png"
-    assert '"Coliseu"' in kwargs["json"]["prompt"]
+    assert url.endswith("/images/edits")
+    assert kwargs["data"]["output_format"] == "png"
+    assert [file_data[0] for _field, file_data in kwargs["files"]] == [
+        "family.png",
+        "cover-approved.png",
+    ]
+    prompt = kwargs["data"]["prompt"]
+    assert '"Coliseu"' in prompt
+    assert "Input image 1 is the original family photo" in prompt
+    assert "Input image 2 is the approved cover" in prompt
+    assert "Show exactly 4 family members together" in prompt
+    assert "never introduce another detailed person" in prompt
 
 
 def test_cover_revision_uses_original_photo_selected_cover_and_user_feedback(tmp_path):
@@ -156,7 +177,7 @@ def test_cover_revision_uses_original_photo_selected_cover_and_user_feedback(tmp
     assert '"Mude o estilo para animação 3D e use tons azuis."' in prompt
     assert "requested visual style replaces" in prompt
     assert '"Família Moraes"' in prompt
-    assert "change the required family member count" in prompt
+    assert "change family identity or the required member count" in prompt
 
 
 def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_path):
@@ -168,9 +189,12 @@ def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_p
 
     reference = tmp_path / "summary-1.png"
     reference.write_bytes(_png_bytes())
+    photo, cover = _family_references(tmp_path)
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
 
     generator.generate_summary_page(
+        family_photo=photo,
+        family_cover=cover,
         output_path=tmp_path / "summary-2.png",
         reference_page=reference,
         family_title="Família Moraes",
@@ -180,9 +204,47 @@ def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_p
 
     _method, url, kwargs = calls[0]
     assert url.endswith("/images/edits")
-    assert [file_data[0] for _field, file_data in kwargs["files"]] == ["summary-1.png"]
+    assert [file_data[0] for _field, file_data in kwargs["files"]] == [
+        "family.png",
+        "cover-approved.png",
+        "summary-1.png",
+    ]
+    assert "Input image 3 is the selected current-page attempt" in kwargs["data"]["prompt"]
     assert "Create a visibly different alternative" in kwargs["data"]["prompt"]
     assert '2. "Coliseu"' in kwargs["data"]["prompt"]
+
+
+def test_landmark_page_uses_same_family_and_forbids_identity_drift(tmp_path):
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _response(_png_bytes(color="#d09a55"))
+
+    photo, cover = _family_references(tmp_path)
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    generator.generate_landmark_page(
+        family_photo=photo,
+        family_cover=cover,
+        output_path=tmp_path / "landmark.png",
+        family_title="Família Moraes",
+        trip_date="2026",
+        landmark_name="Torre Eiffel",
+        city="Paris",
+        country="França",
+        expected_visible_family_member_count=4,
+    )
+
+    _method, url, kwargs = calls[0]
+    assert url.endswith("/images/edits")
+    assert [file_data[0] for _field, file_data in kwargs["files"]] == [
+        "family.png",
+        "cover-approved.png",
+    ]
+    prompt = kwargs["data"]["prompt"]
+    assert "complete canonical family exploring together" in prompt
+    assert "Do not invent, replace, omit, merge" in prompt
+    assert "clothing colors" in prompt
 
 
 def test_openai_page_generator_rejects_missing_key(monkeypatch):
@@ -196,8 +258,11 @@ def test_openai_page_generator_rejects_wrong_dimensions(tmp_path):
         return _response(_png_bytes(size=(512, 512)))
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    photo, cover = _family_references(tmp_path)
     with pytest.raises(PageGenerationError, match="dimensões"):
         generator.generate_summary_page(
+            family_photo=photo,
+            family_cover=cover,
             output_path=tmp_path / "bad.png",
             family_title="Família Moraes",
             trip_date="2026",
@@ -222,8 +287,11 @@ def test_openai_error_exposes_only_safe_diagnostic_identifiers(tmp_path):
         )
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    photo, cover = _family_references(tmp_path)
     with pytest.raises(PageGenerationError) as captured:
         generator.generate_summary_page(
+            family_photo=photo,
+            family_cover=cover,
             output_path=tmp_path / "bad.png",
             family_title="Família Moraes",
             trip_date="2026",

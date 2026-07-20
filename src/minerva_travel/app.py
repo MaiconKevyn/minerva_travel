@@ -1808,6 +1808,18 @@ def _builder_session_or_404(session_id: str, current_user):
         raise HTTPException(status_code=404, detail="Builder session not found") from error
 
 
+def _builder_reference_asset(session_id: str, filename: str, unavailable_message: str) -> Path:
+    expected_asset_dir = builder_asset_dir(session_id)
+    candidate = expected_asset_dir / filename
+    if (
+        candidate.parent != expected_asset_dir
+        or candidate.name != filename
+        or not candidate.is_file()
+    ):
+        raise PageGenerationError(unavailable_message)
+    return candidate
+
+
 def _builder_catalog_and_selected_from_form(form: dict[str, Any]):
     catalog = load_catalog()
     custom_destinations, custom_selected = custom_destinations_from_form(
@@ -1992,24 +2004,37 @@ def generate_builder_page_attempt(
             expected_people = session.form.get("expected_visible_family_member_count")
             reference_attempt = page.selected_attempt()
             reference_page = (
-                builder_asset_dir(session_id) / reference_attempt.filename
+                _builder_reference_asset(
+                    session_id,
+                    reference_attempt.filename,
+                    "A versão selecionada não está mais disponível.",
+                )
                 if reference_attempt is not None
                 else None
             )
-            if reference_page is not None:
-                expected_asset_dir = builder_asset_dir(session_id)
-                if (
-                    reference_page.parent != expected_asset_dir
-                    or reference_page.name != reference_attempt.filename
-                    or not reference_page.is_file()
-                ):
-                    raise PageGenerationError("A versão selecionada não está mais disponível.")
+            family_cover: Path | None = None
+            if page_kind != "cover":
+                cover_page = session.page("cover")
+                cover_attempt = (
+                    cover_page.selected_attempt()
+                    if cover_page is not None and cover_page.approved_at
+                    else None
+                )
+                if cover_attempt is None:
+                    raise PageGenerationError(
+                        "A capa aprovada da família não está disponível como referência."
+                    )
+                family_cover = _builder_reference_asset(
+                    session_id,
+                    cover_attempt.filename,
+                    "A capa aprovada da família não está mais disponível.",
+                )
 
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
         generator = get_guide_page_generator()
+        if not photo_path.is_file():
+            raise PageGenerationError("A foto da família não está mais disponível.")
         if page_kind == "cover":
-            if not photo_path.is_file():
-                raise PageGenerationError("A foto da família não está mais disponível.")
             generator.generate_cover_page(
                 family_photo=photo_path,
                 output_path=output,
@@ -2021,22 +2046,32 @@ def generate_builder_page_attempt(
                 reference_page=reference_page,
             )
         elif page_kind == "trip_summary":
+            if family_cover is None:
+                raise PageGenerationError("A capa aprovada da família não está disponível.")
             generator.generate_summary_page(
+                family_photo=photo_path,
+                family_cover=family_cover,
                 output_path=output,
                 family_title=family_title,
                 trip_date=str(metadata["trip_date"]),
                 landmark_names=list(metadata["landmark_names"]),
+                expected_visible_family_member_count=expected_people,
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )
         elif page_kind == "landmark":
+            if family_cover is None:
+                raise PageGenerationError("A capa aprovada da família não está disponível.")
             generator.generate_landmark_page(
+                family_photo=photo_path,
+                family_cover=family_cover,
                 output_path=output,
                 family_title=family_title,
                 trip_date=str(metadata["trip_date"]),
                 landmark_name=str(metadata["name"]),
                 city=str(metadata["city"]),
                 country=str(metadata["country"]),
+                expected_visible_family_member_count=expected_people,
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )

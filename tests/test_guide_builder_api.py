@@ -66,6 +66,7 @@ def _create_session(client: TestClient) -> dict:
             "children_ages": ["7"],
             "parents_names": "Ana",
             "year": "2026",
+            "expected_visible_family_member_count": "2",
             "custom_landmarks": CUSTOM_LANDMARKS,
             "itinerary_json": json.dumps(
                 {"destinations": [{"place": "Paris", "timing": "Julho de 2026", "days": 3}]}
@@ -165,6 +166,11 @@ def test_page_builder_generates_approves_and_completes_without_pdf(tmp_path, mon
         page = next(item for item in generated.json()["pages"] if item["id"] == page_id)
         assert _approve(client, session_id, page_id, page["selected_attempt_id"]).status_code == 200
         assert generator.calls[-1] == kind
+        request = generator.requests[-1]
+        assert request["family_photo"].is_file()
+        assert request["family_cover"].name == "cover-1.png"
+        assert request["reference_page"] is None
+        assert request["expected_visible_family_member_count"] == 2
 
     completed = client.post(f"/api/guide-builder/{session_id}/complete")
     assert completed.status_code == 200, completed.text
@@ -239,6 +245,54 @@ def test_regeneration_uses_selected_attempt_and_persists_bounded_feedback(tmp_pa
     too_long = _generate(client, session_id, "cover", "cover-too-long", "x" * 601)
     assert too_long.status_code == 422
     assert generator.calls == ["cover", "cover", "cover"]
+
+
+def test_summary_regeneration_keeps_canonical_family_references(tmp_path, monkeypatch):
+    client, generator = _setup(monkeypatch, tmp_path)
+    session_id = _create_session(client)["session_id"]
+    cover = _generate(client, session_id, "cover", "cover-first").json()
+    cover_attempt = cover["pages"][0]["selected_attempt_id"]
+    assert _approve(client, session_id, "cover", cover_attempt).status_code == 200
+
+    first = _generate(client, session_id, "summary", "summary-first")
+    assert first.status_code == 200, first.text
+    first_request = generator.requests[-1]
+    assert first_request["family_cover"].name == "cover-1.png"
+    assert first_request["reference_page"] is None
+
+    revised = _generate(
+        client,
+        session_id,
+        "summary",
+        "summary-revised",
+        "Use um estilo de recortes de papel.",
+    )
+    assert revised.status_code == 200, revised.text
+    revised_request = generator.requests[-1]
+    assert revised_request["family_photo"].is_file()
+    assert revised_request["family_cover"].name == "cover-1.png"
+    assert revised_request["reference_page"].name == "summary-1.png"
+    assert revised_request["expected_visible_family_member_count"] == 2
+
+
+def test_summary_fails_without_the_approved_cover_asset(tmp_path, monkeypatch):
+    client, generator = _setup(monkeypatch, tmp_path)
+    session_id = _create_session(client)["session_id"]
+    generated = _generate(client, session_id, "cover", "cover-first").json()
+    cover_attempt = generated["pages"][0]["selected_attempt_id"]
+    assert _approve(client, session_id, "cover", cover_attempt).status_code == 200
+    (tmp_path / "generated" / "builder" / session_id / "cover-1.png").unlink()
+
+    summary = _generate(client, session_id, "summary", "summary-missing-cover")
+    assert summary.status_code == 502
+    assert summary.json()["detail"]["message"] == (
+        "A capa aprovada da família não está mais disponível."
+    )
+    assert generator.calls == ["cover"]
+    state = client.get(f"/api/guide-builder/{session_id}").json()
+    summary_page = next(page for page in state["pages"] if page["id"] == "summary")
+    assert summary_page["status"] == "error"
+    assert summary_page["attempts"] == []
 
 
 def test_builder_session_and_assets_are_owner_scoped(tmp_path, monkeypatch):

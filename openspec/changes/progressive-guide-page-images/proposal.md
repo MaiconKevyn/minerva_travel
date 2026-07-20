@@ -16,6 +16,8 @@ The first experiment must also validate the current OpenAI image model's ability
 - Display generated page images directly in the authenticated UI without waiting for or producing a PDF.
 - Treat provider failures as visible retryable errors; never substitute a placeholder, raw family photo, or legacy PDF generation.
 - Preserve the exact approved image attempt so later export can reuse the same pixels.
+- Treat the approved cover and original family photo as canonical identity references for every
+  later illustrated page, preventing the model from inventing a different family.
 - Apply owner isolation, attempt limits, request quotas, idempotency, retention, and account-deletion behavior to page-generation sessions and assets.
 
 ## Capabilities

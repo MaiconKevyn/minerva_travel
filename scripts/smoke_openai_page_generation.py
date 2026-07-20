@@ -1,4 +1,4 @@
-"""Run a paid, synthetic OpenAI cover-page smoke without user data."""
+"""Run paid, synthetic OpenAI guide-page smokes without user data."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ SMOKE_DIR = Path("runtime/openai-page-smoke")
 FIXTURE_PATH = SMOKE_DIR / "synthetic-family.png"
 OUTPUT_PATH = SMOKE_DIR / "cover.png"
 REVISION_OUTPUT_PATH = SMOKE_DIR / "cover-revision.png"
+SUMMARY_OUTPUT_PATH = SMOKE_DIR / "summary.png"
 
 
 def create_synthetic_family_fixture() -> Path:
@@ -49,6 +50,11 @@ def parse_args() -> argparse.Namespace:
         "--revision-instruction",
         help="Revise the existing synthetic cover with this design feedback.",
     )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Generate a summary using the synthetic photo and approved cover references.",
+    )
     return parser.parse_args()
 
 
@@ -56,6 +62,20 @@ def main() -> None:
     args = parse_args()
     fixture = create_synthetic_family_fixture()
     generator = OpenAIGuidePageGenerator(quality="low")
+    if args.summary:
+        if not OUTPUT_PATH.is_file():
+            raise SystemExit(f"Generate the base smoke cover first: {OUTPUT_PATH}")
+        generator.generate_summary_page(
+            family_photo=fixture,
+            family_cover=OUTPUT_PATH,
+            output_path=SUMMARY_OUTPUT_PATH,
+            family_title="Família Aurora",
+            trip_date="Julho de 2026",
+            landmark_names=["Torre Eiffel", "Coliseu"],
+            expected_visible_family_member_count=4,
+        )
+        _report_output(SUMMARY_OUTPUT_PATH)
+        return
     reference = OUTPUT_PATH if args.revision_instruction else None
     output = REVISION_OUTPUT_PATH if reference else OUTPUT_PATH
     if reference is not None and not reference.is_file():
@@ -70,11 +90,15 @@ def main() -> None:
         revision_instruction=args.revision_instruction or "",
         reference_page=reference,
     )
+    _report_output(output)
+    if reference is not None and output.read_bytes() == reference.read_bytes():
+        raise SystemExit("The revision returned bytes identical to the selected reference.")
+
+
+def _report_output(output: Path) -> None:
     with Image.open(output) as image:
         digest = hashlib.sha256(output.read_bytes()).hexdigest()[:12]
         print(f"OpenAI smoke OK: {output} ({image.format}, {image.width}x{image.height}, {digest})")
-    if reference is not None and output.read_bytes() == reference.read_bytes():
-        raise SystemExit("The revision returned bytes identical to the selected reference.")
 
 
 if __name__ == "__main__":
