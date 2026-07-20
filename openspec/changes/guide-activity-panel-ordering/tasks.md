@@ -70,6 +70,9 @@
 
 - [x] 7.1 Review the diff for credentials, private uploads, paid-test output, PDFs, runtime files, and
   unrelated user changes.
-- [ ] 7.2 Commit and push the implementation to `main`.
-- [ ] 7.3 Build from pushed `main`, preserve Hostinger production configuration, publish the actual
+- [x] 7.2 Commit and push the implementation to `main` (`f3ba599`).
+- [x] 7.3 Build from pushed `main`, preserve Hostinger production configuration, publish the actual
   `hostinger-frontend` branch, and confirm both remote heads.
+
+Delivery record: static deployment `fe2ffdf` was built from implementation commit `f3ba599`; root
+and `public_html` contain matching production config and activity preview assets.
