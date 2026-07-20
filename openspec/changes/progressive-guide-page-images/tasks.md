@@ -49,6 +49,6 @@
 
 ## 7. Delivery
 
-- [ ] 7.1 Commit the OpenSpec artifacts and implementation to `main` and push `origin/main`.
-- [ ] 7.2 Build the frontend from the pushed `main`, preserve Hostinger production configuration, and publish it to `hostinger-frontend`.
-- [ ] 7.3 Confirm both remote branch heads and report live-test limitations or required Render environment changes.
+- [x] 7.1 Commit the OpenSpec artifacts and implementation to `main` and push `origin/main`.
+- [x] 7.2 Build the frontend from the pushed `main`, preserve Hostinger production configuration, and publish it to `hostinger-frontend`.
+- [x] 7.3 Confirm both remote branch heads and report live-test limitations or required Render environment changes.
