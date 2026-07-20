@@ -83,4 +83,4 @@
 - [x] 11.2 Implement atomic full-bleed PDF composition from the exact approved PNG sequence with lifecycle cleanup and cached reuse.
 - [x] 11.3 Add the final `Gerar PDF e baixar` UI action with progress, retry, and repeat-download states.
 - [x] 11.4 Add compositor, API/security, frontend-contract, and browser lifecycle coverage.
-- [ ] 11.5 Render and visually inspect a synthetic multi-page PDF, run complete validation, and publish `main` and `hostinger-frontend`.
+- [x] 11.5 Render and visually inspect a synthetic multi-page PDF, run complete validation, and publish `main` and `hostinger-frontend`.
