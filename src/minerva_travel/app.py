@@ -41,6 +41,7 @@ from minerva_travel.activity_page_compositor import (
     DRAWING_TITLE,
     LANDMARK_VISITED_LABEL,
     WORD_SEARCH_TITLE,
+    coloring_instruction_for,
 )
 from minerva_travel.asset_policy import (
     AssetProvenanceError,
@@ -2321,7 +2322,7 @@ def _activity_spec(
     landmark: LandmarkActivityContext,
 ) -> dict[str, Any]:
     instructions = {
-        "coloring": f"Pinte {landmark.name} com suas cores favoritas.",
+        "coloring": coloring_instruction_for(landmark.name),
         "detail_hunt": f"Observe {landmark.name} e marque cada detalhe que encontrar.",
         "word_search": f"Encontre no quadro as palavras ligadas a {landmark.name}.",
         "drawing": f"Desenhe sua própria versão de {landmark.name}.",

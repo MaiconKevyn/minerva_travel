@@ -108,3 +108,13 @@
 - `hostinger-frontend` static deployment: `731b24a` (`Deploy landmark activity pages`).
 - Remote branch heads were confirmed after both pushes on 2026-07-20.
 - Production `config.js` and `.htaccess` were preserved in both the root and `public_html` copy.
+
+## 9. Child-Friendly Coloring Worksheet Refinement
+
+- [x] 9.1 Add the exact server-derived coloring instruction contract for every tourist point and
+  include it in builder `required_copy`.
+- [x] 9.2 Add age-aware OpenAI line-art constraints, a bounded illustration layout, and stronger
+  printable white-space validation.
+- [x] 9.3 Update the visual frontend example and automated prompt/compositor/page-plan tests.
+- [x] 9.4 Run backend/frontend verification, visually inspect a synthetic coloring page, and review
+  the final implementation diff.

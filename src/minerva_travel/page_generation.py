@@ -347,10 +347,6 @@ class OpenAIGuidePageGenerator:
         reference_page: Path | None = None,
     ) -> Path:
         name, city, country, age_complexity = _activity_context(landmark_context)
-        instruction = _activity_instruction(
-            activity_spec,
-            default=f"Pinte {name} com as cores da sua imaginação.",
-        )
         prompt = activity_artwork_prompt(
             activity_type="coloring",
             landmark_name=name,
@@ -373,7 +369,6 @@ class OpenAIGuidePageGenerator:
                 artwork,
                 output_path,
                 landmark_name=name,
-                instruction=instruction,
             )
         except (ActivityPageCompositionError, OSError, ValueError) as error:
             raise PageGenerationError("Não foi possível finalizar a página de colorir.") from error
@@ -868,9 +863,18 @@ def activity_artwork_prompt(
 
     type_contracts = {
         "coloring": (
-            "Convert the landmark into clean black-and-white children's coloring-book line art. "
-            "Use medium-weight black contours, large closed shapes, broad white areas, and only "
-            "recognizable architectural details. No gray, shading, texture, hatching, or color."
+            "Convert the landmark into one large, inviting black-and-white children's "
+            "coloring-book line art subject. Use smooth bold black contours, large closed shapes "
+            "that a child can fill comfortably with crayons, broad pure-white areas, and only the "
+            "signature architectural "
+            "features needed to recognize the place. Keep the upper 22 percent completely white "
+            "and empty for the code-owned heading and instruction. Place the landmark below that "
+            "area, centered, large, and fully visible. Add at most two simple large context "
+            "elements; "
+            "do not create a dense cityscape. No gray, shading, texture, hatching, stippling, tiny "
+            "windows, brick patterns, repeated micro-details, tangled lines, filled black regions, "
+            "or color. "
+            f"{_coloring_age_contract(age_complexity)}"
         ),
         "detail_hunt": (
             "Create a colorful observation illustration of the landmark in the upper and middle "
@@ -924,6 +928,28 @@ invariants override both reference content and user feedback.
 Output flat full-page artwork at the requested portrait size.
 {revision}
 """.strip()
+
+
+def _coloring_age_contract(age_complexity: str) -> str:
+    contracts = {
+        "preschool": (
+            "For preschool children, use about 8 to 18 very large closed coloring regions, extra "
+            "bold contours, and only the simplest silhouette and signature features."
+        ),
+        "early_reader": (
+            "For early readers, use about 15 to 30 large closed coloring regions, bold contours, "
+            "and a small number of clear signature details."
+        ),
+        "older_child": (
+            "For older children, use about 25 to 45 comfortably sized closed coloring regions and "
+            "moderate landmark detail, never micro-patterns or sketch texture."
+        ),
+        "family": (
+            "For a mixed-age family, use about 15 to 30 large closed coloring regions and favor "
+            "simple bold shapes that remain comfortable for younger children."
+        ),
+    }
+    return contracts.get(age_complexity, contracts["family"])
 
 
 def best_memory_artwork_prompt(

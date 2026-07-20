@@ -23,6 +23,9 @@ previously unknown places.
   tourist-point page.
 - Generate the visual layer of every activity page through the configured OpenAI Image API and
   reuse the approved tourist-point page or a sanitized landmark reference for place fidelity.
+- Make every coloring page a genuinely child-usable black-and-white worksheet, with age-aware
+  visual complexity and the exact point-specific phrase
+  `Agora é a vez de colorir <ponto turístico> do seu jeito.` rendered by trusted code.
 - Keep rule-bound content such as a word-search grid deterministic and validated, compositing it
   onto the OpenAI-generated activity artwork so the puzzle remains solvable.
 - Reuse the current generate, regenerate, approve, gallery, and final PDF workflow. Every approved

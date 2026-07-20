@@ -39,7 +39,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
   {
     type: 'coloring',
     label: 'Página para colorir',
-    description: 'Uma versão em traços limpos do ponto turístico para colorir.',
+    description:
+      'Um desenho do ponto turístico com traços limpos, formas grandes e uma frase personalizada para colorir.',
     ageLabel: 'A partir de 4 anos',
     durationLabel: '15–25 min',
     materialLabel: 'Lápis de cor',

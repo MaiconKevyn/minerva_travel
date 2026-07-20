@@ -2,12 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  LANDMARK_ACTIVITY_OPTIONS,
   MAX_OPTIONAL_ACTIVITIES_PER_GUIDE,
   MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
   normalizeLandmarkActivitySelections,
   pruneLandmarkActivitySelections,
   toggleLandmarkActivitySelection,
 } from './landmark-activities.js';
+
+test('coloring preview promises child-friendly point-specific artwork', () => {
+  const coloring = LANDMARK_ACTIVITY_OPTIONS.find((option) => option.type === 'coloring');
+
+  assert.equal(coloring.preview, '/activity-examples/coloring.svg');
+  assert.match(coloring.description, /traços limpos, formas grandes/);
+  assert.match(coloring.description, /frase personalizada/);
+});
 
 test('activity selections are normalized to canonical point ids and supported types', () => {
   assert.deepEqual(

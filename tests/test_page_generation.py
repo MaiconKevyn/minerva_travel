@@ -509,6 +509,34 @@ def test_activity_prompt_maps_fixed_reference_order_and_forbids_people_and_model
     assert "invariants override both reference content and user feedback" in prompt
 
 
+@pytest.mark.parametrize(
+    ("age_complexity", "expected_contract"),
+    [
+        ("preschool", "8 to 18 very large closed coloring regions"),
+        ("early_reader", "15 to 30 large closed coloring regions"),
+        ("older_child", "25 to 45 comfortably sized closed coloring regions"),
+        ("family", "mixed-age family"),
+    ],
+)
+def test_coloring_prompt_requires_child_usable_age_aware_lineart(age_complexity, expected_contract):
+    prompt = activity_artwork_prompt(
+        activity_type="coloring",
+        landmark_name="Torre Eiffel",
+        city="Paris",
+        country="França",
+        age_complexity=age_complexity,
+        has_landmark_reference=False,
+        has_revision_reference=False,
+    )
+
+    assert expected_contract in prompt
+    assert "large closed shapes that a child can fill comfortably with crayons" in prompt
+    assert "upper 22 percent completely white" in prompt
+    assert "Add at most two simple large context elements" in prompt
+    assert "do not create a dense cityscape" in prompt
+    assert "tiny windows, brick patterns, repeated micro-details" in prompt
+
+
 def test_coloring_generation_edits_landmark_refs_then_composites_printable_png(tmp_path):
     calls = []
 

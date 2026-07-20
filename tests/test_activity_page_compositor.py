@@ -5,6 +5,9 @@ from PIL import Image, ImageDraw
 
 from minerva_travel.activity_page_compositor import (
     BEST_MEMORY_REQUIRED_COPY,
+    COLORING_ART_REGION,
+    COLORING_INSTRUCTION_TEMPLATE,
+    COLORING_MIN_WHITE_FRACTION,
     COLORING_TITLE,
     DETAIL_HUNT_TITLE,
     DRAWING_BLANK_REGION,
@@ -14,6 +17,7 @@ from minerva_travel.activity_page_compositor import (
     MEMORY_BLANK_REGION,
     WORD_SEARCH_TITLE,
     ActivityPageCompositionError,
+    coloring_instruction_for,
     compose_best_memory_page,
     compose_coloring_page,
     compose_detail_hunt_page,
@@ -70,6 +74,15 @@ def test_compositor_exact_copy_contract_matches_builder_required_copy():
         "Data",
     )
     assert LANDMARK_VISITED_LABEL == "Já visitei"
+    assert COLORING_INSTRUCTION_TEMPLATE == (
+        "Agora é a vez de colorir {landmark_name} do seu jeito."
+    )
+
+
+def test_coloring_instruction_is_exact_point_specific_copy():
+    assert coloring_instruction_for("  Torre   Eiffel ") == (
+        "Agora é a vez de colorir Torre Eiffel do seu jeito."
+    )
 
 
 def test_landmark_compositor_adds_one_empty_printable_visited_checkbox(tmp_path):
@@ -94,7 +107,6 @@ def test_coloring_compositor_outputs_binary_printable_page(tmp_path):
         _lineart(tmp_path / "art.png"),
         output,
         landmark_name="Torre Eiffel",
-        instruction="Use lápis de cor e pinte sem pressa.",
     )
 
     validate_activity_page(output, monochrome=True)
@@ -104,18 +116,26 @@ def test_coloring_compositor_outputs_binary_printable_page(tmp_path):
         colors = image.convert("RGB").getcolors(maxcolors=1024 * 1536)
         assert colors is not None
         assert {color for _count, color in colors} <= {(0, 0, 0), (255, 255, 255)}
+        white = next((count for count, color in colors if color == (255, 255, 255)), 0)
+        assert white / (1024 * 1536) >= COLORING_MIN_WHITE_FRACTION
+        # Provider artwork is fitted below the code-owned heading and instruction.
+        art_ink = (
+            image.convert("L")
+            .crop(COLORING_ART_REGION)
+            .point(lambda value: 255 if value < 128 else 0)
+        )
+        assert art_ink.getbbox() is not None
 
 
 def test_coloring_compositor_rejects_unusable_solid_artwork_atomically(tmp_path):
     output = tmp_path / "coloring.png"
     output.write_bytes(b"previous-attempt")
 
-    with pytest.raises(ActivityPageCompositionError, match="imprimíveis"):
+    with pytest.raises(ActivityPageCompositionError, match="traços infantis"):
         compose_coloring_page(
             _artwork(tmp_path / "solid.png", color="black"),
             output,
             landmark_name="Torre Eiffel",
-            instruction="Pinte o monumento.",
         )
 
     assert output.read_bytes() == b"previous-attempt"

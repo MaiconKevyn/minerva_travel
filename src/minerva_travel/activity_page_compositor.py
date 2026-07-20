@@ -19,6 +19,7 @@ ACCENT = "#db8b45"
 PAPER = "#fffdf8"
 PANEL_OUTLINE = "#b9ccda"
 COLORING_TITLE = "Atividade para colorir"
+COLORING_INSTRUCTION_TEMPLATE = "Agora é a vez de colorir {landmark_name} do seu jeito."
 DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
 DRAWING_TITLE = "Desenhe sua versão"
@@ -34,6 +35,8 @@ BEST_MEMORY_REQUIRED_COPY = (
 LANDMARK_VISITED_LABEL = "Já visitei"
 LANDMARK_VISITED_PANEL = (326, 1392, 698, 1500)
 LANDMARK_VISITED_CHECKBOX = (366, 1423, 414, 1471)
+COLORING_ART_REGION = (68, 342, 956, 1492)
+COLORING_MIN_WHITE_FRACTION = 0.72
 
 # These inner rectangles intentionally exclude captions and borders.  They are
 # exported for semantic tests and for the final output validator.
@@ -67,19 +70,20 @@ def compose_coloring_page(
     output_path: Path,
     *,
     landmark_name: str,
-    instruction: str,
 ) -> Path:
-    image = _load_artwork(artwork_path)
+    normalized_name = _bounded(landmark_name, "landmark_name", 100)
+    instruction = coloring_instruction_for(normalized_name)
+    image = _layout_coloring_artwork(_load_artwork(artwork_path))
+    _validate_coloring_artwork_density(image)
     draw = ImageDraw.Draw(image)
-    _panel(draw, (38, 34, 986, 238))
-    _draw_centered(draw, COLORING_TITLE, 66, 48, bold=True)
-    _draw_centered(draw, _bounded(landmark_name, "landmark_name", 100), 134, 36, bold=True)
-    _panel(draw, (54, 1350, 970, 1492))
+    _panel(draw, (38, 34, 986, 320))
+    _draw_centered(draw, COLORING_TITLE, 54, 48, bold=True)
+    _draw_centered_fit(draw, normalized_name, 116, 38, 22, 884, bold=True)
     _draw_wrapped(
         draw,
-        _bounded(instruction, "instruction", 240),
-        (84, 1380, 940, 1470),
-        font=_font(27),
+        instruction,
+        (82, 180, 942, 302),
+        font=_font(28),
         fill=INK,
         align="center",
     )
@@ -87,6 +91,13 @@ def compose_coloring_page(
     # overlay also removes font antialiasing and guarantees printer-safe output.
     image = image.convert("L").point(lambda value: 0 if value < 210 else 255).convert("RGB")
     return _atomic_save(image, output_path, monochrome=True)
+
+
+def coloring_instruction_for(landmark_name: str) -> str:
+    """Return the exact child-facing instruction for a server-resolved point."""
+
+    normalized_name = _bounded(landmark_name, "landmark_name", 100)
+    return COLORING_INSTRUCTION_TEMPLATE.format(landmark_name=normalized_name)
 
 
 def compose_detail_hunt_page(
@@ -283,7 +294,10 @@ def validate_activity_page(
         total = image.width * image.height
         black_fraction = color_counts.get((0, 0, 0), 0) / total
         white_fraction = color_counts.get((255, 255, 255), 0) / total
-        if not 0.001 <= black_fraction <= 0.40 or white_fraction < 0.60:
+        if (
+            not 0.001 <= black_fraction <= (1 - COLORING_MIN_WHITE_FRACTION)
+            or white_fraction < COLORING_MIN_WHITE_FRACTION
+        ):
             raise ActivityPageCompositionError(
                 "A página de colorir não preservou áreas imprimíveis utilizáveis."
             )
@@ -326,6 +340,46 @@ def _validate_blank_region(image: Image.Image, region: tuple[int, int, int, int]
     )
     if not total or white / total < 0.98:
         raise ActivityPageCompositionError("A página não preservou espaço branco suficiente.")
+
+
+def _layout_coloring_artwork(image: Image.Image) -> Image.Image:
+    """Fit only the generated line art below the trusted heading area."""
+
+    monochrome = image.convert("L").point(lambda value: 0 if value < 210 else 255)
+    black_mask = monochrome.point(lambda value: 255 if value < 128 else 0)
+    bbox = black_mask.getbbox()
+    canvas = Image.new("L", PAGE_IMAGE_SIZE, 255)
+    if bbox is None:
+        return canvas.convert("RGB")
+
+    padding = 24
+    left = max(0, bbox[0] - padding)
+    top = max(0, bbox[1] - padding)
+    right = min(monochrome.width, bbox[2] + padding)
+    bottom = min(monochrome.height, bbox[3] + padding)
+    subject = monochrome.crop((left, top, right, bottom))
+    region_left, region_top, region_right, region_bottom = COLORING_ART_REGION
+    subject.thumbnail(
+        (region_right - region_left, region_bottom - region_top),
+        Image.Resampling.LANCZOS,
+    )
+    subject = subject.point(lambda value: 0 if value < 210 else 255)
+    x = region_left + ((region_right - region_left) - subject.width) // 2
+    y = region_top + ((region_bottom - region_top) - subject.height) // 2
+    canvas.paste(subject, (x, y))
+    return canvas.convert("RGB")
+
+
+def _validate_coloring_artwork_density(image: Image.Image) -> None:
+    region = image.crop(COLORING_ART_REGION).convert("L")
+    total = region.width * region.height
+    colors = cast(list[tuple[int, int]] | None, region.getcolors(maxcolors=256))
+    black = sum(count for count, value in colors or [] if value < 128)
+    black_fraction = black / total if total else 0
+    if not 0.003 <= black_fraction <= 0.28:
+        raise ActivityPageCompositionError(
+            "O desenho para colorir não possui traços infantis utilizáveis."
+        )
 
 
 def _validate_word_search(grid: Sequence[str], words: Sequence[str]) -> tuple[list[str], list[str]]:
@@ -407,6 +461,26 @@ def _draw_centered(
     bbox = draw.textbbox((0, 0), text, font=font)
     x = (PAGE_IMAGE_SIZE[0] - (bbox[2] - bbox[0])) / 2
     draw.text((x, y), text, font=font, fill=INK)
+
+
+def _draw_centered_fit(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    y: int,
+    maximum_size: int,
+    minimum_size: int,
+    maximum_width: int,
+    *,
+    bold: bool = False,
+) -> None:
+    for size in range(maximum_size, minimum_size - 1, -1):
+        font = _font(size, bold=bold)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        width = bbox[2] - bbox[0]
+        if width <= maximum_width:
+            draw.text(((PAGE_IMAGE_SIZE[0] - width) / 2, y), text, font=font, fill=INK)
+            return
+    raise ActivityPageCompositionError("O nome do ponto turístico não cabe no título.")
 
 
 def _draw_wrapped(

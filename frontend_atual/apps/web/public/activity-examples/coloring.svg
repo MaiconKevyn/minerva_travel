@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" role="img" aria-labelledby="title desc">
   <title id="title">Exemplo de página para colorir</title>
-  <desc id="desc">Desenho em linhas pretas de uma torre, árvores e nuvens.</desc>
+  <desc id="desc">Exemplo infantil em linhas pretas, com formas grandes para colorir e uma instrução ligada ao ponto turístico.</desc>
   <rect width="600" height="400" rx="32" fill="white"/>
   <g fill="none" stroke="#17202a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
     <path d="M220 338h180l-22-64-31-47-12-139h-50l-12 139-31 47z"/>
@@ -10,5 +10,9 @@
   </g>
   <rect x="22" y="18" width="118" height="42" rx="21" fill="#173f59" stroke="none"/>
   <text x="81" y="47" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="22" font-weight="700">EXEMPLO</text>
-  <text x="300" y="375" text-anchor="middle" fill="#173f59" font-family="Arial,sans-serif" font-size="24" font-weight="700">PRONTA PARA GANHAR CORES</text>
+  <rect x="92" y="338" width="416" height="56" rx="18" fill="white" stroke="#173f59" stroke-width="3"/>
+  <text x="300" y="360" text-anchor="middle" fill="#173f59" font-family="Arial,sans-serif" font-size="17" font-weight="700">
+    <tspan x="300">Agora é a vez de colorir a Torre Eiffel</tspan>
+    <tspan x="300" dy="21">do seu jeito.</tspan>
+  </text>
 </svg>

@@ -249,6 +249,20 @@ Drafts without activity selections restore as `[]`. Existing persisted builder s
 already-materialized page list and are not mutated to insert a memory page. Only sessions created
 after the feature use the expanded plan.
 
+### Decision 13: Treat coloring pages as printable worksheets, not detailed line-art posters
+
+The model generates only the recognizable landmark drawing. It receives an age-band-specific
+complexity contract: preschool pages use very few large closed regions, early-reader pages retain
+only the landmark's signature features, and older-child pages may add moderate detail without
+micro-patterns, shading, or hatching. Every version remains people-free and must reserve the
+heading area.
+
+Trusted code then fits the simplified drawing inside a bounded illustration region and composites
+the exact instruction `Agora é a vez de colorir <ponto turístico> do seu jeito.` near the top of
+the page. The instruction is derived from the server-resolved landmark name rather than accepted
+from the client or delegated to the image model. Final monochrome validation requires generous
+white space so overly dense artwork fails instead of becoming a frustrating coloring activity.
+
 ## Validation Strategy
 
 ### Backend and content tests
@@ -266,7 +280,8 @@ after the feature use the expanded plan.
 - Assert endpoint, model, prompt contracts, multipart reference ordering, people-free constraints,
   and revision inputs for each page kind.
 - Assert coloring output is black-and-white, printable, correctly sized, and retains a recognizable
-  landmark composition.
+  landmark composition, age-aware simplicity, generous white space, and the exact dynamic
+  `Agora é a vez de colorir <ponto turístico> do seu jeito.` instruction.
 - Assert word-search grids and solutions survive compositing exactly.
 - Assert drawing/memory pages preserve minimum blank writable areas.
 - Assert invalid, oversized, malformed, or wrong-size provider output creates no attempt.

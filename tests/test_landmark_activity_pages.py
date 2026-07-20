@@ -582,6 +582,7 @@ def test_custom_landmark_without_curiosity_or_source_uses_safe_observation():
     )
 
     landmark_page = next(page for page in pages if page.kind == "landmark")
+    coloring_page = next(page for page in pages if page.kind == "landmark_activity")
     assert selected[0] == "custom-cidade-inventada:farol-da-ilha"
     assert activities[0].landmark_selection_id == "google:farol-ilha-123"
     assert landmark_page.metadata["selection_id"] == "google:farol-ilha-123"
@@ -592,6 +593,14 @@ def test_custom_landmark_without_curiosity_or_source_uses_safe_observation():
     assert landmark_page.metadata["curiosity_label"] == "Missão de observação"
     assert landmark_page.metadata["curiosity"] == (
         "Observe os detalhes de Farol da Ilha e descubra qual deles mais chama sua atenção."
+    )
+    assert coloring_page.required_copy == [
+        "Atividade para colorir",
+        "Farol da Ilha",
+        "Agora é a vez de colorir Farol da Ilha do seu jeito.",
+    ]
+    assert coloring_page.metadata["instruction"] == (
+        "Agora é a vez de colorir Farol da Ilha do seu jeito."
     )
 
 
