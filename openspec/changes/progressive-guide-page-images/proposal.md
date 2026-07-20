@@ -13,9 +13,12 @@ The first experiment must also validate the current OpenAI image model's ability
 - Let the user describe what should change in a regeneration, using the selected attempt as a
   visual reference; when the field is empty, request a visibly different alternative instead of
   repeating the same composition.
-- Display generated page images directly in the authenticated UI without waiting for or producing a PDF.
+- Display generated page images directly in the authenticated UI without waiting for a PDF, then
+  let the family explicitly export the approved sequence as a downloadable PDF.
 - Treat provider failures as visible retryable errors; never substitute a placeholder, raw family photo, or legacy PDF generation.
 - Preserve the exact approved image attempt so later export can reuse the same pixels.
+- Assemble the approved PNGs in page order into a full-bleed PDF with one image per page, without
+  rerunning image generation or the legacy HTML guide renderer.
 - Treat the approved cover and original family photo as canonical identity references for the
   summary and for destination pages where the family is explicitly included, preventing the
   model from inventing a different family.
@@ -27,13 +30,15 @@ The first experiment must also validate the current OpenAI image model's ability
 
 ### New Capabilities
 
-- `progressive-guide-page-generation`: Ordered full-page image generation, page attempts, approval, regeneration, and progressive UI review.
+- `progressive-guide-page-generation`: Ordered full-page image generation, page attempts,
+  approval, regeneration, progressive UI review, and approved-image PDF export.
 - `openai-guide-page-art`: OpenAI image editing/generation for family cover, itinerary summary,
   and optional-family destination pages with exact in-image copy.
 
 ### Modified Capabilities
 
-- `guide-content-generation`: The browser-visible guide is now assembled from approved page images; PDF creation is outside the active generation path.
+- `guide-content-generation`: The browser-visible guide is assembled from approved page images;
+  its final PDF is a deterministic packaging of those exact images.
 - `preserve-family-cover-illustration`: Cover identity guardrails apply to the complete generated cover page rather than an illustration later wrapped by HTML.
 
 ## Impact
@@ -47,7 +52,7 @@ The first experiment must also validate the current OpenAI image model's ability
 
 ## Non-Goals
 
-- Producing or downloading a PDF in this change.
+- Reintroducing the legacy HTML-to-PDF guide layout or regenerating content during PDF export.
 - Automatically accepting a generated page without user review.
 - Silently falling back to placeholders, the original photo, or the legacy one-click generator.
 - Guaranteeing perfect typography from every model attempt; the product exposes regeneration and explicit approval so the experiment can measure real output quality.

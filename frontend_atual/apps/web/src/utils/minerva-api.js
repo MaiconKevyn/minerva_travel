@@ -780,7 +780,9 @@ const safeDownloadUrl = (downloadUrl) => {
     `${browserOrigin.replace(/\/$/, '')}/`,
   );
   const resolvedUrl = new URL(String(downloadUrl || ''), baseUrl);
-  if (resolvedUrl.origin !== baseUrl.origin || !resolvedUrl.pathname.startsWith('/download/')) {
+  const validPath = resolvedUrl.pathname.startsWith('/download/')
+    || /^\/guide-builder\/[A-Za-z0-9]+\/pdf$/.test(resolvedUrl.pathname);
+  if (resolvedUrl.origin !== baseUrl.origin || !validPath) {
     throw new Error('Link de download inválido.');
   }
   return resolvedUrl.toString();
@@ -1104,6 +1106,11 @@ export const approveBuilderPage = async (sessionId, pageId, attemptId) =>
 
 export const completeGuideBuilder = async (sessionId) =>
   builderRequest(`/api/guide-builder/${encodeURIComponent(sessionId)}/complete`, {
+    method: 'POST',
+  });
+
+export const generateBuilderPdf = async (sessionId) =>
+  builderRequest(`/api/guide-builder/${encodeURIComponent(sessionId)}/pdf`, {
     method: 'POST',
   });
 

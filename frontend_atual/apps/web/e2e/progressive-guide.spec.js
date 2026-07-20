@@ -57,6 +57,7 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   const landmarkFamilyRequests = [];
   let landmarkSelected = null;
   let landmarkApproved = false;
+  let pdfExportRequests = 0;
 
   const sessionPayload = () => ({
     session_id: 'syntheticsession',
@@ -242,11 +243,47 @@ test('family reviews pages and controls family inclusion on a landmark', async (
         },
       });
     }
+    if (url.pathname.endsWith('/pdf') && method === 'POST') {
+      pdfExportRequests += 1;
+      if (pdfExportRequests === 1) {
+        return route.fulfill({
+          status: 503,
+          json: {
+            detail: {
+              code: 'approved_page_pdf_failed',
+              message: 'Não foi possível montar o PDF. Tente novamente.',
+            },
+          },
+        });
+      }
+      return route.fulfill({
+        status: 200,
+        json: {
+          session_id: 'syntheticsession',
+          download_url: '/guide-builder/syntheticsession/pdf',
+          filename: 'familia-aurora-minerva-travel.pdf',
+          page_count: 3,
+        },
+      });
+    }
     return route.abort('failed');
   });
   await page.route('**/guide-builder/syntheticsession/assets/*.png', (route) =>
     route.fulfill({ status: 200, contentType: 'image/png', body: onePixelPng }),
   );
+  await page.route('**/guide-builder/syntheticsession/pdf', (route) => {
+    if (new URL(route.request().url()).pathname.startsWith('/api/')) {
+      return route.fallback();
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/pdf',
+      headers: {
+        'Content-Disposition': 'attachment; filename="familia-aurora-minerva-travel.pdf"',
+      },
+      body: Buffer.from('%PDF-synthetic'),
+    });
+  });
 
   const email = `paginas-${test.info().project.name}@example.test`;
   const password = 'Aventura2026';
@@ -311,11 +348,22 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   await expect(page.getByText('Com família', { exact: true })).toBeVisible();
   expect(landmarkFamilyRequests).toEqual([false, true]);
   await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
-  await page.getByRole('button', { name: 'Concluir revisão das imagens' }).click();
+  await page.getByRole('button', { name: 'Ver páginas aprovadas' }).click();
 
   await expect(page.getByRole('heading', { name: 'Páginas aprovadas!' })).toBeVisible();
-  await expect(page.getByText(/Nenhum PDF foi gerado/)).toBeVisible();
-  expect(consoleErrors).toEqual([]);
+  await page.getByRole('button', { name: 'Gerar PDF e baixar' }).click();
+  await expect(page.getByRole('alert')).toContainText('Não foi possível montar o PDF.');
+  const firstDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Gerar PDF e baixar' }).click();
+  expect((await firstDownload).suggestedFilename()).toBe('familia-aurora-minerva-travel.pdf');
+  await expect(page.getByText('PDF pronto com 3 páginas.')).toBeVisible();
+  const secondDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Baixar PDF novamente' }).click();
+  expect((await secondDownload).suggestedFilename()).toBe('familia-aurora-minerva-travel.pdf');
+  expect(pdfExportRequests).toBe(3);
+  expect(consoleErrors).toEqual([
+    expect.stringContaining('503 (Service Unavailable)'),
+  ]);
   await test.info().attach(`progressive-guide-${test.info().project.name}`, {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',

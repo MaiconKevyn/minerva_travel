@@ -149,6 +149,8 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(api, /selectBuilderPageAttempt/);
   assert.match(api, /approveBuilderPage/);
   assert.match(api, /completeGuideBuilder/);
+  assert.match(api, /generateBuilderPdf/);
+  assert.match(api, /downloadGuidePdf/);
   assert.match(api, /fetchBuilderAssetObjectUrl/);
   assert.match(api, /Idempotency-Key/);
   assert.match(review, /GuideAssembly/);
@@ -165,7 +167,9 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(assembly, /setIncludeFamily\(false\)/);
   assert.match(assembly, /attempt\.include_family \? 'Com família' : 'Sem família'/);
   assert.match(assembly, /Aprovar e continuar/);
-  assert.match(assembly, /Concluir revisão das imagens/);
-  assert.match(assembly, /Nenhum PDF foi gerado/);
+  assert.match(assembly, /Ver páginas aprovadas/);
+  assert.match(assembly, /Gerar PDF e baixar/);
+  assert.match(assembly, /Baixar PDF novamente/);
+  assert.match(assembly, /PDF pronto com/);
   assert.match(assembly, /required_copy/);
 });

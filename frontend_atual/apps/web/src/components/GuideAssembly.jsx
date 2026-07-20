@@ -4,6 +4,7 @@ import {
   AlertCircle,
   Check,
   CircleCheck,
+  Download,
   ImageIcon,
   Loader2,
   RefreshCcw,
@@ -16,7 +17,9 @@ import {
   approveBuilderPage,
   completeGuideBuilder,
   createIdempotencyKey,
+  downloadGuidePdf,
   fetchBuilderAssetObjectUrl,
+  generateBuilderPdf,
   generateBuilderPageAttempt,
   selectBuilderPageAttempt,
 } from '@/utils/minerva-api.js';
@@ -32,6 +35,17 @@ const STATUS_LABELS = {
 
 const MAX_REVISION_INSTRUCTION_LENGTH = 600;
 
+const saveBlob = (blob, filename) => {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+};
+
 const GuideAssembly = ({ session: initialSession }) => {
   const [session, setSession] = useState(initialSession);
   const [assetUrls, setAssetUrls] = useState({});
@@ -41,6 +55,7 @@ const GuideAssembly = ({ session: initialSession }) => {
   const [revisionInstruction, setRevisionInstruction] = useState('');
   const [includeFamily, setIncludeFamily] = useState(false);
   const [completion, setCompletion] = useState(null);
+  const [pdfExport, setPdfExport] = useState(null);
   const objectUrlsRef = useRef(new Set());
   const generationKeysRef = useRef({});
 
@@ -190,6 +205,22 @@ const GuideAssembly = ({ session: initialSession }) => {
     }
   };
 
+  const handlePdfExport = async () => {
+    setBusyAction('pdf');
+    setActionError('');
+    try {
+      const readyPdf = await generateBuilderPdf(session.session_id);
+      setPdfExport(readyPdf);
+      const { blob, filename } = await downloadGuidePdf(readyPdf.download_url);
+      saveBlob(blob, readyPdf.filename || filename);
+      toast.success('PDF gerado. O download foi iniciado.');
+    } catch (error) {
+      setActionError(error.message || 'Não foi possível gerar e baixar o PDF.');
+    } finally {
+      setBusyAction('');
+    }
+  };
+
   const pageAssetUrl = (page) => {
     const attempt = page.attempts.find((item) => item.id === page.selected_attempt_id);
     return attempt ? assetUrls[attempt.asset_url] : '';
@@ -206,8 +237,8 @@ const GuideAssembly = ({ session: initialSession }) => {
         <div className="space-y-3">
           <h2 className="text-4xl font-serif font-bold text-foreground">Páginas aprovadas!</h2>
           <p className="mx-auto max-w-2xl text-lg font-medium text-muted-foreground">
-            Estas são as imagens finais escolhidas. Nenhum PDF foi gerado; cada página pode ser
-            validada diretamente aqui.
+            Estas são as imagens finais escolhidas. Gere o PDF para reuni-las na mesma sequência,
+            com uma imagem ocupando cada página.
           </p>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -221,6 +252,35 @@ const GuideAssembly = ({ session: initialSession }) => {
               <figcaption className="px-2 py-3 font-bold text-foreground">{page.title}</figcaption>
             </figure>
           ))}
+        </div>
+        <div className="mx-auto max-w-xl rounded-3xl border-2 border-secondary/30 bg-card p-6 shadow-sm">
+          {pdfExport && (
+            <p className="mb-3 font-bold text-secondary" role="status">
+              PDF pronto com {pdfExport.page_count} páginas.
+            </p>
+          )}
+          {actionError && (
+            <p className="mb-3 font-bold text-destructive" role="alert">
+              {actionError}
+            </p>
+          )}
+          <Button
+            type="button"
+            onClick={handlePdfExport}
+            disabled={busyAction === 'pdf'}
+            className="w-full rounded-full py-6 text-base font-bold"
+          >
+            {busyAction === 'pdf' ? (
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-5 w-5" />
+            )}
+            {busyAction === 'pdf'
+              ? 'Gerando PDF...'
+              : pdfExport
+                ? 'Baixar PDF novamente'
+                : 'Gerar PDF e baixar'}
+          </Button>
         </div>
       </motion.div>
     );
@@ -281,8 +341,7 @@ const GuideAssembly = ({ session: initialSession }) => {
             <CircleCheck className="mx-auto mb-4 h-12 w-12 text-secondary" />
             <h3 className="text-2xl font-serif font-bold text-foreground">Todas as páginas estão aprovadas</h3>
             <p className="mx-auto mt-2 max-w-xl text-muted-foreground">
-              Conclua para visualizar somente as imagens finais escolhidas. O PDF fica para uma
-              etapa futura.
+              Continue para revisar a sequência final e gerar o PDF para download.
             </p>
             {actionError && <p className="mt-4 font-bold text-destructive">{actionError}</p>}
             <Button
@@ -292,7 +351,7 @@ const GuideAssembly = ({ session: initialSession }) => {
               className="mt-6 rounded-full px-10 py-6 text-base font-bold"
             >
               {busyAction === 'complete' ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
-              Concluir revisão das imagens
+              Ver páginas aprovadas
             </Button>
           </section>
         ) : activePage ? (

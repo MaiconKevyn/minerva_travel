@@ -151,6 +151,14 @@ class BuilderSession:
             )
         return manifest
 
+    def approved_asset_filenames(self) -> list[str]:
+        self.approved_manifest()
+        return [
+            attempt.filename
+            for page in self.pages
+            if (attempt := page.selected_attempt()) is not None
+        ]
+
     def _page_payload(self, page: BuilderPage) -> dict[str, Any]:
         chosen = page.selected_attempt()
         return {
@@ -198,6 +206,10 @@ def builder_sessions_dir() -> Path:
 
 def builder_asset_dir(session_id: str) -> Path:
     return storage.RUNTIME_DIR / "generated" / "builder" / session_id
+
+
+def builder_pdf_path(session_id: str) -> Path:
+    return builder_asset_dir(session_id) / "approved-guide.pdf"
 
 
 def create_builder_session(

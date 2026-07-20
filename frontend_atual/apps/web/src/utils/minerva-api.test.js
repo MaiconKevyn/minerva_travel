@@ -1003,6 +1003,58 @@ test('guide library APIs list, read, delete and download through authenticated o
   }
 });
 
+test('builder PDF export and download stay on authenticated owner-scoped routes', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  await authClient.signup('builder-pdf@example.com', 'Senha123', 'Família Aurora');
+  await authClient.login('builder-pdf@example.com', 'Senha123');
+
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    const pathname = new URL(String(url)).pathname;
+    const method = options.method || 'GET';
+    if (pathname === '/api/guide-builder/session123/pdf' && method === 'POST') {
+      return new Response(JSON.stringify({
+        session_id: 'session123',
+        download_url: '/guide-builder/session123/pdf',
+        filename: 'familia-aurora-minerva-travel.pdf',
+        page_count: 3,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (pathname === '/guide-builder/session123/pdf' && method === 'GET') {
+      return new Response('%PDF-builder', {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': 'attachment; filename="familia-aurora-minerva-travel.pdf"',
+        },
+      });
+    }
+    return new Response(null, { status: 404 });
+  };
+
+  try {
+    const exported = await minervaApi.generateBuilderPdf('session123');
+    const download = await minervaApi.downloadGuidePdf(exported.download_url);
+    assert.equal(exported.page_count, 3);
+    assert.equal(await download.blob.text(), '%PDF-builder');
+    assert.equal(download.filename, 'familia-aurora-minerva-travel.pdf');
+    assert.deepEqual(
+      calls.map(({ url, options }) => [new URL(url).pathname, options.method || 'GET']),
+      [
+        ['/api/guide-builder/session123/pdf', 'POST'],
+        ['/guide-builder/session123/pdf', 'GET'],
+      ],
+    );
+    calls.forEach(({ options }) => {
+      assert.equal(options.headers.get('Authorization'), 'Bearer local-development-token');
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});
+
 test('guide draft APIs restore, save and discard through authenticated owner routes', async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];

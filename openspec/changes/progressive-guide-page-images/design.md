@@ -12,13 +12,13 @@ The new workflow must make a generated page image the product artifact. OpenAI's
 - Keep page order explicit and stable.
 - Let a family generate, inspect, regenerate, and approve one page at a time.
 - Put the requested copy inside the OpenAI-generated image for the experiment.
-- Keep approved bytes immutable and reusable for a future export step.
+- Keep approved bytes immutable and reuse those exact bytes for the final PDF export.
 - Fail visibly when OpenAI is unavailable; no placeholder output is presented as a successful page.
 - Keep costs bounded and owner data removable.
 
 **Non-Goals:**
 
-- PDF generation or HTML-to-PDF parity.
+- HTML-to-PDF parity with the legacy guide renderer.
 - A production OCR gate that automatically judges typography.
 - A full collaborative editor or arbitrary free-form page designer.
 - Regenerating every remaining activity-page design in the first live API smoke test.
@@ -54,9 +54,11 @@ Local unit tests use a fake page generator, but runtime page endpoints do not ca
 
 Each successful call writes a new immutable PNG and then atomically records the attempt. The limit is reserved before the provider call. Approval references an existing attempt ID and advances the active page. Regeneration does not delete prior versions.
 
-### Decision 5: PDF is decoupled
+### Decision 5: PDF export is decoupled from page generation
 
-Completing page review returns the approved page manifest. It does not call WeasyPrint, create a preview HTML file, or generate a PDF. A future exporter can combine the exact approved PNGs without rerunning image generation.
+Completing page review returns the approved page manifest and does not automatically generate a
+PDF. After completion, a separate explicit export action combines the exact approved PNGs without
+rerunning image generation. It does not call the legacy guide template or create preview HTML.
 
 ### Decision 6: Persistence and privacy follow the owner lifecycle
 
@@ -72,7 +74,9 @@ The review page creates a session but does not generate content automatically. T
 - approved
 - retryable error
 
-Previous approved pages remain visible as thumbnails. The active page offers `Gerar página`, `Gerar outra versão`, version selection, and `Aprovar e continuar`. After the final planned page, the UI shows the approved-page gallery and explicitly says that PDF export will be added later.
+Previous approved pages remain visible as thumbnails. The active page offers `Gerar página`,
+`Gerar outra versão`, version selection, and `Aprovar e continuar`. After the final planned page,
+the UI shows the approved-page gallery with an explicit `Gerar PDF e baixar` action.
 
 ### Decision 8: Regeneration is a controlled visual revision
 
@@ -133,6 +137,23 @@ this invariant.
 With the toggle on, destination generation uses `/v1/images/edits` with the original photo and
 approved cover, followed by the selected current-page attempt when present. The family-continuity
 contract from Decision 9 remains mandatory. Cover and summary behavior does not change.
+
+### Decision 11: Final PDF is a deterministic full-page image sequence
+
+PDF export is allowed only after every page is approved. The server resolves each selected attempt
+from the owner-scoped session, in stable page order, and rejects export if any approved PNG is
+missing or no longer allowlisted. Clients never submit image paths or page order.
+
+The exporter creates a 6×9 inch portrait PDF, matching the 2:3 page-image ratio. Every 1024×1536
+PNG fills one PDF page edge to edge, with no margin, header, footer, extra text, or raster
+regeneration. The implementation uses ReportLab directly instead of the legacy HTML/WeasyPrint
+guide renderer. The write is atomic, and a successful existing export is reused because approved
+pages are immutable.
+
+The PDF lives inside the private builder-session asset directory, is deleted by the existing
+session expiry and account-deletion lifecycle, and is downloadable only through an authenticated,
+owner-scoped endpoint. The response filename is sanitized from the guide title. Export failures
+remain retryable and never remove or alter the approved PNGs.
 
 ## Prompt Contracts
 
@@ -197,7 +218,8 @@ contract from Decision 9 remains mandatory. Cover and summary behavior does not 
   cover, while default landmark generation does not resolve family assets; provider calls receive
   only server-resolved owner assets.
 - Assets require the owning user and are allowlisted.
-- No PDF or preview URL is returned by page generation or completion.
+- No PDF or preview URL is returned by page generation or completion; PDF metadata is returned only
+  by the explicit export endpoint.
 - Repeated idempotency keys do not create duplicate attempts.
 - Revision instructions are length-bounded, persisted with the immutable attempt, and reference
   only an owner-allowlisted selected attempt.
@@ -205,6 +227,8 @@ contract from Decision 9 remains mandatory. Cover and summary behavior does not 
   idempotently replayed without changing the original request semantics.
 - Session expiry, cleanup, and account deletion remove photos, JSON, and page images.
 - Final approved manifest references the exact selected attempt bytes.
+- PDF export rejects incomplete sessions, missing approved assets, foreign owners, and expired
+  sessions; repeated exports reuse the same private artifact.
 
 ### Frontend tests
 
@@ -217,6 +241,8 @@ contract from Decision 9 remains mandatory. Cover and summary behavior does not 
   the selected boolean on first generation and regeneration.
 - Object URLs are revoked on replacement/unmount.
 - The complete cover and summary are displayed using authenticated object URLs.
+- The final gallery offers `Gerar PDF e baixar`, handles retryable errors, and downloads through
+  the authenticated API without exposing a public asset URL.
 
 ### Live validation
 
@@ -227,6 +253,8 @@ contract from Decision 9 remains mandatory. Cover and summary behavior does not 
   that the same four characters and established traits remain visible.
 - Generate one low-quality destination page with family disabled; inspect that the landmark and
   required copy are visible and that no person, silhouette, or crowd appears.
+- Build a synthetic multi-page PDF from distinct approved page fixtures, render every PDF page to
+  PNG, and visually inspect page order, full-bleed coverage, orientation, and clipping.
 - Record the live test as manual evidence; do not make paid live calls part of CI.
 
 ## Risks / Trade-offs
@@ -238,6 +266,8 @@ contract from Decision 9 remains mandatory. Cover and summary behavior does not 
   Default destination pages avoid those inputs and their additional input-token cost.
 - Local runtime persistence is not multi-instance durable. The repository boundary keeps a later Postgres/object-storage migration possible; production must stay single-instance until that migration.
 - A summary with too many labels can become crowded. The first version caps the number of labels per summary page and will split summaries in a follow-up if needed.
+- Full-page PNGs can produce a larger download. The export preserves visual fidelity and reuses one
+  cached private PDF per immutable completed session instead of rebuilding on every download.
 
 ## Rollout
 

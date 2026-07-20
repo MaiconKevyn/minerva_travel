@@ -76,3 +76,11 @@
 - [x] 10.3 Add an off-by-default `Incluir família` control only to destination-page generation in the progressive UI.
 - [x] 10.4 Add provider, API, persistence, frontend-contract, and browser coverage for both modes.
 - [x] 10.5 Run complete automated and synthetic live destination validation, then publish `main` and `hostinger-frontend`.
+
+## 11. Approved Page PDF Export
+
+- [x] 11.1 Define explicit PDF export and authenticated download contracts for completed owner-scoped sessions.
+- [x] 11.2 Implement atomic full-bleed PDF composition from the exact approved PNG sequence with lifecycle cleanup and cached reuse.
+- [x] 11.3 Add the final `Gerar PDF e baixar` UI action with progress, retry, and repeat-download states.
+- [x] 11.4 Add compositor, API/security, frontend-contract, and browser lifecycle coverage.
+- [ ] 11.5 Render and visually inspect a synthetic multi-page PDF, run complete validation, and publish `main` and `hostinger-frontend`.

@@ -10,11 +10,16 @@ from urllib.request import url2pathname
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from PIL import Image, UnidentifiedImageError
+from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen.canvas import Canvas
 
 from minerva_travel import storage
 from minerva_travel.models import GuideContext
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
+APPROVED_PAGE_IMAGE_SIZE = (1024, 1536)
+APPROVED_PDF_PAGE_SIZE = (6 * inch, 9 * inch)
 
 UrlFetcherResult = Any
 UrlFetcher = Callable[[str], UrlFetcherResult]
@@ -40,6 +45,12 @@ class PdfResourceAccessError(ValueError):
 
 class PdfResourceNotFoundError(PdfResourceAccessError):
     code = "pdf_resource_not_found"
+
+
+class ApprovedPagePdfError(ValueError):
+    """An approved page sequence cannot be safely exported."""
+
+    code = "approved_page_pdf_failed"
 
 
 def render_guide_html(
@@ -216,6 +227,78 @@ def write_pdf(
         url_fetcher=url_fetcher,
     ).write_pdf(output_path, presentational_hints=False)
     return output_path
+
+
+def write_approved_page_images_pdf(
+    image_paths: Iterable[Path],
+    output_path: Path,
+    *,
+    title: str = "Guia Minerva Travel",
+) -> Path:
+    """Package approved 2:3 PNG pages into an atomic full-bleed PDF."""
+
+    pages = tuple(Path(path) for path in image_paths)
+    if not pages:
+        raise ApprovedPagePdfError("O guia não possui páginas aprovadas para exportar.")
+    for page in pages:
+        _validate_approved_page_image(page)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output_path.with_suffix(f"{output_path.suffix}.tmp")
+    temporary.unlink(missing_ok=True)
+    page_width, page_height = APPROVED_PDF_PAGE_SIZE
+    try:
+        document = Canvas(
+            str(temporary),
+            pagesize=APPROVED_PDF_PAGE_SIZE,
+            pageCompression=1,
+            invariant=1,
+        )
+        document.setTitle(title[:200] or "Guia Minerva Travel")
+        document.setAuthor("Minerva Travel")
+        document.setCreator("Minerva Travel")
+        for page in pages:
+            document.drawImage(
+                ImageReader(str(page)),
+                0,
+                0,
+                width=page_width,
+                height=page_height,
+                preserveAspectRatio=True,
+                anchor="c",
+            )
+            document.showPage()
+        document.save()
+        with temporary.open("rb") as exported:
+            has_pdf_header = exported.read(5) == b"%PDF-"
+        if temporary.stat().st_size < 8 or not has_pdf_header:
+            raise ApprovedPagePdfError("O compositor não produziu um PDF válido.")
+        temporary.chmod(0o600)
+        temporary.replace(output_path)
+    except ApprovedPagePdfError:
+        temporary.unlink(missing_ok=True)
+        raise
+    except (OSError, TypeError, ValueError, RuntimeError) as error:
+        temporary.unlink(missing_ok=True)
+        raise ApprovedPagePdfError(
+            "Não foi possível montar o PDF das páginas aprovadas."
+        ) from error
+    return output_path
+
+
+def _validate_approved_page_image(path: Path) -> None:
+    try:
+        with Image.open(path) as image:
+            image.verify()
+        with Image.open(path) as image:
+            if image.format != "PNG" or image.size != APPROVED_PAGE_IMAGE_SIZE:
+                raise ApprovedPagePdfError(
+                    "Uma página aprovada não possui o formato ou as dimensões esperadas."
+                )
+    except ApprovedPagePdfError:
+        raise
+    except (FileNotFoundError, UnidentifiedImageError, OSError) as error:
+        raise ApprovedPagePdfError("Uma página aprovada não está disponível.") from error
 
 
 def _load_html_renderer() -> type[Any]:

@@ -48,9 +48,11 @@ from minerva_travel.builder import (
     BuilderIncomplete,
     BuilderPage,
     BuilderPageOutOfOrder,
+    BuilderSession,
     BuilderSessionNotFound,
     approve_page_attempt,
     builder_asset_dir,
+    builder_pdf_path,
     builder_session_lock,
     commit_page_attempt,
     create_builder_session,
@@ -130,7 +132,12 @@ from minerva_travel.page_generation import (
     PageGenerationError,
     get_guide_page_generator,
 )
-from minerva_travel.pdf import render_guide_html, write_pdf
+from minerva_travel.pdf import (
+    ApprovedPagePdfError,
+    render_guide_html,
+    write_approved_page_images_pdf,
+    write_pdf,
+)
 from minerva_travel.persistence import (
     GuideJobRecord,
     delete_guide_and_assets,
@@ -448,6 +455,13 @@ class BuilderApprovedPageResponse(BaseModel):
 class BuilderCompletionResponse(BaseModel):
     session_id: str
     pages: list[BuilderApprovedPageResponse]
+
+
+class BuilderPdfResponse(BaseModel):
+    session_id: str
+    download_url: str
+    filename: str
+    page_count: int = Field(ge=1)
 
 
 class GuideGenerationQueuedResponse(BaseModel):
@@ -2217,6 +2231,106 @@ def complete_guide_builder(session_id: str, current_user: CurrentUser) -> Builde
             detail={"code": "builder_incomplete", "message": "Aprove todas as páginas primeiro."},
         ) from error
     return BuilderCompletionResponse.model_validate({"session_id": session.id, "pages": pages})
+
+
+@app.post(
+    "/api/guide-builder/{session_id}/pdf",
+    response_model=BuilderPdfResponse,
+)
+def generate_guide_builder_pdf(
+    session_id: str,
+    request: Request,
+    current_user: CurrentUser,
+) -> BuilderPdfResponse:
+    try:
+        with builder_session_lock(session_id):
+            session = _builder_session_or_404(session_id, current_user)
+            filenames = session.approved_asset_filenames()
+            allowed_filenames = session.allowed_asset_filenames()
+            pages: list[Path] = []
+            for filename in filenames:
+                path = builder_asset_dir(session.id) / filename
+                if (
+                    filename not in allowed_filenames
+                    or path.name != filename
+                    or path.suffix.lower() != ".png"
+                    or not path.is_file()
+                ):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "builder_approved_asset_missing",
+                            "message": "Uma página aprovada não está mais disponível.",
+                        },
+                    )
+                pages.append(path)
+
+            output = builder_pdf_path(session.id)
+            if not _is_valid_cached_builder_pdf(output):
+                write_approved_page_images_pdf(
+                    pages,
+                    output,
+                    title=str(session.form.get("title") or "Guia Minerva Travel"),
+                )
+            filename = _builder_pdf_download_filename(session)
+            response = BuilderPdfResponse(
+                session_id=session.id,
+                download_url=f"/guide-builder/{session.id}/pdf",
+                filename=filename,
+                page_count=len(pages),
+            )
+        emit_event(
+            "guide_builder_pdf_generated",
+            request_id=getattr(request.state, "request_id", None),
+            user_id=current_user.id,
+            outcome="succeeded",
+            attempt_count=response.page_count,
+            pdf_bytes=output.stat().st_size,
+        )
+        return response
+    except BuilderIncomplete as error:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "builder_incomplete", "message": "Aprove todas as páginas primeiro."},
+        ) from error
+    except ApprovedPagePdfError as error:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": error.code, "message": str(error)},
+        ) from error
+
+
+@app.get("/guide-builder/{session_id}/pdf", include_in_schema=False)
+def download_guide_builder_pdf(session_id: str, current_user: CurrentUser) -> FileResponse:
+    session = _builder_session_or_404(session_id, current_user)
+    output = builder_pdf_path(session.id)
+    if not session.is_complete or not _is_valid_cached_builder_pdf(output):
+        raise HTTPException(status_code=404, detail="PDF not found")
+    return FileResponse(
+        output,
+        media_type="application/pdf",
+        filename=_builder_pdf_download_filename(session),
+        headers={
+            "Cache-Control": "private, no-store, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+def _is_valid_cached_builder_pdf(path: Path) -> bool:
+    try:
+        if not path.is_file() or path.stat().st_size < 8:
+            return False
+        with path.open("rb") as document:
+            return document.read(5) == b"%PDF-"
+    except OSError:
+        return False
+
+
+def _builder_pdf_download_filename(session: BuilderSession) -> str:
+    title = slugify(str(session.form.get("title") or "guia"))[:72] or "guia"
+    return f"{title}-minerva-travel.pdf"
 
 
 @app.get("/guide-builder/{session_id}/assets/{filename}", include_in_schema=False)

@@ -112,10 +112,14 @@ def _approve(client: TestClient, session_id: str, page_id: str, attempt_id: str)
     )
 
 
-def test_page_builder_generates_approves_and_completes_without_pdf(tmp_path, monkeypatch):
+def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, monkeypatch):
     client, generator = _setup(monkeypatch, tmp_path)
     created = _create_session(client)
     session_id = created["session_id"]
+
+    incomplete_pdf = client.post(f"/api/guide-builder/{session_id}/pdf")
+    assert incomplete_pdf.status_code == 409
+    assert incomplete_pdf.json()["detail"]["code"] == "builder_incomplete"
 
     assert generator.calls == []
     assert created["active_page_id"] == "cover"
@@ -192,6 +196,34 @@ def test_page_builder_generates_approves_and_completes_without_pdf(tmp_path, mon
 
     chosen_cover = next(page for page in payload["pages"] if page["page_id"] == "cover")
     assert chosen_cover["attempt_id"] == "cover-1"
+
+    exported = client.post(f"/api/guide-builder/{session_id}/pdf")
+    assert exported.status_code == 200, exported.text
+    pdf_payload = exported.json()
+    assert pdf_payload == {
+        "session_id": session_id,
+        "download_url": f"/guide-builder/{session_id}/pdf",
+        "filename": "familia-moraes-minerva-travel.pdf",
+        "page_count": 4,
+    }
+    pdf_path = tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf"
+    first_bytes = pdf_path.read_bytes()
+    assert first_bytes.startswith(b"%PDF-")
+
+    replayed = client.post(f"/api/guide-builder/{session_id}/pdf")
+    assert replayed.status_code == 200
+    assert pdf_path.read_bytes() == first_bytes
+
+    download = client.get(pdf_payload["download_url"])
+    assert download.status_code == 200
+    assert download.headers["content-type"] == "application/pdf"
+    assert "familia-moraes-minerva-travel.pdf" in download.headers["content-disposition"]
+    assert download.content == first_bytes
+
+    (tmp_path / "generated" / "builder" / session_id / "landmark-2-1.png").unlink()
+    missing_page = client.post(f"/api/guide-builder/{session_id}/pdf")
+    assert missing_page.status_code == 409
+    assert missing_page.json()["detail"]["code"] == "builder_approved_asset_missing"
 
 
 def test_page_attempt_limit_is_checked_before_provider_call(tmp_path, monkeypatch):
@@ -406,6 +438,8 @@ def test_builder_session_and_assets_are_owner_scoped(tmp_path, monkeypatch):
         assert client.get(f"/api/guide-builder/{session_id}").status_code == 404
         assert client.get(asset_url).status_code == 404
         assert _generate(client, session_id, "cover", "owner-b-cover").status_code == 404
+        assert client.post(f"/api/guide-builder/{session_id}/pdf").status_code == 404
+        assert client.get(f"/guide-builder/{session_id}/pdf").status_code == 404
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -414,11 +448,18 @@ def test_account_deletion_removes_builder_session_photo_and_pages(tmp_path, monk
     client, _generator = _setup(monkeypatch, tmp_path)
     created = _create_session(client)
     session_id = created["session_id"]
-    generated = _generate(client, session_id, "cover", "delete-cover")
-    assert generated.status_code == 200
+    for page_id in ("cover", "summary", "landmark-1", "landmark-2"):
+        generated = _generate(client, session_id, page_id, f"delete-{page_id}")
+        assert generated.status_code == 200
+        page = next(item for item in generated.json()["pages"] if item["id"] == page_id)
+        assert _approve(client, session_id, page_id, page["selected_attempt_id"]).status_code == 200
+    assert client.post(f"/api/guide-builder/{session_id}/pdf").status_code == 200
+    pdf_path = tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf"
+    assert pdf_path.is_file()
 
     response = client.delete("/api/account/data")
     assert response.status_code == 200
     assert client.get(f"/api/guide-builder/{session_id}").status_code == 404
     assert not (tmp_path / "builder" / f"{session_id}.json").exists()
     assert not (tmp_path / "generated" / "builder" / session_id).exists()
+    assert not pdf_path.exists()
