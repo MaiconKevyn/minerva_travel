@@ -91,4 +91,4 @@
 - [x] 12.2 Make persisted session mutations revisioned and allow concurrent reservations for different pages while blocking duplicates on one page.
 - [x] 12.3 Make every page in step 6 selectable and scope loading, errors, revision feedback, family choice, and idempotency by page.
 - [x] 12.4 Add backend concurrency/order and frontend navigation/state contract coverage.
-- [ ] 12.5 Run complete verification and publish `main` and `hostinger-frontend`.
+- [x] 12.5 Run complete verification and publish `main` and `hostinger-frontend`.
