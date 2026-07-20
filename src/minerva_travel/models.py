@@ -124,8 +124,9 @@ class Landmark(BaseModel):
     name: str
     description: list[str] = Field(min_length=1)
     image: Path | str
-    lineart_image: Path
+    lineart_image: Path | str
     sort_order: int
+    place_id: str | None = None
     representative_query: str | None = None
     required_terms: list[str] = Field(default_factory=list)
     rejected_terms: list[str] = Field(default_factory=list)
@@ -234,8 +235,8 @@ class GuideActivity(BaseModel):
 
 class GuideContext(BaseModel):
     request: GuideRequest
-    cover_image: Path
-    summary_image: Path | None = None
+    cover_image: Path | str
+    summary_image: Path | str | None = None
     destinations: list[GuideDestination]
     activity_plan: list[GuideActivity] = Field(default_factory=list)
     image_credits: list[ImageCredit] = Field(default_factory=list)

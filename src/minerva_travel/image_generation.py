@@ -71,6 +71,15 @@ class ImageGenerator(Protocol):
     ) -> Path:
         """Generate a black-and-white coloring image for a tourist landmark."""
 
+    def stylize_landmark_photo(
+        self,
+        reference_photo: Path,
+        output_path: Path,
+        landmark_name: str,
+        city: str,
+    ) -> Path:
+        """Transform a real landmark photo into storybook watercolor art."""
+
 
 class PlaceholderImageGenerator:
     def generate_cover(
@@ -254,6 +263,30 @@ class PlaceholderImageGenerator:
         image.save(output_path)
         return output_path
 
+    def stylize_landmark_photo(
+        self,
+        reference_photo: Path,
+        output_path: Path,
+        landmark_name: str,
+        city: str,
+    ) -> Path:
+        # Versao local e gratuita da estilizacao: suaviza a foto real e aplica
+        # moldura em tom de papel, mantendo o ponto turistico reconhecivel.
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(reference_photo) as source:
+            photo = ImageOps.exif_transpose(source).convert("RGB")
+        framed = ImageOps.fit(photo, (1080, 780), method=Image.Resampling.LANCZOS)
+        framed = framed.filter(ImageFilter.SMOOTH_MORE).filter(ImageFilter.SMOOTH)
+        warm_overlay = Image.new("RGB", framed.size, "#f6e7c8")
+        framed = Image.blend(framed, warm_overlay, 0.18)
+
+        canvas = Image.new("RGB", (1200, 900), "#fbf3e2")
+        canvas.paste(framed, (60, 60))
+        draw = ImageDraw.Draw(canvas)
+        draw.rounded_rectangle((60, 60, 1140, 840), radius=8, outline="#c9b58f", width=6)
+        canvas.save(output_path)
+        return output_path
+
 
 def get_image_generator(provider: str) -> ImageGenerator:
     if provider == "placeholder":
@@ -378,6 +411,32 @@ class ReplicateImageGenerator:
                 "num_outputs": 1,
             },
         )
+        _write_replicate_output(output, output_path)
+        return output_path
+
+    def stylize_landmark_photo(
+        self,
+        reference_photo: Path,
+        output_path: Path,
+        landmark_name: str,
+        city: str,
+    ) -> Path:
+        import replicate
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        prompt = landmark_stylize_prompt(landmark_name=landmark_name, city=city)
+        with reference_photo.open("rb") as image_file:
+            output = _run_replicate_with_retry(
+                replicate,
+                self.model,
+                input={
+                    "prompt": prompt,
+                    "input_image": image_file,
+                    "aspect_ratio": "4:3",
+                    "output_format": "png",
+                },
+                wait=60,
+            )
         _write_replicate_output(output, output_path)
         return output_path
 
@@ -598,6 +657,19 @@ def cover_prompt(
         "Vertical cover composition, generous clean space for title text added later. "
         f"Do not include any readable text, logos, watermark, or the title '{title}' "
         "inside the image."
+    )
+
+
+def landmark_stylize_prompt(landmark_name: str, city: str) -> str:
+    # Validado em prova de conceito (Tower Bridge, 2026-07-18): partir da foto
+    # real garante a arquitetura fiel; o prompt so troca o acabamento visual.
+    location = f"{landmark_name} in {city}" if city else landmark_name
+    return (
+        "Transform this photo into a warm children's storybook watercolor "
+        "illustration in vintage travel journal style: cream aged paper tones, "
+        "soft golden light, gentle painterly brushstrokes, charming and inviting. "
+        f"Preserve the real architecture, proportions and recognizable details of "
+        f"{location} faithfully. No text, no watermark, no border, no people added."
     )
 
 

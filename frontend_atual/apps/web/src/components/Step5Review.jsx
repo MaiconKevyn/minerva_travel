@@ -19,6 +19,7 @@ import {
   buildGuideItineraryPayload,
   createIdempotencyKey,
   downloadGuidePdf,
+  fetchGuidePreviewHtml,
   generatePDF,
   RESTAURANT_RECOMMENDATIONS_EXTRA,
   selectGuideLandmarks,
@@ -62,7 +63,24 @@ const Step5Review = () => {
   const [coverStatus, setCoverStatus] = useState(null);
   const [isRetrievingPdf, setIsRetrievingPdf] = useState(false);
   const [generationStatus, setGenerationStatus] = useState('');
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState('');
   const generationIdempotencyKey = useRef(null);
+
+  const loadGuidePreview = async (previewUrl) => {
+    if (!previewUrl) return;
+    setIsLoadingPreview(true);
+    setPreviewError('');
+    try {
+      setPreviewHtml(await fetchGuidePreviewHtml(previewUrl));
+    } catch (error) {
+      console.error('Erro ao carregar a prévia do guia:', error);
+      setPreviewError(error.message || 'Não foi possível carregar a prévia.');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
 
   // Derive the rich data from the IDs
   const finalLandmarks = selectGuideLandmarks(parsedData.landmarks, selectedLandmarks);
@@ -124,6 +142,7 @@ const Step5Review = () => {
         setPdfFilename(result.filename || 'guia-minerva-travel.pdf');
         setCoverStatus(result.cover_status || null);
         setIsSuccess(true);
+        loadGuidePreview(result.preview_url);
         toast.success('Guia de viagem gerado com sucesso!');
         if (result.cover_status?.fallback_used) {
           toast.info('Usamos uma capa segura com a foto original para preservar todos na imagem.');
@@ -177,7 +196,7 @@ const Step5Review = () => {
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-2xl mx-auto text-center space-y-8 py-20"
+        className="w-full max-w-4xl mx-auto text-center space-y-8 py-12"
       >
         <div className="w-24 h-24 bg-accent/20 rounded-full flex items-center justify-center mx-auto text-accent">
           <Sparkles className="w-12 h-12" />
@@ -186,14 +205,44 @@ const Step5Review = () => {
           Guia Gerado com Sucesso!
         </h2>
         <p className="text-xl text-muted-foreground font-medium">
-          O Livro de Aventuras da Família {familyName} está pronto para ser vivido!
+          O Livro de Aventuras da Família {familyName} está pronto. Confira cada página abaixo
+          antes de baixar.
         </p>
         {coverStatus?.fallback_used && (
           <p className="rounded-2xl border border-border/70 bg-card px-5 py-4 text-sm text-muted-foreground">
             A capa foi protegida com a foto original porque a ilustração não pôde ser validada com segurança.
           </p>
         )}
-        <div className="pt-8 flex flex-col sm:flex-row gap-4 justify-center">
+
+        {/* Prévia página a página: o MESMO HTML que o WeasyPrint transforma em PDF. */}
+        <div className="rounded-[2rem] border-2 border-border/70 bg-card p-3 text-left shadow-sm sm:p-4">
+          <div className="mb-3 flex items-center justify-between px-2">
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              Prévia do guia
+            </p>
+            {isLoadingPreview && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+          </div>
+          {previewHtml ? (
+            <iframe
+              title="Prévia do guia"
+              sandbox=""
+              srcDoc={previewHtml}
+              className="h-[70vh] w-full rounded-2xl border border-border/60 bg-white"
+            />
+          ) : previewError ? (
+            <p className="rounded-2xl bg-destructive/10 px-4 py-6 text-center text-sm font-bold text-destructive">
+              {previewError}
+            </p>
+          ) : (
+            <p className="px-4 py-10 text-center text-sm font-medium text-muted-foreground">
+              {isLoadingPreview
+                ? 'Montando a prévia com todas as imagens geradas...'
+                : 'A prévia ficará disponível em instantes.'}
+            </p>
+          )}
+        </div>
+
+        <div className="pt-4 flex flex-col sm:flex-row gap-4 justify-center">
           <Button
             onClick={() => handlePdfAction({ open: true })}
             disabled={isRetrievingPdf}

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -51,6 +52,7 @@ from minerva_travel.config import (
     image_generation_concurrency,
     image_provider,
     landmark_art_generation_enabled,
+    landmark_stylized_art_enabled,
     pilot_restaurant_recommendations_enabled,
 )
 from minerva_travel.contract_limits import (
@@ -80,6 +82,12 @@ from minerva_travel.image_generation import (
 )
 from minerva_travel.itinerary import recommend_itinerary
 from minerva_travel.itinerary_routes import suggest_itinerary_routes
+from minerva_travel.landmark_art_cache import (
+    load_cached_stylized_art,
+    local_cache_path,
+    store_stylized_art,
+    stylized_art_cache_key,
+)
 from minerva_travel.landmark_parser import ParsedLandmark, parse_landmarks_from_message
 from minerva_travel.models import (
     Destination,
@@ -139,6 +147,8 @@ from minerva_travel.wikimedia_client import (
     fetch_landmark_asset,
     find_landmark_asset_metadata,
 )
+
+logger = logging.getLogger(__name__)
 
 CUSTOM_LANDMARK_IMAGE_HOSTS = {
     "lh3.googleusercontent.com",
@@ -349,6 +359,7 @@ class CoverStatusResponse(BaseModel):
 class GuideGenerationCompletedResponse(BaseModel):
     request_id: str
     download_url: str
+    preview_url: str | None = None
     filename: str
     cover_status: CoverStatusResponse
 
@@ -1316,6 +1327,7 @@ async def api_generate(
         payload = {
             "request_id": result["request_id"],
             "download_url": result["download_url"],
+            "preview_url": result.get("preview_url"),
             "filename": result["filename"],
             "cover_status": result["cover_status"],
         }
@@ -1677,6 +1689,33 @@ def delete_guide(guide_id: str, current_user: CurrentUser) -> DeletedResponse:
     return DeletedResponse(deleted=True)
 
 
+@app.get("/guides/{guide_id}/preview", include_in_schema=False)
+def guide_preview(guide_id: str, current_user: CurrentUser) -> FileResponse:
+    record = guide_repository().get_for_owner(guide_id, current_user.id)
+    if record is None or record.status != "succeeded":
+        raise HTTPException(status_code=404, detail="Preview not found")
+    if record.is_expired:
+        raise HTTPException(status_code=410, detail="Preview expired")
+    preview_name = str((record.metadata or {}).get("preview_filename") or "")
+    if not preview_name:
+        raise HTTPException(status_code=404, detail="Preview not found")
+    path = storage.generated_path(preview_name)
+    if path.name != preview_name or path.suffix.lower() != ".html" or not path.is_file():
+        raise HTTPException(status_code=404, detail="Preview not found")
+    return FileResponse(
+        path,
+        media_type="text/html; charset=utf-8",
+        headers={
+            "Cache-Control": "private, no-store, max-age=0",
+            "X-Content-Type-Options": "nosniff",
+            # Previa e autocontida (CSS inline + imagens data:); nada externo.
+            "Content-Security-Policy": (
+                "default-src 'none'; img-src data:; style-src 'unsafe-inline'"
+            ),
+        },
+    )
+
+
 @app.get("/download/{filename}")
 def download(filename: str, current_user: CurrentUser) -> FileResponse:
     record = guide_repository().get_by_pdf_for_owner(filename, current_user.id)
@@ -1907,6 +1946,16 @@ async def generate_pdf_from_saved_photo(
             request_id,
             reference_images=reference_images,
         )
+    if landmark_stylized_art_enabled():
+        # Aquarela por ponto a partir da foto real (cache global por place_id):
+        # sobrescreve a foto crua no PDF quando a estilizacao esta disponivel.
+        stylized_images = generate_stylized_landmark_art(
+            catalog.destinations,
+            selected,
+            generator,
+            reference_images=reference_images,
+        )
+        landmark_images.update(stylized_images)
     context = build_guide_context(
         request,
         catalog,
@@ -1928,12 +1977,18 @@ async def generate_pdf_from_saved_photo(
     title_slug = slugify(request.title)[:48] or "guia"
     pdf_output = storage.pdf_path(f"{title_slug}-{request_id[:16]}.pdf")
     write_pdf(context, pdf_output)
+    # A previa usa o MESMO template do PDF em modo preview: imagens locais
+    # aprovadas viram data URLs e o HTML fica autocontido para o navegador.
+    preview_output = storage.generated_path(f"{request_id}-preview.html")
+    preview_output.parent.mkdir(parents=True, exist_ok=True)
+    preview_output.write_text(render_guide_html(context, preview=True), encoding="utf-8")
     owned_assets = _owned_guide_assets(
         request_id=request_id,
         family_photo=photo_path,
         cover=cover_path,
         summary=summary_path,
         pdf=pdf_output,
+        preview=preview_output,
         generated_images=[*landmark_images.values(), *landmark_lineart_images.values()],
     )
     try:
@@ -1957,6 +2012,7 @@ async def generate_pdf_from_saved_photo(
                     request.itinerary.model_dump(mode="json") if request.itinerary else None
                 ),
                 "privacy_consent": privacy_consent.metadata() if privacy_consent else None,
+                "preview_filename": preview_output.name,
             },
             assets=owned_assets,
         )
@@ -1969,6 +2025,7 @@ async def generate_pdf_from_saved_photo(
         "request_id": request_id,
         "filename": pdf_output.name,
         "download_url": f"/download/{pdf_output.name}",
+        "preview_url": f"/guides/{request_id}/preview",
         "cover_status": cover_status_payload(cover_result, request),
     }
 
@@ -1981,6 +2038,7 @@ def _owned_guide_assets(
     summary: Path,
     pdf: Path,
     generated_images: list[Path],
+    preview: Path | None = None,
 ) -> list[tuple[str, Path]]:
     candidates = [
         ("family_upload", family_photo),
@@ -1988,6 +2046,8 @@ def _owned_guide_assets(
         ("trip_summary", summary),
         ("generated_guide", pdf),
     ]
+    if preview is not None:
+        candidates.append(("guide_preview", preview))
     candidates.extend(
         ("generated_landmark", path) for path in generated_images if request_id in path.parts
     )
@@ -2217,6 +2277,88 @@ def _lineart_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         return ImageFont.truetype("DejaVuSans.ttf", size)
     except OSError:
         return ImageFont.load_default()
+
+
+def generate_stylized_landmark_art(
+    destinations: list[Destination],
+    selected: list[str],
+    generator,
+    reference_images: dict[str, Path],
+) -> dict[str, Path]:
+    """Arte aquarela por ponto turistico, a partir da foto real, com cache global.
+
+    O arquivo devolvido mora em ``runtime/landmark-art`` (cache compartilhado
+    entre pedidos) e por isso fica fora dos assets "owned" do guia — a
+    retencao por pedido nunca apaga o cache.
+    """
+    if getattr(generator, "stylize_landmark_photo", None) is None:
+        return {}
+    selected_ids = set(selected)
+    jobs: list[tuple[str, str, Destination, Landmark, Path]] = []
+    for destination in destinations:
+        for landmark in destination.landmarks:
+            selection_id = f"{destination.id}:{landmark.id}"
+            if selection_id not in selected_ids:
+                continue
+            reference = reference_images.get(selection_id)
+            if not reference or not Path(reference).exists():
+                continue
+            cache_key = stylized_art_cache_key(destination, landmark)
+            jobs.append((selection_id, cache_key, destination, landmark, Path(reference)))
+
+    if not jobs:
+        return {}
+
+    stylized: dict[str, Path] = {}
+    pending: list[tuple[str, str, Destination, Landmark, Path]] = []
+    for selection_id, cache_key, destination, landmark, reference in jobs:
+        cached = load_cached_stylized_art(cache_key)
+        if cached is not None:
+            stylized[selection_id] = cached
+        else:
+            pending.append((selection_id, cache_key, destination, landmark, reference))
+
+    if not pending:
+        return stylized
+
+    max_workers = min(image_generation_concurrency(), len(pending))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(
+                _stylize_single_landmark,
+                generator,
+                cache_key,
+                landmark.name,
+                destination.city,
+                reference,
+            ): selection_id
+            for selection_id, cache_key, destination, landmark, reference in pending
+        }
+        for future in as_completed(futures):
+            selection_id = futures[future]
+            try:
+                stylized[selection_id] = future.result()
+            except Exception:  # noqa: BLE001 - arte estilizada e melhoria opcional
+                logger.exception("stylized landmark art failed for %s", selection_id)
+    return stylized
+
+
+def _stylize_single_landmark(
+    generator,
+    cache_key: str,
+    landmark_name: str,
+    city: str,
+    reference: Path,
+) -> Path:
+    output_path = local_cache_path(cache_key)
+    generator.stylize_landmark_photo(
+        reference_photo=reference,
+        output_path=output_path,
+        landmark_name=landmark_name,
+        city=city,
+    )
+    store_stylized_art(cache_key, output_path)
+    return output_path
 
 
 def generate_selected_landmark_art(

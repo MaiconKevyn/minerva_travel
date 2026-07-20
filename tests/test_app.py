@@ -1402,3 +1402,224 @@ def test_selected_landmark_art_generates_multiple_landmarks_concurrently(monkeyp
     assert len(images) == 2
     assert len(lineart_images) == 2
     assert max_active_image_generations == 2
+
+
+def test_api_generate_stylizes_custom_landmark_photo_with_global_cache(tmp_path, monkeypatch):
+    captured_images = []
+    stylize_calls = []
+    downloaded_image = tmp_path / "custom-images" / "eiffel.png"
+    downloaded_image.parent.mkdir(parents=True)
+    downloaded_image.write_bytes(TEST_FAMILY_PHOTO)
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
+            return output_path
+
+        def stylize_landmark_photo(self, reference_photo, output_path, landmark_name, city):
+            stylize_calls.append((reference_photo, landmark_name, city))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"stylized-art")
+            return output_path
+
+    def fake_write_pdf(context, output_path):
+        captured_images.extend(
+            landmark.image
+            for destination in context.destinations
+            for landmark in destination.landmarks
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"pdf")
+        return output_path
+
+    def fake_download_custom_images(destinations, selected, request_id, *, skip_selection_ids):
+        selection_id = f"{destinations[0].id}:{destinations[0].landmarks[0].id}"
+        return {selection_id: downloaded_image}
+
+    custom_landmarks = json.dumps(
+        [
+            {
+                "name": "Torre Eiffel",
+                "city": "Paris",
+                "country": "França",
+                "description": ["A torre mais famosa de Paris."],
+                "image": "https://lh3.googleusercontent.com/place-photo=w900",
+                "place_id": "ChIJLU7jZClu5kcR4PcOOO6p3I0",
+            }
+        ]
+    )
+
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", lambda *_: {})
+    monkeypatch.setattr(
+        "minerva_travel.app.download_custom_landmark_images",
+        fake_download_custom_images,
+    )
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setattr("minerva_travel.app.write_pdf", fake_write_pdf)
+    client = TestClient(app)
+
+    form = {
+        "title": "Guia de Paris",
+        "children_names": "Alice",
+        "parents_names": "Ana",
+        "year": "2026",
+        "custom_landmarks": custom_landmarks,
+    }
+
+    first = client.post(
+        "/api/generate",
+        data=form,
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
+    )
+
+    assert first.status_code == 200
+    assert len(stylize_calls) == 1
+    assert stylize_calls[0][0] == downloaded_image
+    expected_cache = (
+        tmp_path / "landmark-art" / "stylized" / "v1" / "chijlu7jzclu5kcr4pcooo6p3i0.png"
+    )
+    assert captured_images == [expected_cache]
+    assert expected_cache.read_bytes() == b"stylized-art"
+
+    # Segunda geracao do MESMO ponto: cache local atende, sem nova chamada de IA.
+    captured_images.clear()
+    second = client.post(
+        "/api/generate",
+        data=form,
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
+    )
+
+    assert second.status_code == 200
+    assert len(stylize_calls) == 1
+    assert captured_images == [expected_cache]
+
+
+def test_api_generate_skips_stylization_when_flag_disabled(tmp_path, monkeypatch):
+    downloaded_image = tmp_path / "custom-images" / "eiffel.png"
+    downloaded_image.parent.mkdir(parents=True)
+    downloaded_image.write_bytes(TEST_FAMILY_PHOTO)
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(b"cover")
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(b"summary")
+            return output_path
+
+        def stylize_landmark_photo(self, reference_photo, output_path, landmark_name, city):
+            raise AssertionError("stylization must stay disabled")
+
+    def fake_download_custom_images(destinations, selected, request_id, *, skip_selection_ids):
+        selection_id = f"{destinations[0].id}:{destinations[0].landmarks[0].id}"
+        return {selection_id: downloaded_image}
+
+    monkeypatch.setenv("LANDMARK_STYLIZED_ART", "false")
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.fetch_custom_wikimedia_assets", lambda *_: {})
+    monkeypatch.setattr(
+        "minerva_travel.app.download_custom_landmark_images",
+        fake_download_custom_images,
+    )
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setattr(
+        "minerva_travel.app.write_pdf",
+        lambda context, output_path: (
+            output_path.parent.mkdir(parents=True, exist_ok=True),
+            output_path.write_bytes(b"pdf"),
+            output_path,
+        )[-1],
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Guia de Paris",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "custom_landmarks": json.dumps(
+                [
+                    {
+                        "name": "Torre Eiffel",
+                        "city": "Paris",
+                        "country": "França",
+                        "image": "https://lh3.googleusercontent.com/place-photo=w900",
+                    }
+                ]
+            ),
+        },
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
+    )
+
+    assert response.status_code == 200
+
+
+def test_api_generate_saves_browser_preview_and_serves_it_to_the_owner(tmp_path, monkeypatch):
+    from io import BytesIO
+
+    from PIL import Image as PILImage
+
+    def _png_bytes(color: str) -> bytes:
+        buffer = BytesIO()
+        PILImage.new("RGB", (120, 90), color).save(buffer, format="PNG")
+        return buffer.getvalue()
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(_png_bytes("#4f86b7"))
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(_png_bytes("#69b482"))
+            return output_path
+
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setattr(
+        "minerva_travel.app.write_pdf",
+        lambda context, output_path: (
+            output_path.parent.mkdir(parents=True, exist_ok=True),
+            output_path.write_bytes(b"pdf"),
+            output_path,
+        )[-1],
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Guia de Paris",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "selected_landmarks": ["paris:eiffel-tower"],
+        },
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    request_id = payload["request_id"]
+    assert payload["preview_url"] == f"/guides/{request_id}/preview"
+
+    preview = client.get(payload["preview_url"])
+
+    assert preview.status_code == 200
+    assert preview.headers["content-type"].startswith("text/html")
+    assert preview.headers["cache-control"] == "private, no-store, max-age=0"
+    assert "guide-shell" in preview.text
+    assert "preview-mode" in preview.text
+    # A capa gerada aparece embutida; nenhum caminho local vaza para o HTML.
+    assert "data:image/" in preview.text
+    assert str(tmp_path) not in preview.text
+
+    missing = client.get("/guides/nao-existe/preview")
+    assert missing.status_code == 404

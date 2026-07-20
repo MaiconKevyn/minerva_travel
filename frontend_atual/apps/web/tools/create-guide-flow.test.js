@@ -128,3 +128,16 @@ test('review step offers restaurant recommendations under the explicit pilot con
   assert.match(review, /setRestaurantRecommendationsExtra/);
   assert.match(review, /restaurantRecommendationsExtra/);
 });
+
+test('success screen shows the canonical guide preview before the download', () => {
+  const api = readProjectFile('src/utils/minerva-api.js');
+  const review = readProjectFile('src/components/Step5Review.jsx');
+
+  assert.match(api, /fetchGuidePreviewHtml/);
+  assert.match(api, /safeGuidePreviewUrl/);
+  assert.match(review, /fetchGuidePreviewHtml/);
+  assert.match(review, /loadGuidePreview\(result\.preview_url\)/);
+  assert.match(review, /sandbox=""/);
+  assert.match(review, /srcDoc=\{previewHtml\}/);
+  assert.match(review, /Prévia do guia/);
+});

@@ -113,6 +113,7 @@ class GuideJobWorker:
             result_payload = {
                 "request_id": result["request_id"],
                 "download_url": result["download_url"],
+                "preview_url": result.get("preview_url"),
                 "filename": result["filename"],
                 "cover_status": result["cover_status"],
             }

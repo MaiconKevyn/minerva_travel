@@ -501,6 +501,10 @@ export const appendGuideLandmarks = (formData, guideData) => {
         if (landmark.image_attributions?.length > 0) {
           payload.image_attributions = landmark.image_attributions;
         }
+        if (landmark.place_id) {
+          // Chave do cache global de arte estilizada no backend.
+          payload.place_id = landmark.place_id;
+        }
         return payload;
       })
     );
@@ -806,6 +810,34 @@ export const downloadGuidePdf = async (downloadUrl, { signal } = {}) => {
     blob: await response.blob(),
     filename: downloadFilename(response, resolvedUrl),
   };
+};
+
+const safeGuidePreviewUrl = (previewUrl) => {
+  const browserOrigin = globalThis.location?.origin || DEFAULT_API_BASE_URL;
+  const baseUrl = new URL(
+    `${apiBaseUrl().replace(/\/$/, '')}/`,
+    `${browserOrigin.replace(/\/$/, '')}/`,
+  );
+  const resolvedUrl = new URL(String(previewUrl || ''), baseUrl);
+  const validPath = /^\/guides\/[A-Za-z0-9-]+\/preview$/.test(resolvedUrl.pathname);
+  if (resolvedUrl.origin !== baseUrl.origin || !validPath) {
+    throw new Error('Link de prévia inválido.');
+  }
+  return resolvedUrl.toString();
+};
+
+export const fetchGuidePreviewHtml = async (previewUrl, { signal } = {}) => {
+  const resolvedUrl = safeGuidePreviewUrl(previewUrl);
+  const response = await authenticatedFetch(resolvedUrl, {
+    headers: { Accept: 'text/html' },
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível carregar a prévia'));
+  }
+
+  return response.text();
 };
 
 export const fetchCatalog = async () => {

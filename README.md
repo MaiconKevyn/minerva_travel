@@ -216,6 +216,7 @@ Backend `.env`:
 ```env
 IMAGE_PROVIDER=replicate
 LANDMARK_ART_GENERATION=false
+LANDMARK_STYLIZED_ART=true
 COLORING_LINEART_GENERATION=true
 IMAGE_GENERATION_CONCURRENCY=2
 REPLICATE_API_TOKEN=sua_chave_aqui
@@ -250,6 +251,14 @@ processados em paralelo. A lineart premium e gerada como desenho editorial
 limpo a partir do nome/local do ponto turistico, sem tracar a foto de
 referencia, para evitar ruido fotografico e manter uma pagina realmente boa
 para criancas colorirem.
+
+`LANDMARK_STYLIZED_ART=true` transforma a foto real de cada ponto turistico
+em ilustracao aquarela (flux-kontext) antes de montar o PDF, preservando a
+arquitetura verdadeira do lugar. A arte e gerada uma unica vez por ponto no
+mundo: o resultado fica em cache por `place_id` em `runtime/landmark-art/`
+(camada local) e no bucket `landmark-assets` (camada duravel compartilhada),
+com prefixo de versao de estilo (`stylized/v1/...`) para invalidar quando o
+prompt visual mudar.
 
 `COLORING_LINEART_GENERATION=true` mantem a lineart premium ativa para pontos
 personalizados/dinamicos mesmo quando `LANDMARK_ART_GENERATION=false`. Isso evita

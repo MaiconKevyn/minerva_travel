@@ -26,3 +26,4 @@ frontend_atual/apps/api/
 frontend_atual/apps/pocketbase/
 frontend_atual/apps/web/test-results/
 frontend_atual/apps/web/playwright-report/
+.DS_Store

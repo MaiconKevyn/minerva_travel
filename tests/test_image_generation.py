@@ -411,3 +411,32 @@ def test_family_cover_fallback_preserves_sanitized_family_photo(tmp_path):
     with Image.open(output) as cover:
         assert cover.size == (1200, 1600)
         assert cover.convert("RGB").getpixel((600, 500)) == (144, 196, 223)
+
+
+def test_placeholder_stylize_landmark_photo_keeps_local_and_free(tmp_path):
+    reference = tmp_path / "reference.png"
+    Image.new("RGB", (900, 600), "#4f86b7").save(reference)
+    output = tmp_path / "stylized.png"
+
+    generator = PlaceholderImageGenerator()
+    result = generator.stylize_landmark_photo(
+        reference_photo=reference,
+        output_path=output,
+        landmark_name="Torre Eiffel",
+        city="Paris",
+    )
+
+    assert result == output
+    with Image.open(output) as stylized:
+        assert stylized.size == (1200, 900)
+
+
+def test_landmark_stylize_prompt_demands_faithful_architecture():
+    from minerva_travel.image_generation import landmark_stylize_prompt
+
+    prompt = landmark_stylize_prompt(landmark_name="Tower Bridge", city="Londres")
+
+    assert "watercolor" in prompt
+    assert "Preserve the real architecture" in prompt
+    assert "Tower Bridge in Londres" in prompt
+    assert "No text" in prompt
