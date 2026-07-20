@@ -1069,6 +1069,11 @@ export const createGuideBuilder = async (guideData) => {
   return response.json();
 };
 
+export const fetchGuideBuilderSession = async (sessionId) =>
+  builderRequest(`/api/guide-builder/${encodeURIComponent(sessionId)}`, {
+    method: 'GET',
+  });
+
 export const generateBuilderPageAttempt = async (
   sessionId,
   pageId,

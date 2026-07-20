@@ -979,6 +979,11 @@
             "title": "Pages",
             "type": "array"
           },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
           "session_id": {
             "title": "Session Id",
             "type": "string"
@@ -993,6 +998,7 @@
           "created_at",
           "expires_at",
           "title",
+          "revision",
           "is_complete",
           "pages"
         ],

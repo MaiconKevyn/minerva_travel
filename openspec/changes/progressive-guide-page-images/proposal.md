@@ -6,10 +6,13 @@ The first experiment must also validate the current OpenAI image model's ability
 
 ## What Changes
 
-- Replace the current automatic block generation experience with an ordered page-generation workflow.
+- Replace the current automatic block generation experience with a stable ordered page plan whose
+  pages can be generated and reviewed independently.
 - Generate a complete vertical PNG for each page, including its required visible text, using the OpenAI Image API.
 - Start with the cover and illustrated trip summary, while representing subsequent guide pages through the same ordered page contract.
 - Require an explicit user action to generate, approve, or regenerate each page.
+- Let the family open and generate any eligible page without changing its fixed position in the
+  guide, including running generation for different pages concurrently.
 - Let the user describe what should change in a regeneration, using the selected attempt as a
   visual reference; when the field is empty, request a visibly different alternative instead of
   repeating the same composition.

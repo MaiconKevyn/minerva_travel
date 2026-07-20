@@ -114,7 +114,7 @@ test('restored activity step keeps the no-optional path and mandatory memory vis
   await page.goto('/create');
 
   await expect(page.getByRole('heading', { name: 'Atividades da aventura' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Minha melhor memória' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Minha melhor memória' })).toBeVisible();
   await expect(page.getByText('0 de 8 páginas opcionais')).toBeVisible();
   await page.getByRole('button', { name: 'Continuar sem atividades opcionais' }).click();
   await expect(page.getByRole('heading', { name: /Escolha a foto de capa do PDF/ })).toBeVisible();
@@ -148,12 +148,14 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   let memorySelected = null;
   let memoryApproved = false;
   let pdfExportRequests = 0;
+  let sessionRevision = 0;
 
   const sessionPayload = () => ({
     session_id: 'syntheticsession',
     created_at: '2026-07-20T00:00:00+00:00',
     expires_at: '2026-08-03T00:00:00+00:00',
     title: 'Família Aurora',
+    revision: ++sessionRevision,
     active_page_id: !coverApproved
       ? 'cover'
       : !summaryApproved
@@ -361,6 +363,9 @@ test('family reviews pages and controls family inclusion on a landmark', async (
       const includeFamily = requestPayload.include_family === true;
       landmarkFamilyRequests.push(includeFamily);
       const next = landmarkAttempts.length + 1;
+      if (next === 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
       landmarkAttempts = [
         ...landmarkAttempts,
         attempt(
@@ -482,8 +487,17 @@ test('family reviews pages and controls family inclusion on a landmark', async (
 
   await page.getByRole('button', { name: 'Começar pelas páginas' }).click();
   await expect(page.getByText('Nenhuma imagem gerada ainda')).toBeVisible();
+
+  await page.getByRole('button', { name: /Torre Eiffel, França/ }).click();
+  await page.getByRole('button', { name: 'Gerar página' }).click();
+  await expect(page.getByRole('button', { name: 'Gerando esta página...' })).toBeVisible();
+  await page.getByRole('button', { name: /Capa da família/ }).click();
   await page.getByRole('button', { name: 'Gerar página' }).click();
   await expect(page.getByAltText('Versão escolhida de Capa da família')).toBeVisible();
+  await page.getByRole('button', { name: /Torre Eiffel, França/ }).click();
+  await expect(page.getByAltText('Versão escolhida de Torre Eiffel, França')).toBeVisible();
+  await expect(page.getByText('Sem família', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /Capa da família/ }).click();
   const revisionField = page.getByLabel('O que você quer mudar nesta versão?');
   await expect(revisionField).toBeVisible();
   await revisionField.fill('Mude para animação 3D, com tons azuis e título menor.');
@@ -505,42 +519,41 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   expect(consoleErrors.some((message) => message.includes('502 (Bad Gateway)'))).toBe(true);
   consoleErrors.length = 0;
   await page.locator('button').filter({ hasText: 'Versão 1' }).click();
-  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+  await page.getByRole('button', { name: 'Aprovar página' }).click();
 
   await expect(page.getByRole('heading', { name: 'Nosso roteiro ilustrado' })).toBeVisible();
   await expect(page.getByText('Torre Eiffel', { exact: true })).toBeVisible();
   await expect(page.getByText('Coliseu', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Gerar página' }).click();
-  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+  await page.getByRole('button', { name: 'Aprovar página' }).click();
 
   await expect(page.getByRole('heading', { name: 'Torre Eiffel, França' })).toBeVisible();
   const includeFamilySwitch = page.getByRole('switch', { name: 'Incluir família' });
   await expect(includeFamilySwitch).not.toBeChecked();
-  await page.getByRole('button', { name: 'Gerar página' }).click();
   await expect(page.getByText('Sem família', { exact: true })).toBeVisible();
   await includeFamilySwitch.click();
   await expect(includeFamilySwitch).toBeChecked();
   await page.getByRole('button', { name: 'Gerar outra versão' }).click();
   await expect(page.getByText('Com família', { exact: true })).toBeVisible();
   expect(landmarkFamilyRequests).toEqual([false, true]);
-  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+  await page.getByRole('button', { name: 'Aprovar página' }).click();
 
   await expect(page.getByRole('heading', { name: 'Página para colorir — Torre Eiffel' })).toBeVisible();
   await expect(page.getByText('Ligada a Torre Eiffel')).toBeVisible();
   await expect(page.getByRole('switch', { name: 'Incluir família' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Gerar página' }).click();
-  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+  await page.getByRole('button', { name: 'Aprovar página' }).click();
 
   await expect(page.getByRole('heading', { name: 'Caça-palavras — Torre Eiffel' })).toBeVisible();
   await expect(page.getByRole('switch', { name: 'Incluir família' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Gerar página' }).click();
-  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+  await page.getByRole('button', { name: 'Aprovar página' }).click();
 
   await expect(page.getByRole('heading', { name: 'Minha melhor memória' })).toBeVisible();
   await expect(page.locator('section span').getByText('Página obrigatória', { exact: true })).toBeVisible();
   await expect(page.getByRole('switch', { name: 'Incluir família' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Gerar página' }).click();
-  await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
+  await page.getByRole('button', { name: 'Aprovar página' }).click();
   expect(activityRequestBodies).toHaveLength(3);
   expect(activityRequestBodies.every((body) => body.include_family === false)).toBe(true);
   await page.getByRole('button', { name: 'Ver páginas aprovadas' }).click();

@@ -179,6 +179,7 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(api, /generateBuilderPdf/);
   assert.match(api, /downloadGuidePdf/);
   assert.match(api, /fetchBuilderAssetObjectUrl/);
+  assert.match(api, /fetchGuideBuilderSession/);
   assert.match(api, /Idempotency-Key/);
   assert.match(review, /GuideAssembly/);
   assert.doesNotMatch(review, /legacyGenerate/);
@@ -192,9 +193,16 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(api, /include_family: includeFamily/);
   assert.match(assembly, /Incluir família/);
   assert.match(assembly, /activePage\.kind === 'landmark'/);
-  assert.match(assembly, /setIncludeFamily\(false\)/);
+  assert.match(assembly, /selectedPageId/);
+  assert.match(assembly, /setSelectedPageId\(page\.id\)/);
+  assert.match(assembly, /aria-current=\{isSelected \? 'page'/);
+  assert.match(assembly, /pageBusyActions/);
+  assert.match(assembly, /revisionInstructions/);
+  assert.match(assembly, /includeFamilyByPage/);
+  assert.match(assembly, /nextSession\.revision/);
+  assert.match(assembly, /Você pode abrir outra página e iniciar uma nova geração/);
   assert.match(assembly, /attempt\.include_family \? 'Com família' : 'Sem família'/);
-  assert.match(assembly, /Aprovar e continuar/);
+  assert.match(assembly, /Aprovar página/);
   assert.match(assembly, /Ver páginas aprovadas/);
   assert.match(assembly, /Gerar PDF e baixar/);
   assert.match(assembly, /Baixar PDF novamente/);

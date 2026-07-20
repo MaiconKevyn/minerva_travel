@@ -84,3 +84,11 @@
 - [x] 11.3 Add the final `Gerar PDF e baixar` UI action with progress, retry, and repeat-download states.
 - [x] 11.4 Add compositor, API/security, frontend-contract, and browser lifecycle coverage.
 - [x] 11.5 Render and visually inspect a synthetic multi-page PDF, run complete validation, and publish `main` and `hostinger-frontend`.
+
+## 12. Independent Parallel Page Generation
+
+- [x] 12.1 Separate fixed guide/PDF position from generation and approval order, preserving explicit reference dependencies.
+- [x] 12.2 Make persisted session mutations revisioned and allow concurrent reservations for different pages while blocking duplicates on one page.
+- [x] 12.3 Make every page in step 6 selectable and scope loading, errors, revision feedback, family choice, and idempotency by page.
+- [x] 12.4 Add backend concurrency/order and frontend navigation/state contract coverage.
+- [ ] 12.5 Run complete verification and publish `main` and `hostinger-frontend`.

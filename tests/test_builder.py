@@ -6,6 +6,7 @@ import pytest
 from minerva_travel.builder import (
     BuilderAttemptInProgress,
     BuilderPage,
+    approve_page_attempt,
     cleanup_expired_builder_sessions,
     commit_page_attempt,
     create_builder_session,
@@ -68,6 +69,47 @@ def test_idempotent_replay_does_not_change_the_selected_version(tmp_path, monkey
     assert replayed_id == first_id
     assert replayed is True
     assert session.page("cover").selected_attempt_id == second_id
+
+
+def test_different_pages_can_be_reserved_and_approved_out_of_generation_order(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    photo = tmp_path / "family.png"
+    photo.write_bytes(b"private-photo")
+    cover = _page()
+    landmark = BuilderPage(
+        id="landmark-1",
+        kind="landmark",
+        title="Torre Eiffel",
+        position=3,
+        required_copy=["Torre Eiffel"],
+    )
+    session = create_builder_session(
+        owner_id="owner",
+        form={"title": "Família Teste"},
+        photo_path=photo,
+        pages=[landmark, cover],
+        privacy_consent=None,
+    )
+
+    landmark_attempt, _ = reserve_page_attempt(session, "landmark-1", "landmark-first")
+    cover_attempt, _ = reserve_page_attempt(session, "cover", "cover-second")
+    assert session.page("landmark-1").status == "generating"
+    assert session.page("cover").status == "generating"
+
+    commit_page_attempt(session, "landmark-1", landmark_attempt, "landmark-1.png")
+    approve_page_attempt(session, "landmark-1", landmark_attempt)
+    commit_page_attempt(session, "cover", cover_attempt, "cover-1.png")
+    approve_page_attempt(session, "cover", cover_attempt)
+
+    payload = session.public_payload()
+    assert [page["id"] for page in payload["pages"]] == ["cover", "landmark-1"]
+    assert [page["page_id"] for page in session.approved_manifest()] == [
+        "cover",
+        "landmark-1",
+    ]
+    assert payload["revision"] >= 5
 
 
 def test_expired_cleanup_removes_manifest_photo_and_generated_assets(tmp_path, monkeypatch):

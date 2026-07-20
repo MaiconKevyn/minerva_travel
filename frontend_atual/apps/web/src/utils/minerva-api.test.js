@@ -1045,6 +1045,13 @@ test('builder PDF export and download stay on authenticated owner-scoped routes'
     calls.push({ url: String(url), options });
     const pathname = new URL(String(url)).pathname;
     const method = options.method || 'GET';
+    if (pathname === '/api/guide-builder/session123' && method === 'GET') {
+      return new Response(JSON.stringify({
+        session_id: 'session123',
+        revision: 7,
+        pages: [],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     if (pathname === '/api/guide-builder/session123/pdf' && method === 'POST') {
       return new Response(JSON.stringify({
         session_id: 'session123',
@@ -1066,14 +1073,17 @@ test('builder PDF export and download stay on authenticated owner-scoped routes'
   };
 
   try {
+    const session = await minervaApi.fetchGuideBuilderSession('session123');
     const exported = await minervaApi.generateBuilderPdf('session123');
     const download = await minervaApi.downloadGuidePdf(exported.download_url);
+    assert.equal(session.revision, 7);
     assert.equal(exported.page_count, 3);
     assert.equal(await download.blob.text(), '%PDF-builder');
     assert.equal(download.filename, 'familia-aurora-minerva-travel.pdf');
     assert.deepEqual(
       calls.map(({ url, options }) => [new URL(url).pathname, options.method || 'GET']),
       [
+        ['/api/guide-builder/session123', 'GET'],
         ['/api/guide-builder/session123/pdf', 'POST'],
         ['/guide-builder/session123/pdf', 'GET'],
       ],

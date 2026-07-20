@@ -1,6 +1,8 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
+from threading import Barrier
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -162,7 +164,9 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
     assert "Torre Eiffel" in created["pages"][1]["required_copy"]
     assert "Coliseu" in created["pages"][1]["required_copy"]
 
-    assert _generate(client, session_id, "summary", "summary-early").status_code == 409
+    early_summary = _generate(client, session_id, "summary", "summary-early")
+    assert early_summary.status_code == 409
+    assert early_summary.json()["detail"]["code"] == "page_dependency_missing"
     assert generator.calls == []
 
     first = _generate(client, session_id, "cover", "cover-request-1")
@@ -269,6 +273,73 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
     missing_page = client.post(f"/api/guide-builder/{session_id}/pdf")
     assert missing_page.status_code == 409
     assert missing_page.json()["detail"]["code"] == "builder_approved_asset_missing"
+
+
+def test_independent_pages_generate_concurrently_without_changing_guide_order(
+    tmp_path, monkeypatch
+):
+    client, generator = _setup(monkeypatch, tmp_path)
+    created = _create_session(client)
+    session_id = created["session_id"]
+    initial_order = [page["id"] for page in created["pages"]]
+    barrier = Barrier(2)
+    original_destination = generator.generate_destination_intro_page
+    original_landmark = generator.generate_landmark_page
+    configured_concurrency: list[int] = []
+
+    def wait_then_destination(**kwargs):
+        barrier.wait(timeout=5)
+        return original_destination(**kwargs)
+
+    def wait_then_landmark(**kwargs):
+        barrier.wait(timeout=5)
+        return original_landmark(**kwargs)
+
+    def admit_without_external_control(**kwargs):
+        configured_concurrency.append(kwargs["default_user_concurrency"])
+        return None
+
+    generator.generate_destination_intro_page = wait_then_destination
+    generator.generate_landmark_page = wait_then_landmark
+    monkeypatch.setattr(
+        "minerva_travel.app.admit_expensive_request",
+        admit_without_external_control,
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        destination_future = pool.submit(
+            _generate,
+            client,
+            session_id,
+            "destination-1",
+            "destination-parallel",
+        )
+        landmark_future = pool.submit(
+            _generate,
+            client,
+            session_id,
+            "landmark-1",
+            "landmark-parallel",
+        )
+        destination = destination_future.result(timeout=10)
+        landmark = landmark_future.result(timeout=10)
+
+    assert destination.status_code == 200, destination.text
+    assert landmark.status_code == 200, landmark.text
+    latest = client.get(f"/api/guide-builder/{session_id}").json()
+    assert [page["id"] for page in latest["pages"]] == initial_order
+    assert latest["active_page_id"] == "cover"
+    assert configured_concurrency == [4, 4]
+    assert latest["revision"] > created["revision"]
+
+    for page_id in ("landmark-1", "destination-1"):
+        page = next(item for item in latest["pages"] if item["id"] == page_id)
+        approved = _approve(client, session_id, page_id, page["selected_attempt_id"])
+        assert approved.status_code == 200, approved.text
+
+    approved_out_of_order = client.get(f"/api/guide-builder/{session_id}").json()
+    assert approved_out_of_order["active_page_id"] == "cover"
+    assert [page["id"] for page in approved_out_of_order["pages"]] == initial_order
 
 
 def test_page_attempt_limit_is_checked_before_provider_call(tmp_path, monkeypatch):

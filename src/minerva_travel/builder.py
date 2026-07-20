@@ -36,6 +36,10 @@ class BuilderPageOutOfOrder(Exception):
     pass
 
 
+class BuilderPageDependencyMissing(Exception):
+    pass
+
+
 class BuilderAttemptNotFound(Exception):
     pass
 
@@ -101,12 +105,16 @@ class BuilderSession:
     photo_filename: str
     pages: list[BuilderPage]
     privacy_consent: dict[str, Any] | None = None
+    revision: int = 0
 
     def page(self, page_id: str) -> BuilderPage | None:
         return next((page for page in self.pages if page.id == page_id), None)
 
     def active_page(self) -> BuilderPage | None:
-        return next((page for page in self.pages if page.approved_at is None), None)
+        return next((page for page in self.ordered_pages() if page.approved_at is None), None)
+
+    def ordered_pages(self) -> list[BuilderPage]:
+        return sorted(self.pages, key=lambda page: (page.position, page.id))
 
     @property
     def is_complete(self) -> bool:
@@ -126,14 +134,15 @@ class BuilderSession:
             "created_at": self.created_at,
             "expires_at": self.expires_at,
             "title": self.form.get("title", ""),
+            "revision": self.revision,
             "active_page_id": active_page.id if active_page else None,
             "is_complete": self.is_complete,
-            "pages": [self._page_payload(page) for page in self.pages],
+            "pages": [self._page_payload(page) for page in self.ordered_pages()],
         }
 
     def approved_manifest(self) -> list[dict[str, Any]]:
         manifest: list[dict[str, Any]] = []
-        for page in self.pages:
+        for page in self.ordered_pages():
             attempt = page.selected_attempt()
             if not page.approved_at or attempt is None:
                 raise BuilderIncomplete(self.id)
@@ -155,7 +164,7 @@ class BuilderSession:
         self.approved_manifest()
         return [
             attempt.filename
-            for page in self.pages
+            for page in self.ordered_pages()
             if (attempt := page.selected_attempt()) is not None
         ]
 
@@ -240,6 +249,7 @@ def save_builder_session(session: BuilderSession) -> None:
     path = builder_sessions_dir() / f"{session.id}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".json.tmp")
+    session.revision += 1
     temporary.write_text(json.dumps(asdict(session), ensure_ascii=False), encoding="utf-8")
     temporary.replace(path)
 
@@ -268,6 +278,7 @@ def _load_builder_session(session_id: str) -> BuilderSession:
             form=payload["form"],
             photo_filename=payload["photo_filename"],
             privacy_consent=payload.get("privacy_consent"),
+            revision=int(payload.get("revision", 0)),
             pages=[
                 BuilderPage(
                     **{
@@ -298,7 +309,7 @@ def reserve_page_attempt(
     for attempt in page.attempts:
         if attempt.idempotency_key == idempotency_key:
             return attempt.id, True
-    if session.active_page() is not page:
+    if page.approved_at:
         raise BuilderPageOutOfOrder(page_id)
     if page.pending_attempt_id:
         raise BuilderAttemptInProgress(page_id)
@@ -366,8 +377,10 @@ def select_page_attempt(session: BuilderSession, page_id: str, attempt_id: str) 
 
 def approve_page_attempt(session: BuilderSession, page_id: str, attempt_id: str | None) -> None:
     page = session.page(page_id)
-    if page is None or session.active_page() is not page:
+    if page is None or page.approved_at:
         raise BuilderPageOutOfOrder(page_id)
+    if page.pending_attempt_id:
+        raise BuilderAttemptInProgress(page_id)
     selected = attempt_id or page.selected_attempt_id
     if not selected or not any(attempt.id == selected for attempt in page.attempts):
         raise BuilderAttemptNotFound(selected or "")

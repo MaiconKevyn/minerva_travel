@@ -19,6 +19,7 @@ import {
   createIdempotencyKey,
   downloadGuidePdf,
   fetchBuilderAssetObjectUrl,
+  fetchGuideBuilderSession,
   generateBuilderPdf,
   generateBuilderPageAttempt,
   selectBuilderPageAttempt,
@@ -58,12 +59,17 @@ const saveBlob = (blob, filename) => {
 
 const GuideAssembly = ({ session: initialSession }) => {
   const [session, setSession] = useState(initialSession);
+  const [selectedPageId, setSelectedPageId] = useState(
+    initialSession.active_page_id || initialSession.pages[0]?.id || '',
+  );
   const [assetUrls, setAssetUrls] = useState({});
   const [assetLoadErrors, setAssetLoadErrors] = useState({});
+  const [pageBusyActions, setPageBusyActions] = useState({});
+  const [pageErrors, setPageErrors] = useState({});
+  const [revisionInstructions, setRevisionInstructions] = useState({});
+  const [includeFamilyByPage, setIncludeFamilyByPage] = useState({});
   const [busyAction, setBusyAction] = useState('');
   const [actionError, setActionError] = useState('');
-  const [revisionInstruction, setRevisionInstruction] = useState('');
-  const [includeFamily, setIncludeFamily] = useState(false);
   const [completion, setCompletion] = useState(null);
   const [pdfExport, setPdfExport] = useState(null);
   const objectUrlsRef = useRef(new Set());
@@ -122,9 +128,16 @@ const GuideAssembly = ({ session: initialSession }) => {
   }, [hydrateAssets, initialSession]);
 
   const activePage = useMemo(
-    () => session.pages.find((page) => page.id === session.active_page_id) || null,
-    [session],
+    () => session.pages.find((page) => page.id === selectedPageId)
+      || session.pages.find((page) => page.id === session.active_page_id)
+      || session.pages[0]
+      || null,
+    [selectedPageId, session],
   );
+  const activePageBusyAction = activePage ? pageBusyActions[activePage.id] || '' : '';
+  const activePageError = activePage ? pageErrors[activePage.id] || '' : '';
+  const revisionInstruction = activePage ? revisionInstructions[activePage.id] || '' : '';
+  const includeFamily = activePage ? includeFamilyByPage[activePage.id] || false : false;
   const selectedAttempt = activePage?.attempts.find(
     (attempt) => attempt.id === activePage.selected_attempt_id,
   );
@@ -134,76 +147,135 @@ const GuideAssembly = ({ session: initialSession }) => {
     : '';
 
   useEffect(() => {
-    setRevisionInstruction('');
-    setIncludeFamily(false);
-  }, [activePage?.id]);
+    if (!session.pages.some((page) => page.id === selectedPageId)) {
+      setSelectedPageId(session.active_page_id || session.pages[0]?.id || '');
+    }
+  }, [selectedPageId, session.active_page_id, session.pages]);
+
+  const applySession = useCallback(async (nextSession) => {
+    setSession((current) => (
+      Number(nextSession.revision || 0) > Number(current.revision || 0)
+        ? nextSession
+        : current
+    ));
+    await hydrateAssets(nextSession);
+    return nextSession;
+  }, [hydrateAssets]);
 
   const updateSession = async (operation) => {
     const nextSession = await operation();
-    setSession(nextSession);
-    await hydrateAssets(nextSession);
-    return nextSession;
+    return applySession(nextSession);
+  };
+
+  useEffect(() => {
+    if (!session.pages.some((page) => page.status === 'generating')) return undefined;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const latest = await fetchGuideBuilderSession(session.session_id);
+        if (!cancelled) await applySession(latest);
+      } catch (error) {
+        console.error('Erro ao atualizar páginas em geração:', error);
+      }
+    };
+    const timer = window.setInterval(refresh, 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [applySession, session.pages, session.session_id]);
+
+  const setPageBusy = (pageId, action) => {
+    setPageBusyActions((current) => {
+      const next = { ...current };
+      if (action) next[pageId] = action;
+      else delete next[pageId];
+      return next;
+    });
+  };
+
+  const setPageError = (pageId, message) => {
+    setPageErrors((current) => ({ ...current, [pageId]: message }));
   };
 
   const handleGenerate = async () => {
-    if (!activePage) return;
-    setBusyAction('generate');
-    setActionError('');
-    const key = generationKeysRef.current[activePage.id] || createIdempotencyKey();
-    generationKeysRef.current[activePage.id] = key;
-    const requestedRevision = revisionInstruction.trim();
+    if (
+      !activePage
+      || pageBusyActions[activePage.id]
+      || activePage.status === 'generating'
+      || activePage.approved_at
+    ) return;
+    const page = activePage;
+    setPageBusy(page.id, 'generate');
+    setPageError(page.id, '');
+    const key = generationKeysRef.current[page.id] || createIdempotencyKey();
+    generationKeysRef.current[page.id] = key;
+    const requestedRevision = (revisionInstructions[page.id] || '').trim();
     try {
       await updateSession(() =>
         generateBuilderPageAttempt(
           session.session_id,
-          activePage.id,
+          page.id,
           key,
           requestedRevision,
-          activePage.kind === 'landmark' && includeFamily,
+          page.kind === 'landmark' && Boolean(includeFamilyByPage[page.id]),
         ),
       );
-      delete generationKeysRef.current[activePage.id];
-      setRevisionInstruction('');
-      toast.success(`${activePage.title} gerada. Confira todos os textos antes de aprovar.`);
+      delete generationKeysRef.current[page.id];
+      setRevisionInstructions((current) => ({ ...current, [page.id]: '' }));
+      toast.success(`${page.title} gerada. Confira todos os textos antes de aprovar.`);
     } catch (error) {
-      setActionError(error.message || 'Não foi possível gerar esta página.');
+      setPageError(page.id, error.message || 'Não foi possível gerar esta página.');
     } finally {
-      setBusyAction('');
+      setPageBusy(page.id, '');
     }
   };
 
   const handleSelect = async (attemptId) => {
-    if (!activePage || busyAction) return;
-    setBusyAction('select');
-    setActionError('');
+    if (
+      !activePage
+      || pageBusyActions[activePage.id]
+      || activePage.status === 'generating'
+      || activePage.approved_at
+    ) return;
+    const page = activePage;
+    setPageBusy(page.id, 'select');
+    setPageError(page.id, '');
     try {
       await updateSession(() =>
-        selectBuilderPageAttempt(session.session_id, activePage.id, attemptId),
+        selectBuilderPageAttempt(session.session_id, page.id, attemptId),
       );
     } catch (error) {
-      setActionError(error.message || 'Não foi possível escolher esta versão.');
+      setPageError(page.id, error.message || 'Não foi possível escolher esta versão.');
     } finally {
-      setBusyAction('');
+      setPageBusy(page.id, '');
     }
   };
 
   const handleApprove = async () => {
-    if (!activePage?.selected_attempt_id) return;
-    setBusyAction('approve');
-    setActionError('');
+    if (
+      !activePage?.selected_attempt_id
+      || pageBusyActions[activePage.id]
+      || activePage.status === 'generating'
+      || activePage.approved_at
+    ) return;
+    const page = activePage;
+    setPageBusy(page.id, 'approve');
+    setPageError(page.id, '');
     try {
-      await updateSession(() =>
+      const nextSession = await updateSession(() =>
         approveBuilderPage(
           session.session_id,
-          activePage.id,
-          activePage.selected_attempt_id,
+          page.id,
+          page.selected_attempt_id,
         ),
       );
-      toast.success(`${activePage.title} aprovada.`);
+      setSelectedPageId(nextSession.active_page_id || page.id);
+      toast.success(`${page.title} aprovada.`);
     } catch (error) {
-      setActionError(error.message || 'Não foi possível aprovar esta página.');
+      setPageError(page.id, error.message || 'Não foi possível aprovar esta página.');
     } finally {
-      setBusyAction('');
+      setPageBusy(page.id, '');
     }
   };
 
@@ -312,32 +384,53 @@ const GuideAssembly = ({ session: initialSession }) => {
         </p>
         <ol className="space-y-3">
           {session.pages.map((page) => {
-            const isActive = page.id === session.active_page_id;
+            const isSelected = page.id === activePage?.id;
+            const isRecommended = page.id === session.active_page_id;
+            const pageBusyAction = pageBusyActions[page.id];
             return (
-              <li
-                key={page.id}
-                className={`rounded-2xl border px-4 py-3 text-left ${
-                  isActive ? 'border-primary bg-primary/5' : 'border-border/60'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                    page.status === 'approved' ? 'bg-secondary text-white' : 'bg-muted text-foreground'
-                  }`}>
-                    {page.status === 'approved' ? <Check className="h-4 w-4" /> : page.position}
-                  </span>
-                  <div>
-                    <p className="font-bold text-foreground">{page.title}</p>
-                    <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-primary">
-                      {page.kind === 'landmark_activity' && page.metadata?.activity_label
-                        ? page.metadata.activity_label
-                        : PAGE_KIND_LABELS[page.kind]}
-                    </p>
-                    <p className="mt-1 text-xs font-medium text-muted-foreground">
-                      {STATUS_LABELS[page.status]}
-                    </p>
+              <li key={page.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPageId(page.id)}
+                  aria-current={isSelected ? 'page' : undefined}
+                  className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
+                    isSelected
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-border/60 hover:border-primary/40 hover:bg-muted/40'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                      page.status === 'approved' ? 'bg-secondary text-white' : 'bg-muted text-foreground'
+                    }`}>
+                      {page.status === 'approved' ? (
+                        <Check className="h-4 w-4" />
+                      ) : pageBusyAction === 'generate' || page.status === 'generating' ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      ) : (
+                        page.position
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-foreground">{page.title}</p>
+                      <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-primary">
+                        {page.kind === 'landmark_activity' && page.metadata?.activity_label
+                          ? page.metadata.activity_label
+                          : PAGE_KIND_LABELS[page.kind]}
+                      </p>
+                      <p className="mt-1 text-xs font-medium text-muted-foreground">
+                        {pageBusyAction === 'generate'
+                          ? STATUS_LABELS.generating
+                          : STATUS_LABELS[page.status]}
+                      </p>
+                      {isRecommended && page.status !== 'approved' && (
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-secondary">
+                          Próxima pendente
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </button>
               </li>
             );
           })}
@@ -347,11 +440,11 @@ const GuideAssembly = ({ session: initialSession }) => {
       <section className="space-y-6">
         <div className="space-y-3 text-center lg:text-left">
           <h2 className="text-3xl font-serif font-bold text-foreground md:text-4xl">
-            Gere e confira cada página
+            Gere e confira na ordem que preferir
           </h2>
           <p className="text-lg font-medium text-muted-foreground">
-            A próxima página só é gerada quando você pedir. Confira ilustração, nomes e datas
-            diretamente na imagem antes de aprovar.
+            Clique em qualquer página do guia. Você pode iniciar outra geração enquanto uma já
+            está em andamento; a sequência final continuará seguindo a numeração ao lado.
           </p>
         </div>
 
@@ -414,7 +507,7 @@ const GuideAssembly = ({ session: initialSession }) => {
                   />
                 ) : (
                   <div className="flex min-h-[520px] flex-col items-center justify-center gap-4 px-6 text-center text-muted-foreground">
-                    {busyAction === 'generate' ? (
+                    {activePageBusyAction === 'generate' || activePage.status === 'generating' ? (
                       <>
                         <Loader2 className="h-10 w-10 animate-spin text-primary" />
                         <p className="font-bold text-foreground">Gerando a página completa...</p>
@@ -456,7 +549,11 @@ const GuideAssembly = ({ session: initialSession }) => {
                           <button
                             key={attempt.id}
                             type="button"
-                            disabled={Boolean(busyAction)}
+                            disabled={
+                              Boolean(activePageBusyAction)
+                              || activePage.status === 'generating'
+                              || Boolean(activePage.approved_at)
+                            }
                             onClick={() => handleSelect(attempt.id)}
                             className={`relative overflow-hidden rounded-2xl border-4 ${
                               selected ? 'border-primary' : 'border-transparent hover:border-primary/40'
@@ -493,7 +590,7 @@ const GuideAssembly = ({ session: initialSession }) => {
                   </div>
                 )}
 
-                {selectedAttempt && (
+                {selectedAttempt && !activePage.approved_at && (
                   <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
                     <label
                       htmlFor={`revision-${activePage.id}`}
@@ -504,9 +601,14 @@ const GuideAssembly = ({ session: initialSession }) => {
                     <Textarea
                       id={`revision-${activePage.id}`}
                       value={revisionInstruction}
-                      onChange={(event) => setRevisionInstruction(event.target.value)}
+                      onChange={(event) => setRevisionInstructions((current) => ({
+                        ...current,
+                        [activePage.id]: event.target.value,
+                      }))}
                       maxLength={MAX_REVISION_INSTRUCTION_LENGTH}
-                      disabled={Boolean(busyAction)}
+                      disabled={
+                        Boolean(activePageBusyAction) || activePage.status === 'generating'
+                      }
                       placeholder="Ex.: mude para um estilo 3D, use tons azuis e deixe o título menor."
                       className="mt-2 min-h-28 resize-y bg-background"
                     />
@@ -521,7 +623,7 @@ const GuideAssembly = ({ session: initialSession }) => {
                   </div>
                 )}
 
-                {activePage.kind === 'landmark' && (
+                {activePage.kind === 'landmark' && !activePage.approved_at && (
                   <div className="rounded-2xl border border-secondary/25 bg-secondary/5 p-4">
                     <div className="flex items-center justify-between gap-4">
                       <div>
@@ -538,52 +640,80 @@ const GuideAssembly = ({ session: initialSession }) => {
                       <Switch
                         id={`include-family-${activePage.id}`}
                         checked={includeFamily}
-                        onCheckedChange={setIncludeFamily}
-                        disabled={Boolean(busyAction)}
+                        onCheckedChange={(checked) => setIncludeFamilyByPage((current) => ({
+                          ...current,
+                          [activePage.id]: checked,
+                        }))}
+                        disabled={
+                          Boolean(activePageBusyAction) || activePage.status === 'generating'
+                        }
                         aria-label="Incluir família"
                       />
                     </div>
                   </div>
                 )}
 
-                {(actionError || activePage.error || selectedAssetError) && (
+                {(activePageError || activePage.error || selectedAssetError) && (
                   <div className="flex gap-3 rounded-2xl bg-destructive/10 p-4 text-sm font-bold text-destructive">
                     <AlertCircle className="h-5 w-5 shrink-0" />
-                    <p>{actionError || activePage.error || selectedAssetError}</p>
+                    <p>{activePageError || activePage.error || selectedAssetError}</p>
                   </div>
                 )}
 
-                <div className="space-y-3">
-                  <Button
-                    type="button"
-                    variant={selectedAttempt ? 'outline' : 'default'}
-                    disabled={Boolean(busyAction) || activePage.attempts_left <= 0}
-                    onClick={handleGenerate}
-                    className="w-full rounded-full py-6 font-bold"
-                  >
-                    {busyAction === 'generate' ? (
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    ) : selectedAttempt ? (
-                      <RefreshCcw className="mr-2 h-5 w-5" />
-                    ) : (
-                      <Sparkles className="mr-2 h-5 w-5" />
+                {activePage.approved_at ? (
+                  <div className="rounded-2xl bg-secondary/10 p-4 text-sm font-bold text-secondary">
+                    <CircleCheck className="mr-2 inline h-5 w-5" />
+                    Página aprovada. Você pode abrir qualquer outra página na lista.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <Button
+                      type="button"
+                      variant={selectedAttempt ? 'outline' : 'default'}
+                      disabled={
+                        Boolean(activePageBusyAction)
+                        || activePage.status === 'generating'
+                        || activePage.attempts_left <= 0
+                      }
+                      onClick={handleGenerate}
+                      className="w-full rounded-full py-6 font-bold"
+                    >
+                      {activePageBusyAction === 'generate' ? (
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      ) : selectedAttempt ? (
+                        <RefreshCcw className="mr-2 h-5 w-5" />
+                      ) : (
+                        <Sparkles className="mr-2 h-5 w-5" />
+                      )}
+                      {activePageBusyAction === 'generate'
+                        ? 'Gerando esta página...'
+                        : selectedAttempt && revisionInstruction.trim()
+                          ? 'Gerar versão com ajustes'
+                          : selectedAttempt
+                            ? 'Gerar outra versão'
+                            : 'Gerar página'}
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={
+                        !selectedAttempt
+                        || !selectedImageUrl
+                        || Boolean(activePageBusyAction)
+                        || activePage.status === 'generating'
+                      }
+                      onClick={handleApprove}
+                      className="w-full rounded-full bg-secondary py-6 font-bold text-white hover:bg-secondary/90"
+                    >
+                      {activePageBusyAction === 'approve' ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Check className="mr-2 h-5 w-5" />}
+                      Aprovar página
+                    </Button>
+                    {(activePageBusyAction === 'generate' || activePage.status === 'generating') && (
+                      <p className="text-center text-xs font-medium text-muted-foreground" role="status">
+                        Você pode abrir outra página e iniciar uma nova geração enquanto aguarda.
+                      </p>
                     )}
-                    {selectedAttempt && revisionInstruction.trim()
-                      ? 'Gerar versão com ajustes'
-                      : selectedAttempt
-                        ? 'Gerar outra versão'
-                        : 'Gerar página'}
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={!selectedAttempt || !selectedImageUrl || Boolean(busyAction)}
-                    onClick={handleApprove}
-                    className="w-full rounded-full bg-secondary py-6 font-bold text-white hover:bg-secondary/90"
-                  >
-                    {busyAction === 'approve' ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Check className="mr-2 h-5 w-5" />}
-                    Aprovar e continuar
-                  </Button>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </section>

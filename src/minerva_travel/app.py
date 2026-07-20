@@ -57,6 +57,7 @@ from minerva_travel.builder import (
     BuilderAttemptNotFound,
     BuilderIncomplete,
     BuilderPage,
+    BuilderPageDependencyMissing,
     BuilderPageOutOfOrder,
     BuilderSession,
     BuilderSessionNotFound,
@@ -213,6 +214,8 @@ MAX_PROGRESSIVE_BUILDER_PAGES = (
     4 + MAX_GUIDE_DESTINATIONS + MAX_GUIDE_LANDMARKS + MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE
 )
 DEFAULT_BUILDER_PAGE_GENERATION_QUOTA = max(64, MAX_PROGRESSIVE_BUILDER_PAGES)
+DEFAULT_BUILDER_PAGE_GENERATION_RATE_LIMIT = 16
+DEFAULT_BUILDER_PAGE_GENERATION_CONCURRENCY = 4
 
 
 class ApiErrorResponse(BaseModel):
@@ -480,6 +483,7 @@ class BuilderSessionResponse(BaseModel):
     created_at: str
     expires_at: str
     title: str
+    revision: int = Field(ge=0)
     active_page_id: str | None = None
     is_complete: bool
     pages: list[BuilderPageResponse]
@@ -570,7 +574,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allowed_origins(),
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Accept", "Authorization", "Content-Type", "Idempotency-Key"],
     expose_headers=["Idempotency-Replayed", "Retry-After", "X-Request-ID"],
 )
@@ -2643,10 +2647,10 @@ def generate_builder_page_attempt(
             user_id=current_user.id,
             scope="guide_page_generate",
             provider="openai",
-            default_user_limit=4,
-            default_ip_limit=12,
+            default_user_limit=DEFAULT_BUILDER_PAGE_GENERATION_RATE_LIMIT,
+            default_ip_limit=DEFAULT_BUILDER_PAGE_GENERATION_RATE_LIMIT * 3,
             default_window_seconds=10 * 60,
-            default_user_concurrency=1,
+            default_user_concurrency=DEFAULT_BUILDER_PAGE_GENERATION_CONCURRENCY,
             default_user_quota=DEFAULT_BUILDER_PAGE_GENERATION_QUOTA,
         )
         with builder_session_lock(session_id):
@@ -2700,7 +2704,7 @@ def generate_builder_page_attempt(
                     else None
                 )
                 if cover_attempt is None:
-                    raise PageGenerationError(
+                    raise BuilderPageDependencyMissing(
                         "A capa aprovada da família não está disponível como referência."
                     )
                 family_cover = _builder_reference_asset(
@@ -2719,7 +2723,7 @@ def generate_builder_page_attempt(
                     else None
                 )
                 if linked_attempt is None:
-                    raise PageGenerationError(
+                    raise BuilderPageDependencyMissing(
                         "A página aprovada do ponto turístico não está disponível."
                     )
                 approved_landmark_page = _builder_reference_asset(
@@ -2749,7 +2753,9 @@ def generate_builder_page_attempt(
             )
         elif page_kind == "trip_summary":
             if family_cover is None:
-                raise PageGenerationError("A capa aprovada da família não está disponível.")
+                raise BuilderPageDependencyMissing(
+                    "A capa aprovada da família não está disponível."
+                )
             generator.generate_summary_page(
                 family_photo=photo_path,
                 family_cover=family_cover,
@@ -2776,7 +2782,9 @@ def generate_builder_page_attempt(
             )
         elif page_kind == "landmark":
             if include_family and family_cover is None:
-                raise PageGenerationError("A capa aprovada da família não está disponível.")
+                raise BuilderPageDependencyMissing(
+                    "A capa aprovada da família não está disponível."
+                )
             generator.generate_landmark_page(
                 family_photo=photo_path if include_family else None,
                 family_cover=family_cover,
@@ -2796,7 +2804,7 @@ def generate_builder_page_attempt(
             )
         elif page_kind == "landmark_activity":
             if approved_landmark_page is None:
-                raise PageGenerationError(
+                raise BuilderPageDependencyMissing(
                     "A página aprovada do ponto turístico não está disponível."
                 )
             activity_type = str(metadata.get("activity_type") or "")
@@ -2841,7 +2849,9 @@ def generate_builder_page_attempt(
             )
         elif page_kind == "homecoming":
             if family_cover is None:
-                raise PageGenerationError("A capa aprovada da família não está disponível.")
+                raise BuilderPageDependencyMissing(
+                    "A capa aprovada da família não está disponível."
+                )
             generator.generate_homecoming_page(
                 family_photo=photo_path,
                 family_cover=family_cover,
@@ -2887,8 +2897,17 @@ def generate_builder_page_attempt(
             status_code=409,
             detail={
                 "code": "page_out_of_order",
-                "message": "Aprove a página atual antes de continuar.",
+                "message": "Esta página já foi aprovada.",
             },
+        ) from error
+    except BuilderPageDependencyMissing as error:
+        if attempt_id:
+            with builder_session_lock(session_id):
+                session = _builder_session_or_404(session_id, current_user)
+                rollback_page_attempt(session, page_id, attempt_id, str(error))
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "page_dependency_missing", "message": str(error)},
         ) from error
     except (PageGenerationConfigurationError, PageGenerationError) as error:
         if attempt_id:
@@ -2962,10 +2981,15 @@ def approve_builder_page(
             status_code=422,
             detail="Gere e escolha uma versão antes de aprovar.",
         ) from error
+    except BuilderAttemptInProgress as error:
+        raise HTTPException(
+            status_code=409,
+            detail="Aguarde a geração desta página terminar antes de aprová-la.",
+        ) from error
     except BuilderPageOutOfOrder as error:
         raise HTTPException(
             status_code=409,
-            detail="Aprove as páginas na ordem do guia.",
+            detail="Esta página já foi aprovada.",
         ) from error
 
 
