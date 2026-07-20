@@ -142,5 +142,11 @@
   control failures with the same idempotency key, bounded attempts, and visible waiting state.
 - [x] 11.4 Exclude daily quotas and permanent errors from automatic retries, allow other pages to
   keep generating in parallel, and cancel pending timers on component unmount.
-- [ ] 11.5 Add backend and frontend regression tests, run full validation, and publish both target
+- [x] 11.5 Add backend and frontend regression tests, run full validation, and publish both target
   branches.
+
+### Approval-independent generation delivery record
+
+- `main` implementation: `7b222df` (`Fix activity generation and temporary retries`).
+- `hostinger-frontend` static deployment: `a0be40d` (`Deploy activity generation retries`).
+- Remote branch heads, production `config.js`, and `.htaccess` copies were confirmed on 2026-07-20.
