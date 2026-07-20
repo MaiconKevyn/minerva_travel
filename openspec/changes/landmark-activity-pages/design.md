@@ -6,7 +6,7 @@ active page when the parent asks. Approved PNGs are later packaged into a privat
 per page.
 
 The legacy guide engine already contains reusable concepts and utilities for age complexity,
-coloring, word search, detail hunt, and drawing. The progressive page plan currently contains only
+coloring, word search, detail hunt, and free-form painting. The progressive page plan currently contains only
 `cover`, `trip_summary`, and `landmark` pages. Its tourist-point metadata keeps only name, city,
 and country, so it must retain richer server-resolved context before activity pages can be reliable.
 
@@ -198,8 +198,9 @@ Every activity page contains an OpenAI-generated visual layer and finishes as a 
 - `word_search`: the existing seeded grid generator builds a solvable puzzle from normalized place,
   city, and activity vocabulary. OpenAI creates the decorative landmark vignette/background, while
   code composites the exact grid and word list so letters cannot drift.
-- `drawing`: OpenAI creates a point-specific decorative frame and small landmark vignette with a
-  large clean white drawing area. Exact prompt text and writing lines are composited afterward.
+- `drawing`: the backward-compatible technical type now represents `Minha pintura`. OpenAI creates
+  a point-specific painting-workshop frame, a small landmark vignette, palette, and brushes around
+  a large pure-white canvas. Exact painting prompt text and writing lines are composited afterward.
 
 This hybrid still uses the OpenAI API for every activity page while preserving puzzle correctness,
 print usability, and exact Portuguese copy. Regeneration may change artwork and framing but must
@@ -299,6 +300,20 @@ delays take precedence; otherwise the fallback schedule grows from seconds to mi
 exhaustion and permanent errors never retry automatically, and unmounting the review cancels its
 pending timers and requests.
 
+### Decision 16: Replace free drawing with a blank-canvas painting activity
+
+The fourth optional card is presented to parents and children as `Minha pintura`, not
+`Desenhe sua versão`. It offers a clean canvas where the child creates a painting inspired by the
+selected tourist point. The generated border may contain a small recognizable point vignette,
+palette, and brushes, but the central canvas must remain pure white and free of model-created
+sketches, tracing guides, shading, or text.
+
+This remains intentionally distinct from `Página para colorir`: coloring supplies deterministic
+black line art ready to fill, while painting starts with a blank canvas. Trusted code renders the
+title, point name, exact instruction, `Título da minha pintura`, and date field. The serialized
+activity type remains `drawing` so existing drafts, builder sessions, API clients, and page IDs
+continue to load without migration; only its product meaning and visible copy change.
+
 ## Validation Strategy
 
 ### Backend and content tests
@@ -320,7 +335,7 @@ pending timers and requests.
   landmark composition, age-aware simplicity, generous white space, and the exact dynamic
   `Agora é a vez de colorir <ponto turístico> do seu jeito.` instruction.
 - Assert word-search grids and solutions survive compositing exactly.
-- Assert drawing/memory pages preserve minimum blank writable areas.
+- Assert painting/memory pages preserve minimum blank writable areas.
 - Assert the homecoming prompt preserves family identity and the deterministic compositor keeps
   the closing copy and writable area exact.
 - Assert invalid, oversized, malformed, or wrong-size provider output creates no attempt.

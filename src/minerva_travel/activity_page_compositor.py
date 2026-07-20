@@ -22,7 +22,7 @@ COLORING_TITLE = "Atividade para colorir"
 COLORING_INSTRUCTION_TEMPLATE = "Agora é a vez de colorir {landmark_name} do seu jeito."
 DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
-DRAWING_TITLE = "Desenhe sua versão"
+PAINTING_TITLE = "Minha pintura"
 BEST_MEMORY_REQUIRED_COPY = (
     "Minha melhor memória",
     "Meu lugar favorito foi...",
@@ -225,7 +225,7 @@ def compose_drawing_page(
     image = _load_artwork(artwork_path)
     draw = ImageDraw.Draw(image)
     _panel(draw, (38, 34, 986, 294))
-    _draw_centered(draw, DRAWING_TITLE, 52, 53, bold=True)
+    _draw_centered(draw, PAINTING_TITLE, 52, 53, bold=True)
     _draw_centered(draw, _bounded(landmark_name, "landmark_name", 100), 116, 30, bold=True)
     _draw_wrapped(
         draw,
@@ -237,7 +237,7 @@ def compose_drawing_page(
     )
     draw.rounded_rectangle((70, 330, 954, 1297), radius=28, fill="white", outline=INK, width=5)
     _panel(draw, (70, 1310, 954, 1488), radius=20)
-    draw.text((96, 1325), "Título do meu desenho:", font=_font(24, bold=True), fill=INK)
+    draw.text((96, 1325), "Título da minha pintura:", font=_font(24, bold=True), fill=INK)
     draw.line((354, 1356, 928, 1356), fill=INK, width=3)
     draw.text((96, 1401), "Data:", font=_font(23, bold=True), fill=INK)
     draw.line((172, 1431, 430, 1431), fill=INK, width=3)

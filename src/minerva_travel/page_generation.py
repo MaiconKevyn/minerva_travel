@@ -528,7 +528,7 @@ class OpenAIGuidePageGenerator:
         name, city, country, age_complexity = _activity_context(landmark_context)
         drawing_prompt = _activity_instruction(
             activity_spec,
-            default=f"Desenhe o detalhe de {name} que você mais quer guardar na memória.",
+            default=f"Crie uma pintura de {name} do seu jeito.",
         )
         prompt = activity_artwork_prompt(
             activity_type="drawing",
@@ -996,8 +996,10 @@ def activity_artwork_prompt(
             "puzzle."
         ),
         "drawing": (
-            "Create a watercolor decorative frame and one small recognizable landmark vignette "
-            "near the perimeter. Keep the large central 70 percent completely empty and white."
+            "Create a child-friendly painting-workshop frame with a small watercolor landmark "
+            "vignette near the perimeter plus a simple paint palette and two clean brushes. Keep "
+            "the large central 70 percent completely empty and pure white as a blank painting "
+            "canvas. Do not paint, sketch, trace, shade, or place guide marks inside that canvas."
         ),
     }
     try:

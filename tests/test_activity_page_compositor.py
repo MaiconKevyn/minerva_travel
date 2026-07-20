@@ -11,12 +11,12 @@ from minerva_travel.activity_page_compositor import (
     COLORING_TITLE,
     DETAIL_HUNT_TITLE,
     DRAWING_BLANK_REGION,
-    DRAWING_TITLE,
     HOMECOMING_REQUIRED_COPY,
     HOMECOMING_WRITING_BLANK_REGIONS,
     LANDMARK_VISITED_CHECKBOX,
     LANDMARK_VISITED_LABEL,
     MEMORY_BLANK_REGION,
+    PAINTING_TITLE,
     WORD_SEARCH_TITLE,
     ActivityPageCompositionError,
     coloring_instruction_for,
@@ -61,11 +61,11 @@ def _white_fraction(path: Path, region: tuple[int, int, int, int]) -> float:
 
 
 def test_compositor_exact_copy_contract_matches_builder_required_copy():
-    assert (COLORING_TITLE, DETAIL_HUNT_TITLE, WORD_SEARCH_TITLE, DRAWING_TITLE) == (
+    assert (COLORING_TITLE, DETAIL_HUNT_TITLE, WORD_SEARCH_TITLE, PAINTING_TITLE) == (
         "Atividade para colorir",
         "Caça aos detalhes",
         "Caça-palavras",
-        "Desenhe sua versão",
+        "Minha pintura",
     )
     assert BEST_MEMORY_REQUIRED_COPY == (
         "Minha melhor memória",
@@ -225,7 +225,7 @@ def test_drawing_and_memory_preserve_measurable_blank_response_areas(tmp_path):
         artwork,
         drawing,
         landmark_name="Torre Eiffel",
-        prompt="Desenhe o detalhe de que você mais gostou.",
+        prompt="Agora é a sua vez de criar uma pintura da Torre Eiffel do seu jeito.",
     )
     compose_best_memory_page(
         artwork,

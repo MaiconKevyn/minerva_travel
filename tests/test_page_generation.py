@@ -687,8 +687,8 @@ def test_coloring_generation_edits_landmark_refs_then_composites_printable_png(t
         ),
         (
             "generate_drawing_page",
-            {"prompt": "Desenhe o que mais chamou sua atenção."},
-            "central 70 percent completely empty and white",
+            {"prompt": "Crie uma pintura do lugar do seu jeito."},
+            "blank painting canvas",
         ),
     ],
 )

@@ -444,6 +444,15 @@ def test_page_plan_interleaves_activities_and_appends_one_memory_page(tmp_path, 
     assert activity["metadata"]["linked_landmark_page_id"] == "landmark-1"
     assert activity["metadata"]["instruction"] in activity["required_copy"]
 
+    painting = next(page for page in payload["pages"] if page["id"] == "activity-2-drawing")
+    assert painting["metadata"]["activity_type"] == "drawing"
+    assert painting["metadata"]["activity_label"] == "Minha pintura"
+    assert painting["metadata"]["instruction"] == (
+        "Agora é a sua vez de criar uma pintura de Museu do Louvre do seu jeito."
+    )
+    assert painting["required_copy"][:2] == ["Minha pintura", "Museu do Louvre"]
+    assert painting["metadata"]["instruction"] in painting["required_copy"]
+
     session = load_builder_session(payload["session_id"], "development-user")
     assert session.form["activity_selections"] == [
         {

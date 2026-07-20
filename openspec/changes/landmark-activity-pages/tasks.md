@@ -5,7 +5,7 @@
 - [x] 1.2 Add catalog/custom landmark activity-context fixtures, including a non-catalog point with
   no trusted curiosity or source image.
 - [x] 1.3 Add representative committed preview assets for coloring, detail hunt, word search, and
-  drawing, clearly labeled as examples rather than generated output.
+  painting, clearly labeled as examples rather than generated output.
 - [x] 1.4 Add failing contract tests for malformed JSON, unknown points, unselected points,
   duplicate types, unsupported types, and limit overflow.
 
@@ -60,7 +60,7 @@
   composited checkboxes/copy.
 - [x] 5.5 Reuse the seeded word-search generator and composite its exact grid/word list over an
   OpenAI-generated landmark activity background.
-- [x] 5.6 Implement drawing-page generation with a measurable blank drawing area and exact
+- [x] 5.6 Implement the backward-compatible `drawing` page as a painting activity with a measurable blank canvas and exact
   composited prompt.
 - [x] 5.7 Implement mandatory best-memory generation with blank response areas, trip context, age
   adaptation, and edit-based revisions.
@@ -150,3 +150,14 @@
 - `main` implementation: `7b222df` (`Fix activity generation and temporary retries`).
 - `hostinger-frontend` static deployment: `a0be40d` (`Deploy activity generation retries`).
 - Remote branch heads, production `config.js`, and `.htaccess` copies were confirmed on 2026-07-20.
+
+## 12. Replace Free Drawing With `Minha pintura`
+
+- [x] 12.1 Keep the persisted `drawing` identifier for compatibility while replacing all visible
+  selection and generated-page copy with the `Minha pintura` experience.
+- [x] 12.2 Update the OpenAI artwork contract and trusted compositor for a painting-themed frame,
+  point-specific instruction, blank white canvas, painting title, and date fields.
+- [x] 12.3 Replace the drawing preview with an accessible painting preview and clearly distinguish
+  blank-canvas painting from the ready-to-color activity.
+- [ ] 12.4 Run backend/frontend regression tests, inspect the preview/build, and publish both target
+  branches.

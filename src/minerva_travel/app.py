@@ -38,9 +38,9 @@ from minerva_travel.activity_page_compositor import (
     BEST_MEMORY_REQUIRED_COPY,
     COLORING_TITLE,
     DETAIL_HUNT_TITLE,
-    DRAWING_TITLE,
     HOMECOMING_REQUIRED_COPY,
     LANDMARK_VISITED_LABEL,
+    PAINTING_TITLE,
     WORD_SEARCH_TITLE,
     coloring_instruction_for,
 )
@@ -2044,7 +2044,7 @@ _ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
     "coloring": COLORING_TITLE,
     "detail_hunt": DETAIL_HUNT_TITLE,
     "word_search": WORD_SEARCH_TITLE,
-    "drawing": DRAWING_TITLE,
+    "drawing": PAINTING_TITLE,
 }
 
 
@@ -2332,7 +2332,7 @@ def _activity_spec(
         "coloring": coloring_instruction_for(landmark.name),
         "detail_hunt": f"Observe {landmark.name} e marque cada detalhe que encontrar.",
         "word_search": f"Encontre no quadro as palavras ligadas a {landmark.name}.",
-        "drawing": f"Desenhe sua própria versão de {landmark.name}.",
+        "drawing": (f"Agora é a sua vez de criar uma pintura de {landmark.name} do seu jeito."),
     }
     spec: dict[str, Any] = {
         "instruction": instructions[activity_type],

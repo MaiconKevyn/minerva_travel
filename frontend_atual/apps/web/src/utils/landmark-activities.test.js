@@ -18,6 +18,15 @@ test('coloring preview promises child-friendly point-specific artwork', () => {
   assert.match(coloring.description, /frase personalizada/);
 });
 
+test('painting replaces the free drawing activity without changing persisted type', () => {
+  const painting = LANDMARK_ACTIVITY_OPTIONS.find((option) => option.type === 'drawing');
+
+  assert.equal(painting.label, 'Minha pintura');
+  assert.equal(painting.preview, '/activity-examples/painting.svg');
+  assert.match(painting.description, /criar uma pintura/);
+  assert.match(painting.materialLabel, /Tinta, pincel/);
+});
+
 test('activity selections are normalized to canonical point ids and supported types', () => {
   assert.deepEqual(
     normalizeLandmarkActivitySelections([

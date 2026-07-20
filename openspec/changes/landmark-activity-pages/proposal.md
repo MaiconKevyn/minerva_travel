@@ -15,8 +15,8 @@ previously unknown places.
   tourist points and child ages are already known.
 - Show representative preview artwork for every activity type, not description-only choices.
 - Let the parent explicitly select zero or more optional activities for each tourist point.
-- Start with four optional landmark-bound activities: detail hunt, word search, drawing prompt,
-  and coloring page.
+- Start with four optional landmark-bound activities: detail hunt, word search, a blank-canvas
+  painting activity, and a coloring page with ready-made outlines.
 - Add one mandatory `Minha melhor memória` page after every tourist point and its selected
   activities.
 - Add one mandatory `Hora de voltar para casa` closing page after `Minha melhor memória`, with the
@@ -28,6 +28,8 @@ previously unknown places.
 - Make every coloring page a genuinely child-usable black-and-white worksheet, with age-aware
   visual complexity and the exact point-specific phrase
   `Agora é a vez de colorir <ponto turístico> do seu jeito.` rendered by trusted code.
+- Present the persisted `drawing` activity as `Minha pintura`: a blank canvas for the child to
+  paint the selected tourist point, clearly distinct from the ready-to-color worksheet.
 - Keep rule-bound content such as a word-search grid deterministic and validated, compositing it
   onto the OpenAI-generated activity artwork so the puzzle remains solvable.
 - Reuse the current generate, regenerate, approve, gallery, and final PDF workflow. Every approved

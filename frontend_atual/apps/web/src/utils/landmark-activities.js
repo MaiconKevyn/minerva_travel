@@ -29,12 +29,12 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
   },
   {
     type: 'drawing',
-    label: 'Desenhe sua versão',
-    description: 'Complete uma moldura inspirada no lugar com seu próprio desenho.',
+    label: 'Minha pintura',
+    description: 'Use o espaço em branco para criar uma pintura do lugar do seu jeito.',
     ageLabel: 'A partir de 4 anos',
     durationLabel: '10–20 min',
-    materialLabel: 'Lápis ou canetinha',
-    preview: '/activity-examples/drawing.svg',
+    materialLabel: 'Tinta, pincel ou lápis de cor',
+    preview: '/activity-examples/painting.svg',
   },
   {
     type: 'coloring',
