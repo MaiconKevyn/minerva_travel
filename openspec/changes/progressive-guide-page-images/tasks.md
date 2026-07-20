@@ -75,4 +75,4 @@
 - [x] 10.2 Branch destination generation between people-free generation/editing and canonical-family referenced editing.
 - [x] 10.3 Add an off-by-default `Incluir família` control only to destination-page generation in the progressive UI.
 - [x] 10.4 Add provider, API, persistence, frontend-contract, and browser coverage for both modes.
-- [ ] 10.5 Run complete automated and synthetic live destination validation, then publish `main` and `hostinger-frontend`.
+- [x] 10.5 Run complete automated and synthetic live destination validation, then publish `main` and `hostinger-frontend`.
