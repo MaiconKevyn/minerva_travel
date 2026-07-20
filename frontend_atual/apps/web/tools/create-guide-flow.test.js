@@ -138,6 +138,16 @@ test('success screen shows the canonical guide preview before the download', () 
   assert.match(review, /fetchGuidePreviewHtml/);
   assert.match(review, /loadGuidePreview\(result\.preview_url\)/);
   assert.match(review, /sandbox=""/);
-  assert.match(review, /srcDoc=\{previewHtml\}/);
   assert.match(review, /Prévia do guia/);
+});
+
+test('generation is guide-first with a page-by-page preview pager', () => {
+  const review = readProjectFile('src/components/Step5Review.jsx');
+
+  assert.match(review, /Gerar guia da família/);
+  assert.doesNotMatch(review, /Gerar PDF do Guia/);
+  assert.match(review, /previewPages/);
+  assert.match(review, /Página \{currentPreviewPage \+ 1\} de \{previewPages\.length\}/);
+  assert.match(review, /Anterior/);
+  assert.match(review, /Próxima/);
 });
