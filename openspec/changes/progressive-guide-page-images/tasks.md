@@ -67,4 +67,4 @@
 - [x] 9.2 Send canonical family references, plus the optional current-page revision reference, as ordered multipart edit inputs.
 - [x] 9.3 Strengthen summary and landmark prompts against family-member invention, replacement, omission, and trait drift.
 - [x] 9.4 Add provider and API coverage for first-generation and regeneration reference order, missing assets, and prompt constraints.
-- [ ] 9.5 Run complete automated and synthetic live summary validation, then publish `main` and `hostinger-frontend`.
+- [x] 9.5 Run complete automated and synthetic live summary validation, then publish `main` and `hostinger-frontend`.
