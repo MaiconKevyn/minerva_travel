@@ -158,14 +158,14 @@ const StepActivities = () => {
                         className="sr-only"
                         aria-describedby={`${inputId}-description`}
                       />
-                      <div className="relative aspect-[3/2] overflow-hidden bg-muted">
+                      <div className="relative aspect-[2/3] overflow-hidden bg-muted">
                         <img
                           src={activity.preview}
                           alt={`Exemplo visual de ${activity.label}`}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                          className="h-full w-full object-cover object-top transition duration-300 group-hover:scale-[1.02]"
                         />
                         <span className="absolute left-3 top-3 rounded-full bg-foreground/85 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-background">
-                          Exemplo
+                          Exemplo real
                         </span>
                         <span className={`absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border-2 ${
                           selected

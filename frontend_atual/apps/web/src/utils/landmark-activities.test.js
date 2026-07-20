@@ -13,7 +13,7 @@ import {
 test('coloring preview promises child-friendly point-specific artwork', () => {
   const coloring = LANDMARK_ACTIVITY_OPTIONS.find((option) => option.type === 'coloring');
 
-  assert.equal(coloring.preview, '/activity-examples/coloring.svg');
+  assert.equal(coloring.preview, '/activity-examples/coloring-real.webp');
   assert.match(coloring.description, /traços limpos, formas grandes/);
   assert.match(coloring.description, /frase personalizada/);
 });
@@ -22,7 +22,7 @@ test('painting replaces the free drawing activity without changing persisted typ
   const painting = LANDMARK_ACTIVITY_OPTIONS.find((option) => option.type === 'drawing');
 
   assert.equal(painting.label, 'Minha pintura');
-  assert.equal(painting.preview, '/activity-examples/painting.svg');
+  assert.equal(painting.preview, '/activity-examples/painting-real.webp');
   assert.match(painting.description, /criar uma pintura/);
   assert.match(painting.materialLabel, /Tinta, pincel/);
 });

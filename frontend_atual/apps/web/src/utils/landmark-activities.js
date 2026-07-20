@@ -16,7 +16,7 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     ageLabel: 'A partir de 5 anos',
     durationLabel: '5–10 min',
     materialLabel: 'Lápis',
-    preview: '/activity-examples/detail-hunt.svg',
+    preview: '/activity-examples/detail-hunt-real.webp',
   },
   {
     type: 'word_search',
@@ -25,7 +25,7 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     ageLabel: 'A partir de 6 anos',
     durationLabel: '10–15 min',
     materialLabel: 'Lápis',
-    preview: '/activity-examples/word-search.svg',
+    preview: '/activity-examples/word-search-real.webp',
   },
   {
     type: 'drawing',
@@ -34,7 +34,7 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     ageLabel: 'A partir de 4 anos',
     durationLabel: '10–20 min',
     materialLabel: 'Tinta, pincel ou lápis de cor',
-    preview: '/activity-examples/painting.svg',
+    preview: '/activity-examples/painting-real.webp',
   },
   {
     type: 'coloring',
@@ -44,7 +44,7 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     ageLabel: 'A partir de 4 anos',
     durationLabel: '15–25 min',
     materialLabel: 'Lápis de cor',
-    preview: '/activity-examples/coloring.svg',
+    preview: '/activity-examples/coloring-real.webp',
   },
 ];
 

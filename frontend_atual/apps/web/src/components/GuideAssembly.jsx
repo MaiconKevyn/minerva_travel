@@ -13,7 +13,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import GuideActivityPanel from '@/components/GuideActivityPanel.jsx';
 import {
+  addBuilderActivity,
   approveBuilderPage,
   completeGuideBuilder,
   createIdempotencyKey,
@@ -24,6 +26,8 @@ import {
   generateBuilderPdf,
   generateBuilderPageAttempt,
   isRetryableBuilderGenerationError,
+  moveBuilderActivity,
+  removeBuilderActivity,
   selectBuilderPageAttempt,
 } from '@/utils/minerva-api.js';
 import { toast } from 'sonner';
@@ -81,6 +85,20 @@ const waitForRetry = (delayMs, signal) => new Promise((resolve, reject) => {
   if (signal.aborted) abort();
 });
 
+const withOptimisticPageMove = (current, pageId, afterPageId) => {
+  const movedPage = current.pages.find((page) => page.id === pageId);
+  if (!movedPage) return current;
+  const remaining = current.pages.filter((page) => page.id !== pageId);
+  const anchorIndex = remaining.findIndex((page) => page.id === afterPageId);
+  if (anchorIndex < 0) return current;
+  const pages = [...remaining];
+  pages.splice(anchorIndex + 1, 0, movedPage);
+  return {
+    ...current,
+    pages: pages.map((page, index) => ({ ...page, position: index + 1 })),
+  };
+};
+
 const GuideAssembly = ({ session: initialSession }) => {
   const [session, setSession] = useState(initialSession);
   const [selectedPageId, setSelectedPageId] = useState(
@@ -97,6 +115,8 @@ const GuideAssembly = ({ session: initialSession }) => {
   const [actionError, setActionError] = useState('');
   const [completion, setCompletion] = useState(null);
   const [pdfExport, setPdfExport] = useState(null);
+  const [layoutBusyAction, setLayoutBusyAction] = useState('');
+  const [layoutError, setLayoutError] = useState('');
   const objectUrlsRef = useRef(new Set());
   const hydratedAssetUrlsRef = useRef(new Set());
   const generationKeysRef = useRef({});
@@ -378,6 +398,100 @@ const GuideAssembly = ({ session: initialSession }) => {
     }
   };
 
+  const handleLayoutFailure = async (error, fallbackMessage) => {
+    setLayoutError(error.message || fallbackMessage);
+    if (error.code === 'builder_layout_conflict') {
+      try {
+        await applySession(await fetchGuideBuilderSession(session.session_id));
+      } catch (refreshError) {
+        console.error('Erro ao atualizar a ordem do guia:', refreshError);
+      }
+    }
+  };
+
+  const handleAddActivity = async (landmarkSelectionId, activityType) => {
+    const action = `add:${activityType}`;
+    setLayoutBusyAction(action);
+    setLayoutError('');
+    try {
+      const nextSession = await updateSession(() => addBuilderActivity(session.session_id, {
+        landmarkSelectionId,
+        activityType,
+        layoutRevision: session.layout_revision || 0,
+      }));
+      const addedPage = nextSession.pages.find((page) => (
+        page.kind === 'landmark_activity'
+        && page.metadata?.landmark_selection_id === landmarkSelectionId
+        && page.metadata?.activity_type === activityType
+      ));
+      setPdfExport(null);
+      if (addedPage) setSelectedPageId(addedPage.id);
+      toast.success('Atividade adicionada. Você pode posicioná-la ou gerar quando quiser.');
+    } catch (error) {
+      await handleLayoutFailure(error, 'Não foi possível adicionar a atividade.');
+    } finally {
+      setLayoutBusyAction('');
+    }
+  };
+
+  const handleMoveActivity = async (pageId, afterPageId) => {
+    const action = `move:${pageId}`;
+    const previousSession = session;
+    setLayoutBusyAction(action);
+    setLayoutError('');
+    setSession((current) => withOptimisticPageMove(current, pageId, afterPageId));
+    try {
+      await updateSession(() => moveBuilderActivity(session.session_id, pageId, {
+        afterPageId,
+        layoutRevision: session.layout_revision || 0,
+      }));
+      setPdfExport(null);
+      toast.success('Nova posição salva para o guia e para o PDF.');
+    } catch (error) {
+      setSession((current) => (
+        current.revision > previousSession.revision ? current : previousSession
+      ));
+      await handleLayoutFailure(error, 'Não foi possível mover esta atividade.');
+    } finally {
+      setLayoutBusyAction('');
+    }
+  };
+
+  const handleRemoveActivity = async (page) => {
+    const hasGeneratedVersions = page.attempts.length > 0;
+    if (
+      hasGeneratedVersions
+      && !window.confirm(
+        `Remover “${page.title}” e apagar todas as versões já geradas desta atividade?`,
+      )
+    ) return;
+    const action = `remove:${page.id}`;
+    const previousSession = session;
+    setLayoutBusyAction(action);
+    setLayoutError('');
+    setSession((current) => ({
+      ...current,
+      pages: current.pages
+        .filter((item) => item.id !== page.id)
+        .map((item, index) => ({ ...item, position: index + 1 })),
+    }));
+    try {
+      await updateSession(() => removeBuilderActivity(session.session_id, page.id, {
+        layoutRevision: session.layout_revision || 0,
+        confirmGenerated: hasGeneratedVersions,
+      }));
+      setPdfExport(null);
+      toast.success('Atividade removida do guia.');
+    } catch (error) {
+      setSession((current) => (
+        current.revision > previousSession.revision ? current : previousSession
+      ));
+      await handleLayoutFailure(error, 'Não foi possível remover esta atividade.');
+    } finally {
+      setLayoutBusyAction('');
+    }
+  };
+
   const pageAssetUrl = (page) => {
     const attempt = page.attempts.find((item) => item.id === page.selected_attempt_id);
     return attempt ? assetUrls[attempt.asset_url] : '';
@@ -453,6 +567,14 @@ const GuideAssembly = ({ session: initialSession }) => {
         <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
           Páginas do guia
         </p>
+        <GuideActivityPanel
+          session={session}
+          busyAction={layoutBusyAction}
+          errorMessage={layoutError}
+          onAdd={handleAddActivity}
+          onMove={handleMoveActivity}
+          onRemove={handleRemoveActivity}
+        />
         <ol className="space-y-3">
           {session.pages.map((page) => {
             const isSelected = page.id === activePage?.id;

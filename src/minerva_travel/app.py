@@ -52,15 +52,21 @@ from minerva_travel.asset_policy import (
 from minerva_travel.auth import CurrentUser
 from minerva_travel.builder import (
     MAX_REVISION_INSTRUCTION_LENGTH,
+    BuilderActivityAnchorInvalid,
+    BuilderActivityDuplicate,
+    BuilderActivityNotFound,
+    BuilderActivityRemovalConfirmationRequired,
     BuilderAttemptInProgress,
     BuilderAttemptLimitReached,
     BuilderAttemptNotFound,
     BuilderIncomplete,
+    BuilderLayoutConflict,
     BuilderPage,
     BuilderPageDependencyMissing,
     BuilderPageOutOfOrder,
     BuilderSession,
     BuilderSessionNotFound,
+    add_activity_page,
     approve_page_attempt,
     builder_asset_dir,
     builder_pdf_path,
@@ -69,6 +75,8 @@ from minerva_travel.builder import (
     create_builder_session,
     delete_builder_sessions_for_owner,
     load_builder_session,
+    move_activity_page,
+    remove_activity_page,
     reserve_page_attempt,
     rollback_page_attempt,
     select_page_attempt,
@@ -485,6 +493,7 @@ class BuilderSessionResponse(BaseModel):
     expires_at: str
     title: str
     revision: int = Field(ge=0)
+    layout_revision: int = Field(default=0, ge=0)
     active_page_id: str | None = None
     is_complete: bool
     pages: list[BuilderPageResponse]
@@ -501,6 +510,23 @@ class BuilderPageGenerationRequest(StrictRequestModel):
 
 class BuilderPageApprovalRequest(StrictRequestModel):
     attempt_id: str | None = Field(default=None, max_length=120)
+
+
+class BuilderActivityCreateRequest(StrictRequestModel):
+    landmark_selection_id: str = Field(min_length=1, max_length=200)
+    activity_type: OptionalLandmarkActivityType
+    after_page_id: str | None = Field(default=None, min_length=1, max_length=120)
+    layout_revision: int = Field(ge=0)
+
+
+class BuilderActivityMoveRequest(StrictRequestModel):
+    after_page_id: str = Field(min_length=1, max_length=120)
+    layout_revision: int = Field(ge=0)
+
+
+class BuilderActivityDeleteRequest(StrictRequestModel):
+    layout_revision: int = Field(ge=0)
+    confirm_generated: bool = False
 
 
 class BuilderApprovedPageResponse(BaseModel):
@@ -2358,6 +2384,54 @@ def _activity_spec(
     return spec
 
 
+def _builder_activity_page(
+    landmark: LandmarkActivityContext,
+    activity_type: OptionalLandmarkActivityType,
+    *,
+    trip_date: str,
+    position: int = 0,
+) -> BuilderPage:
+    """Build one activity page from trusted persisted landmark context."""
+
+    private_context = landmark.model_dump(mode="json")
+    curiosity_label = (
+        "Você sabia?" if landmark.curiosity_kind == "trusted" else "Missão de observação"
+    )
+    public_context = {
+        "destination_id": landmark.destination_id,
+        "landmark_selection_id": landmark.selection_id,
+        "landmark_name": landmark.name,
+        "city": landmark.city,
+        "country": landmark.country,
+        "description": landmark.description,
+        "curiosity": landmark.curiosity,
+        "curiosity_kind": landmark.curiosity_kind,
+        "curiosity_label": curiosity_label,
+        "age_complexity": landmark.age_complexity,
+        "source_image_available": landmark.source_image_available,
+        "linked_landmark_page_id": landmark.landmark_page_id,
+    }
+    spec = _activity_spec(activity_type, landmark)
+    activity_label = _ACTIVITY_LABELS[activity_type]
+    return BuilderPage(
+        id=f"activity-{landmark.itinerary_order}-{activity_type.replace('_', '-')}",
+        kind="landmark_activity",
+        title=f"{activity_label}: {landmark.name}",
+        position=position,
+        required_copy=[activity_label, landmark.name, str(spec["instruction"])],
+        metadata={
+            **private_context,
+            **public_context,
+            "activity_type": activity_type,
+            "activity_label": activity_label,
+            "instruction": spec["instruction"],
+            "activity_spec": spec,
+            "linked_landmark_page_id": landmark.landmark_page_id,
+            "trip_date": trip_date,
+        },
+    )
+
+
 def _builder_page_plan(
     form: dict[str, Any],
     destinations: list[Destination],
@@ -2509,30 +2583,12 @@ def _builder_page_plan(
         )
         next_position += 1
         for activity in activities_by_landmark.get(landmark.selection_id, []):
-            activity_type = activity.activity_type
-            spec = _activity_spec(activity_type, landmark)
-            activity_label = _ACTIVITY_LABELS[activity_type]
             pages.append(
-                BuilderPage(
-                    id=(f"activity-{landmark.itinerary_order}-{activity_type.replace('_', '-')}"),
-                    kind="landmark_activity",
-                    title=f"{activity_label}: {landmark.name}",
+                _builder_activity_page(
+                    landmark,
+                    activity.activity_type,
+                    trip_date=trip_date,
                     position=next_position,
-                    required_copy=[
-                        activity_label,
-                        landmark.name,
-                        str(spec["instruction"]),
-                    ],
-                    metadata={
-                        **private_context,
-                        **public_context,
-                        "activity_type": activity_type,
-                        "activity_label": activity_label,
-                        "instruction": spec["instruction"],
-                        "activity_spec": spec,
-                        "linked_landmark_page_id": landmark.landmark_page_id,
-                        "trip_date": trip_date,
-                    },
                 )
             )
             next_position += 1
@@ -2618,6 +2674,216 @@ async def create_guide_builder(
 def get_guide_builder(session_id: str, current_user: CurrentUser) -> BuilderSessionResponse:
     session = _builder_session_or_404(session_id, current_user)
     return BuilderSessionResponse.model_validate(session.public_payload())
+
+
+def _builder_activity_input_error(code: str, message: str) -> HTTPException:
+    return HTTPException(status_code=422, detail={"code": code, "message": message})
+
+
+def _session_landmark_context(
+    session: BuilderSession, landmark_selection_id: str
+) -> LandmarkActivityContext:
+    landmark_page = next(
+        (
+            page
+            for page in session.pages
+            if page.kind == "landmark"
+            and page.metadata.get("landmark_selection_id") == landmark_selection_id
+        ),
+        None,
+    )
+    if landmark_page is None:
+        raise ActivitySelectionInputError(
+            "activity_landmark_not_selected",
+            "Escolha um ponto turístico que faça parte deste guia.",
+        )
+    try:
+        return LandmarkActivityContext.model_validate(landmark_page.metadata)
+    except ValidationError as error:
+        raise ActivitySelectionInputError(
+            "activity_landmark_context_unavailable",
+            (
+                "Este guia antigo não possui os dados necessários para criar a atividade "
+                "com segurança."
+            ),
+        ) from error
+
+
+def _new_session_activity_page(
+    session: BuilderSession,
+    landmark_selection_id: str,
+    activity_type: OptionalLandmarkActivityType,
+) -> BuilderPage:
+    activities = [page for page in session.pages if page.kind == "landmark_activity"]
+    if len(activities) >= MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE:
+        raise ActivitySelectionInputError(
+            "activity_selection_guide_limit",
+            f"Escolha no máximo {MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE} atividades por guia.",
+        )
+    for_landmark = [
+        page
+        for page in activities
+        if page.metadata.get("landmark_selection_id") == landmark_selection_id
+    ]
+    if len(for_landmark) >= MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK:
+        raise ActivitySelectionInputError(
+            "activity_selection_landmark_limit",
+            (
+                "Escolha no máximo "
+                f"{MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK} atividades por ponto turístico."
+            ),
+        )
+    if any(page.metadata.get("activity_type") == activity_type for page in for_landmark):
+        raise ActivitySelectionInputError(
+            "activity_selection_duplicate",
+            "Esta atividade já está no guia para o ponto turístico escolhido.",
+        )
+    landmark = _session_landmark_context(session, landmark_selection_id)
+    return _builder_activity_page(
+        landmark,
+        activity_type,
+        trip_date=_builder_trip_date(session.form),
+    )
+
+
+@app.post(
+    "/api/guide-builder/{session_id}/activities",
+    response_model=BuilderSessionResponse,
+)
+def add_builder_activity(
+    session_id: str,
+    payload: BuilderActivityCreateRequest,
+    current_user: CurrentUser,
+) -> BuilderSessionResponse:
+    try:
+        with builder_session_lock(session_id):
+            session = _builder_session_or_404(session_id, current_user)
+            page = _new_session_activity_page(
+                session,
+                payload.landmark_selection_id,
+                payload.activity_type,
+            )
+            add_activity_page(
+                session,
+                page,
+                after_page_id=payload.after_page_id,
+                expected_layout_revision=payload.layout_revision,
+            )
+            return BuilderSessionResponse.model_validate(session.public_payload())
+    except ActivitySelectionInputError as error:
+        raise _builder_activity_input_error(error.code, error.message) from error
+    except BuilderActivityDuplicate as error:
+        raise _builder_activity_input_error(
+            "activity_selection_duplicate",
+            "Esta atividade já está no guia para o ponto turístico escolhido.",
+        ) from error
+    except BuilderActivityAnchorInvalid as error:
+        raise _builder_activity_input_error(
+            "activity_anchor_invalid",
+            "Escolha uma posição depois do ponto turístico e antes das páginas finais.",
+        ) from error
+    except BuilderLayoutConflict as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "builder_layout_conflict",
+                "message": "A ordem do guia mudou. Atualize e tente novamente.",
+                "layout_revision": error.current_revision,
+            },
+        ) from error
+
+
+@app.patch(
+    "/api/guide-builder/{session_id}/activities/{page_id}/position",
+    response_model=BuilderSessionResponse,
+)
+def move_builder_activity(
+    session_id: str,
+    page_id: str,
+    payload: BuilderActivityMoveRequest,
+    current_user: CurrentUser,
+) -> BuilderSessionResponse:
+    try:
+        with builder_session_lock(session_id):
+            session = _builder_session_or_404(session_id, current_user)
+            move_activity_page(
+                session,
+                page_id,
+                after_page_id=payload.after_page_id,
+                expected_layout_revision=payload.layout_revision,
+            )
+            return BuilderSessionResponse.model_validate(session.public_payload())
+    except BuilderActivityNotFound as error:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "builder_activity_not_found", "message": "Atividade não encontrada."},
+        ) from error
+    except BuilderActivityAnchorInvalid as error:
+        raise _builder_activity_input_error(
+            "activity_anchor_invalid",
+            "Escolha uma posição depois do ponto turístico e antes das páginas finais.",
+        ) from error
+    except BuilderLayoutConflict as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "builder_layout_conflict",
+                "message": "A ordem do guia mudou. Atualize e tente novamente.",
+                "layout_revision": error.current_revision,
+            },
+        ) from error
+
+
+@app.delete(
+    "/api/guide-builder/{session_id}/activities/{page_id}",
+    response_model=BuilderSessionResponse,
+)
+def delete_builder_activity(
+    session_id: str,
+    page_id: str,
+    payload: BuilderActivityDeleteRequest,
+    current_user: CurrentUser,
+) -> BuilderSessionResponse:
+    try:
+        with builder_session_lock(session_id):
+            session = _builder_session_or_404(session_id, current_user)
+            remove_activity_page(
+                session,
+                page_id,
+                expected_layout_revision=payload.layout_revision,
+                confirm_generated=payload.confirm_generated,
+            )
+            return BuilderSessionResponse.model_validate(session.public_payload())
+    except BuilderActivityNotFound as error:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "builder_activity_not_found", "message": "Atividade não encontrada."},
+        ) from error
+    except BuilderAttemptInProgress as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "builder_activity_generating",
+                "message": "Aguarde esta atividade terminar de gerar antes de removê-la.",
+            },
+        ) from error
+    except BuilderActivityRemovalConfirmationRequired as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "builder_activity_confirmation_required",
+                "message": "Confirme para apagar as versões já geradas desta atividade.",
+            },
+        ) from error
+    except BuilderLayoutConflict as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "builder_layout_conflict",
+                "message": "A ordem do guia mudou. Atualize e tente novamente.",
+                "layout_revision": error.current_revision,
+            },
+        ) from error
 
 
 @app.post(

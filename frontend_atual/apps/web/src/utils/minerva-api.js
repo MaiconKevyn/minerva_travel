@@ -682,6 +682,7 @@ export class MinervaApiError extends Error {
     retryAfterSeconds = 0,
     scope = '',
     reason = '',
+    layoutRevision = 0,
   } = {}) {
     super(message);
     this.name = 'MinervaApiError';
@@ -690,6 +691,7 @@ export class MinervaApiError extends Error {
     this.retryAfterSeconds = retryAfterSeconds;
     this.scope = scope;
     this.reason = reason;
+    this.layoutRevision = layoutRevision;
   }
 }
 
@@ -715,6 +717,7 @@ const responseApiError = async (response, fallbackMessage) => {
         : 0,
     scope: String(detail?.scope || ''),
     reason: String(detail?.reason || ''),
+    layoutRevision: Number.isInteger(detail?.layout_revision) ? detail.layout_revision : 0,
   });
 };
 
@@ -1118,7 +1121,7 @@ const builderRequest = async (path, { method = 'POST', body } = {}) => {
       : {}),
   });
   if (!response.ok) {
-    throw new Error(await responseErrorMessage(response, 'Não foi possível montar o guia'));
+    throw await responseApiError(response, 'Não foi possível montar o guia');
   }
   return response.json();
 };
@@ -1145,6 +1148,45 @@ export const fetchGuideBuilderSession = async (sessionId) =>
   builderRequest(`/api/guide-builder/${encodeURIComponent(sessionId)}`, {
     method: 'GET',
   });
+
+export const addBuilderActivity = async (
+  sessionId,
+  { landmarkSelectionId, activityType, afterPageId = null, layoutRevision },
+) => builderRequest(`/api/guide-builder/${encodeURIComponent(sessionId)}/activities`, {
+  body: {
+    landmark_selection_id: landmarkSelectionId,
+    activity_type: activityType,
+    ...(afterPageId ? { after_page_id: afterPageId } : {}),
+    layout_revision: layoutRevision,
+  },
+});
+
+export const moveBuilderActivity = async (
+  sessionId,
+  pageId,
+  { afterPageId, layoutRevision },
+) => builderRequest(
+  `/api/guide-builder/${encodeURIComponent(sessionId)}/activities/${encodeURIComponent(pageId)}/position`,
+  {
+    method: 'PATCH',
+    body: { after_page_id: afterPageId, layout_revision: layoutRevision },
+  },
+);
+
+export const removeBuilderActivity = async (
+  sessionId,
+  pageId,
+  { layoutRevision, confirmGenerated = false },
+) => builderRequest(
+  `/api/guide-builder/${encodeURIComponent(sessionId)}/activities/${encodeURIComponent(pageId)}`,
+  {
+    method: 'DELETE',
+    body: {
+      layout_revision: layoutRevision,
+      confirm_generated: confirmGenerated,
+    },
+  },
+);
 
 export const generateBuilderPageAttempt = async (
   sessionId,

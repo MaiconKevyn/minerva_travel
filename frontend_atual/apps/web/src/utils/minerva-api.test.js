@@ -1177,6 +1177,64 @@ test('builder PDF export and download stay on authenticated owner-scoped routes'
   }
 });
 
+test('builder activity layout APIs send narrow authenticated structural mutations', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  await authClient.signup('builder-layout@example.com', 'Senha123', 'Família Layout');
+  await authClient.login('builder-layout@example.com', 'Senha123');
+
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    return new Response(JSON.stringify({
+      session_id: 'session123',
+      revision: calls.length,
+      layout_revision: calls.length,
+      pages: [],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+
+  try {
+    await minervaApi.addBuilderActivity('session123', {
+      landmarkSelectionId: 'paris:eiffel-tower',
+      activityType: 'coloring',
+      layoutRevision: 2,
+    });
+    await minervaApi.moveBuilderActivity('session123', 'activity-1-coloring', {
+      afterPageId: 'landmark-2',
+      layoutRevision: 3,
+    });
+    await minervaApi.removeBuilderActivity('session123', 'activity-1-coloring', {
+      layoutRevision: 4,
+      confirmGenerated: true,
+    });
+
+    assert.deepEqual(
+      calls.map(({ url, options }) => [new URL(url).pathname, options.method || 'GET']),
+      [
+        ['/api/guide-builder/session123/activities', 'POST'],
+        ['/api/guide-builder/session123/activities/activity-1-coloring/position', 'PATCH'],
+        ['/api/guide-builder/session123/activities/activity-1-coloring', 'DELETE'],
+      ],
+    );
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      landmark_selection_id: 'paris:eiffel-tower',
+      activity_type: 'coloring',
+      layout_revision: 2,
+    });
+    assert.deepEqual(JSON.parse(calls[1].options.body), {
+      after_page_id: 'landmark-2',
+      layout_revision: 3,
+    });
+    assert.deepEqual(JSON.parse(calls[2].options.body), {
+      layout_revision: 4,
+      confirm_generated: true,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});
+
 test('guide draft APIs restore, save and discard through authenticated owner routes', async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];

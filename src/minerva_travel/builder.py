@@ -48,6 +48,28 @@ class BuilderIncomplete(Exception):
     pass
 
 
+class BuilderLayoutConflict(Exception):
+    def __init__(self, current_revision: int) -> None:
+        super().__init__(str(current_revision))
+        self.current_revision = current_revision
+
+
+class BuilderActivityDuplicate(Exception):
+    pass
+
+
+class BuilderActivityNotFound(Exception):
+    pass
+
+
+class BuilderActivityAnchorInvalid(Exception):
+    pass
+
+
+class BuilderActivityRemovalConfirmationRequired(Exception):
+    pass
+
+
 @dataclass
 class BuilderAttempt:
     id: str
@@ -106,6 +128,7 @@ class BuilderSession:
     pages: list[BuilderPage]
     privacy_consent: dict[str, Any] | None = None
     revision: int = 0
+    layout_revision: int = 0
 
     def page(self, page_id: str) -> BuilderPage | None:
         return next((page for page in self.pages if page.id == page_id), None)
@@ -135,6 +158,7 @@ class BuilderSession:
             "expires_at": self.expires_at,
             "title": self.form.get("title", ""),
             "revision": self.revision,
+            "layout_revision": self.layout_revision,
             "active_page_id": active_page.id if active_page else None,
             "is_complete": self.is_complete,
             "pages": [self._page_payload(page) for page in self.ordered_pages()],
@@ -279,6 +303,7 @@ def _load_builder_session(session_id: str) -> BuilderSession:
             photo_filename=payload["photo_filename"],
             privacy_consent=payload.get("privacy_consent"),
             revision=int(payload.get("revision", 0)),
+            layout_revision=int(payload.get("layout_revision", 0)),
             pages=[
                 BuilderPage(
                     **{
@@ -388,6 +413,157 @@ def approve_page_attempt(session: BuilderSession, page_id: str, attempt_id: str 
     page.approved_at = datetime.now(UTC).isoformat()
     page.error = None
     save_builder_session(session)
+
+
+def add_activity_page(
+    session: BuilderSession,
+    page: BuilderPage,
+    *,
+    after_page_id: str | None,
+    expected_layout_revision: int,
+) -> None:
+    """Add one server-built activity page at a legal, canonical layout position."""
+
+    _assert_layout_revision(session, expected_layout_revision)
+    if page.kind != "landmark_activity":
+        raise BuilderActivityNotFound(page.id)
+    if session.page(page.id) is not None:
+        raise BuilderActivityDuplicate(page.id)
+
+    ordered = session.ordered_pages()
+    linked_page_id = str(page.metadata.get("linked_landmark_page_id") or "")
+    if after_page_id is None:
+        anchor_index = _default_activity_anchor_index(ordered, linked_page_id)
+    else:
+        anchor_index = _activity_anchor_index(ordered, after_page_id, linked_page_id)
+    ordered.insert(anchor_index + 1, page)
+    _commit_layout(session, ordered)
+
+
+def move_activity_page(
+    session: BuilderSession,
+    page_id: str,
+    *,
+    after_page_id: str,
+    expected_layout_revision: int,
+) -> None:
+    """Move only an optional activity while keeping all fixed pages in relative order."""
+
+    _assert_layout_revision(session, expected_layout_revision)
+    page = session.page(page_id)
+    if page is None or page.kind != "landmark_activity":
+        raise BuilderActivityNotFound(page_id)
+    if page_id == after_page_id:
+        raise BuilderActivityAnchorInvalid(after_page_id)
+
+    ordered = [item for item in session.ordered_pages() if item.id != page_id]
+    linked_page_id = str(page.metadata.get("linked_landmark_page_id") or "")
+    anchor_index = _activity_anchor_index(ordered, after_page_id, linked_page_id)
+    ordered.insert(anchor_index + 1, page)
+    _commit_layout(session, ordered)
+
+
+def remove_activity_page(
+    session: BuilderSession,
+    page_id: str,
+    *,
+    expected_layout_revision: int,
+    confirm_generated: bool,
+) -> None:
+    """Remove one optional activity and its private attempts from the session."""
+
+    _assert_layout_revision(session, expected_layout_revision)
+    page = session.page(page_id)
+    if page is None or page.kind != "landmark_activity":
+        raise BuilderActivityNotFound(page_id)
+    if page.pending_attempt_id:
+        raise BuilderAttemptInProgress(page_id)
+    if page.attempts and not confirm_generated:
+        raise BuilderActivityRemovalConfirmationRequired(page_id)
+
+    asset_root = builder_asset_dir(session.id)
+    for attempt in page.attempts:
+        candidate = asset_root / attempt.filename
+        if candidate.parent == asset_root and candidate.name == attempt.filename:
+            candidate.unlink(missing_ok=True)
+    _commit_layout(
+        session,
+        [item for item in session.ordered_pages() if item.id != page_id],
+    )
+
+
+def _assert_layout_revision(session: BuilderSession, expected: int) -> None:
+    if session.layout_revision != expected:
+        raise BuilderLayoutConflict(session.layout_revision)
+
+
+def _default_activity_anchor_index(ordered: list[BuilderPage], linked_page_id: str) -> int:
+    linked_index = next(
+        (index for index, item in enumerate(ordered) if item.id == linked_page_id),
+        None,
+    )
+    if linked_index is None:
+        raise BuilderActivityAnchorInvalid(linked_page_id)
+    anchor_index = linked_index
+    for index in range(linked_index + 1, len(ordered)):
+        item = ordered[index]
+        if (
+            item.kind != "landmark_activity"
+            or item.metadata.get("linked_landmark_page_id") != linked_page_id
+        ):
+            break
+        anchor_index = index
+    return anchor_index
+
+
+def _activity_anchor_index(
+    ordered: list[BuilderPage], after_page_id: str, linked_page_id: str
+) -> int:
+    anchor_index = next(
+        (index for index, item in enumerate(ordered) if item.id == after_page_id),
+        None,
+    )
+    linked_index = next(
+        (index for index, item in enumerate(ordered) if item.id == linked_page_id),
+        None,
+    )
+    if anchor_index is None or linked_index is None:
+        raise BuilderActivityAnchorInvalid(after_page_id)
+    anchor = ordered[anchor_index]
+    if anchor.kind in {"best_memory", "homecoming"} or anchor_index < linked_index:
+        raise BuilderActivityAnchorInvalid(after_page_id)
+    return anchor_index
+
+
+def _commit_layout(session: BuilderSession, ordered: list[BuilderPage]) -> None:
+    for position, page in enumerate(ordered, start=1):
+        page.position = position
+    session.pages = ordered
+    _sync_activity_selections(session)
+    session.layout_revision += 1
+    builder_pdf_path(session.id).unlink(missing_ok=True)
+    save_builder_session(session)
+
+
+def _sync_activity_selections(session: BuilderSession) -> None:
+    counts: dict[str, int] = {}
+    selections: list[dict[str, Any]] = []
+    for page in session.ordered_pages():
+        if page.kind != "landmark_activity":
+            continue
+        landmark_id = str(page.metadata.get("landmark_selection_id") or "")
+        activity_type = str(page.metadata.get("activity_type") or "")
+        if not landmark_id or not activity_type:
+            continue
+        counts[landmark_id] = counts.get(landmark_id, 0) + 1
+        selections.append(
+            {
+                "landmark_selection_id": landmark_id,
+                "activity_type": activity_type,
+                "order": counts[landmark_id],
+            }
+        )
+    session.form["activity_selections"] = selections
 
 
 def delete_builder_sessions_for_owner(owner_id: str) -> int:

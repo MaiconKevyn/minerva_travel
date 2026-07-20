@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { Buffer } from 'node:buffer';
 
 const onePixelPng = Buffer.from(
@@ -144,6 +145,8 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   const activitySelected = { coloring: null, word_search: null };
   const activityApproved = { coloring: false, word_search: false };
   const activityRequestBodies = [];
+  let wordSearchIncluded = false;
+  let layoutRevision = 0;
   let memoryAttempts = [];
   let memorySelected = null;
   let memoryApproved = false;
@@ -156,6 +159,7 @@ test('family reviews pages and controls family inclusion on a landmark', async (
     expires_at: '2026-08-03T00:00:00+00:00',
     title: 'Família Aurora',
     revision: ++sessionRevision,
+    layout_revision: layoutRevision,
     active_page_id: !coverApproved
       ? 'cover'
       : !summaryApproved
@@ -164,13 +168,13 @@ test('family reviews pages and controls family inclusion on a landmark', async (
           ? 'landmark-1'
           : !activityApproved.coloring
             ? 'activity-coloring'
-            : !activityApproved.word_search
+          : wordSearchIncluded && !activityApproved.word_search
               ? 'activity-word-search'
               : !memoryApproved
                 ? 'best-memory'
                 : null,
     is_complete: coverApproved && summaryApproved && landmarkApproved &&
-      activityApproved.coloring && activityApproved.word_search && memoryApproved,
+      activityApproved.coloring && (!wordSearchIncluded || activityApproved.word_search) && memoryApproved,
     pages: [
       pageState({
         id: 'cover',
@@ -254,7 +258,7 @@ test('family reviews pages and controls family inclusion on a landmark', async (
         approved: memoryApproved,
         metadata: { age_complexity: 'early_reader' },
       }),
-    ],
+    ].filter((item) => wordSearchIncluded || item.id !== 'activity-word-search'),
   });
 
   await page.route('**/api/guides', (route) =>
@@ -321,6 +325,16 @@ test('family reviews pages and controls family inclusion on a landmark', async (
     const method = request.method();
     if (url.pathname === '/api/guide-builder' && method === 'POST') {
       return route.fulfill({ status: 201, json: sessionPayload() });
+    }
+    if (url.pathname.endsWith('/activities') && method === 'POST') {
+      expect(request.postDataJSON()).toMatchObject({
+        landmark_selection_id: 'eiffel',
+        activity_type: 'word_search',
+        layout_revision: 0,
+      });
+      wordSearchIncluded = true;
+      layoutRevision += 1;
+      return route.fulfill({ status: 200, json: sessionPayload() });
     }
     if (url.pathname.endsWith('/pages/cover/attempts') && method === 'POST') {
       const revisionInstruction = request.postDataJSON()?.revision_instruction || '';
@@ -487,6 +501,30 @@ test('family reviews pages and controls family inclusion on a landmark', async (
 
   await page.getByRole('button', { name: 'Começar pelas páginas' }).click();
   await expect(page.getByText('Nenhuma imagem gerada ainda')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Adicionar atividades' }).click();
+  await expect(page.getByRole('heading', { name: 'Atividades do guia' })).toBeVisible();
+  const wordSearchCard = page.locator('article').filter({ hasText: 'Caça-palavras' });
+  await wordSearchCard.getByRole('button', { name: /Ver exemplo completo/ }).click();
+  const previewDialog = page.getByRole('dialog').filter({
+    has: page.getByRole('heading', { name: 'Caça-palavras' }),
+  });
+  await expect(previewDialog).toBeVisible();
+  await previewDialog.getByRole('button', { name: 'Close' }).click();
+  await wordSearchCard.getByRole('button', { name: 'Adicionar ao guia' }).click();
+  await expect(page.getByText('Atividade adicionada. Você pode posicioná-la ou gerar quando quiser.')).toBeVisible();
+  await page.getByRole('button', { name: /Organizar páginas/ }).click();
+  const activityPanel = page.getByRole('dialog').filter({
+    has: page.getByRole('heading', { name: 'Atividades do guia' }),
+  });
+  await expect(activityPanel.getByText('Caça-palavras — Torre Eiffel', { exact: true })).toBeVisible();
+  await expect(activityPanel.getByLabel('Inserir Caça-palavras — Torre Eiffel depois de')).toBeVisible();
+  const panelAccessibility = await new AxeBuilder({ page })
+    .include('[role="dialog"]')
+    .withTags(['wcag2a', 'wcag2aa'])
+    .analyze();
+  expect(panelAccessibility.violations).toEqual([]);
+  await activityPanel.getByRole('button', { name: 'Close' }).click();
 
   await page.getByRole('button', { name: /Torre Eiffel, França/ }).click();
   await page.getByRole('button', { name: 'Gerar página' }).click();

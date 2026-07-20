@@ -218,3 +218,31 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.match(assembly, /Ligada a/);
   assert.match(assembly, /hydratedAssetUrlsRef/);
 });
+
+test('final builder offers a real-example activity panel and persistent page placement', () => {
+  const api = readProjectFile('src/utils/minerva-api.js');
+  const assembly = readProjectFile('src/components/GuideAssembly.jsx');
+  const panel = readProjectFile('src/components/GuideActivityPanel.jsx');
+  const activities = readProjectFile('src/utils/landmark-activities.js');
+
+  assert.match(assembly, /GuideActivityPanel/);
+  assert.match(assembly, /handleAddActivity/);
+  assert.match(assembly, /handleMoveActivity/);
+  assert.match(assembly, /handleRemoveActivity/);
+  assert.match(api, /addBuilderActivity/);
+  assert.match(api, /moveBuilderActivity/);
+  assert.match(api, /removeBuilderActivity/);
+  assert.match(api, /layout_revision/);
+  assert.match(panel, /Adicionar atividades/);
+  assert.match(panel, /Exemplo real/);
+  assert.match(panel, /Organizar páginas/);
+  assert.match(panel, /draggable=/);
+  assert.match(panel, /Inserir depois de/);
+  assert.match(panel, /Mover .* uma posição para cima/);
+  assert.match(panel, /aria-live="polite"/);
+  assert.match(panel, /A imagem só será produzida/);
+  assert.match(activities, /detail-hunt-real\.webp/);
+  assert.match(activities, /word-search-real\.webp/);
+  assert.match(activities, /painting-real\.webp/);
+  assert.match(activities, /coloring-real\.webp/);
+});

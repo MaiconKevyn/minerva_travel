@@ -2,7 +2,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, Event
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -350,6 +350,61 @@ def test_independent_pages_generate_concurrently_without_changing_guide_order(
     assert [page["id"] for page in approved_out_of_order["pages"]] == initial_order
 
 
+def test_activity_move_is_preserved_while_another_page_is_generating(tmp_path, monkeypatch):
+    client, generator = _setup(monkeypatch, tmp_path)
+    created = _create_session(client)
+    session_id = created["session_id"]
+    selection_id = next(page for page in created["pages"] if page["id"] == "landmark-1")[
+        "metadata"
+    ]["landmark_selection_id"]
+    added = client.post(
+        f"/api/guide-builder/{session_id}/activities",
+        json={
+            "landmark_selection_id": selection_id,
+            "activity_type": "coloring",
+            "layout_revision": 0,
+        },
+    )
+    assert added.status_code == 200, added.text
+
+    started = Event()
+    release = Event()
+    original_landmark = generator.generate_landmark_page
+
+    def wait_then_generate(**kwargs):
+        started.set()
+        assert release.wait(timeout=5)
+        return original_landmark(**kwargs)
+
+    generator.generate_landmark_page = wait_then_generate
+    monkeypatch.setattr("minerva_travel.app.admit_expensive_request", lambda **_kwargs: None)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        generation_future = pool.submit(
+            _generate,
+            client,
+            session_id,
+            "landmark-1",
+            "landmark-during-layout",
+        )
+        assert started.wait(timeout=5)
+        moved = client.patch(
+            f"/api/guide-builder/{session_id}/activities/activity-1-coloring/position",
+            json={"after_page_id": "landmark-2", "layout_revision": 1},
+        )
+        release.set()
+        generated = generation_future.result(timeout=10)
+
+    assert moved.status_code == 200, moved.text
+    assert generated.status_code == 200, generated.text
+    latest = client.get(f"/api/guide-builder/{session_id}").json()
+    ordered_ids = [page["id"] for page in latest["pages"]]
+    assert ordered_ids.index("activity-1-coloring") == ordered_ids.index("landmark-2") + 1
+    landmark_page = next(page for page in latest["pages"] if page["id"] == "landmark-1")
+    assert len(landmark_page["attempts"]) == 1
+    assert latest["layout_revision"] == 2
+
+
 def test_page_attempt_limit_is_checked_before_provider_call(tmp_path, monkeypatch):
     client, generator = _setup(monkeypatch, tmp_path)
     session_id = _create_session(client)["session_id"]
@@ -605,6 +660,9 @@ def test_builder_session_and_assets_are_owner_scoped(tmp_path, monkeypatch):
     try:
         created = _create_session(client)
         session_id = created["session_id"]
+        selection_id = next(page for page in created["pages"] if page["id"] == "landmark-1")[
+            "metadata"
+        ]["landmark_selection_id"]
         generated = _generate(client, session_id, "cover", "owner-a-cover").json()
         asset_url = generated["pages"][0]["attempts"][0]["asset_url"]
     finally:
@@ -615,10 +673,124 @@ def test_builder_session_and_assets_are_owner_scoped(tmp_path, monkeypatch):
         assert client.get(f"/api/guide-builder/{session_id}").status_code == 404
         assert client.get(asset_url).status_code == 404
         assert _generate(client, session_id, "cover", "owner-b-cover").status_code == 404
+        assert (
+            client.post(
+                f"/api/guide-builder/{session_id}/activities",
+                json={
+                    "landmark_selection_id": selection_id,
+                    "activity_type": "coloring",
+                    "layout_revision": 0,
+                },
+            ).status_code
+            == 404
+        )
         assert client.post(f"/api/guide-builder/{session_id}/pdf").status_code == 404
         assert client.get(f"/guide-builder/{session_id}/pdf").status_code == 404
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_activity_can_be_added_moved_and_removed_without_generation(tmp_path, monkeypatch):
+    client, generator = _setup(monkeypatch, tmp_path)
+    created = _create_session(client)
+    session_id = created["session_id"]
+    first_landmark = next(page for page in created["pages"] if page["id"] == "landmark-1")
+    selection_id = first_landmark["metadata"]["landmark_selection_id"]
+
+    added = client.post(
+        f"/api/guide-builder/{session_id}/activities",
+        json={
+            "landmark_selection_id": selection_id,
+            "activity_type": "coloring",
+            "layout_revision": 0,
+        },
+    )
+    assert added.status_code == 200, added.text
+    added_payload = added.json()
+    assert added_payload["layout_revision"] == 1
+    assert generator.calls == []
+    ordered_ids = [page["id"] for page in added_payload["pages"]]
+    assert ordered_ids.index("activity-1-coloring") == ordered_ids.index("landmark-1") + 1
+    activity = next(page for page in added_payload["pages"] if page["id"] == "activity-1-coloring")
+    assert activity["status"] == "ready"
+    assert activity["attempts"] == []
+
+    duplicate = client.post(
+        f"/api/guide-builder/{session_id}/activities",
+        json={
+            "landmark_selection_id": selection_id,
+            "activity_type": "coloring",
+            "layout_revision": 1,
+        },
+    )
+    assert duplicate.status_code == 422
+    assert duplicate.json()["detail"]["code"] == "activity_selection_duplicate"
+
+    moved = client.patch(
+        f"/api/guide-builder/{session_id}/activities/activity-1-coloring/position",
+        json={"after_page_id": "landmark-2", "layout_revision": 1},
+    )
+    assert moved.status_code == 200, moved.text
+    moved_payload = moved.json()
+    assert moved_payload["layout_revision"] == 2
+    moved_ids = [page["id"] for page in moved_payload["pages"]]
+    assert moved_ids.index("activity-1-coloring") == moved_ids.index("landmark-2") + 1
+    assert [page["position"] for page in moved_payload["pages"]] == list(
+        range(1, len(moved_payload["pages"]) + 1)
+    )
+
+    stale = client.patch(
+        f"/api/guide-builder/{session_id}/activities/activity-1-coloring/position",
+        json={"after_page_id": "landmark-1", "layout_revision": 1},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "builder_layout_conflict"
+    assert stale.json()["detail"]["layout_revision"] == 2
+
+    invalid_anchor = client.patch(
+        f"/api/guide-builder/{session_id}/activities/activity-1-coloring/position",
+        json={"after_page_id": "cover", "layout_revision": 2},
+    )
+    assert invalid_anchor.status_code == 422
+    assert invalid_anchor.json()["detail"]["code"] == "activity_anchor_invalid"
+
+    generated = _generate(
+        client,
+        session_id,
+        "activity-1-coloring",
+        "dynamic-coloring",
+    )
+    assert generated.status_code == 200, generated.text
+    activity_attempt = next(
+        page for page in generated.json()["pages"] if page["id"] == "activity-1-coloring"
+    )["attempts"][0]
+    asset_name = activity_attempt["asset_url"].rsplit("/", 1)[-1]
+    asset_path = tmp_path / "generated" / "builder" / session_id / asset_name
+    assert asset_path.is_file()
+
+    confirmation_required = client.request(
+        "DELETE",
+        f"/api/guide-builder/{session_id}/activities/activity-1-coloring",
+        json={"layout_revision": 2},
+    )
+    assert confirmation_required.status_code == 409
+    assert (
+        confirmation_required.json()["detail"]["code"] == "builder_activity_confirmation_required"
+    )
+
+    cached_pdf = tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf"
+    cached_pdf.parent.mkdir(parents=True, exist_ok=True)
+    cached_pdf.write_bytes(b"stale-pdf")
+    removed = client.request(
+        "DELETE",
+        f"/api/guide-builder/{session_id}/activities/activity-1-coloring",
+        json={"layout_revision": 2, "confirm_generated": True},
+    )
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["layout_revision"] == 3
+    assert "activity-1-coloring" not in [page["id"] for page in removed.json()["pages"]]
+    assert not asset_path.exists()
+    assert not cached_pdf.exists()
 
 
 def test_account_deletion_removes_builder_session_photo_and_pages(tmp_path, monkeypatch):

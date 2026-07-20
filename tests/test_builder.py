@@ -169,6 +169,7 @@ def test_revision_instruction_is_normalized_persisted_and_old_sessions_remain_re
 
     session_path = tmp_path / "builder" / f"{session.id}.json"
     legacy_payload = json.loads(session_path.read_text(encoding="utf-8"))
+    legacy_payload.pop("layout_revision")
     legacy_payload["pages"][0].pop("pending_revision_instruction")
     legacy_payload["pages"][0].pop("pending_include_family")
     legacy_payload["pages"][0]["attempts"][0].pop("revision_instruction")
@@ -176,6 +177,7 @@ def test_revision_instruction_is_normalized_persisted_and_old_sessions_remain_re
     session_path.write_text(json.dumps(legacy_payload), encoding="utf-8")
 
     legacy = load_builder_session(session.id, "owner")
+    assert legacy.layout_revision == 0
     assert legacy.pages[0].pending_revision_instruction == ""
     assert legacy.pages[0].pending_include_family is False
     assert legacy.pages[0].attempts[0].revision_instruction == ""
