@@ -21,10 +21,12 @@ def _png_bytes(color: str) -> bytes:
 class FakePageGenerator:
     def __init__(self) -> None:
         self.calls: list[str] = []
+        self.requests: list[dict] = []
         self.fail_next = False
 
-    def _write(self, kind: str, output_path: Path) -> Path:
+    def _write(self, kind: str, output_path: Path, request: dict) -> Path:
         self.calls.append(kind)
+        self.requests.append({"kind": kind, **request})
         if self.fail_next:
             self.fail_next = False
             raise PageGenerationError("Falha simulada do provedor.")
@@ -37,14 +39,14 @@ class FakePageGenerator:
         output_path.write_bytes(_png_bytes(colors[kind]))
         return output_path
 
-    def generate_cover_page(self, *, output_path, **_kwargs):
-        return self._write("cover", output_path)
+    def generate_cover_page(self, *, output_path, **kwargs):
+        return self._write("cover", output_path, kwargs)
 
-    def generate_summary_page(self, *, output_path, **_kwargs):
-        return self._write("summary", output_path)
+    def generate_summary_page(self, *, output_path, **kwargs):
+        return self._write("summary", output_path, kwargs)
 
-    def generate_landmark_page(self, *, output_path, **_kwargs):
-        return self._write("landmark", output_path)
+    def generate_landmark_page(self, *, output_path, **kwargs):
+        return self._write("landmark", output_path, kwargs)
 
 
 CUSTOM_LANDMARKS = json.dumps(
@@ -82,10 +84,21 @@ def _setup(monkeypatch, tmp_path) -> tuple[TestClient, FakePageGenerator]:
     return TestClient(app), generator
 
 
-def _generate(client: TestClient, session_id: str, page_id: str, key: str):
+def _generate(
+    client: TestClient,
+    session_id: str,
+    page_id: str,
+    key: str,
+    revision_instruction: str | None = None,
+):
     return client.post(
         f"/api/guide-builder/{session_id}/pages/{page_id}/attempts",
         headers={"Idempotency-Key": key},
+        json=(
+            {"revision_instruction": revision_instruction}
+            if revision_instruction is not None
+            else None
+        ),
     )
 
 
@@ -192,6 +205,40 @@ def test_provider_failure_is_retryable_and_does_not_consume_attempt(tmp_path, mo
     retried = _generate(client, session_id, "cover", "same-safe-key")
     assert retried.status_code == 200
     assert len(retried.json()["pages"][0]["attempts"]) == 1
+
+
+def test_regeneration_uses_selected_attempt_and_persists_bounded_feedback(tmp_path, monkeypatch):
+    client, generator = _setup(monkeypatch, tmp_path)
+    session_id = _create_session(client)["session_id"]
+
+    first = _generate(client, session_id, "cover", "cover-first")
+    assert first.status_code == 200
+    assert generator.requests[-1]["reference_page"] is None
+    assert generator.requests[-1]["revision_instruction"] == ""
+
+    feedback = "  Mude   para estilo de colagem 3D\ne use tons azuis.  "
+    revised = _generate(client, session_id, "cover", "cover-revised", feedback)
+    assert revised.status_code == 200, revised.text
+    request = generator.requests[-1]
+    assert request["reference_page"].name == "cover-1.png"
+    assert request["revision_instruction"] == "Mude para estilo de colagem 3D e use tons azuis."
+    attempts = revised.json()["pages"][0]["attempts"]
+    assert attempts[-1]["revision_instruction"] == (
+        "Mude para estilo de colagem 3D e use tons azuis."
+    )
+
+    selected = client.patch(
+        f"/api/guide-builder/{session_id}/pages/cover/selection",
+        json={"attempt_id": "cover-1"},
+    )
+    assert selected.status_code == 200
+    third = _generate(client, session_id, "cover", "cover-selected", "Troque o fundo.")
+    assert third.status_code == 200
+    assert generator.requests[-1]["reference_page"].name == "cover-1.png"
+
+    too_long = _generate(client, session_id, "cover", "cover-too-long", "x" * 601)
+    assert too_long.status_code == 422
+    assert generator.calls == ["cover", "cover", "cover"]
 
 
 def test_builder_session_and_assets_are_owner_scoped(tmp_path, monkeypatch):

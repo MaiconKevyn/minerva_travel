@@ -6,10 +6,11 @@ const onePixelPng = Buffer.from(
   'base64',
 );
 
-const attempt = (id, filename) => ({
+const attempt = (id, filename, revisionInstruction = '') => ({
   id,
   asset_url: `/guide-builder/syntheticsession/assets/${filename}`,
   created_at: '2026-07-20T00:00:00+00:00',
+  revision_instruction: revisionInstruction,
 });
 
 const pageState = ({
@@ -44,6 +45,8 @@ test('family reviews versions and approves cover then summary directly in the UI
   });
 
   let coverAttempts = [];
+  const coverRevisionRequests = [];
+  let rejectNextCoverRevision = false;
   let coverSelected = null;
   let coverApproved = false;
   let summaryAttempts = [];
@@ -149,8 +152,20 @@ test('family reviews versions and approves cover then summary directly in the UI
       return route.fulfill({ status: 201, json: sessionPayload() });
     }
     if (url.pathname.endsWith('/pages/cover/attempts') && method === 'POST') {
+      const revisionInstruction = request.postDataJSON()?.revision_instruction || '';
+      coverRevisionRequests.push(revisionInstruction);
+      if (rejectNextCoverRevision) {
+        rejectNextCoverRevision = false;
+        return route.fulfill({
+          status: 502,
+          json: { detail: { message: 'Falha simulada ao refazer a capa.' } },
+        });
+      }
       const next = coverAttempts.length + 1;
-      coverAttempts = [...coverAttempts, attempt(`cover-${next}`, `cover-${next}.png`)];
+      coverAttempts = [
+        ...coverAttempts,
+        attempt(`cover-${next}`, `cover-${next}.png`, revisionInstruction),
+      ];
       coverSelected = `cover-${next}`;
       return route.fulfill({ status: 200, json: sessionPayload() });
     }
@@ -213,8 +228,26 @@ test('family reviews versions and approves cover then summary directly in the UI
   await expect(page.getByText('Nenhuma imagem gerada ainda')).toBeVisible();
   await page.getByRole('button', { name: 'Gerar página' }).click();
   await expect(page.getByAltText('Versão escolhida de Capa da família')).toBeVisible();
-  await page.getByRole('button', { name: 'Gerar outra versão' }).click();
+  const revisionField = page.getByLabel('O que você quer mudar nesta versão?');
+  await expect(revisionField).toBeVisible();
+  await revisionField.fill('Mude para animação 3D, com tons azuis e título menor.');
+  await page.getByRole('button', { name: 'Gerar versão com ajustes' }).click();
   await expect(page.getByText('Versão 2', { exact: true })).toBeVisible();
+  await expect(revisionField).toHaveValue('');
+  expect(coverRevisionRequests).toEqual([
+    '',
+    'Mude para animação 3D, com tons azuis e título menor.',
+  ]);
+  rejectNextCoverRevision = true;
+  await revisionField.fill('Troque apenas o fundo por uma cena noturna.');
+  await page.getByRole('button', { name: 'Gerar versão com ajustes' }).click();
+  await expect(page.getByText('Falha simulada ao refazer a capa.')).toBeVisible();
+  await expect(revisionField).toHaveValue('Troque apenas o fundo por uma cena noturna.');
+  expect(coverRevisionRequests.at(-1)).toBe(
+    'Troque apenas o fundo por uma cena noturna.',
+  );
+  expect(consoleErrors.some((message) => message.includes('502 (Bad Gateway)'))).toBe(true);
+  consoleErrors.length = 0;
   await page.locator('button').filter({ hasText: 'Versão 1' }).click();
   await page.getByRole('button', { name: 'Aprovar e continuar' }).click();
 

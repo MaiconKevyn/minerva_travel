@@ -91,7 +91,7 @@ def test_openai_cover_uses_official_edit_contract_and_persists_png(tmp_path):
     assert kwargs["data"]["model"] == "gpt-image-2"
     assert "input_fidelity" not in kwargs["data"]
     assert kwargs["data"]["size"] == "1024x1536"
-    assert "image[]" in kwargs["files"]
+    assert [field for field, _file in kwargs["files"]] == ["image[]"]
     with Image.open(output) as image:
         assert image.size == (1024, 1536)
         assert image.format == "PNG"
@@ -116,6 +116,73 @@ def test_openai_summary_uses_generation_contract(tmp_path):
     assert url.endswith("/images/generations")
     assert kwargs["json"]["output_format"] == "png"
     assert '"Coliseu"' in kwargs["json"]["prompt"]
+
+
+def test_cover_revision_uses_original_photo_selected_cover_and_user_feedback(tmp_path):
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _response(_png_bytes(color="#8f6cb3"))
+
+    photo = tmp_path / "family.png"
+    photo.write_bytes(_png_bytes(size=(400, 300)))
+    reference = tmp_path / "cover-1.png"
+    reference.write_bytes(_png_bytes())
+    generator = OpenAIGuidePageGenerator(
+        api_key="test-key", model="gpt-image-2", transport=transport
+    )
+
+    generator.generate_cover_page(
+        family_photo=photo,
+        reference_page=reference,
+        revision_instruction="Mude o estilo para animação 3D e use tons azuis.",
+        output_path=tmp_path / "cover-2.png",
+        family_title="Família Moraes",
+        trip_date="Julho de 2026",
+        landmark_names=["Torre Eiffel"],
+        expected_visible_family_member_count=3,
+    )
+
+    _method, url, kwargs = calls[0]
+    assert url.endswith("/images/edits")
+    assert [field for field, _file in kwargs["files"]] == ["image[]", "image[]"]
+    assert [file_data[0] for _field, file_data in kwargs["files"]] == [
+        "family.png",
+        "cover-1.png",
+    ]
+    prompt = kwargs["data"]["prompt"]
+    assert "Input image 1 is the original family photo" in prompt
+    assert '"Mude o estilo para animação 3D e use tons azuis."' in prompt
+    assert "requested visual style replaces" in prompt
+    assert '"Família Moraes"' in prompt
+    assert "change the required family member count" in prompt
+
+
+def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_path):
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _response(_png_bytes(color="#cc825f"))
+
+    reference = tmp_path / "summary-1.png"
+    reference.write_bytes(_png_bytes())
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+
+    generator.generate_summary_page(
+        output_path=tmp_path / "summary-2.png",
+        reference_page=reference,
+        family_title="Família Moraes",
+        trip_date="2026",
+        landmark_names=["Torre Eiffel", "Coliseu"],
+    )
+
+    _method, url, kwargs = calls[0]
+    assert url.endswith("/images/edits")
+    assert [file_data[0] for _field, file_data in kwargs["files"]] == ["summary-1.png"]
+    assert "Create a visibly different alternative" in kwargs["data"]["prompt"]
+    assert '2. "Coliseu"' in kwargs["data"]["prompt"]
 
 
 def test_openai_page_generator_rejects_missing_key(monkeypatch):

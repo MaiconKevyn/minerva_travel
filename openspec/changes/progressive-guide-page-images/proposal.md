@@ -10,6 +10,9 @@ The first experiment must also validate the current OpenAI image model's ability
 - Generate a complete vertical PNG for each page, including its required visible text, using the OpenAI Image API.
 - Start with the cover and illustrated trip summary, while representing subsequent guide pages through the same ordered page contract.
 - Require an explicit user action to generate, approve, or regenerate each page.
+- Let the user describe what should change in a regeneration, using the selected attempt as a
+  visual reference; when the field is empty, request a visibly different alternative instead of
+  repeating the same composition.
 - Display generated page images directly in the authenticated UI without waiting for or producing a PDF.
 - Treat provider failures as visible retryable errors; never substitute a placeholder, raw family photo, or legacy PDF generation.
 - Preserve the exact approved image attempt so later export can reuse the same pixels.

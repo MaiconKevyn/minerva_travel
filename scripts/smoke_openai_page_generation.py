@@ -1,7 +1,9 @@
-"""Run one paid, synthetic OpenAI cover-page smoke without user data."""
+"""Run a paid, synthetic OpenAI cover-page smoke without user data."""
 
 from __future__ import annotations
 
+import argparse
+import hashlib
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -11,6 +13,7 @@ from minerva_travel.page_generation import OpenAIGuidePageGenerator
 SMOKE_DIR = Path("runtime/openai-page-smoke")
 FIXTURE_PATH = SMOKE_DIR / "synthetic-family.png"
 OUTPUT_PATH = SMOKE_DIR / "cover.png"
+REVISION_OUTPUT_PATH = SMOKE_DIR / "cover-revision.png"
 
 
 def create_synthetic_family_fixture() -> Path:
@@ -40,19 +43,38 @@ def create_synthetic_family_fixture() -> Path:
     return FIXTURE_PATH
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--revision-instruction",
+        help="Revise the existing synthetic cover with this design feedback.",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
     fixture = create_synthetic_family_fixture()
     generator = OpenAIGuidePageGenerator(quality="low")
+    reference = OUTPUT_PATH if args.revision_instruction else None
+    output = REVISION_OUTPUT_PATH if reference else OUTPUT_PATH
+    if reference is not None and not reference.is_file():
+        raise SystemExit(f"Generate the base smoke cover first: {reference}")
     generator.generate_cover_page(
         family_photo=fixture,
-        output_path=OUTPUT_PATH,
+        output_path=output,
         family_title="Família Aurora",
         trip_date="Julho de 2026",
         landmark_names=["Torre Eiffel", "Coliseu"],
         expected_visible_family_member_count=4,
+        revision_instruction=args.revision_instruction or "",
+        reference_page=reference,
     )
-    with Image.open(OUTPUT_PATH) as image:
-        print(f"OpenAI smoke OK: {OUTPUT_PATH} ({image.format}, {image.width}x{image.height})")
+    with Image.open(output) as image:
+        digest = hashlib.sha256(output.read_bytes()).hexdigest()[:12]
+        print(f"OpenAI smoke OK: {output} ({image.format}, {image.width}x{image.height}, {digest})")
+    if reference is not None and output.read_bytes() == reference.read_bytes():
+        raise SystemExit("The revision returned bytes identical to the selected reference.")
 
 
 if __name__ == "__main__":

@@ -52,3 +52,11 @@
 - [x] 7.1 Commit the OpenSpec artifacts and implementation to `main` and push `origin/main`.
 - [x] 7.2 Build the frontend from the pushed `main`, preserve Hostinger production configuration, and publish it to `hostinger-frontend`.
 - [x] 7.3 Confirm both remote branch heads and report live-test limitations or required Render environment changes.
+
+## 8. Directed Page Revisions
+
+- [x] 8.1 Extend the attempt contract and persistence with a bounded normalized revision instruction while remaining compatible with existing sessions.
+- [x] 8.2 Regenerate from the selected attempt through the Image edits endpoint, preserving original family input and mandatory copy/composition rules.
+- [x] 8.3 Add the optional revision field, empty-field variation behavior, and clear retry states to the progressive UI.
+- [x] 8.4 Add provider, API, frontend-contract, and browser lifecycle coverage for directed revisions.
+- [ ] 8.5 Run complete automated and synthetic live visual validation, then publish `main` and `hostinger-frontend`.

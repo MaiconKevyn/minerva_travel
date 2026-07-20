@@ -17,6 +17,7 @@ from minerva_travel import storage
 from minerva_travel.config import guide_draft_retention_days
 
 MAX_ATTEMPTS_PER_PAGE = 4
+MAX_REVISION_INSTRUCTION_LENGTH = 600
 
 
 class BuilderSessionNotFound(Exception):
@@ -49,6 +50,7 @@ class BuilderAttempt:
     filename: str
     created_at: str
     idempotency_key: str
+    revision_instruction: str = ""
 
 
 @dataclass
@@ -64,6 +66,7 @@ class BuilderPage:
     approved_at: str | None = None
     pending_attempt_id: str | None = None
     pending_idempotency_key: str | None = None
+    pending_revision_instruction: str = ""
     error: str | None = None
 
     def selected_attempt(self) -> BuilderAttempt | None:
@@ -160,6 +163,7 @@ class BuilderSession:
                     "id": attempt.id,
                     "asset_url": self._asset_url(attempt.filename),
                     "created_at": attempt.created_at,
+                    "revision_instruction": attempt.revision_instruction,
                 }
                 for attempt in page.attempts
             ],
@@ -263,7 +267,10 @@ def _load_builder_session(session_id: str) -> BuilderSession:
 
 
 def reserve_page_attempt(
-    session: BuilderSession, page_id: str, idempotency_key: str
+    session: BuilderSession,
+    page_id: str,
+    idempotency_key: str,
+    revision_instruction: str = "",
 ) -> tuple[str, bool]:
     page = session.page(page_id)
     if page is None:
@@ -280,6 +287,7 @@ def reserve_page_attempt(
     attempt_id = f"{page.id}-{len(page.attempts) + 1}"
     page.pending_attempt_id = attempt_id
     page.pending_idempotency_key = idempotency_key
+    page.pending_revision_instruction = normalize_revision_instruction(revision_instruction)
     page.error = None
     save_builder_session(session)
     return attempt_id, False
@@ -296,11 +304,13 @@ def commit_page_attempt(
         filename=filename,
         created_at=datetime.now(UTC).isoformat(),
         idempotency_key=page.pending_idempotency_key,
+        revision_instruction=page.pending_revision_instruction,
     )
     page.attempts.append(attempt)
     page.selected_attempt_id = attempt.id
     page.pending_attempt_id = None
     page.pending_idempotency_key = None
+    page.pending_revision_instruction = ""
     page.error = None
     save_builder_session(session)
     return attempt
@@ -314,6 +324,7 @@ def rollback_page_attempt(
         return
     page.pending_attempt_id = None
     page.pending_idempotency_key = None
+    page.pending_revision_instruction = ""
     page.error = message
     save_builder_session(session)
 
@@ -408,3 +419,9 @@ def _is_private_runtime_path(path: Path) -> bool:
     except OSError:
         return False
     return candidate == root or root in candidate.parents
+
+
+def normalize_revision_instruction(value: str) -> str:
+    """Normalize bounded human design feedback before storing or prompting."""
+
+    return " ".join(value.split())[:MAX_REVISION_INSTRUCTION_LENGTH]

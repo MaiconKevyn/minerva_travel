@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import {
   approveBuilderPage,
   completeGuideBuilder,
@@ -28,12 +29,15 @@ const STATUS_LABELS = {
   error: 'Precisa tentar novamente',
 };
 
+const MAX_REVISION_INSTRUCTION_LENGTH = 600;
+
 const GuideAssembly = ({ session: initialSession }) => {
   const [session, setSession] = useState(initialSession);
   const [assetUrls, setAssetUrls] = useState({});
   const [assetLoadErrors, setAssetLoadErrors] = useState({});
   const [busyAction, setBusyAction] = useState('');
   const [actionError, setActionError] = useState('');
+  const [revisionInstruction, setRevisionInstruction] = useState('');
   const [completion, setCompletion] = useState(null);
   const objectUrlsRef = useRef(new Set());
   const generationKeysRef = useRef({});
@@ -98,6 +102,10 @@ const GuideAssembly = ({ session: initialSession }) => {
     ? assetLoadErrors[selectedAttempt.asset_url]
     : '';
 
+  useEffect(() => {
+    setRevisionInstruction('');
+  }, [activePage?.id]);
+
   const updateSession = async (operation) => {
     const nextSession = await operation();
     setSession(nextSession);
@@ -111,11 +119,18 @@ const GuideAssembly = ({ session: initialSession }) => {
     setActionError('');
     const key = generationKeysRef.current[activePage.id] || createIdempotencyKey();
     generationKeysRef.current[activePage.id] = key;
+    const requestedRevision = revisionInstruction.trim();
     try {
       await updateSession(() =>
-        generateBuilderPageAttempt(session.session_id, activePage.id, key),
+        generateBuilderPageAttempt(
+          session.session_id,
+          activePage.id,
+          key,
+          requestedRevision,
+        ),
       );
       delete generationKeysRef.current[activePage.id];
+      setRevisionInstruction('');
       toast.success(`${activePage.title} gerada. Confira todos os textos antes de aprovar.`);
     } catch (error) {
       setActionError(error.message || 'Não foi possível gerar esta página.');
@@ -374,6 +389,34 @@ const GuideAssembly = ({ session: initialSession }) => {
                   </div>
                 )}
 
+                {selectedAttempt && (
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                    <label
+                      htmlFor={`revision-${activePage.id}`}
+                      className="text-sm font-bold text-foreground"
+                    >
+                      O que você quer mudar nesta versão?
+                    </label>
+                    <Textarea
+                      id={`revision-${activePage.id}`}
+                      value={revisionInstruction}
+                      onChange={(event) => setRevisionInstruction(event.target.value)}
+                      maxLength={MAX_REVISION_INSTRUCTION_LENGTH}
+                      disabled={Boolean(busyAction)}
+                      placeholder="Ex.: mude para um estilo 3D, use tons azuis e deixe o título menor."
+                      className="mt-2 min-h-28 resize-y bg-background"
+                    />
+                    <div className="mt-2 flex items-start justify-between gap-3 text-xs text-muted-foreground">
+                      <p>
+                        Se deixar vazio, criaremos uma alternativa visivelmente diferente.
+                      </p>
+                      <span className="shrink-0" aria-live="polite">
+                        {revisionInstruction.length}/{MAX_REVISION_INSTRUCTION_LENGTH}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {(actionError || activePage.error || selectedAssetError) && (
                   <div className="flex gap-3 rounded-2xl bg-destructive/10 p-4 text-sm font-bold text-destructive">
                     <AlertCircle className="h-5 w-5 shrink-0" />
@@ -396,7 +439,11 @@ const GuideAssembly = ({ session: initialSession }) => {
                     ) : (
                       <Sparkles className="mr-2 h-5 w-5" />
                     )}
-                    {selectedAttempt ? 'Gerar outra versão' : 'Gerar página'}
+                    {selectedAttempt && revisionInstruction.trim()
+                      ? 'Gerar versão com ajustes'
+                      : selectedAttempt
+                        ? 'Gerar outra versão'
+                        : 'Gerar página'}
                   </Button>
                   <Button
                     type="button"

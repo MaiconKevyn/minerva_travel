@@ -155,6 +155,10 @@ test('progressive assembly generates, versions, approves and completes page imag
   assert.doesNotMatch(review, /legacyGenerate/);
   assert.match(assembly, /Gerar página/);
   assert.match(assembly, /Gerar outra versão/);
+  assert.match(assembly, /O que você quer mudar nesta versão\?/);
+  assert.match(assembly, /Gerar versão com ajustes/);
+  assert.match(assembly, /alternativa visivelmente diferente/);
+  assert.match(api, /revision_instruction: revisionInstruction\.trim\(\)/);
   assert.match(assembly, /Aprovar e continuar/);
   assert.match(assembly, /Concluir revisão das imagens/);
   assert.match(assembly, /Nenhum PDF foi gerado/);

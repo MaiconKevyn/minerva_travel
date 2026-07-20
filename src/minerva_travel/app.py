@@ -41,6 +41,7 @@ from minerva_travel.asset_policy import (
 )
 from minerva_travel.auth import CurrentUser
 from minerva_travel.builder import (
+    MAX_REVISION_INSTRUCTION_LENGTH,
     BuilderAttemptInProgress,
     BuilderAttemptLimitReached,
     BuilderAttemptNotFound,
@@ -392,6 +393,7 @@ class BuilderAttemptResponse(BaseModel):
     id: str
     asset_url: str
     created_at: str
+    revision_instruction: str = ""
 
 
 class BuilderPageResponse(BaseModel):
@@ -420,6 +422,10 @@ class BuilderSessionResponse(BaseModel):
 
 class BuilderAttemptSelectionRequest(StrictRequestModel):
     attempt_id: str = Field(min_length=1, max_length=120)
+
+
+class BuilderPageGenerationRequest(StrictRequestModel):
+    revision_instruction: str = Field(default="", max_length=MAX_REVISION_INSTRUCTION_LENGTH)
 
 
 class BuilderPageApprovalRequest(StrictRequestModel):
@@ -1944,6 +1950,7 @@ def generate_builder_page_attempt(
     request: Request,
     response: Response,
     current_user: CurrentUser,
+    payload: BuilderPageGenerationRequest | None = None,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> BuilderSessionResponse:
     key = (idempotency_key or "").strip()
@@ -1969,18 +1976,34 @@ def generate_builder_page_attempt(
         )
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
-            attempt_id, replayed = reserve_page_attempt(session, page_id, key)
+            revision_instruction = payload.revision_instruction if payload else ""
+            attempt_id, replayed = reserve_page_attempt(session, page_id, key, revision_instruction)
             if replayed:
                 response.headers["Idempotency-Replayed"] = "true"
                 return BuilderSessionResponse.model_validate(session.public_payload())
             page = session.page(page_id)
             if page is None:
                 raise BuilderPageOutOfOrder(page_id)
+            revision_instruction = page.pending_revision_instruction
             page_kind = page.kind
             metadata = dict(page.metadata)
             family_title = str(session.form.get("title") or "Guia da família")
             photo_path = Path(session.photo_filename)
             expected_people = session.form.get("expected_visible_family_member_count")
+            reference_attempt = page.selected_attempt()
+            reference_page = (
+                builder_asset_dir(session_id) / reference_attempt.filename
+                if reference_attempt is not None
+                else None
+            )
+            if reference_page is not None:
+                expected_asset_dir = builder_asset_dir(session_id)
+                if (
+                    reference_page.parent != expected_asset_dir
+                    or reference_page.name != reference_attempt.filename
+                    or not reference_page.is_file()
+                ):
+                    raise PageGenerationError("A versão selecionada não está mais disponível.")
 
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
         generator = get_guide_page_generator()
@@ -1994,6 +2017,8 @@ def generate_builder_page_attempt(
                 trip_date=str(metadata["trip_date"]),
                 landmark_names=list(metadata["landmark_names"]),
                 expected_visible_family_member_count=expected_people,
+                revision_instruction=revision_instruction,
+                reference_page=reference_page,
             )
         elif page_kind == "trip_summary":
             generator.generate_summary_page(
@@ -2001,6 +2026,8 @@ def generate_builder_page_attempt(
                 family_title=family_title,
                 trip_date=str(metadata["trip_date"]),
                 landmark_names=list(metadata["landmark_names"]),
+                revision_instruction=revision_instruction,
+                reference_page=reference_page,
             )
         elif page_kind == "landmark":
             generator.generate_landmark_page(
@@ -2010,6 +2037,8 @@ def generate_builder_page_attempt(
                 landmark_name=str(metadata["name"]),
                 city=str(metadata["city"]),
                 country=str(metadata["country"]),
+                revision_instruction=revision_instruction,
+                reference_page=reference_page,
             )
         else:
             raise PageGenerationError("Tipo de página ainda não suportado.")

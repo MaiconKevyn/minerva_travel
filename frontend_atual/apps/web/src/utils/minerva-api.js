@@ -1058,12 +1058,21 @@ export const createGuideBuilder = async (guideData) => {
   return response.json();
 };
 
-export const generateBuilderPageAttempt = async (sessionId, pageId, idempotencyKey) => {
+export const generateBuilderPageAttempt = async (
+  sessionId,
+  pageId,
+  idempotencyKey,
+  revisionInstruction = '',
+) => {
   const response = await authenticatedFetch(
     `${apiBaseUrl()}/api/guide-builder/${encodeURIComponent(sessionId)}/pages/${encodeURIComponent(pageId)}/attempts`,
     {
       method: 'POST',
-      headers: { 'Idempotency-Key': idempotencyKey || createIdempotencyKey() },
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey || createIdempotencyKey(),
+      },
+      body: JSON.stringify({ revision_instruction: revisionInstruction.trim() }),
     },
   );
   if (!response.ok) {

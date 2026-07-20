@@ -71,6 +71,24 @@ The review page creates a session but does not generate content automatically. T
 
 Previous approved pages remain visible as thumbnails. The active page offers `Gerar página`, `Gerar outra versão`, version selection, and `Aprovar e continuar`. After the final planned page, the UI shows the approved-page gallery and explicitly says that PDF export will be added later.
 
+### Decision 8: Regeneration is a controlled visual revision
+
+After a page has at least one successful attempt, the UI exposes an optional bounded text field
+where the family can describe the desired change, including a new visual style. The selected
+attempt is resolved server-side from the owner-scoped session and supplied to the Image API as a
+reference; clients never submit filesystem paths or arbitrary asset URLs.
+
+For a cover revision, the original sanitized family photo remains the first reference and the
+selected cover is the second reference. Other page types use the selected attempt as their
+revision reference. The user instruction is quoted as design feedback and remains subordinate to
+the page's exact-copy, family-composition, safety, no-extra-text, and no-watermark contracts.
+
+An empty field is valid. In that case the prompt explicitly requests a visibly different
+alternative by changing composition, palette, lighting, decorative treatment, and typography
+while preserving required copy and people. Every successful attempt stores the normalized
+revision instruction for auditability and idempotent replay; older persisted sessions load with an
+empty instruction.
+
 ## Prompt Contracts
 
 ### Cover
@@ -104,6 +122,10 @@ Previous approved pages remain visible as thumbnails. The active page offers `Ge
 
 - Exact prompt strings contain canonical title/date/stop names and no legacy text-free instruction.
 - OpenAI request payload and multipart fields match the official endpoint contract.
+- Cover revisions send the original photo and selected cover as repeated multipart image inputs;
+  other page revisions send the selected page and use the edits endpoint.
+- User revision text and the empty-field variation directive are present without weakening exact
+  copy or family-composition constraints.
 - Base64 output becomes a valid 1024x1536 PNG.
 - Attempt reservation happens before provider calls and rolls back on failure.
 - Approval order and attempt limits are enforced.
@@ -114,6 +136,8 @@ Previous approved pages remain visible as thumbnails. The active page offers `Ge
 - Assets require the owning user and are allowlisted.
 - No PDF or preview URL is returned by page generation or completion.
 - Repeated idempotency keys do not create duplicate attempts.
+- Revision instructions are length-bounded, persisted with the immutable attempt, and reference
+  only an owner-allowlisted selected attempt.
 - Session expiry, cleanup, and account deletion remove photos, JSON, and page images.
 - Final approved manifest references the exact selected attempt bytes.
 
@@ -122,6 +146,8 @@ Previous approved pages remain visible as thumbnails. The active page offers `Ge
 - No automatic generation effect.
 - No call to `generatePDF` or legacy fallback in the page workflow.
 - Active-page status, regenerate, version selection, approval, retry, and completion states.
+- Optional revision text is submitted on regeneration, survives a failed request, and is cleared
+  after a successful new attempt.
 - Object URLs are revoked on replacement/unmount.
 - The complete cover and summary are displayed using authenticated object URLs.
 

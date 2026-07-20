@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -8,6 +9,7 @@ from minerva_travel.builder import (
     cleanup_expired_builder_sessions,
     commit_page_attempt,
     create_builder_session,
+    load_builder_session,
     reserve_page_attempt,
     save_builder_session,
 )
@@ -90,3 +92,39 @@ def test_expired_cleanup_removes_manifest_photo_and_generated_assets(tmp_path, m
     assert not photo.exists()
     assert not assets.exists()
     assert not (tmp_path / "builder" / f"{session.id}.json").exists()
+
+
+def test_revision_instruction_is_normalized_persisted_and_old_sessions_remain_readable(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    photo = tmp_path / "family.png"
+    photo.write_bytes(b"private-photo")
+    session = create_builder_session(
+        owner_id="owner",
+        form={"title": "Família Teste"},
+        photo_path=photo,
+        pages=[_page()],
+        privacy_consent=None,
+    )
+
+    attempt_id, _ = reserve_page_attempt(
+        session, "cover", "request-one", "  Mude   para colagem\ncom tons azuis.  "
+    )
+    commit_page_attempt(session, "cover", attempt_id, "cover-1.png")
+    loaded = load_builder_session(session.id, "owner")
+    assert loaded.pages[0].attempts[0].revision_instruction == ("Mude para colagem com tons azuis.")
+    assert (
+        loaded.public_payload()["pages"][0]["attempts"][0]["revision_instruction"]
+        == "Mude para colagem com tons azuis."
+    )
+
+    session_path = tmp_path / "builder" / f"{session.id}.json"
+    legacy_payload = json.loads(session_path.read_text(encoding="utf-8"))
+    legacy_payload["pages"][0].pop("pending_revision_instruction")
+    legacy_payload["pages"][0]["attempts"][0].pop("revision_instruction")
+    session_path.write_text(json.dumps(legacy_payload), encoding="utf-8")
+
+    legacy = load_builder_session(session.id, "owner")
+    assert legacy.pages[0].pending_revision_instruction == ""
+    assert legacy.pages[0].attempts[0].revision_instruction == ""
