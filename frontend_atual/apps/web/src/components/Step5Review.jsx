@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Camera,
@@ -10,8 +10,10 @@ import {
   Star,
   Users,
   BookHeart,
+  AlertCircle,
   Plane,
   Puzzle,
+  RefreshCcw,
 } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -19,6 +21,7 @@ import {
   categoryLabelForAttraction,
   buildGuideItineraryPayload,
   createGuideBuilder,
+  fetchGuideBuilderSession,
   RESTAURANT_RECOMMENDATIONS_EXTRA,
   selectGuideLandmarks,
 } from '@/utils/minerva-api.js';
@@ -52,11 +55,53 @@ const Step5Review = () => {
     recommendedItinerary,
     restaurantRecommendationsExtra,
     setRestaurantRecommendationsExtra,
-    year
+    year,
+    builderSessionId,
+    checkpointBuilderSession,
+    clearBuilderSessionCheckpoint,
   } = useConversationalGuide();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [builderSession, setBuilderSession] = useState(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(Boolean(builderSessionId));
+  const [sessionRestoreError, setSessionRestoreError] = useState('');
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!builderSessionId || builderSession) {
+      setIsRestoringSession(false);
+      return undefined;
+    }
+    let active = true;
+    setIsRestoringSession(true);
+    setSessionRestoreError('');
+    fetchGuideBuilderSession(builderSessionId)
+      .then((session) => {
+        if (active) setBuilderSession(session);
+      })
+      .catch((error) => {
+        if (!active) return;
+        if (error.status === 404) {
+          toast.error('A montagem anterior expirou. Seu roteiro foi mantido; selecione a foto para continuar.');
+          clearBuilderSessionCheckpoint({ returnToPhoto: true });
+          return;
+        }
+        setSessionRestoreError(
+          error.message || 'Não foi possível recuperar as páginas agora. Tente novamente.',
+        );
+      })
+      .finally(() => {
+        if (active) setIsRestoringSession(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    builderSession,
+    builderSessionId,
+    clearBuilderSessionCheckpoint,
+    restoreAttempt,
+  ]);
 
   // Derive the rich data from the IDs
   const finalLandmarks = selectGuideLandmarks(parsedData.landmarks, selectedLandmarks);
@@ -105,6 +150,7 @@ const Step5Review = () => {
     const guideData = buildGuideData();
     try {
       const session = await createGuideBuilder(guideData);
+      await checkpointBuilderSession(session.session_id);
       setBuilderSession(session);
     } catch (error) {
       console.error('Não foi possível iniciar a criação por páginas:', error);
@@ -116,6 +162,40 @@ const Step5Review = () => {
 
   if (builderSession) {
     return <GuideAssembly session={builderSession} />;
+  }
+
+  if (isRestoringSession) {
+    return (
+      <div className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col items-center justify-center px-6 text-center">
+        <Loader2 className="mb-5 h-12 w-12 animate-spin text-primary" aria-hidden="true" />
+        <h2 className="text-3xl font-serif font-bold text-foreground">Recuperando suas páginas…</h2>
+        <p className="mt-3 font-medium text-muted-foreground">
+          As imagens, versões escolhidas e aprovações estão sendo carregadas do seu guia.
+        </p>
+      </div>
+    );
+  }
+
+  if (sessionRestoreError) {
+    return (
+      <div className="mx-auto w-full max-w-2xl rounded-[2rem] border-2 border-destructive/30 bg-card p-8 text-center shadow-sm">
+        <AlertCircle className="mx-auto h-12 w-12 text-destructive" aria-hidden="true" />
+        <h2 className="mt-4 text-3xl font-serif font-bold text-foreground">
+          Não conseguimos carregar as páginas
+        </h2>
+        <p className="mt-3 font-medium text-muted-foreground" role="alert">
+          {sessionRestoreError}
+        </p>
+        <Button
+          type="button"
+          onClick={() => setRestoreAttempt((attempt) => attempt + 1)}
+          className="mt-6 rounded-full px-8 py-6 font-bold"
+        >
+          <RefreshCcw className="mr-2 h-5 w-5" aria-hidden="true" />
+          Tentar carregar novamente
+        </Button>
+      </div>
+    );
   }
 
   // Group final landmarks by destination id

@@ -15,6 +15,17 @@ const attempt = (id, filename, revisionInstruction = '', includeFamily = false) 
   include_family: includeFamily,
 });
 
+const authenticateLocalTestUser = async (page, email, name) => {
+  await page.addInitScript(({ userEmail, userName }) => {
+    globalThis.localStorage.setItem('minerva_local_session', JSON.stringify({
+      id: `local:${userEmail}`,
+      email: userEmail,
+      name: userName,
+      collectionName: 'users',
+    }));
+  }, { userEmail: email, userName: name });
+};
+
 const pageState = ({
   id,
   kind,
@@ -96,22 +107,7 @@ test('restored activity step keeps the no-optional path and mandatory memory vis
   );
 
   const email = `atividades-${test.info().project.name}@example.test`;
-  const password = 'Aventura2026';
-  await page.goto('/signup', { waitUntil: 'domcontentloaded' });
-  await page.getByLabel('Nome da Família ou Responsável').fill('Família Aurora');
-  await page.getByLabel('Email Mágico').fill(email);
-  await page.getByLabel('Senha Secreta', { exact: true }).fill(password);
-  await page.getByLabel('Confirme a Senha').fill(password);
-  await page.getByRole('button', { name: 'Criar Minha Conta' }).click();
-  await expect(page).toHaveURL(/\/login$/);
-  const loginEmail = page.getByLabel('Email Mágico');
-  const loginPassword = page.getByLabel('Senha Secreta');
-  await loginPassword.fill(password);
-  await loginEmail.fill(email);
-  await expect(loginEmail).toHaveValue(email);
-  await expect(loginPassword).toHaveValue(password);
-  await page.getByRole('button', { name: 'Entrar na Aventura' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await authenticateLocalTestUser(page, email, 'Família Aurora');
   await page.goto('/create', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByRole('heading', { name: 'Atividades da aventura' })).toBeVisible();
@@ -119,6 +115,187 @@ test('restored activity step keeps the no-optional path and mandatory memory vis
   await expect(page.getByText('0 de 8 páginas opcionais')).toBeVisible();
   await page.getByRole('button', { name: 'Continuar sem atividades opcionais' }).click();
   await expect(page.getByRole('heading', { name: /Escolha a foto de capa do PDF/ })).toBeVisible();
+});
+
+test('reload restores the saved builder session and its generated pages', async ({ page }) => {
+  const builderSession = {
+    session_id: 'resumesession123',
+    created_at: '2026-07-21T10:00:00+00:00',
+    expires_at: '2026-08-04T10:00:00+00:00',
+    title: 'Família Aurora',
+    revision: 5,
+    layout_revision: 0,
+    active_page_id: 'cover',
+    is_complete: false,
+    pages: [pageState({
+      id: 'cover',
+      kind: 'cover',
+      title: 'Capa da família',
+      position: 1,
+      requiredCopy: ['Família Aurora', 'Julho de 2026'],
+      attempts: [{
+        ...attempt('cover-saved', 'cover-saved.png'),
+        asset_url: '/guide-builder/resumesession123/assets/cover-saved.png',
+      }],
+      selectedAttemptId: 'cover-saved',
+    })],
+  };
+  let builderGets = 0;
+  let builderCreates = 0;
+
+  await page.route('**/api/guides', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{"guides":[]}' }),
+  );
+  await page.route('**/api/drafts/current', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        draft: {
+          id: 'resume-draft',
+          revision: 4,
+          updated_at: '2026-07-21T10:02:00+00:00',
+          payload: {
+            schema_version: 2,
+            current_step: 7,
+            builder_session_id: 'resumesession123',
+            family_name: 'Aurora',
+            destination: 'Paris em Julho de 2026',
+            destinations_list: [
+              {
+                id: 'paris',
+                place: 'Paris',
+                timing: 'Julho de 2026',
+                days: 3,
+                landmarks: ['Torre Eiffel'],
+              },
+            ],
+            itinerary_mode: 'known',
+            children_list: [{ id: 'child-1', name: 'Lia', age: 8 }],
+            parents_list: ['Ana', 'Caio'],
+            year: 2026,
+            parsed_data: { destinations: [], landmarks: [] },
+            selected_landmarks: [],
+            landmark_activity_selections: [],
+            itinerary_preferences: { days: 3, interests: [], pace: 'balanced' },
+            has_searched_landmarks: true,
+          },
+        },
+      },
+    }),
+  );
+  await page.route('**/api/drafts/resume-draft', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        id: 'resume-draft',
+        revision: 5,
+        updated_at: '2026-07-21T10:03:00+00:00',
+        payload: route.request().postDataJSON()?.payload || {},
+      },
+    }),
+  );
+  await page.route('**/api/guide-builder**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname === '/api/guide-builder/resumesession123' && request.method() === 'GET') {
+      builderGets += 1;
+      if (builderGets > 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      return route.fulfill({ status: 200, json: builderSession });
+    }
+    if (pathname === '/api/guide-builder' && request.method() === 'POST') {
+      builderCreates += 1;
+    }
+    return route.abort('failed');
+  });
+  await page.route('**/guide-builder/resumesession123/assets/cover-saved.png', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: onePixelPng }),
+  );
+
+  const email = `retomada-${test.info().project.name}@example.test`;
+  await authenticateLocalTestUser(page, email, 'Família Aurora');
+  await page.goto('/create', { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(/\/create\?builder=resumesession123$/);
+  await expect(page.getByAltText('Versão escolhida de Capa da família')).toBeVisible();
+  await expect(page.getByText('Progresso recuperado. Suas páginas geradas continuam salvas com segurança.')).toBeVisible();
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: 'Recuperando suas páginas…' })).toBeVisible();
+  await expect(page.getByAltText('Versão escolhida de Capa da família')).toBeVisible();
+  expect(builderGets).toBeGreaterThanOrEqual(2);
+  expect(builderCreates).toBe(0);
+});
+
+test('expired builder returns to the photo step without erasing the saved itinerary', async ({ page }) => {
+  let updatedPayload = null;
+  await page.route('**/api/guides', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{"guides":[]}' }),
+  );
+  await page.route('**/api/drafts/current', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        draft: {
+          id: 'expired-draft',
+          revision: 2,
+          updated_at: '2026-07-21T10:00:00+00:00',
+          payload: {
+            schema_version: 2,
+            current_step: 7,
+            builder_session_id: 'expiredsession123',
+            family_name: 'Silva',
+            destination: 'Paris em Julho de 2026',
+            destinations_list: [
+              {
+                id: 'paris',
+                place: 'Paris',
+                timing: 'Julho de 2026',
+                days: 3,
+                landmarks: ['Torre Eiffel'],
+              },
+            ],
+            itinerary_mode: 'known',
+            children_list: [{ id: 'child-1', name: 'Lia', age: 8 }],
+            parents_list: ['Ana', 'Caio'],
+            year: 2026,
+            parsed_data: { destinations: [], landmarks: [] },
+            selected_landmarks: [],
+            landmark_activity_selections: [],
+            itinerary_preferences: { days: 3, interests: [], pace: 'balanced' },
+          },
+        },
+      },
+    }),
+  );
+  await page.route('**/api/drafts/expired-draft', (route) => {
+    updatedPayload = route.request().postDataJSON()?.payload || null;
+    return route.fulfill({
+      status: 200,
+      json: {
+        id: 'expired-draft',
+        revision: 3,
+        updated_at: '2026-07-21T10:01:00+00:00',
+        payload: updatedPayload,
+      },
+    });
+  });
+  await page.route('**/api/guide-builder/expiredsession123', (route) =>
+    route.fulfill({ status: 404, json: { detail: 'Builder session not found' } }),
+  );
+
+  const email = `expirada-${test.info().project.name}@example.test`;
+  await authenticateLocalTestUser(page, email, 'Família Silva');
+  await page.goto('/create', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: /Escolha a foto de capa do PDF/ })).toBeVisible();
+  await expect(page).toHaveURL(/\/create$/);
+  await expect.poll(() => updatedPayload).not.toBeNull();
+  expect(updatedPayload).toMatchObject({
+    current_step: 6,
+    builder_session_id: '',
+    family_name: 'Silva',
+    destination: 'Paris em Julho de 2026',
+  });
 });
 
 test('family reviews pages and controls family inclusion on a landmark', async ({
@@ -482,22 +659,7 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   });
 
   const email = `paginas-${test.info().project.name}@example.test`;
-  const password = 'Aventura2026';
-  await page.goto('/signup', { waitUntil: 'domcontentloaded' });
-  await page.getByLabel('Nome da Família ou Responsável').fill('Família Aurora');
-  await page.getByLabel('Email Mágico').fill(email);
-  await page.getByLabel('Senha Secreta', { exact: true }).fill(password);
-  await page.getByLabel('Confirme a Senha').fill(password);
-  await page.getByRole('button', { name: 'Criar Minha Conta' }).click();
-  await expect(page).toHaveURL(/\/login$/);
-  const loginEmail = page.getByLabel('Email Mágico');
-  const loginPassword = page.getByLabel('Senha Secreta');
-  await loginPassword.fill(password);
-  await loginEmail.fill(email);
-  await expect(loginEmail).toHaveValue(email);
-  await expect(loginPassword).toHaveValue(password);
-  await page.getByRole('button', { name: 'Entrar na Aventura' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await authenticateLocalTestUser(page, email, 'Família Aurora');
   await page.goto('/create', { waitUntil: 'domcontentloaded' });
 
   await page.getByRole('button', { name: 'Começar pelas páginas' }).click();

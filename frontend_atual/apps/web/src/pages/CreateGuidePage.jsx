@@ -2,7 +2,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import Header from '@/components/Header.jsx';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import Step2CoverPhoto from '@/components/Step2CoverPhoto.jsx';
@@ -22,6 +22,9 @@ const CreateGuidePageContent = () => {
     draftId,
     draftStatus,
     draftError,
+    draftReady,
+    restoredProgress,
+    builderSessionId,
     discardDraft,
   } = useConversationalGuide();
   // No modo "Ja sei o roteiro" a etapa de preferencias (2) e pulada.
@@ -40,6 +43,30 @@ const CreateGuidePageContent = () => {
       default: return <Step3Destination />;
     }
   };
+
+  if (!draftReady) {
+    return (
+      <>
+        <Helmet>
+          <title>Retomando guia - Minerva Travel</title>
+        </Helmet>
+        <div className="min-h-screen bg-background">
+          <Header />
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center px-6 text-center"
+          >
+            <Loader2 className="mb-5 h-12 w-12 animate-spin text-primary" aria-hidden="true" />
+            <h1 className="text-3xl font-serif font-bold text-foreground">Retomando seu guia…</h1>
+            <p className="mt-3 font-medium text-muted-foreground">
+              Estamos recuperando a etapa, as escolhas e as páginas que você já gerou.
+            </p>
+          </main>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -109,7 +136,11 @@ const CreateGuidePageContent = () => {
             aria-live="polite"
           >
             {draftStatus === 'saving' && 'Salvando rascunho…'}
-            {draftStatus === 'saved' && 'Rascunho salvo com segurança. A foto será enviada novamente antes da geração.'}
+            {draftStatus === 'saved' && restoredProgress && builderSessionId
+              && 'Progresso recuperado. Suas páginas geradas continuam salvas com segurança.'}
+            {draftStatus === 'saved' && (!restoredProgress || !builderSessionId)
+              && 'Progresso salvo com segurança. A foto não é armazenada no navegador.'}
+            {draftStatus === 'local' && draftError}
             {draftStatus === 'error' && draftError}
           </p>
 
