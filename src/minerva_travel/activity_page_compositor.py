@@ -20,6 +20,10 @@ PAPER = "#fffdf8"
 PANEL_OUTLINE = "#b9ccda"
 COLORING_TITLE = "Atividade para colorir"
 COLORING_INSTRUCTION_TEMPLATE = "Agora é a vez de colorir {landmark_name} do seu jeito."
+FAMILY_COLORING_TITLE = "Família de férias para colorir"
+FAMILY_COLORING_INSTRUCTION_TEMPLATE = (
+    "Agora é a vez de colorir a aventura da sua família em {landmark_name}."
+)
 DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
 PAINTING_TITLE = "Minha pintura"
@@ -110,6 +114,43 @@ def coloring_instruction_for(landmark_name: str) -> str:
 
     normalized_name = _bounded(landmark_name, "landmark_name", 100)
     return COLORING_INSTRUCTION_TEMPLATE.format(landmark_name=normalized_name)
+
+
+def compose_family_coloring_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    family_title: str,
+    landmark_name: str,
+) -> Path:
+    """Compose exact family-vacation copy over validated printable line art."""
+
+    normalized_family = _bounded(family_title, "family_title", 100)
+    normalized_landmark = _bounded(landmark_name, "landmark_name", 100)
+    instruction = family_coloring_instruction_for(normalized_landmark)
+    image = _layout_coloring_artwork(_load_artwork(artwork_path))
+    _validate_coloring_artwork_density(image)
+    draw = ImageDraw.Draw(image)
+    _panel(draw, (38, 34, 986, 320))
+    _draw_centered_fit(draw, FAMILY_COLORING_TITLE, 50, 50, 28, 884, bold=True)
+    _draw_centered_fit(draw, normalized_family, 116, 34, 22, 884, bold=True)
+    _draw_wrapped(
+        draw,
+        instruction,
+        (82, 180, 942, 302),
+        font=_font(27),
+        fill=INK,
+        align="center",
+    )
+    image = image.convert("L").point(lambda value: 0 if value < 210 else 255).convert("RGB")
+    return _atomic_save(image, output_path, monochrome=True)
+
+
+def family_coloring_instruction_for(landmark_name: str) -> str:
+    """Return exact child-facing copy for the family vacation coloring page."""
+
+    normalized_name = _bounded(landmark_name, "landmark_name", 100)
+    return FAMILY_COLORING_INSTRUCTION_TEMPLATE.format(landmark_name=normalized_name)
 
 
 def compose_detail_hunt_page(

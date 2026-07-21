@@ -38,11 +38,13 @@ from minerva_travel.activity_page_compositor import (
     BEST_MEMORY_REQUIRED_COPY,
     COLORING_TITLE,
     DETAIL_HUNT_TITLE,
+    FAMILY_COLORING_TITLE,
     HOMECOMING_REQUIRED_COPY,
     LANDMARK_VISITED_LABEL,
     PAINTING_TITLE,
     WORD_SEARCH_TITLE,
     coloring_instruction_for,
+    family_coloring_instruction_for,
 )
 from minerva_travel.asset_policy import (
     AssetProvenanceError,
@@ -2068,6 +2070,7 @@ def _builder_trip_date(form: dict[str, Any]) -> str:
 
 _ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
     "coloring": COLORING_TITLE,
+    "family_coloring": FAMILY_COLORING_TITLE,
     "detail_hunt": DETAIL_HUNT_TITLE,
     "word_search": WORD_SEARCH_TITLE,
     "drawing": PAINTING_TITLE,
@@ -2356,6 +2359,7 @@ def _activity_spec(
 ) -> dict[str, Any]:
     instructions = {
         "coloring": coloring_instruction_for(landmark.name),
+        "family_coloring": family_coloring_instruction_for(landmark.name),
         "detail_hunt": f"Observe {landmark.name} e marque cada detalhe que encontrar.",
         "word_search": f"Encontre no quadro as palavras ligadas a {landmark.name}.",
         "drawing": (f"Agora é a sua vez de criar uma pintura de {landmark.name} do seu jeito."),
@@ -2388,6 +2392,7 @@ def _builder_activity_page(
     landmark: LandmarkActivityContext,
     activity_type: OptionalLandmarkActivityType,
     *,
+    family_title: str,
     trip_date: str,
     position: int = 0,
 ) -> BuilderPage:
@@ -2413,12 +2418,15 @@ def _builder_activity_page(
     }
     spec = _activity_spec(activity_type, landmark)
     activity_label = _ACTIVITY_LABELS[activity_type]
+    required_copy = [activity_label, landmark.name, str(spec["instruction"])]
+    if activity_type == "family_coloring":
+        required_copy.insert(1, family_title)
     return BuilderPage(
         id=f"activity-{landmark.itinerary_order}-{activity_type.replace('_', '-')}",
         kind="landmark_activity",
         title=f"{activity_label}: {landmark.name}",
         position=position,
-        required_copy=[activity_label, landmark.name, str(spec["instruction"])],
+        required_copy=required_copy,
         metadata={
             **private_context,
             **public_context,
@@ -2587,6 +2595,7 @@ def _builder_page_plan(
                 _builder_activity_page(
                     landmark,
                     activity.activity_type,
+                    family_title=str(form.get("title") or "Guia da família"),
                     trip_date=trip_date,
                     position=next_position,
                 )
@@ -2742,6 +2751,7 @@ def _new_session_activity_page(
     return _builder_activity_page(
         landmark,
         activity_type,
+        family_title=str(session.form.get("title") or "Guia da família"),
         trip_date=_builder_trip_date(session.form),
     )
 
@@ -2929,7 +2939,9 @@ def generate_builder_page_attempt(
             requested_include_family = bool(payload.include_family if payload else False)
             if page.kind == "landmark":
                 include_family = requested_include_family
-            elif page.kind in {"destination_intro", "landmark_activity", "best_memory"}:
+            elif page.kind == "landmark_activity":
+                include_family = page.metadata.get("activity_type") == "family_coloring"
+            elif page.kind in {"destination_intro", "best_memory"}:
                 include_family = False
             else:
                 include_family = True
@@ -2947,6 +2959,10 @@ def generate_builder_page_attempt(
             include_family = page.pending_include_family
             page_kind = page.kind
             metadata = dict(page.metadata)
+            family_coloring_activity = (
+                page_kind == "landmark_activity"
+                and metadata.get("activity_type") == "family_coloring"
+            )
             family_title = str(session.form.get("title") or "Guia da família")
             photo_path = Path(session.photo_filename)
             expected_people = session.form.get("expected_visible_family_member_count")
@@ -2979,6 +2995,22 @@ def generate_builder_page_attempt(
                     cover_attempt.filename,
                     "A capa aprovada da família não está mais disponível.",
                 )
+            elif family_coloring_activity:
+                cover_page = session.page("cover")
+                cover_attempt = (
+                    cover_page.selected_attempt()
+                    if cover_page is not None and cover_page.approved_at
+                    else None
+                )
+                if cover_attempt is not None:
+                    try:
+                        family_cover = _builder_reference_asset(
+                            session_id,
+                            cover_attempt.filename,
+                            "A capa aprovada da família não está mais disponível.",
+                        )
+                    except BuilderPageDependencyMissing:
+                        family_cover = None
             landmark_page_reference: Path | None = None
             landmark_reference: Path | None = None
             if page_kind == "landmark_activity":
@@ -2986,17 +3018,23 @@ def generate_builder_page_attempt(
                 linked_page = session.page(linked_page_id)
                 linked_attempt = linked_page.selected_attempt() if linked_page is not None else None
                 if linked_attempt is not None:
-                    landmark_page_reference = _builder_reference_asset(
-                        session_id,
-                        linked_attempt.filename,
-                        "A versão gerada do ponto turístico não está mais disponível.",
-                    )
+                    try:
+                        landmark_page_reference = _builder_reference_asset(
+                            session_id,
+                            linked_attempt.filename,
+                            "A versão gerada do ponto turístico não está mais disponível.",
+                        )
+                    except BuilderPageDependencyMissing:
+                        if not family_coloring_activity:
+                            raise
                 landmark_reference = _builder_local_landmark_reference(metadata.get("source_image"))
 
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
         generator = get_guide_page_generator()
-        family_photo_required = page_kind in {"cover", "trip_summary", "homecoming"} or (
-            page_kind == "landmark" and include_family
+        family_photo_required = (
+            page_kind in {"cover", "trip_summary", "homecoming"}
+            or (page_kind == "landmark" and include_family)
+            or family_coloring_activity
         )
         if family_photo_required and not photo_path.is_file():
             raise PageGenerationError("A foto da família não está mais disponível.")
@@ -3085,6 +3123,14 @@ def generate_builder_page_attempt(
             }
             if activity_type == "coloring":
                 generator.generate_coloring_page(**common_activity_kwargs)
+            elif activity_type == "family_coloring":
+                generator.generate_family_coloring_page(
+                    **common_activity_kwargs,
+                    family_photo=photo_path,
+                    family_cover=family_cover,
+                    family_title=family_title,
+                    expected_visible_family_member_count=expected_people,
+                )
             elif activity_type == "detail_hunt":
                 generator.generate_detail_hunt_page(**common_activity_kwargs)
             elif activity_type == "word_search":

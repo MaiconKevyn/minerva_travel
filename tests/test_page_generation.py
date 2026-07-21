@@ -14,6 +14,7 @@ from minerva_travel.page_generation import (
     best_memory_artwork_prompt,
     cover_page_prompt,
     destination_intro_page_prompt,
+    family_coloring_artwork_prompt,
     homecoming_page_prompt,
     landmark_page_prompt,
     summary_page_prompt,
@@ -606,10 +607,36 @@ def test_coloring_prompt_requires_child_usable_age_aware_lineart(age_complexity,
 
     assert expected_contract in prompt
     assert "large closed shapes that a child can fill comfortably with crayons" in prompt
-    assert "upper 22 percent completely white" in prompt
+    assert "22 percent completely white" in prompt
     assert "Add at most two simple large context elements" in prompt
     assert "do not create a dense cityscape" in prompt
     assert "tiny windows, brick patterns, repeated micro-details" in prompt
+
+
+def test_family_coloring_prompt_preserves_family_and_uses_original_trait_contract():
+    prompt = family_coloring_artwork_prompt(
+        landmark_name="Torre Eiffel",
+        city="Paris",
+        country="França",
+        age_complexity="early_reader",
+        expected_visible_family_member_count=4,
+        has_family_cover=True,
+        has_landmark_reference=True,
+        has_landmark_page_reference=True,
+        has_revision_reference=True,
+        revision_instruction="Deixe os personagens ainda mais fofos e arredondados.",
+    )
+
+    assert "Input image 1 is the sanitized original family photo" in prompt
+    assert "Input image 2 is the approved family cover" in prompt
+    assert "Input image 3 is a sanitized landmark reference" in prompt
+    assert "Input image 4 is the approved landmark guide page" in prompt
+    assert "Input image 5 is the selected current activity attempt" in prompt
+    assert "Depict exactly 4 family members together" in prompt
+    assert "original cozy, cute and rounded children's coloring-book" in prompt
+    assert "Do not imitate, name or reproduce any artist" in prompt
+    assert "22 percent completely white" in prompt
+    assert "do not render any letter" in prompt
 
 
 def test_coloring_generation_edits_landmark_refs_then_composites_printable_png(tmp_path):
@@ -654,6 +681,62 @@ def test_coloring_generation_edits_landmark_refs_then_composites_printable_png(t
     assert "black-and-white children's coloring-book line art" in kwargs["data"]["prompt"]
     assert "Remove every person" in kwargs["data"]["prompt"]
     assert not (tmp_path / ".coloring.provider.png").exists()
+    with Image.open(output) as image:
+        assert image.size == (1024, 1536)
+        colors = image.convert("RGB").getcolors(maxcolors=1024 * 1536)
+        assert colors is not None
+        assert {color for _count, color in colors} <= {(0, 0, 0), (255, 255, 255)}
+
+
+def test_family_coloring_generation_uses_family_first_and_optional_references(tmp_path):
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _response(_lineart_png_bytes())
+
+    family, cover = _family_references(tmp_path)
+    landmark = tmp_path / "landmark-source.png"
+    landmark.write_bytes(_png_bytes(size=(800, 600)))
+    approved_landmark = tmp_path / "approved-landmark.png"
+    approved_landmark.write_bytes(_png_bytes())
+    selected = tmp_path / "selected-family-coloring.png"
+    selected.write_bytes(_png_bytes())
+    output = tmp_path / "family-coloring.png"
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+
+    generator.generate_family_coloring_page(
+        family_photo=family,
+        family_cover=cover,
+        output_path=output,
+        family_title="Família Silva",
+        expected_visible_family_member_count=4,
+        landmark_reference=landmark,
+        landmark_page_reference=approved_landmark,
+        landmark_context={
+            "selection_id": "paris:eiffel",
+            "name": "Torre Eiffel",
+            "city": "Paris",
+            "country": "França",
+            "age_complexity": "early_reader",
+        },
+        activity_spec={"instruction": "Texto aplicado pelo compositor."},
+        revision_instruction="Use linhas mais largas.",
+        reference_page=selected,
+    )
+
+    _method, url, kwargs = calls[0]
+    assert url.endswith("/images/edits")
+    assert [file_data[0] for _field, file_data in kwargs["files"]] == [
+        "family.png",
+        "cover-approved.png",
+        "landmark-source.png",
+        "approved-landmark.png",
+        "selected-family-coloring.png",
+    ]
+    assert "authoritative for membership" in kwargs["data"]["prompt"]
+    assert "Do not imitate, name or reproduce any artist" in kwargs["data"]["prompt"]
+    assert not (tmp_path / ".family-coloring.provider.png").exists()
     with Image.open(output) as image:
         assert image.size == (1024, 1536)
         colors = image.convert("RGB").getcolors(maxcolors=1024 * 1536)

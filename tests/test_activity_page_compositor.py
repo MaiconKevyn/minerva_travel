@@ -11,6 +11,8 @@ from minerva_travel.activity_page_compositor import (
     COLORING_TITLE,
     DETAIL_HUNT_TITLE,
     DRAWING_BLANK_REGION,
+    FAMILY_COLORING_INSTRUCTION_TEMPLATE,
+    FAMILY_COLORING_TITLE,
     HOMECOMING_REQUIRED_COPY,
     HOMECOMING_WRITING_BLANK_REGIONS,
     LANDMARK_VISITED_CHECKBOX,
@@ -24,9 +26,11 @@ from minerva_travel.activity_page_compositor import (
     compose_coloring_page,
     compose_detail_hunt_page,
     compose_drawing_page,
+    compose_family_coloring_page,
     compose_homecoming_page,
     compose_landmark_visited_checkbox,
     compose_word_search_page,
+    family_coloring_instruction_for,
     validate_activity_page,
 )
 from minerva_travel.word_search import build_word_search_grid
@@ -61,8 +65,15 @@ def _white_fraction(path: Path, region: tuple[int, int, int, int]) -> float:
 
 
 def test_compositor_exact_copy_contract_matches_builder_required_copy():
-    assert (COLORING_TITLE, DETAIL_HUNT_TITLE, WORD_SEARCH_TITLE, PAINTING_TITLE) == (
+    assert (
+        COLORING_TITLE,
+        FAMILY_COLORING_TITLE,
+        DETAIL_HUNT_TITLE,
+        WORD_SEARCH_TITLE,
+        PAINTING_TITLE,
+    ) == (
         "Atividade para colorir",
+        "Família de férias para colorir",
         "Caça aos detalhes",
         "Caça-palavras",
         "Minha pintura",
@@ -87,11 +98,20 @@ def test_compositor_exact_copy_contract_matches_builder_required_copy():
     assert COLORING_INSTRUCTION_TEMPLATE == (
         "Agora é a vez de colorir {landmark_name} do seu jeito."
     )
+    assert FAMILY_COLORING_INSTRUCTION_TEMPLATE == (
+        "Agora é a vez de colorir a aventura da sua família em {landmark_name}."
+    )
 
 
 def test_coloring_instruction_is_exact_point_specific_copy():
     assert coloring_instruction_for("  Torre   Eiffel ") == (
         "Agora é a vez de colorir Torre Eiffel do seu jeito."
+    )
+
+
+def test_family_coloring_instruction_is_exact_point_specific_copy():
+    assert family_coloring_instruction_for("  Torre   Eiffel ") == (
+        "Agora é a vez de colorir a aventura da sua família em Torre Eiffel."
     )
 
 
@@ -135,6 +155,25 @@ def test_coloring_compositor_outputs_binary_printable_page(tmp_path):
             .point(lambda value: 255 if value < 128 else 0)
         )
         assert art_ink.getbbox() is not None
+
+
+def test_family_coloring_compositor_outputs_binary_page_with_exact_copy(tmp_path):
+    output = tmp_path / "family-coloring.png"
+    compose_family_coloring_page(
+        _lineart(tmp_path / "family-art.png"),
+        output,
+        family_title="Família Silva",
+        landmark_name="Torre Eiffel",
+    )
+
+    validate_activity_page(output, monochrome=True)
+    with Image.open(output) as image:
+        assert image.size == (1024, 1536)
+        colors = image.convert("RGB").getcolors(maxcolors=1024 * 1536)
+        assert colors is not None
+        assert {color for _count, color in colors} <= {(0, 0, 0), (255, 255, 255)}
+        white = next((count for count, color in colors if color == (255, 255, 255)), 0)
+        assert white / (1024 * 1536) >= COLORING_MIN_WHITE_FRACTION
 
 
 def test_coloring_compositor_rejects_unusable_solid_artwork_atomically(tmp_path):

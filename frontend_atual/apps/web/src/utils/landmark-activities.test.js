@@ -27,6 +27,19 @@ test('painting replaces the free drawing activity without changing persisted typ
   assert.match(painting.materialLabel, /Tinta, pincel/);
 });
 
+test('family vacation coloring uses the private family photo and an original visual description', () => {
+  const familyColoring = LANDMARK_ACTIVITY_OPTIONS.find(
+    (option) => option.type === 'family_coloring',
+  );
+
+  assert.equal(familyColoring.label, 'Família de férias para colorir');
+  assert.equal(
+    familyColoring.preview,
+    '/activity-examples/family-coloring-real.webp',
+  );
+  assert.match(familyColoring.description, /foto enviada como referência/);
+});
+
 test('activity selections are normalized to canonical point ids and supported types', () => {
   assert.deepEqual(
     normalizeLandmarkActivitySelections([
@@ -34,8 +47,12 @@ test('activity selections are normalized to canonical point ids and supported ty
       { landmark_selection_id: 'paris:eiffel', activity_type: 'coloring' },
       { landmark_selection_id: 'paris:eiffel', activity_type: 'unsupported' },
       { landmark_selection_id: '', activity_type: 'drawing' },
+      { landmark_selection_id: 'paris:louvre', activity_type: 'family_coloring' },
     ]),
-    [{ landmark_selection_id: 'paris:eiffel', activity_type: 'coloring', order: 1 }],
+    [
+      { landmark_selection_id: 'paris:eiffel', activity_type: 'coloring', order: 1 },
+      { landmark_selection_id: 'paris:louvre', activity_type: 'family_coloring', order: 1 },
+    ],
   );
 });
 

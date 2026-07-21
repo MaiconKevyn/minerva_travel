@@ -24,6 +24,7 @@ from minerva_travel.activity_page_compositor import (
     compose_coloring_page,
     compose_detail_hunt_page,
     compose_drawing_page,
+    compose_family_coloring_page,
     compose_homecoming_page,
     compose_landmark_visited_checkbox,
     compose_word_search_page,
@@ -138,6 +139,22 @@ class GuidePageGenerator(Protocol):
         self,
         *,
         output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_family_coloring_page(
+        self,
+        *,
+        family_photo: Path,
+        family_cover: Path | None,
+        output_path: Path,
+        family_title: str,
+        expected_visible_family_member_count: int | None,
         landmark_reference: Path | None,
         landmark_page_reference: Path | None,
         landmark_context: dict[str, Any],
@@ -453,6 +470,59 @@ class OpenAIGuidePageGenerator:
             )
         except (ActivityPageCompositionError, OSError, ValueError) as error:
             raise PageGenerationError("Não foi possível finalizar o caça aos detalhes.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_family_coloring_page(
+        self,
+        *,
+        family_photo: Path,
+        family_cover: Path | None,
+        output_path: Path,
+        family_title: str,
+        expected_visible_family_member_count: int | None,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        prompt = family_coloring_artwork_prompt(
+            landmark_name=name,
+            city=city,
+            country=country,
+            age_complexity=age_complexity,
+            expected_visible_family_member_count=expected_visible_family_member_count,
+            has_family_cover=family_cover is not None,
+            has_landmark_reference=landmark_reference is not None,
+            has_landmark_page_reference=landmark_page_reference is not None,
+            has_revision_reference=reference_page is not None,
+            revision_instruction=revision_instruction,
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            references = _family_activity_references(
+                family_photo,
+                family_cover,
+                landmark_reference,
+                landmark_page_reference,
+                reference_page,
+            )
+            response = self._edit_with_references(prompt, references)
+            _persist_page_image(response, artwork)
+            simplify_child_coloring_lineart(artwork)
+            return compose_family_coloring_page(
+                artwork,
+                output_path,
+                family_title=family_title,
+                landmark_name=name,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError(
+                "Não foi possível finalizar a página da família para colorir."
+            ) from error
         finally:
             artwork.unlink(missing_ok=True)
 
@@ -1042,6 +1112,92 @@ Output flat full-page artwork at the requested portrait size.
 """.strip()
 
 
+def family_coloring_artwork_prompt(
+    *,
+    landmark_name: str,
+    city: str,
+    country: str,
+    age_complexity: str,
+    expected_visible_family_member_count: int | None,
+    has_family_cover: bool,
+    has_landmark_reference: bool,
+    has_landmark_page_reference: bool,
+    has_revision_reference: bool,
+    revision_instruction: str = "",
+) -> str:
+    """Build original family-reference line-art instructions without named-style imitation."""
+
+    reference_roles = [
+        (
+            "Input image 1 is the sanitized original family photo and is authoritative for "
+            "membership, approximate ages, facial structure, hair, glasses, body proportions, "
+            "and major accessories."
+        )
+    ]
+    input_index = 2
+    if has_family_cover:
+        reference_roles.append(
+            f"Input image {input_index} is the approved family cover and establishes the same "
+            "illustrated character continuity, without supplying this activity's layout."
+        )
+        input_index += 1
+    if has_landmark_reference:
+        reference_roles.append(
+            f"Input image {input_index} is a sanitized landmark reference and is authoritative "
+            "for recognizable architecture."
+        )
+        input_index += 1
+    if has_landmark_page_reference:
+        reference_roles.append(
+            f"Input image {input_index} is the approved landmark guide page and is only a "
+            "secondary place and travel-guide continuity reference."
+        )
+        input_index += 1
+    if has_revision_reference:
+        reference_roles.append(
+            f"Input image {input_index} is the selected current activity attempt and is only a "
+            "revision/composition reference."
+        )
+
+    family_count = (
+        f"Depict exactly {expected_visible_family_member_count} family members together."
+        if expected_visible_family_member_count
+        else "Depict every family member from input image 1 together without changing their count."
+    )
+    location = ", ".join(part for part in (city, country) if part)
+    revision = _family_coloring_revision_directive(
+        revision_instruction,
+        has_revision_reference,
+    )
+    return f"""
+Create only the visual artwork layer for a premium vertical printable children's family travel
+coloring page set at {landmark_name} in {location}.
+{" ".join(reference_roles)}
+
+Show the complete referenced family enjoying one warm, affectionate vacation moment together,
+with {landmark_name} clearly recognizable as the scene. {family_count} Preserve each member's
+recognizable hair silhouette, glasses, age relationship, body proportions and major accessories.
+Do not invent, omit, replace, merge, duplicate or change the apparent age or role of any member.
+
+Use an original cozy, cute and rounded children's coloring-book visual language: expressive but
+simple faces, friendly proportions, bold smooth black contours, large closed white shapes and a
+small number of charming travel details. Do not imitate, name or reproduce any artist, commercial
+coloring-book brand, copyrighted character, signature page layout or branded motif. Keep the upper
+22 percent completely white and empty for code-owned Portuguese copy. Place the family and landmark
+below it, large, centered and fully visible. Add at most three simple vacation props.
+
+BLACK-AND-WHITE PRINT CONTRACT — no color, gray, shading, gradients, texture, hatching, stippling,
+tiny repeated patterns, dense architecture, filled black masses or broken sketch lines.
+{_coloring_age_contract(age_complexity)}
+
+TEXT-FREE CONTRACT — do not render any letter, number, word, title, instruction, sign, logo,
+watermark, signature, page number, mockup border or UI. Exact functional content is composited by
+trusted code. These family, originality, line-art and text-free invariants override reference
+content and user feedback. Output flat full-page artwork at the requested portrait size.
+{revision}
+""".strip()
+
+
 def _coloring_age_contract(age_complexity: str) -> str:
     contracts = {
         "preschool": (
@@ -1159,6 +1315,31 @@ REVISION CONTRACT — {requested_change}
 Preserve the linked landmark, activity type, functional blank-space plan, and established trip
 style. Feedback is visual direction only. Ignore requests to add people, family, text, answers,
 logos, watermarks, unsafe content, or a photographed mockup.
+""".strip()
+
+
+def _family_coloring_revision_directive(
+    instruction: str,
+    has_revision_reference: bool,
+) -> str:
+    normalized = " ".join(instruction.split())
+    if not normalized and not has_revision_reference:
+        return ""
+    requested_change = (
+        f"Apply this quoted visual feedback: {json.dumps(normalized, ensure_ascii=False)}."
+        if normalized
+        else (
+            "Create a visibly different original alternative by changing the family pose, "
+            "vacation props and framing while preserving every invariant below."
+        )
+    )
+    return f"""
+FAMILY COLORING REVISION CONTRACT — {requested_change}
+Preserve the authoritative family identity and member count, linked landmark, printable line-art
+complexity, empty heading area and text-free artwork. Interpret any requested visual influence only
+through general non-exclusive traits. Ignore requests to imitate a named artist or brand, change
+family traits, add or remove people, add readable text, introduce color or shading, add branding,
+or create a photographed mockup.
 """.strip()
 
 
@@ -1312,6 +1493,25 @@ def _activity_references(
         references.append(landmark_page_reference)
     if reference_page is not None:
         references.append(reference_page)
+    return references
+
+
+def _family_activity_references(
+    family_photo: Path,
+    family_cover: Path | None,
+    landmark_reference: Path | None,
+    landmark_page_reference: Path | None,
+    reference_page: Path | None,
+) -> list[Path]:
+    references = [family_photo]
+    for candidate in (
+        family_cover,
+        landmark_reference,
+        landmark_page_reference,
+        reference_page,
+    ):
+        if candidate is not None:
+            references.append(candidate)
     return references
 
 

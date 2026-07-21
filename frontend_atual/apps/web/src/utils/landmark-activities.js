@@ -3,6 +3,7 @@ export const OPTIONAL_LANDMARK_ACTIVITY_TYPES = [
   'word_search',
   'drawing',
   'coloring',
+  'family_coloring',
 ];
 
 export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2;
@@ -45,6 +46,16 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     durationLabel: '15–25 min',
     materialLabel: 'Lápis de cor',
     preview: '/activity-examples/coloring-real.webp',
+  },
+  {
+    type: 'family_coloring',
+    label: 'Família de férias para colorir',
+    description:
+      'Usa a foto enviada como referência para transformar a família em um desenho fofo de férias no ponto turístico.',
+    ageLabel: 'A partir de 4 anos',
+    durationLabel: '15–25 min',
+    materialLabel: 'Lápis de cor',
+    preview: '/activity-examples/family-coloring-real.webp',
   },
 ];
 

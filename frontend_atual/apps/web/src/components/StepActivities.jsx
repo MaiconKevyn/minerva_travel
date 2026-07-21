@@ -136,7 +136,7 @@ const StepActivities = () => {
                 </span>
               </div>
 
-              <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
+              <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-3 xl:grid-cols-5">
                 {LANDMARK_ACTIVITY_OPTIONS.map((activity) => {
                   const selected = isSelected(selectionId, activity.type);
                   const inputId = `${selectionId}-${activity.type}`.replace(/[^a-zA-Z0-9_-]/g, '-');

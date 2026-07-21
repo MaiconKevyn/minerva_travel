@@ -81,6 +81,9 @@ class RecordingPageGenerator:
     def generate_coloring_page(self, *, output_path, **kwargs):
         return self._write("coloring", output_path, kwargs)
 
+    def generate_family_coloring_page(self, *, output_path, **kwargs):
+        return self._write("family_coloring", output_path, kwargs)
+
     def generate_detail_hunt_page(self, *, output_path, **kwargs):
         return self._write("detail_hunt", output_path, kwargs)
 
@@ -677,6 +680,78 @@ def test_activity_can_generate_before_linked_landmark_without_any_visual_referen
     assert activity_request["landmark_reference"] is None
     assert activity_request["landmark_page_reference"] is None
     assert activity_request["landmark_context"]["name"] == "Pantheon"
+
+
+def test_family_coloring_generates_from_private_photo_without_approved_cover(
+    tmp_path,
+    monkeypatch,
+):
+    generator = RecordingPageGenerator()
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.get_guide_page_generator", lambda: generator)
+    client = TestClient(app)
+    response = _post_builder(
+        client,
+        {
+            "title": "Família Lima",
+            "children_names": "Bia",
+            "children_ages": "7",
+            "parents_names": "Ana",
+            "year": "2026",
+            "expected_visible_family_member_count": "2",
+            "custom_landmarks": json.dumps(
+                [
+                    {
+                        "selection_id": "google:pantheon-family-123",
+                        "name": "Pantheon",
+                        "city": "Roma",
+                        "country": "Itália",
+                        "description": ["Um monumento escolhido pela família."],
+                    }
+                ]
+            ),
+            "activity_selections_json": json.dumps(
+                [
+                    {
+                        "landmark_selection_id": "google:pantheon-family-123",
+                        "activity_type": "family_coloring",
+                        "order": 1,
+                    }
+                ]
+            ),
+        },
+    )
+    assert response.status_code == 201, response.text
+    session_id = response.json()["session_id"]
+    activity = next(
+        page for page in response.json()["pages"] if page["id"] == "activity-1-family-coloring"
+    )
+    assert activity["required_copy"] == [
+        "Família de férias para colorir",
+        "Família Lima",
+        "Pantheon",
+        "Agora é a vez de colorir a aventura da sua família em Pantheon.",
+    ]
+
+    generated = client.post(
+        f"/api/guide-builder/{session_id}/pages/activity-1-family-coloring/attempts",
+        headers={"Idempotency-Key": "generate-family-coloring-before-cover"},
+        json={},
+    )
+
+    assert generated.status_code == 200, generated.text
+    request = generator.requests[-1]
+    assert request["kind"] == "family_coloring"
+    assert request["family_photo"].is_file()
+    assert request["family_cover"] is None
+    assert request["landmark_reference"] is None
+    assert request["landmark_page_reference"] is None
+    assert request["family_title"] == "Família Lima"
+    assert request["expected_visible_family_member_count"] == 2
+    generated_activity = next(
+        page for page in generated.json()["pages"] if page["id"] == "activity-1-family-coloring"
+    )
+    assert generated_activity["attempts"][-1]["include_family"] is True
 
 
 def test_activity_and_memory_dispatch_never_require_or_forward_family_photo(

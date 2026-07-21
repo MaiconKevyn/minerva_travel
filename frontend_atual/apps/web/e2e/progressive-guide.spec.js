@@ -97,7 +97,7 @@ test('restored activity step keeps the no-optional path and mandatory memory vis
 
   const email = `atividades-${test.info().project.name}@example.test`;
   const password = 'Aventura2026';
-  await page.goto('/signup');
+  await page.goto('/signup', { waitUntil: 'domcontentloaded' });
   await page.getByLabel('Nome da Família ou Responsável').fill('Família Aurora');
   await page.getByLabel('Email Mágico').fill(email);
   await page.getByLabel('Senha Secreta', { exact: true }).fill(password);
@@ -112,7 +112,7 @@ test('restored activity step keeps the no-optional path and mandatory memory vis
   await expect(loginPassword).toHaveValue(password);
   await page.getByRole('button', { name: 'Entrar na Aventura' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await page.goto('/create');
+  await page.goto('/create', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByRole('heading', { name: 'Atividades da aventura' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Minha melhor memória' })).toBeVisible();
@@ -124,6 +124,7 @@ test('restored activity step keeps the no-optional path and mandatory memory vis
 test('family reviews pages and controls family inclusion on a landmark', async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   const consoleErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -482,7 +483,7 @@ test('family reviews pages and controls family inclusion on a landmark', async (
 
   const email = `paginas-${test.info().project.name}@example.test`;
   const password = 'Aventura2026';
-  await page.goto('/signup');
+  await page.goto('/signup', { waitUntil: 'domcontentloaded' });
   await page.getByLabel('Nome da Família ou Responsável').fill('Família Aurora');
   await page.getByLabel('Email Mágico').fill(email);
   await page.getByLabel('Senha Secreta', { exact: true }).fill(password);
@@ -497,13 +498,31 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   await expect(loginPassword).toHaveValue(password);
   await page.getByRole('button', { name: 'Entrar na Aventura' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await page.goto('/create');
+  await page.goto('/create', { waitUntil: 'domcontentloaded' });
 
   await page.getByRole('button', { name: 'Começar pelas páginas' }).click();
   await expect(page.getByText('Nenhuma imagem gerada ainda')).toBeVisible();
 
   await page.getByRole('button', { name: 'Adicionar atividades' }).click();
   await expect(page.getByRole('heading', { name: 'Atividades do guia' })).toBeVisible();
+  const familyColoringCard = page.locator('article').filter({
+    hasText: 'Família de férias para colorir',
+  });
+  await expect(familyColoringCard).toBeVisible();
+  await familyColoringCard.getByRole('button', { name: /Ver exemplo completo/ }).click();
+  const familyColoringPreview = page.getByRole('dialog').filter({
+    has: page.getByRole('heading', { name: 'Família de férias para colorir' }),
+  });
+  await expect(familyColoringPreview).toBeVisible();
+  const familyPreviewImage = familyColoringPreview.getByAltText(
+    'Exemplo completo da atividade Família de férias para colorir',
+  );
+  await expect(familyPreviewImage).toHaveAttribute(
+    'src',
+    '/activity-examples/family-coloring-real.webp',
+  );
+  expect(await familyPreviewImage.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+  await familyColoringPreview.getByRole('button', { name: 'Close' }).click();
   const wordSearchCard = page.locator('article').filter({ hasText: 'Caça-palavras' });
   await wordSearchCard.getByRole('button', { name: /Ver exemplo completo/ }).click();
   const previewDialog = page.getByRole('dialog').filter({
