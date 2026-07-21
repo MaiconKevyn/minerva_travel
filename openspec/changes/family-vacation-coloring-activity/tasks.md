@@ -24,5 +24,6 @@
 ## 4. Delivery
 
 - [x] 4.1 Review for credentials, private photos, generated runtime files and unrelated user changes.
-- [ ] 4.2 Commit and push to `main`.
-- [ ] 4.3 Build from pushed `main`, publish `hostinger-frontend` and confirm both remote heads.
+- [x] 4.2 Commit and push to `main` (`555de0b`).
+- [x] 4.3 Build from committed `main`, publish `hostinger-frontend` (`4f5aca2`) and confirm both
+  remote heads.
