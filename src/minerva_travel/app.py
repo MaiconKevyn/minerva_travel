@@ -40,6 +40,8 @@ from minerva_travel.activity_page_compositor import (
     DETAIL_HUNT_TITLE,
     FAMILY_COLORING_TITLE,
     HOMECOMING_REQUIRED_COPY,
+    INVESTIGATOR_INSTRUCTION,
+    INVESTIGATOR_TITLE,
     LANDMARK_VISITED_LABEL,
     PAINTING_TITLE,
     WORD_SEARCH_TITLE,
@@ -123,6 +125,11 @@ from minerva_travel.image_generation import (
     get_cover_image_validator,
     get_image_generator,
     simplify_child_coloring_lineart,
+)
+from minerva_travel.investigator_activity import (
+    InvestigatorChildProfile,
+    InvestigatorMissionError,
+    normalize_investigator_children,
 )
 from minerva_travel.itinerary import recommend_itinerary
 from minerva_travel.itinerary_routes import suggest_itinerary_routes
@@ -2068,9 +2075,33 @@ def _builder_trip_date(form: dict[str, Any]) -> str:
     return str(form.get("year") or "")
 
 
+def _builder_investigator_children(form: dict[str, Any]) -> list[InvestigatorChildProfile]:
+    raw_names = form.get("children_names", "")
+    if isinstance(raw_names, str):
+        names = _split_names(raw_names)
+    elif isinstance(raw_names, list):
+        names = [str(name) for name in raw_names]
+    else:
+        names = []
+    raw_ages = form.get("children_ages", [])
+    ages = (
+        [age if isinstance(age, int) and not isinstance(age, bool) else None for age in raw_ages]
+        if isinstance(raw_ages, list)
+        else []
+    )
+    try:
+        return normalize_investigator_children(names, ages)
+    except InvestigatorMissionError as error:
+        raise ActivitySelectionInputError(
+            "investigator_children_invalid",
+            "Revise os nomes e as idades das crianças antes de adicionar Investigador.",
+        ) from error
+
+
 _ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
     "coloring": COLORING_TITLE,
     "family_coloring": FAMILY_COLORING_TITLE,
+    "investigator": INVESTIGATOR_TITLE,
     "detail_hunt": DETAIL_HUNT_TITLE,
     "word_search": WORD_SEARCH_TITLE,
     "drawing": PAINTING_TITLE,
@@ -2356,10 +2387,12 @@ def normalize_landmark_activity_selections(
 def _activity_spec(
     activity_type: OptionalLandmarkActivityType,
     landmark: LandmarkActivityContext,
+    children: list[InvestigatorChildProfile] | None = None,
 ) -> dict[str, Any]:
     instructions = {
         "coloring": coloring_instruction_for(landmark.name),
         "family_coloring": family_coloring_instruction_for(landmark.name),
+        "investigator": INVESTIGATOR_INSTRUCTION,
         "detail_hunt": f"Observe {landmark.name} e marque cada detalhe que encontrar.",
         "word_search": f"Encontre no quadro as palavras ligadas a {landmark.name}.",
         "drawing": (f"Agora é a sua vez de criar uma pintura de {landmark.name} do seu jeito."),
@@ -2385,6 +2418,12 @@ def _activity_spec(
         ]
         spec["words"] = list(dict.fromkeys(word.upper() for word in candidates))[:8]
         spec["seed"] = landmark.selection_id
+    elif activity_type == "investigator":
+        if not children:
+            raise InvestigatorMissionError(
+                "A atividade Investigador precisa das crianças cadastradas."
+            )
+        spec["children"] = [child.model_dump(mode="json") for child in children]
     return spec
 
 
@@ -2394,6 +2433,7 @@ def _builder_activity_page(
     *,
     family_title: str,
     trip_date: str,
+    children: list[InvestigatorChildProfile] | None = None,
     position: int = 0,
 ) -> BuilderPage:
     """Build one activity page from trusted persisted landmark context."""
@@ -2416,11 +2456,13 @@ def _builder_activity_page(
         "source_image_available": landmark.source_image_available,
         "linked_landmark_page_id": landmark.landmark_page_id,
     }
-    spec = _activity_spec(activity_type, landmark)
+    spec = _activity_spec(activity_type, landmark, children)
     activity_label = _ACTIVITY_LABELS[activity_type]
     required_copy = [activity_label, landmark.name, str(spec["instruction"])]
     if activity_type == "family_coloring":
         required_copy.insert(1, family_title)
+    elif activity_type == "investigator":
+        required_copy.extend([f"Missão de {child.name}" for child in children or []] + ["Concluí"])
     return BuilderPage(
         id=f"activity-{landmark.itinerary_order}-{activity_type.replace('_', '-')}",
         kind="landmark_activity",
@@ -2477,6 +2519,11 @@ def _builder_page_plan(
         activity_selections,
         selected_landmarks=landmarks,
         all_landmark_ids=all_landmark_ids,
+    )
+    investigator_children = (
+        _builder_investigator_children(form)
+        if any(selection.activity_type == "investigator" for selection in activity_selections)
+        else []
     )
     activities_by_landmark: dict[str, list[LandmarkActivitySelection]] = {}
     for selection in activity_selections:
@@ -2597,6 +2644,7 @@ def _builder_page_plan(
                     activity.activity_type,
                     family_title=str(form.get("title") or "Guia da família"),
                     trip_date=trip_date,
+                    children=investigator_children,
                     position=next_position,
                 )
             )
@@ -2753,6 +2801,11 @@ def _new_session_activity_page(
         activity_type,
         family_title=str(session.form.get("title") or "Guia da família"),
         trip_date=_builder_trip_date(session.form),
+        children=(
+            _builder_investigator_children(session.form)
+            if activity_type == "investigator"
+            else None
+        ),
     )
 
 
@@ -2940,7 +2993,10 @@ def generate_builder_page_attempt(
             if page.kind == "landmark":
                 include_family = requested_include_family
             elif page.kind == "landmark_activity":
-                include_family = page.metadata.get("activity_type") == "family_coloring"
+                include_family = page.metadata.get("activity_type") in {
+                    "family_coloring",
+                    "investigator",
+                }
             elif page.kind in {"destination_intro", "best_memory"}:
                 include_family = False
             else:
@@ -2959,10 +3015,9 @@ def generate_builder_page_attempt(
             include_family = page.pending_include_family
             page_kind = page.kind
             metadata = dict(page.metadata)
-            family_coloring_activity = (
-                page_kind == "landmark_activity"
-                and metadata.get("activity_type") == "family_coloring"
-            )
+            family_reference_activity = page_kind == "landmark_activity" and metadata.get(
+                "activity_type"
+            ) in {"family_coloring", "investigator"}
             family_title = str(session.form.get("title") or "Guia da família")
             photo_path = Path(session.photo_filename)
             expected_people = session.form.get("expected_visible_family_member_count")
@@ -2995,7 +3050,7 @@ def generate_builder_page_attempt(
                     cover_attempt.filename,
                     "A capa aprovada da família não está mais disponível.",
                 )
-            elif family_coloring_activity:
+            elif family_reference_activity:
                 cover_page = session.page("cover")
                 cover_attempt = (
                     cover_page.selected_attempt()
@@ -3025,7 +3080,7 @@ def generate_builder_page_attempt(
                             "A versão gerada do ponto turístico não está mais disponível.",
                         )
                     except BuilderPageDependencyMissing:
-                        if not family_coloring_activity:
+                        if not family_reference_activity:
                             raise
                 landmark_reference = _builder_local_landmark_reference(metadata.get("source_image"))
 
@@ -3034,7 +3089,7 @@ def generate_builder_page_attempt(
         family_photo_required = (
             page_kind in {"cover", "trip_summary", "homecoming"}
             or (page_kind == "landmark" and include_family)
-            or family_coloring_activity
+            or family_reference_activity
         )
         if family_photo_required and not photo_path.is_file():
             raise PageGenerationError("A foto da família não está mais disponível.")
@@ -3125,6 +3180,14 @@ def generate_builder_page_attempt(
                 generator.generate_coloring_page(**common_activity_kwargs)
             elif activity_type == "family_coloring":
                 generator.generate_family_coloring_page(
+                    **common_activity_kwargs,
+                    family_photo=photo_path,
+                    family_cover=family_cover,
+                    family_title=family_title,
+                    expected_visible_family_member_count=expected_people,
+                )
+            elif activity_type == "investigator":
+                generator.generate_investigator_page(
                     **common_activity_kwargs,
                     family_photo=photo_path,
                     family_cover=family_cover,

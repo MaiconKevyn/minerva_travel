@@ -422,6 +422,7 @@
             "enum": [
               "coloring",
               "family_coloring",
+              "investigator",
               "detail_hunt",
               "word_search",
               "drawing"
@@ -682,6 +683,7 @@
                 "enum": [
                   "coloring",
                   "family_coloring",
+                  "investigator",
                   "detail_hunt",
                   "word_search",
                   "drawing"
@@ -8150,6 +8152,7 @@
   "x-minerva-optional-landmark-activity-types": [
     "coloring",
     "family_coloring",
+    "investigator",
     "detail_hunt",
     "word_search",
     "drawing"

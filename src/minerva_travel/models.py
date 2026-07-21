@@ -28,6 +28,7 @@ ActivityComplexity = Literal["preschool", "early_reader", "older_child", "family
 OptionalLandmarkActivityType = Literal[
     "coloring",
     "family_coloring",
+    "investigator",
     "detail_hunt",
     "word_search",
     "drawing",
@@ -36,6 +37,7 @@ OptionalLandmarkActivityType = Literal[
 OPTIONAL_LANDMARK_ACTIVITY_TYPES: tuple[OptionalLandmarkActivityType, ...] = (
     "coloring",
     "family_coloring",
+    "investigator",
     "detail_hunt",
     "word_search",
     "drawing",

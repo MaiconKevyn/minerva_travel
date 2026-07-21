@@ -1,4 +1,5 @@
 import base64
+import json
 from io import BytesIO
 
 import httpx
@@ -16,6 +17,7 @@ from minerva_travel.page_generation import (
     destination_intro_page_prompt,
     family_coloring_artwork_prompt,
     homecoming_page_prompt,
+    investigator_artwork_prompt,
     landmark_page_prompt,
     summary_page_prompt,
 )
@@ -56,6 +58,15 @@ def _error_response(status: int, *, retry_after: str = "") -> httpx.Response:
         request=request,
         headers=headers,
         json={"error": {"code": "rate_limit_exceeded", "type": "requests"}},
+    )
+
+
+def _mission_response(missions) -> httpx.Response:
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    return httpx.Response(
+        200,
+        request=request,
+        json={"output_text": json.dumps({"missions": missions}, ensure_ascii=False)},
     )
 
 
@@ -639,6 +650,32 @@ def test_family_coloring_prompt_preserves_family_and_uses_original_trait_contrac
     assert "do not render any letter" in prompt
 
 
+def test_investigator_artwork_prompt_preserves_family_and_reserves_mission_grid():
+    prompt = investigator_artwork_prompt(
+        landmark_name="Museu do Louvre",
+        city="Paris",
+        country="França",
+        age_complexity="preschool",
+        child_count=2,
+        expected_visible_family_member_count=4,
+        has_family_cover=True,
+        has_landmark_reference=True,
+        has_landmark_page_reference=True,
+        has_revision_reference=True,
+        revision_instruction="Use uma paleta mais clara.",
+    )
+
+    assert "Input image 1 is the sanitized original family photo" in prompt
+    assert "Input image 2 is the approved family cover" in prompt
+    assert "Input image 3 is a sanitized landmark reference" in prompt
+    assert "Input image 4 is the approved landmark page" in prompt
+    assert "Input image 5 is the selected current Investigator attempt" in prompt
+    assert "Show exactly 4 recognizable family members" in prompt
+    assert "contains 2 registered children" in prompt
+    assert "lower 50 percent pale" in prompt
+    assert "do not render any letter" in prompt
+
+
 def test_coloring_generation_edits_landmark_refs_then_composites_printable_png(tmp_path):
     calls = []
 
@@ -742,6 +779,87 @@ def test_family_coloring_generation_uses_family_first_and_optional_references(tm
         colors = image.convert("RGB").getcolors(maxcolors=1024 * 1536)
         assert colors is not None
         assert {color for _count, color in colors} <= {(0, 0, 0), (255, 255, 255)}
+
+
+def test_investigator_generation_creates_structured_missions_then_family_first_artwork(tmp_path):
+    calls = []
+    missions = [
+        {
+            "child_index": 1,
+            "child_name": "Lia",
+            "clue": "Procure uma forma triangular.",
+            "mission": "Aponte para ela e desenhe a forma no ar.",
+        },
+        {
+            "child_index": 2,
+            "child_name": "Ravi",
+            "clue": "Observe uma obra com muitas cores.",
+            "mission": "Compare duas cores e anote a principal diferença.",
+        },
+    ]
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if url.endswith("/responses"):
+            return _mission_response(missions)
+        return _response(_png_bytes())
+
+    family, cover = _family_references(tmp_path)
+    landmark = tmp_path / "louvre-source.png"
+    landmark.write_bytes(_png_bytes(size=(800, 600)))
+    approved_landmark = tmp_path / "approved-louvre.png"
+    approved_landmark.write_bytes(_png_bytes())
+    selected = tmp_path / "selected-investigator.png"
+    selected.write_bytes(_png_bytes())
+    output = tmp_path / "investigator.png"
+    generator = OpenAIGuidePageGenerator(
+        api_key="test-key",
+        activity_model="test-activity-model",
+        transport=transport,
+    )
+
+    generator.generate_investigator_page(
+        family_photo=family,
+        family_cover=cover,
+        output_path=output,
+        family_title="Família Lima",
+        expected_visible_family_member_count=4,
+        landmark_reference=landmark,
+        landmark_page_reference=approved_landmark,
+        landmark_context={
+            "selection_id": "paris:louvre",
+            "name": "Museu do Louvre",
+            "city": "Paris",
+            "country": "França",
+            "description": "Museu instalado em um antigo palácio.",
+            "curiosity": "A entrada conhecida tem formato de pirâmide.",
+            "curiosity_kind": "trusted",
+            "age_complexity": "preschool",
+        },
+        activity_spec={
+            "children": [
+                {"name": "Lia", "age": 4},
+                {"name": "Ravi", "age": 11},
+            ]
+        },
+        revision_instruction="Use uma paleta mais clara.",
+        reference_page=selected,
+    )
+
+    assert calls[0][1].endswith("/responses")
+    assert calls[0][2]["json"]["model"] == "test-activity-model"
+    assert calls[0][2]["json"]["text"]["format"]["strict"] is True
+    assert calls[1][1].endswith("/images/edits")
+    assert [file_data[0] for _field, file_data in calls[1][2]["files"]] == [
+        "family.png",
+        "cover-approved.png",
+        "louvre-source.png",
+        "approved-louvre.png",
+        "selected-investigator.png",
+    ]
+    assert not (tmp_path / ".investigator.provider.png").exists()
+    with Image.open(output) as image:
+        assert image.size == (1024, 1536)
 
 
 @pytest.mark.parametrize(

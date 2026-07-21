@@ -71,6 +71,9 @@ class FakePageGenerator:
     def generate_family_coloring_page(self, *, output_path, **kwargs):
         return self._write("activity", output_path, kwargs)
 
+    def generate_investigator_page(self, *, output_path, **kwargs):
+        return self._write("activity", output_path, kwargs)
+
     def generate_detail_hunt_page(self, *, output_path, **kwargs):
         return self._write("activity", output_path, kwargs)
 

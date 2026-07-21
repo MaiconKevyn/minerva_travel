@@ -247,5 +247,8 @@ test('final builder offers a real-example activity panel and persistent page pla
   assert.match(activities, /coloring-real\.webp/);
   assert.match(activities, /family-coloring-real\.webp/);
   assert.match(activities, /Família de férias para colorir/);
+  assert.match(activities, /investigator-real\.webp/);
+  assert.match(activities, /Investigador/);
+  assert.match(activities, /Cada criança recebe uma pista/);
   assert.match(activities, /foto enviada como referência/);
 });

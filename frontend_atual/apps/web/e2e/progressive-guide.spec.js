@@ -523,6 +523,22 @@ test('family reviews pages and controls family inclusion on a landmark', async (
   );
   expect(await familyPreviewImage.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
   await familyColoringPreview.getByRole('button', { name: 'Close' }).click();
+  const investigatorCard = page.locator('article').filter({ hasText: 'Investigador' });
+  await expect(investigatorCard).toContainText('Cada criança recebe uma pista');
+  await investigatorCard.getByRole('button', { name: /Ver exemplo completo/ }).click();
+  const investigatorPreview = page.getByRole('dialog').filter({
+    has: page.getByRole('heading', { name: 'Investigador' }),
+  });
+  await expect(investigatorPreview).toBeVisible();
+  const investigatorPreviewImage = investigatorPreview.getByAltText(
+    'Exemplo completo da atividade Investigador',
+  );
+  await expect(investigatorPreviewImage).toHaveAttribute(
+    'src',
+    '/activity-examples/investigator-real.webp',
+  );
+  expect(await investigatorPreviewImage.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+  await investigatorPreview.getByRole('button', { name: 'Close' }).click();
   const wordSearchCard = page.locator('article').filter({ hasText: 'Caça-palavras' });
   await wordSearchCard.getByRole('button', { name: /Ver exemplo completo/ }).click();
   const previewDialog = page.getByRole('dialog').filter({

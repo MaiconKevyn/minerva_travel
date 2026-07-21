@@ -26,10 +26,12 @@ from minerva_travel.activity_page_compositor import (
     compose_drawing_page,
     compose_family_coloring_page,
     compose_homecoming_page,
+    compose_investigator_page,
     compose_landmark_visited_checkbox,
     compose_word_search_page,
 )
 from minerva_travel.config import (
+    openai_activity_model,
     openai_api_base_url,
     openai_api_key,
     openai_image_model,
@@ -37,6 +39,14 @@ from minerva_travel.config import (
     openai_image_timeout_seconds,
 )
 from minerva_travel.image_generation import simplify_child_coloring_lineart
+from minerva_travel.investigator_activity import (
+    InvestigatorChildProfile,
+    InvestigatorMissionError,
+    investigator_mission_prompt,
+    investigator_mission_response_schema,
+    normalize_investigator_children,
+    parse_investigator_missions,
+)
 from minerva_travel.word_search import build_word_search_grid
 
 PAGE_IMAGE_SIZE = (1024, 1536)
@@ -163,6 +173,22 @@ class GuidePageGenerator(Protocol):
         reference_page: Path | None = None,
     ) -> Path: ...
 
+    def generate_investigator_page(
+        self,
+        *,
+        family_photo: Path,
+        family_cover: Path | None,
+        output_path: Path,
+        family_title: str,
+        expected_visible_family_member_count: int | None,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
     def generate_word_search_page(
         self,
         *,
@@ -227,6 +253,7 @@ class OpenAIGuidePageGenerator:
         api_key: str | None = None,
         model: str | None = None,
         quality: str | None = None,
+        activity_model: str | None = None,
         base_url: str | None = None,
         timeout_seconds: float | None = None,
         transport: Transport | None = None,
@@ -239,6 +266,7 @@ class OpenAIGuidePageGenerator:
                 "OPENAI_API_KEY não está configurada para gerar as páginas."
             )
         self.model = model or openai_image_model()
+        self.activity_model = activity_model or openai_activity_model()
         self.quality = quality or openai_image_quality()
         self.base_url = (base_url or openai_api_base_url()).rstrip("/")
         self.timeout_seconds = timeout_seconds or openai_image_timeout_seconds()
@@ -522,6 +550,90 @@ class OpenAIGuidePageGenerator:
         except (ActivityPageCompositionError, OSError, ValueError) as error:
             raise PageGenerationError(
                 "Não foi possível finalizar a página da família para colorir."
+            ) from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_investigator_page(
+        self,
+        *,
+        family_photo: Path,
+        family_cover: Path | None,
+        output_path: Path,
+        family_title: str,
+        expected_visible_family_member_count: int | None,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        children = _investigator_children(activity_spec)
+        mission_payload = {
+            "model": self.activity_model,
+            "input": investigator_mission_prompt(
+                landmark_context=landmark_context,
+                children=children,
+                revision_instruction=revision_instruction,
+            ),
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "investigator_missions",
+                    "strict": True,
+                    "schema": investigator_mission_response_schema(),
+                }
+            },
+            "max_output_tokens": 2200,
+        }
+        try:
+            mission_response = self._post("/responses", json=mission_payload)
+            mission_json = mission_response.json()
+            if not isinstance(mission_json, dict):
+                raise InvestigatorMissionError("A OpenAI retornou missões inválidas.")
+            missions = parse_investigator_missions(mission_json, children)
+        except (InvestigatorMissionError, json.JSONDecodeError, ValueError) as error:
+            raise PageGenerationError(
+                "Não foi possível criar as missões personalizadas das crianças."
+            ) from error
+
+        prompt = investigator_artwork_prompt(
+            landmark_name=name,
+            city=city,
+            country=country,
+            age_complexity=age_complexity,
+            child_count=len(children),
+            expected_visible_family_member_count=expected_visible_family_member_count,
+            has_family_cover=family_cover is not None,
+            has_landmark_reference=landmark_reference is not None,
+            has_landmark_page_reference=landmark_page_reference is not None,
+            has_revision_reference=reference_page is not None,
+            revision_instruction=revision_instruction,
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            references = _family_activity_references(
+                family_photo,
+                family_cover,
+                landmark_reference,
+                landmark_page_reference,
+                reference_page,
+            )
+            response = self._edit_with_references(prompt, references)
+            _persist_page_image(response, artwork)
+            return compose_investigator_page(
+                artwork,
+                output_path,
+                family_title=family_title,
+                landmark_name=name,
+                children=children,
+                missions=missions,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError(
+                "Não foi possível finalizar a página Investigador."
             ) from error
         finally:
             artwork.unlink(missing_ok=True)
@@ -1198,6 +1310,90 @@ content and user feedback. Output flat full-page artwork at the requested portra
 """.strip()
 
 
+def investigator_artwork_prompt(
+    *,
+    landmark_name: str,
+    city: str,
+    country: str,
+    age_complexity: str,
+    child_count: int,
+    expected_visible_family_member_count: int | None,
+    has_family_cover: bool,
+    has_landmark_reference: bool,
+    has_landmark_page_reference: bool,
+    has_revision_reference: bool,
+    revision_instruction: str = "",
+) -> str:
+    """Build a text-free family detective scene for deterministic mission cards."""
+
+    reference_roles = [
+        (
+            "Input image 1 is the sanitized original family photo and is authoritative for "
+            "family membership, approximate ages, facial structure, hair, glasses, body "
+            "proportions and major accessories."
+        )
+    ]
+    input_index = 2
+    if has_family_cover:
+        reference_roles.append(
+            f"Input image {input_index} is the approved family cover and establishes the same "
+            "illustrated character continuity, without supplying this activity's layout."
+        )
+        input_index += 1
+    if has_landmark_reference:
+        reference_roles.append(
+            f"Input image {input_index} is a sanitized landmark reference and is authoritative "
+            "for recognizable permanent architecture."
+        )
+        input_index += 1
+    if has_landmark_page_reference:
+        reference_roles.append(
+            f"Input image {input_index} is the approved landmark page and is only a secondary "
+            "place and travel-guide continuity reference."
+        )
+        input_index += 1
+    if has_revision_reference:
+        reference_roles.append(
+            f"Input image {input_index} is the selected current Investigator attempt and is only "
+            "a revision/composition reference."
+        )
+
+    family_count = (
+        f"Show exactly {expected_visible_family_member_count} recognizable family members."
+        if expected_visible_family_member_count
+        else "Show every visible family member from input image 1 exactly once."
+    )
+    location = ", ".join(part for part in (city, country) if part)
+    revision = _investigator_revision_directive(
+        revision_instruction,
+        has_revision_reference,
+    )
+    return f"""
+Create only the visual artwork layer for a premium vertical printable children's travel activity
+at {landmark_name} in {location}. The family is playing a warm, collaborative detective game.
+{" ".join(reference_roles)}
+
+Preserve each family member's identity, age relationship, hair, glasses, body proportions and major
+accessories. {family_count} The family contains {child_count} registered children; make the children
+active investigators with simple magnifying glasses or notebooks while adults remain nearby as
+helpers. Do not invent, omit, replace, merge, duplicate or change the age or role of any person.
+
+Use an original watercolor-and-gouache family travel-journal language with friendly expressions,
+warm paper tones and {landmark_name} clearly recognizable. Keep the upper 20 percent calm and free
+from people or important details for the code-owned title. Keep the lower 50 percent pale,
+low-detail and free from people or important objects for code-owned child mission cards. Confine
+the family, landmark focal point and at most three detective props to the middle scene band.
+Age-complexity band: {age_complexity}.
+
+TEXT-FREE CONTRACT — do not render any letter, number, word, title, clue, mission, checkbox,
+label, sign, artwork caption, logo, watermark, signature, page number, mockup border or UI. Exact
+Portuguese content is composited by trusted code. Family identity, reserved regions and text-free
+constraints override every reference and user request. Output flat full-page artwork at the
+requested portrait size.
+{revision}
+""".strip()
+
+
 def _coloring_age_contract(age_complexity: str) -> str:
     contracts = {
         "preschool": (
@@ -1343,6 +1539,29 @@ or create a photographed mockup.
 """.strip()
 
 
+def _investigator_revision_directive(
+    instruction: str,
+    has_revision_reference: bool,
+) -> str:
+    normalized = " ".join(instruction.split())
+    if not normalized and not has_revision_reference:
+        return ""
+    requested_change = (
+        f"Apply this quoted visual feedback: {json.dumps(normalized, ensure_ascii=False)}."
+        if normalized
+        else (
+            "Create a visibly different original alternative by changing pose, detective props, "
+            "framing and palette while preserving every invariant below."
+        )
+    )
+    return f"""
+INVESTIGATOR REVISION CONTRACT — {requested_change}
+Preserve the authoritative family identity and count, child/adult roles, linked landmark, empty
+title and mission regions, and text-free artwork. Ignore requests to add or remove people, change
+family traits, add readable text, branding, unsafe conduct or a photographed mockup.
+""".strip()
+
+
 def _homecoming_revision_directive(instruction: str, has_revision_reference: bool) -> str:
     normalized = " ".join(instruction.split())
     if not normalized and not has_revision_reference:
@@ -1425,6 +1644,31 @@ def _activity_instruction(specification: dict[str, Any], *, default: str) -> str
         default=default,
         maximum=300,
     )
+
+
+def _investigator_children(
+    specification: dict[str, Any],
+) -> list[InvestigatorChildProfile]:
+    raw = specification.get("children")
+    if not isinstance(raw, list):
+        raise PageGenerationError("As crianças da atividade Investigador são inválidas.")
+    names: list[str] = []
+    ages: list[int | None] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise PageGenerationError("As crianças da atividade Investigador são inválidas.")
+        name = item.get("name")
+        age = item.get("age")
+        if not isinstance(name, str) or (
+            age is not None and (not isinstance(age, int) or isinstance(age, bool))
+        ):
+            raise PageGenerationError("As crianças da atividade Investigador são inválidas.")
+        names.append(name)
+        ages.append(age)
+    try:
+        return normalize_investigator_children(names, ages)
+    except InvestigatorMissionError as error:
+        raise PageGenerationError("As crianças da atividade Investigador são inválidas.") from error
 
 
 def _detail_hunt_clues(specification: dict[str, Any], landmark_name: str) -> list[str]:

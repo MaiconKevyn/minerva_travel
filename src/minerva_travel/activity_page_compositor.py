@@ -6,11 +6,17 @@ functional element whose spelling, geometry, or blank space must be exact.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from pathlib import Path
 from typing import cast
 
 from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
+
+from minerva_travel.investigator_activity import (
+    InvestigatorChildProfile,
+    InvestigatorMission,
+)
 
 PAGE_IMAGE_SIZE = (1024, 1536)
 INK = "#153451"
@@ -27,6 +33,10 @@ FAMILY_COLORING_INSTRUCTION_TEMPLATE = (
 DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
 PAINTING_TITLE = "Minha pintura"
+INVESTIGATOR_TITLE = "Investigador"
+INVESTIGATOR_INSTRUCTION = (
+    "Cada criança tem uma missão secreta. Observem com atenção e trabalhem em equipe!"
+)
 BEST_MEMORY_REQUIRED_COPY = (
     "Minha melhor memória",
     "Meu lugar favorito foi...",
@@ -193,6 +203,70 @@ def compose_detail_hunt_page(
             fill=INK,
         )
         y += item_height
+    return _atomic_save(image, output_path)
+
+
+def compose_investigator_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    family_title: str,
+    landmark_name: str,
+    children: Sequence[InvestigatorChildProfile],
+    missions: Sequence[InvestigatorMission],
+) -> Path:
+    """Compose exact child-specific detective missions over a text-free visual layer."""
+
+    if not 1 <= len(children) <= 10 or len(missions) != len(children):
+        raise ActivityPageCompositionError("A página Investigador possui missões incompletas.")
+    for index, (child, mission) in enumerate(zip(children, missions, strict=True), start=1):
+        if mission.child_index != index or mission.child_name != child.name:
+            raise ActivityPageCompositionError(
+                "As missões não correspondem às crianças cadastradas."
+            )
+
+    family = _bounded(family_title, "family_title", 100)
+    landmark = _bounded(landmark_name, "landmark_name", 100)
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _panel(draw, (38, 30, 986, 300))
+    _draw_centered(draw, INVESTIGATOR_TITLE, 46, 52, bold=True)
+    _draw_centered_fit(draw, landmark, 111, 37, 22, 884, bold=True)
+    _draw_centered_fit(draw, family, 163, 24, 17, 884, bold=True)
+    _draw_wrapped(
+        draw,
+        INVESTIGATOR_INSTRUCTION,
+        (86, 208, 938, 282),
+        font=_font(21),
+        fill=MUTED_INK,
+        align="center",
+    )
+
+    columns = 1 if len(missions) == 1 else 2
+    rows = math.ceil(len(missions) / columns)
+    left = 54
+    right = 970
+    bottom = 1490
+    gap_x = 16
+    gap_y = 12
+    available_height = 730
+    row_height = min(240, (available_height - gap_y * (rows - 1)) // rows)
+    grid_height = rows * row_height + gap_y * (rows - 1)
+    top = bottom - grid_height
+    column_width = (right - left - gap_x * (columns - 1)) // columns
+
+    for index, (child, mission) in enumerate(zip(children, missions, strict=True)):
+        row = index // columns
+        column = index % columns
+        x0 = left + column * (column_width + gap_x)
+        y0 = top + row * (row_height + gap_y)
+        _draw_investigator_mission_card(
+            draw,
+            (x0, y0, x0 + column_width, y0 + row_height),
+            child=child,
+            mission=mission,
+            compact=rows >= 4,
+        )
     return _atomic_save(image, output_path)
 
 
@@ -422,6 +496,59 @@ def _memory_line(draw: ImageDraw.ImageDraw, top: int, label: str) -> None:
     draw.line((112 + label_width, top + 54, 924, top + 54), fill=INK, width=2)
 
 
+def _draw_investigator_mission_card(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    *,
+    child: InvestigatorChildProfile,
+    mission: InvestigatorMission,
+    compact: bool,
+) -> None:
+    left, top, right, bottom = box
+    _panel(draw, box, radius=18 if compact else 24)
+    age = f" • {child.age} anos" if child.age is not None else ""
+    _draw_centered_fit_box(
+        draw,
+        f"Missão de {child.name}{age}",
+        (left + 14, top + 7, right - 14, top + (32 if compact else 42)),
+        maximum_size=18 if compact else 22,
+        minimum_size=12,
+        bold=True,
+    )
+    separator_y = top + (35 if compact else 47)
+    draw.line((left + 18, separator_y, right - 18, separator_y), fill=PANEL_OUTLINE, width=2)
+    task = f"Pista: {mission.clue} Missão: {mission.mission}"
+    _draw_wrapped_fit(
+        draw,
+        task,
+        (left + 18, separator_y + 7, right - 18, bottom - 31),
+        maximum_size=18 if compact else 21,
+        minimum_size=11,
+        fill=INK,
+    )
+    checkbox_size = 18 if compact else 22
+    checkbox_right = right - 86
+    checkbox_top = bottom - checkbox_size - 7
+    draw.rounded_rectangle(
+        (
+            checkbox_right - checkbox_size,
+            checkbox_top,
+            checkbox_right,
+            checkbox_top + checkbox_size,
+        ),
+        radius=3,
+        fill="white",
+        outline=INK,
+        width=2,
+    )
+    draw.text(
+        (checkbox_right + 7, checkbox_top - 3),
+        "Concluí",
+        font=_font(13 if compact else 16, bold=True),
+        fill=INK,
+    )
+
+
 def _validate_blank_region(image: Image.Image, region: tuple[int, int, int, int]) -> None:
     left, top, right, bottom = region
     if not (0 <= left < right <= image.width and 0 <= top < bottom <= image.height):
@@ -584,6 +711,56 @@ def _draw_centered_fit(
             draw.text(((PAGE_IMAGE_SIZE[0] - width) / 2, y), text, font=font, fill=INK)
             return
     raise ActivityPageCompositionError("O nome do ponto turístico não cabe no título.")
+
+
+def _draw_centered_fit_box(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    box: tuple[int, int, int, int],
+    *,
+    maximum_size: int,
+    minimum_size: int,
+    bold: bool = False,
+) -> None:
+    left, top, right, bottom = box
+    for size in range(maximum_size, minimum_size - 1, -1):
+        font = _font(size, bold=bold)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        width = bbox[2] - bbox[0]
+        height = bbox[3] - bbox[1]
+        if width <= right - left and height <= bottom - top:
+            x = left + ((right - left) - width) / 2
+            y = top + ((bottom - top) - height) / 2 - bbox[1]
+            draw.text((x, y), text, font=font, fill=INK)
+            return
+    raise ActivityPageCompositionError("O nome da criança não cabe no cartão de missão.")
+
+
+def _draw_wrapped_fit(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    box: tuple[int, int, int, int],
+    *,
+    maximum_size: int,
+    minimum_size: int,
+    fill: str,
+) -> None:
+    left, top, right, bottom = box
+    for size in range(maximum_size, minimum_size - 1, -1):
+        font = _font(size)
+        try:
+            lines = _wrap_text(draw, text, font, right - left)
+        except ActivityPageCompositionError:
+            continue
+        line_height = max(1, font.getbbox("Ág")[3] - font.getbbox("Ág")[1] + 5)
+        if top + len(lines) * line_height > bottom:
+            continue
+        y: float = top
+        for line in lines:
+            draw.text((left, y), line, font=font, fill=fill)
+            y += line_height
+        return
+    raise ActivityPageCompositionError("A missão não cabe no cartão da criança.")
 
 
 def _draw_wrapped(

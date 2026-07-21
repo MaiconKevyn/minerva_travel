@@ -65,6 +65,15 @@ def openai_image_model() -> str:
     return os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2").strip() or "gpt-image-2"
 
 
+def openai_activity_model() -> str:
+    load_project_env()
+    return (
+        os.getenv("OPENAI_ACTIVITY_MODEL")
+        or os.getenv("OPENAI_LANDMARK_MODEL")
+        or "gpt-4o-2024-08-06"
+    ).strip()
+
+
 def openai_image_quality() -> str:
     load_project_env()
     quality = os.getenv("OPENAI_IMAGE_QUALITY", "medium").strip().lower()

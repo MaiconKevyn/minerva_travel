@@ -4,6 +4,7 @@ export const OPTIONAL_LANDMARK_ACTIVITY_TYPES = [
   'drawing',
   'coloring',
   'family_coloring',
+  'investigator',
 ];
 
 export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2;
@@ -46,6 +47,16 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     durationLabel: '15–25 min',
     materialLabel: 'Lápis de cor',
     preview: '/activity-examples/coloring-real.webp',
+  },
+  {
+    type: 'investigator',
+    label: 'Investigador',
+    description:
+      'Cada criança recebe uma pista e uma missão diferente, adaptada à idade e ao ponto turístico.',
+    ageLabel: 'Para todas as idades',
+    durationLabel: '10–20 min',
+    materialLabel: 'Lápis',
+    preview: '/activity-examples/investigator-real.webp',
   },
   {
     type: 'family_coloring',
