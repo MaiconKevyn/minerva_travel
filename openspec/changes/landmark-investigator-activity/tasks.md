@@ -28,5 +28,6 @@
 ## 5. Delivery
 
 - [x] 5.1 Review for credentials, private photos, generated runtime files and unrelated user changes.
-- [ ] 5.2 Commit and push to `main`.
-- [ ] 5.3 Build from committed `main`, publish `hostinger-frontend` and confirm both remote heads.
+- [x] 5.2 Commit and push to `main` (`e5fcad1`).
+- [x] 5.3 Build from committed `main`, publish `hostinger-frontend` (`ea6ed1c`) and confirm both
+  remote heads.
