@@ -222,6 +222,34 @@ export const serializeGuideDestinations = (destinations = []) =>
     })
     .join('\n');
 
+export const PACE_LABELS = {
+  light: 'Leve',
+  balanced: 'Equilibrado',
+  full: 'Intenso',
+};
+
+export const paceLabel = (pace) => PACE_LABELS[pace] || PACE_LABELS.balanced;
+
+export const pluralize = (count, singular, plural) =>
+  `${count} ${count === 1 ? singular : plural}`;
+
+/**
+ * Versão legível dos destinos para a tela de revisão.
+ * `serializeGuideDestinations` continua sendo o formato enviado ao backend;
+ * esse texto de máquina nunca deve aparecer para a família.
+ */
+export const guideDestinationSummaryItems = (destinations = []) =>
+  normalizeGuideDestinations(destinations)
+    .filter((destination) => destination.place || destination.timing || destination.days > 0)
+    .map((destination, index) => ({
+      id: destination.id || `destino-${index + 1}`,
+      order: index + 1,
+      place: destination.place,
+      timing: destination.timing,
+      daysLabel: pluralize(destination.days, 'dia', 'dias'),
+      landmarks: destination.landmarks,
+    }));
+
 export const normalizeGuideChildren = (children = []) =>
   children.map((child, index) => ({
     id: child.id || `child-${index + 1}`,
