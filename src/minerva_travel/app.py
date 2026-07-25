@@ -21,6 +21,7 @@ from fastapi import (
     Form,
     Header,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -189,6 +190,7 @@ from minerva_travel.persistence import (
     purge_all_data_for_owner,
 )
 from minerva_travel.place_discovery import discover_dynamic_itinerary, resolve_landmark_locations
+from minerva_travel.place_suggestions import suggest_places
 from minerva_travel.privacy import (
     PrivacyConsent,
     PrivacyConsentError,
@@ -389,6 +391,21 @@ class CustomLandmarkDestinationResponse(BaseModel):
 class CustomLandmarksResponse(BaseModel):
     selected_landmarks: list[str]
     destinations: list[CustomLandmarkDestinationResponse]
+
+
+class PlaceSuggestionResponse(BaseModel):
+    place_id: str
+    name: str
+    city: str
+    country: str
+    location_label: str
+    formatted_address: str
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class PlaceSuggestionsResponse(BaseModel):
+    suggestions: list[PlaceSuggestionResponse]
 
 
 class PreviewImageResponse(BaseModel):
@@ -1142,6 +1159,35 @@ def resolve_custom_landmarks(
             )
             for destination in custom_destinations
         ],
+    )
+
+
+@app.get(
+    "/api/places/suggest",
+    response_model=PlaceSuggestionsResponse,
+    dependencies=[
+        Depends(
+            expensive_request_guard(
+                "places_suggest",
+                "google",
+                default_user_limit=120,
+                default_ip_limit=240,
+            )
+        )
+    ],
+)
+def suggest_places_endpoint(
+    _current_user: CurrentUser,
+    q: Annotated[str, Query(min_length=1, max_length=120)],
+    kind: Annotated[Literal["city", "landmark"], Query()] = "landmark",
+    near: Annotated[str, Query(max_length=160)] = "",
+) -> PlaceSuggestionsResponse:
+    """Autocomplete de lugares. A chave do Google fica só no servidor."""
+    suggestions = suggest_places(q, api_key=google_maps_api_key(), kind=kind, near=near)
+    return PlaceSuggestionsResponse(
+        suggestions=[
+            PlaceSuggestionResponse.model_validate(item.as_payload()) for item in suggestions
+        ]
     )
 
 

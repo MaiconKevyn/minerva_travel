@@ -34,7 +34,6 @@ const EnhancedStep5FamilyDetails = () => {
     parentsList: contextParents,
     setParentsList,
     year,
-    setYear,
     nextStep
   } = useConversationalGuide();
 
@@ -405,22 +404,17 @@ const EnhancedStep5FamilyDetails = () => {
           </Button>
         </div>
 
-        {/* Year Section */}
-        <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-accent/10">
-          <Label htmlFor="year" className="mb-6 flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
-            <div className="p-2 bg-accent/10 rounded-xl text-accent">
-              <Calendar className="w-6 h-6" />
-            </div>
-            Ano da Viagem
-          </Label>
-          <Input
-            id="year"
-            type="number"
-            value={year}
-            onChange={(e) => setYear(parseInt(e.target.value) || new Date().getFullYear())}
-            placeholder="Ex: 2026"
-            className="rounded-xl border-border bg-background py-6 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-accent sm:text-lg"
-          />
+        {/* O ano vem do "Quando?" de cada destino: pedir de novo aqui só criava
+            a chance de a capa dizer um ano e o roteiro dizer outro. */}
+        <div className="flex items-center gap-3 rounded-[2rem] border-2 border-accent/10 bg-card p-6 dark:bg-slate-800/50">
+          <div className="rounded-xl bg-accent/10 p-2 text-accent">
+            <Calendar className="h-6 w-6" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">
+            {year
+              ? <>Ano da viagem: <strong className="text-foreground">{year}</strong>, conforme o roteiro.</>
+              : 'O ano da viagem vem do "Quando?" que você escolheu no roteiro.'}
+          </p>
         </div>
 
         <div className="pt-8 flex justify-center">

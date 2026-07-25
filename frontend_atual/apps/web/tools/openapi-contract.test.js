@@ -65,6 +65,7 @@ test('frontend API operations and consumed response fields match the backend Ope
     ['/api/itinerary/discover', 'post', ['summary', 'selected_landmarks', 'days', 'alternatives', 'resolved_destination']],
     ['/api/itinerary/routes/suggest', 'post', ['options']],
     ['/api/landmarks/resolve-structured', 'post', ['custom_landmarks', 'selected_landmarks', 'destinations']],
+    ['/api/places/suggest', 'get', ['suggestions']],
     ['/api/landmarks/parse', 'post', ['custom_landmarks', 'selected_landmarks', 'destinations']],
     ['/api/guides', 'get', ['guides']],
     ['/api/guides/{guide_id}', 'get', ['id', 'title', 'status', 'download_url']],
@@ -102,6 +103,16 @@ test('frontend API operations and consumed response fields match the backend Ope
     ]),
   );
   assert.ok(apiSource.includes('/api/generate'));
+});
+
+test('place suggestions expose the fields the autocomplete writes into the guide', () => {
+  const item = dereference(
+    dereference(operationSchema('/api/places/suggest', 'get')).properties.suggestions.items,
+  );
+  // O nome oficial e o rótulo "Cidade, País" são o que vai impresso no livro.
+  ['place_id', 'name', 'location_label', 'formatted_address'].forEach((field) => {
+    assert.ok(item.properties[field], `PlaceSuggestion no longer exposes: ${field}`);
+  });
 });
 
 test('shared API errors retain the fields used by frontend feedback', () => {

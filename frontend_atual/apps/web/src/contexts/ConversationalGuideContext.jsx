@@ -13,6 +13,7 @@ import {
   normalizeFamilyMemberCount,
   normalizeGuideDestinations,
   serializeGuideDestinations,
+  tripYearFromDestinations,
 } from '@/utils/guide-form.js';
 import {
   createGuideDraft,
@@ -280,7 +281,9 @@ export const ConversationalGuideProvider = ({ children }) => {
           : 'known');
         setChildrenList(Array.isArray(payload.children_list) ? payload.children_list : []);
         setParentsList(Array.isArray(payload.parents_list) ? payload.parents_list : []);
-        setYear(Number(payload.year) || 2026);
+        setYear(
+          tripYearFromDestinations(restoredDestinations) || Number(payload.year) || 2026,
+        );
         setParsedData(payload.parsed_data && typeof payload.parsed_data === 'object'
           ? payload.parsed_data
           : { destinations: [], landmarks: [] });
@@ -505,6 +508,10 @@ export const ConversationalGuideProvider = ({ children }) => {
     const normalized = normalizeGuideDestinations(destinations);
     const summary = serializeGuideDestinations(normalized);
     setDestinationsListState(normalized);
+    // O ano impresso sai do "Quando?" da primeira parada. Enquanto era um
+    // campo separado, dava para a capa dizer 2026 e o roteiro dizer 2027.
+    const tripYear = tripYearFromDestinations(normalized);
+    if (tripYear) setYear(tripYear);
     resetRouteData(summary);
   }, [resetRouteData]);
 

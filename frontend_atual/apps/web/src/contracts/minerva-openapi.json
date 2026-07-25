@@ -1890,6 +1890,17 @@
             "title": "Cover Fallback Used",
             "type": "boolean"
           },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
           "created_at": {
             "title": "Created At",
             "type": "string"
@@ -2324,6 +2335,82 @@
           "destinations"
         ],
         "title": "LandmarkResolutionResponse",
+        "type": "object"
+      },
+      "PlaceSuggestionResponse": {
+        "properties": {
+          "city": {
+            "title": "City",
+            "type": "string"
+          },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "formatted_address": {
+            "title": "Formatted Address",
+            "type": "string"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "location_label": {
+            "title": "Location Label",
+            "type": "string"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "place_id": {
+            "title": "Place Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "place_id",
+          "name",
+          "city",
+          "country",
+          "location_label",
+          "formatted_address"
+        ],
+        "title": "PlaceSuggestionResponse",
+        "type": "object"
+      },
+      "PlaceSuggestionsResponse": {
+        "properties": {
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/PlaceSuggestionResponse"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "suggestions"
+        ],
+        "title": "PlaceSuggestionsResponse",
         "type": "object"
       },
       "PreviewDestinationResponse": {
@@ -7565,6 +7652,188 @@
           }
         ],
         "summary": "Resolve Structured Landmarks"
+      }
+    },
+    "/api/places/suggest": {
+      "get": {
+        "description": "Autocomplete de lugares. A chave do Google fica só no servidor.",
+        "operationId": "suggest_places_endpoint_api_places_suggest_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 120,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "landmark",
+              "enum": [
+                "city",
+                "landmark"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "near",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 160,
+              "title": "Near",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceSuggestionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Erro padronizado da API"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Suggest Places Endpoint"
       }
     },
     "/download/{filename}": {

@@ -1033,6 +1033,28 @@ export const buildStructuredLandmarksPayload = ({ destinationsList = [] } = {}) 
     .map((item) => ({ place: item.place, landmarks: item.landmarks })),
 });
 
+/**
+ * Autocomplete de lugares. A chave do Google fica no backend, então o
+ * navegador consulta a nossa API — nunca o Google diretamente.
+ */
+export const fetchPlaceSuggestions = async (query, { kind = 'landmark', near = '', signal } = {}) => {
+  const term = String(query || '').trim();
+  if (term.length < 3) return [];
+
+  const params = new URLSearchParams({ q: term, kind });
+  if (near) params.set('near', near);
+
+  const response = await authenticatedFetch(`${apiBaseUrl()}/api/places/suggest?${params}`, {
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível buscar lugares'));
+  }
+  const data = await response.json();
+  return Array.isArray(data.suggestions) ? data.suggestions : [];
+};
+
 export const resolveStructuredLandmarks = async (payload) => {
   const baseUrl = apiBaseUrl();
 

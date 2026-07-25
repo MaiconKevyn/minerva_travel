@@ -20,9 +20,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   normalizeRouteSuggestionDestinations,
+  canonicalizeDestinationTiming,
   createGuideDestination,
+  formatTripTiming,
   normalizeGuideDestinations,
+  normalizeTripYear,
   parseFreeformItineraryText,
+  parseTripTiming,
+  TRIP_MONTHS,
+  tripYearOptions,
   validGuideDestinations,
   validKnownGuideDestinations,
 } from '@/utils/guide-form.js';
@@ -30,6 +36,14 @@ import {
   buildRouteSuggestionPayload,
   suggestItineraryRoutes,
 } from '@/utils/minerva-api.js';
+import PlaceAutocomplete from '@/components/PlaceAutocomplete.jsx';
+
+const CURRENT_YEAR = normalizeTripYear(new Date().getFullYear()) || 2026;
+
+const selectClasses =
+  'h-[3.25rem] w-full rounded-xl border border-input bg-background px-3 text-base text-foreground ' +
+  'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ' +
+  'focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
 const itineraryModeOptions = [
   {
@@ -69,6 +83,9 @@ const Step3Destination = () => {
     destinationsList?.length ? destinationsList : [createGuideDestination()]
   );
   const [error, setError] = useState('');
+  // O "Quando?" guardado é sempre o texto final ("Julho de 2026"), mas quem
+  // escolheu só o mês precisa ver a escolha na tela antes de o texto existir.
+  const [timingDrafts, setTimingDrafts] = useState({});
   const [freeformText, setFreeformText] = useState('');
   const [freeformResult, setFreeformResult] = useState(null);
   const [routeIdea, setRouteIdea] = useState('');
@@ -86,16 +103,29 @@ const Step3Destination = () => {
 
   useEffect(() => {
     if (!restoredDraftId) return;
+    setTimingDrafts({});
     setLocalDestinations(
       restoredDestinationsList?.length
-        ? normalizeGuideDestinations(restoredDestinationsList)
+        ? canonicalizeDestinationTiming(normalizeGuideDestinations(restoredDestinationsList))
         : [createGuideDestination()]
     );
   }, [restoredDestinationsList, restoredDraftId]);
 
   useEffect(() => {
-    if (draftResetKey > 0) setLocalDestinations([createGuideDestination()]);
+    if (draftResetKey > 0) {
+      setTimingDrafts({});
+      setLocalDestinations([createGuideDestination()]);
+    }
   }, [draftResetKey]);
+
+  // O campo de destino não é mais um <input> direto, então o foco de um
+  // destino recém-adicionado (ou do que sobrou após remover) vai pelo id.
+  useEffect(() => {
+    const pendingId = pendingFocusDestinationId.current;
+    if (!pendingId) return;
+    pendingFocusDestinationId.current = null;
+    document.getElementById(`${pendingId}-place`)?.focus();
+  }, [localDestinations]);
 
   const changeItineraryMode = (mode) => {
     setItineraryMode(mode);
@@ -136,6 +166,19 @@ const Step3Destination = () => {
 
   const landmarkBoxesFor = (destination) =>
     destination.landmarks?.length ? destination.landmarks : [''];
+
+  const timingSelectionFor = (destination) => {
+    const draft = timingDrafts[destination.id];
+    if (draft) return draft;
+    const parsed = parseTripTiming(destination.timing);
+    return { month: parsed.month, year: parsed.year || CURRENT_YEAR };
+  };
+
+  const updateTiming = (destination, patch) => {
+    const next = { ...timingSelectionFor(destination), ...patch };
+    setTimingDrafts((prev) => ({ ...prev, [destination.id]: next }));
+    updateDestinationField(destination.id, 'timing', formatTripTiming(next.month, next.year));
+  };
 
   const focusFirstInvalidField = (destinations) => {
     const destinationIndex = destinations.findIndex((item) =>
@@ -230,7 +273,8 @@ const Step3Destination = () => {
     const result = parseFreeformItineraryText(freeformText);
     setFreeformResult(result);
     if (result.destinations.length > 0) {
-      setLocalDestinations(result.destinations);
+      setTimingDrafts({});
+      setLocalDestinations(canonicalizeDestinationTiming(result.destinations));
     }
     setError('');
   };
@@ -267,7 +311,8 @@ const Step3Destination = () => {
   const acceptSuggestedRoute = (route) => {
     const destinations = normalizeRouteSuggestionDestinations(route.structured_destinations || []);
     if (destinations.length > 0) {
-      setLocalDestinations(destinations);
+      setTimingDrafts({});
+      setLocalDestinations(canonicalizeDestinationTiming(destinations));
       setError('');
     }
   };
@@ -468,23 +513,24 @@ const Step3Destination = () => {
                 <Label htmlFor={`${destination.id}-place`} className="font-bold">
                   Pra onde você vai?
                 </Label>
-                <Input
+                <PlaceAutocomplete
                   id={`${destination.id}-place`}
-                  ref={(input) => {
-                    if (input && pendingFocusDestinationId.current === destination.id) {
-                      pendingFocusDestinationId.current = null;
-                      input.focus();
-                    }
-                  }}
+                  kind="city"
                   autoFocus={index === 0}
                   value={destination.place}
-                  onChange={(event) =>
-                    updateDestinationField(destination.id, 'place', event.target.value)
+                  onChange={(value) => updateDestinationField(destination.id, 'place', value)}
+                  onSelect={(suggestion) =>
+                    updateDestinationField(
+                      destination.id,
+                      'place',
+                      suggestion.location_label || suggestion.name,
+                    )
                   }
-                  placeholder="Ex: Paris, França"
-                  className="rounded-xl py-6 text-base"
-                  aria-invalid={Boolean(error && !destination.place.trim())}
-                  aria-describedby={error && !destination.place.trim() ? 'destination-error' : undefined}
+                  placeholder="Ex: Paris"
+                  ariaInvalid={Boolean(error && !destination.place.trim())}
+                  ariaDescribedBy={
+                    error && !destination.place.trim() ? 'destination-error' : undefined
+                  }
                 />
               </div>
 
@@ -492,17 +538,41 @@ const Step3Destination = () => {
                 <Label htmlFor={`${destination.id}-timing`} className="font-bold">
                   Quando?
                 </Label>
-                <Input
-                  id={`${destination.id}-timing`}
-                  value={destination.timing}
-                  onChange={(event) =>
-                    updateDestinationField(destination.id, 'timing', event.target.value)
-                  }
-                  placeholder="Ex: Julho de 2026"
-                  className="rounded-xl py-6 text-base"
-                  aria-invalid={Boolean(error && !destination.timing.trim())}
-                  aria-describedby={error && !destination.timing.trim() ? 'destination-error' : undefined}
-                />
+                <div className="grid grid-cols-[1.35fr_1fr] gap-2">
+                  <select
+                    id={`${destination.id}-timing`}
+                    value={timingSelectionFor(destination).month}
+                    onChange={(event) => updateTiming(destination, { month: event.target.value })}
+                    aria-label={`Mês da viagem no destino ${index + 1}`}
+                    aria-invalid={Boolean(error && !destination.timing.trim())}
+                    aria-describedby={error && !destination.timing.trim() ? 'destination-error' : undefined}
+                    className={selectClasses}
+                  >
+                    <option value="">Mês</option>
+                    {TRIP_MONTHS.map((month) => (
+                      <option key={month} value={month}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    id={`${destination.id}-timing-year`}
+                    value={timingSelectionFor(destination).year}
+                    onChange={(event) =>
+                      updateTiming(destination, { year: Number(event.target.value) })
+                    }
+                    aria-label={`Ano da viagem no destino ${index + 1}`}
+                    className={selectClasses}
+                  >
+                    {tripYearOptions(timingSelectionFor(destination).year, CURRENT_YEAR).map(
+                      (year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -513,6 +583,8 @@ const Step3Destination = () => {
                   id={`${destination.id}-days`}
                   type="number"
                   min="1"
+                  max="60"
+                  inputMode="numeric"
                   value={destination.days}
                   onChange={(event) =>
                     updateDestinationField(destination.id, 'days', event.target.value)
@@ -536,30 +608,36 @@ const Step3Destination = () => {
                   {landmarkBoxesFor(destination).map((landmarkName, landmarkIndex) => (
                     <div
                       key={`${destination.id}-landmark-${landmarkIndex}`}
-                      className="flex items-center gap-3"
+                      className="flex items-start gap-3"
                     >
-                      <Input
-                        id={`${destination.id}-landmark-${landmarkIndex}`}
-                        value={landmarkName}
-                        onChange={(event) =>
-                          updateLandmarkField(destination.id, landmarkIndex, event.target.value)
-                        }
-                        placeholder={`Ex: ${landmarkIndex === 0 ? 'Torre Eiffel' : 'Museu do Louvre'}`}
-                        aria-label={`Ponto turístico ${landmarkIndex + 1} do destino ${index + 1}`}
-                        aria-invalid={Boolean(
-                          error &&
+                      <div className="min-w-0 flex-1">
+                        <PlaceAutocomplete
+                          id={`${destination.id}-landmark-${landmarkIndex}`}
+                          kind="landmark"
+                          near={destination.place}
+                          value={landmarkName}
+                          onChange={(value) =>
+                            updateLandmarkField(destination.id, landmarkIndex, value)
+                          }
+                          onSelect={(suggestion) =>
+                            updateLandmarkField(destination.id, landmarkIndex, suggestion.name)
+                          }
+                          placeholder={`Ex: ${landmarkIndex === 0 ? 'Torre Eiffel' : 'Museu do Louvre'}`}
+                          ariaLabel={`Ponto turístico ${landmarkIndex + 1} do destino ${index + 1}`}
+                          ariaInvalid={Boolean(
+                            error &&
+                              itineraryMode === 'known' &&
+                              !landmarkBoxesFor(destination).some((item) => item.trim()),
+                          )}
+                          ariaDescribedBy={
+                            error &&
                             itineraryMode === 'known' &&
                             !landmarkBoxesFor(destination).some((item) => item.trim())
-                        )}
-                        aria-describedby={
-                          error &&
-                          itineraryMode === 'known' &&
-                          !landmarkBoxesFor(destination).some((item) => item.trim())
-                            ? 'destination-error'
-                            : undefined
-                        }
-                        className="rounded-xl py-6 text-base"
-                      />
+                              ? 'destination-error'
+                              : undefined
+                          }
+                        />
+                      </div>
                       <Button
                         type="button"
                         variant="ghost"
@@ -568,7 +646,7 @@ const Step3Destination = () => {
                         disabled={
                           landmarkBoxesFor(destination).length === 1 && !landmarkName.trim()
                         }
-                        className="h-12 w-12 shrink-0 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
+                        className="h-[3.25rem] w-12 shrink-0 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
                         aria-label="Remover ponto turístico"
                       >
                         <X className="h-5 w-5" />
@@ -622,10 +700,10 @@ const Step3Destination = () => {
           </Button>
         </div>
 
-        <div className="flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground">
-          <CalendarDays className="h-4 w-4" />
+        <div className="flex items-center justify-center gap-2 text-center text-sm font-medium text-muted-foreground">
+          <CalendarDays className="h-4 w-4 shrink-0" />
           {itineraryMode === 'known'
-            ? 'Vamos buscar as fotos e o mapa dos pontos turísticos que você informar.'
+            ? 'Escolha os lugares na lista que aparece: é o nome oficial deles que vai impresso no livro.'
             : 'O tempo de cada destino será usado para montar o ritmo do roteiro.'}
         </div>
       </motion.form>

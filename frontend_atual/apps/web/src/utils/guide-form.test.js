@@ -228,3 +228,48 @@ test('normalizeRouteSuggestionDestinations returns editable canonical destinatio
     { id: 'suggested-2', place: 'Londres', timing: 'depois de Paris', days: 2 },
   ]);
 });
+
+test('formatTripTiming produz exatamente o texto que vai impresso', () => {
+  assert.equal(guideForm.formatTripTiming('Julho', 2026), 'Julho de 2026');
+  assert.equal(guideForm.formatTripTiming('Março', '2027'), 'Março de 2027');
+  // Sem mês ou com ano fora da faixa não existe texto: melhor vazio que errado.
+  assert.equal(guideForm.formatTripTiming('', 2026), '');
+  assert.equal(guideForm.formatTripTiming('Julho', 1999), '');
+  assert.equal(guideForm.formatTripTiming('julho', 2026), '');
+});
+
+test('parseTripTiming recupera mês e ano de rascunhos antigos em texto livre', () => {
+  assert.deepEqual(guideForm.parseTripTiming('Julho de 2026'), { month: 'Julho', year: 2026 });
+  assert.deepEqual(guideForm.parseTripTiming('julho/2026'), { month: 'Julho', year: 2026 });
+  assert.deepEqual(guideForm.parseTripTiming('marco de 2027'), { month: 'Março', year: 2027 });
+  assert.deepEqual(guideForm.parseTripTiming('07/2026'), { month: 'Julho', year: 2026 });
+  assert.deepEqual(guideForm.parseTripTiming('verão de 2026'), { month: '', year: 2026 });
+  assert.deepEqual(guideForm.parseTripTiming('depois de Paris'), { month: '', year: 0 });
+});
+
+test('canonicalizeDestinationTiming esvazia o que não dá para imprimir', () => {
+  const destinations = guideForm.canonicalizeDestinationTiming([
+    { id: 'a', place: 'Paris', timing: 'julho de 2026', days: 3 },
+    { id: 'b', place: 'Londres', timing: 'depois de Paris', days: 2 },
+  ]);
+
+  assert.equal(destinations[0].timing, 'Julho de 2026');
+  assert.equal(destinations[1].timing, '');
+  assert.equal(destinations[0].days, 3);
+});
+
+test('tripYearFromDestinations usa a primeira parada com ano reconhecido', () => {
+  assert.equal(
+    guideForm.tripYearFromDestinations([
+      { place: 'Paris', timing: 'depois do carnaval', days: 2 },
+      { place: 'Londres', timing: 'Agosto de 2027', days: 3 },
+    ]),
+    2027,
+  );
+  assert.equal(guideForm.tripYearFromDestinations([]), 0);
+});
+
+test('tripYearOptions cobre os próximos anos e mantém o já escolhido', () => {
+  assert.deepEqual(guideForm.tripYearOptions(0, 2026), [2026, 2027, 2028, 2029]);
+  assert.deepEqual(guideForm.tripYearOptions(2031, 2026), [2026, 2027, 2028, 2029, 2031]);
+});

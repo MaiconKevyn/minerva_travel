@@ -11,6 +11,7 @@ import {
   Users,
   BookHeart,
   AlertCircle,
+  PenLine,
   Plane,
   Puzzle,
   RefreshCcw,
@@ -62,9 +63,11 @@ const Step5Review = () => {
     builderSessionId,
     checkpointBuilderSession,
     clearBuilderSessionCheckpoint,
+    setStep,
   } = useConversationalGuide();
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [printConfirmed, setPrintConfirmed] = useState(false);
   const [builderSession, setBuilderSession] = useState(null);
   const [isRestoringSession, setIsRestoringSession] = useState(Boolean(builderSessionId));
   const [sessionRestoreError, setSessionRestoreError] = useState('');
@@ -468,10 +471,106 @@ const Step5Review = () => {
         </label>
       </div>
 
+      {/* Última barreira antes da gráfica: o guia é impresso com estes textos
+          exatos, então a família confere a grafia uma vez e assume o "confere". */}
+      <div className="rounded-[2rem] border-2 border-primary/25 bg-primary/[0.04] p-5 shadow-sm sm:p-8">
+        <div className="flex items-start gap-4">
+          <PenLine className="mt-1 h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
+          <div>
+            <h3 className="text-xl font-serif font-bold text-foreground sm:text-2xl">
+              Assim vai impresso
+            </h3>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">
+              Estes textos são copiados letra por letra para as páginas do livro.
+              Depois de gerar, corrigir um nome exige refazer as páginas.
+            </p>
+          </div>
+        </div>
+
+        <dl className="mt-6 space-y-4 text-sm">
+          <div className="rounded-2xl bg-card p-4">
+            <dt className="font-bold uppercase tracking-[0.14em] text-muted-foreground">Na capa</dt>
+            <dd className="mt-1 font-serif text-lg font-bold text-foreground">
+              Família {familyName || '—'}
+              {year ? <span className="text-muted-foreground"> · {year}</span> : null}
+            </dd>
+          </div>
+
+          {(childNamesList.length > 0 || parentsNames) && (
+            <div className="rounded-2xl bg-card p-4">
+              <dt className="font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                Nomes da família
+              </dt>
+              <dd className="mt-1 font-medium text-foreground">
+                {[...parentsList.filter(Boolean), ...childNamesList].join(' · ')}
+              </dd>
+            </div>
+          )}
+
+          {destinationSummaryItems.length > 0 && (
+            <div className="rounded-2xl bg-card p-4">
+              <dt className="font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                Paradas e datas
+              </dt>
+              <dd className="mt-1 space-y-1">
+                {destinationSummaryItems.map((item) => (
+                  <p key={item.id} className="font-medium text-foreground">
+                    {item.place}
+                    {item.timing && <span className="text-muted-foreground"> — {item.timing}</span>}
+                  </p>
+                ))}
+              </dd>
+            </div>
+          )}
+
+          {finalLandmarks.length > 0 && (
+            <div className="rounded-2xl bg-card p-4">
+              <dt className="font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                Pontos turísticos
+              </dt>
+              <dd className="mt-1 font-medium text-foreground">
+                {finalLandmarks.map((landmark) => landmark.name).join(' · ')}
+              </dd>
+            </div>
+          )}
+        </dl>
+
+        <div className="mt-6 flex flex-col gap-4 border-t border-primary/15 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex cursor-pointer items-start gap-3 text-sm font-bold text-foreground">
+            <input
+              type="checkbox"
+              checked={printConfirmed}
+              onChange={(event) => setPrintConfirmed(event.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
+            />
+            Confere: é assim que os nomes devem aparecer no livro.
+          </label>
+          <div className="flex shrink-0 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setStep(1)}
+              className="rounded-full px-5 py-5 text-sm font-bold"
+            >
+              Corrigir roteiro
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setStep(4)}
+              className="rounded-full px-5 py-5 text-sm font-bold"
+            >
+              Corrigir nomes
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <div className="flex justify-center pt-8">
         <Button
           onClick={handleGenerate}
-          disabled={isGenerating}
+          disabled={isGenerating || !printConfirmed}
+          aria-describedby={printConfirmed ? undefined : 'print-confirmation-hint'}
           className="w-full max-w-md rounded-full bg-primary px-6 py-6 text-base font-bold text-white shadow-[0_8px_30px_rgb(241,97,59,0.3)] transition-all hover:-translate-y-1 hover:bg-primary/90 disabled:opacity-70 disabled:hover:translate-y-0 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
         >
           {isGenerating ? (
@@ -481,6 +580,11 @@ const Step5Review = () => {
           )}
         </Button>
       </div>
+      {!printConfirmed && (
+        <p id="print-confirmation-hint" className="mt-4 text-center text-sm font-medium text-muted-foreground">
+          Confirme acima que os nomes estão corretos para liberar a criação das páginas.
+        </p>
+      )}
       {isGenerating && (
         <p className="mt-4 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
           Preparando a ordem das páginas. Nenhuma imagem será gerada sem sua confirmação.

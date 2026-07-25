@@ -176,6 +176,86 @@ export const normalizeGuideDestinations = (destinations = []) =>
     landmarks: normalizeDestinationLandmarks(destination.landmarks),
   }));
 
+export const TRIP_MONTHS = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+];
+
+const withoutAccents = (text) =>
+  String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+export const normalizeTripYear = (value) => {
+  const year = Number.parseInt(value, 10);
+  return Number.isFinite(year) && year >= MIN_GUIDE_YEAR && year <= MAX_GUIDE_YEAR ? year : 0;
+};
+
+/**
+ * "Julho de 2026" — exatamente o texto que sai impresso na capa do guia.
+ * O campo "Quando?" era livre, então "julho" ou "vrão 2026" chegavam à
+ * gráfica do jeito que foram digitados; agora só existe essa forma.
+ */
+export const formatTripTiming = (month, year) => {
+  const monthLabel = TRIP_MONTHS.find((item) => item === month) || '';
+  const tripYear = normalizeTripYear(year);
+  return monthLabel && tripYear ? `${monthLabel} de ${tripYear}` : '';
+};
+
+/**
+ * Lê o mês e o ano de um "Quando?" já salvo. Rascunhos antigos guardaram
+ * texto livre ("julho/2026", "07/2026"), então o que der para reconhecer
+ * volta preenchido e o resto fica em branco para a família escolher.
+ */
+export const parseTripTiming = (timing = '') => {
+  const text = String(timing || '');
+  const normalized = withoutAccents(text);
+  const namedMonth = TRIP_MONTHS.find((item) => normalized.includes(withoutAccents(item)));
+  const numericMonth = namedMonth
+    ? ''
+    : TRIP_MONTHS[Number.parseInt(text.match(/\b(0?[1-9]|1[0-2])\s*[/-]/)?.[1] || '', 10) - 1] || '';
+  return {
+    month: namedMonth || numericMonth || '',
+    year: normalizeTripYear(text.match(/\b(20\d{2})\b/)?.[1] || ''),
+  };
+};
+
+/**
+ * Passa o "Quando?" de destinos vindos de texto livre ou de sugestão pela
+ * mesma forma canônica dos seletores. O que não dá para reconhecer vira
+ * vazio: melhor a família escolher do que imprimir "verão" na capa.
+ */
+export const canonicalizeDestinationTiming = (destinations = []) =>
+  destinations.map((destination) => {
+    const { month, year } = parseTripTiming(destination.timing);
+    return { ...destination, timing: formatTripTiming(month, year) };
+  });
+
+/** O ano impresso no guia vem da primeira parada — não de um campo à parte. */
+export const tripYearFromDestinations = (destinations = []) => {
+  for (const destination of normalizeGuideDestinations(destinations)) {
+    const { year } = parseTripTiming(destination.timing);
+    if (year) return year;
+  }
+  return 0;
+};
+
+export const tripYearOptions = (selectedYear = 0, referenceYear = new Date().getFullYear()) => {
+  const base = normalizeTripYear(referenceYear) || MIN_GUIDE_YEAR;
+  const years = new Set([base, base + 1, base + 2, base + 3]);
+  const chosen = normalizeTripYear(selectedYear);
+  if (chosen) years.add(chosen);
+  return [...years].filter((year) => year <= MAX_GUIDE_YEAR).sort((a, b) => a - b);
+};
+
 export const normalizeRouteSuggestionDestinations = (destinations = []) =>
   destinations.map((destination, index) => ({
     id: `suggested-${index + 1}`,
