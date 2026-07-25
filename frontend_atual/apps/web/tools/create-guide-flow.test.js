@@ -252,3 +252,22 @@ test('final builder offers a real-example activity panel and persistent page pla
   assert.match(activities, /Cada criança recebe uma pista/);
   assert.match(activities, /foto enviada como referência/);
 });
+
+test('signup avoids a pointless login step and never lands on an empty form', () => {
+  const signup = readProjectFile('src/pages/SignupPage.jsx');
+  const login = readProjectFile('src/pages/LoginPage.jsx');
+  const authClient = readProjectFile('src/lib/authClient.js');
+
+  // O cliente informa o estado da conta; a tela não inspeciona o provedor.
+  assert.match(authClient, /authenticated: Boolean\(data\?\.session\)/);
+  assert.match(authClient, /needsEmailConfirmation/);
+
+  assert.match(signup, /result\.authenticated/);
+  assert.match(signup, /navigate\('\/create'\)/);
+  assert.match(signup, /state: \{ email, reason: 'confirm-email' \}/);
+  assert.match(signup, /state: \{ email, reason: 'signed-up' \}/);
+  assert.doesNotMatch(signup, /Faça login para continuar/);
+
+  assert.match(login, /location\.state\?\.email/);
+  assert.match(login, /Sua conta está pronta!/);
+});

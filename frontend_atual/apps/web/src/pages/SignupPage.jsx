@@ -48,8 +48,18 @@ const SignupPage = () => {
     const result = await signup(email, password, name);
 
     if (result.success) {
-      toast.success('Conta criada com sucesso! Faça login para continuar.');
-      navigate('/login');
+      if (result.authenticated) {
+        // Cadastro já autenticado: mandar para o login seria um passo inútil.
+        toast.success('Conta criada! Vamos montar o guia da sua família.');
+        navigate('/create');
+      } else if (result.needsEmailConfirmation) {
+        toast.success('Conta criada! Confirme o e-mail que enviamos para entrar.');
+        navigate('/login', { state: { email, reason: 'confirm-email' } });
+      } else {
+        // Sem sessão automática: ao menos levamos o e-mail preenchido adiante.
+        toast.success('Conta criada! Entre para continuar.');
+        navigate('/login', { state: { email, reason: 'signed-up' } });
+      }
     } else {
       toast.error(result.error);
     }

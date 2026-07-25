@@ -10,7 +10,10 @@ import { Airplane, Flower } from '@/components/DecorativeElements.jsx';
 import { Eye, EyeOff, Loader2, Key } from 'lucide-react';
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  // Quem acabou de criar a conta chega com o e-mail já conhecido; refazer a
+  // digitação seria fricção pura logo no primeiro contato com o produto.
+  const [email, setEmail] = useState(location.state?.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,9 +21,9 @@ const LoginPage = () => {
 
   const { login, requestPasswordReset } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const from = location.state?.from?.pathname || '/dashboard';
+  const signupReason = location.state?.reason;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -78,8 +81,16 @@ const LoginPage = () => {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary/10 mb-4">
                 <Key className="w-8 h-8 text-secondary" />
               </div>
-              <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Bem-vindo de Volta!</h1>
-              <p className="text-muted-foreground font-medium">Suas próximas aventuras aguardam.</p>
+              <h1 className="text-3xl font-serif font-bold text-foreground mb-2">
+                {signupReason ? 'Sua conta está pronta!' : 'Bem-vindo de Volta!'}
+              </h1>
+              <p className="text-muted-foreground font-medium">
+                {signupReason === 'confirm-email'
+                  ? 'Confirme o e-mail que enviamos e entre para começar.'
+                  : signupReason === 'signed-up'
+                    ? 'Entre com a senha que você acabou de criar.'
+                    : 'Suas próximas aventuras aguardam.'}
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
