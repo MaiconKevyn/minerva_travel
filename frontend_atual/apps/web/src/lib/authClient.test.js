@@ -17,7 +17,11 @@ test('createAuthClient uses local auth when no Supabase configuration is provide
 
   const signup = await authClient.signup('mae@example.com', 'Senha123', 'Mae');
 
-  assert.deepEqual(signup, { success: true });
+  assert.deepEqual(signup, {
+    success: true,
+    authenticated: false,
+    needsEmailConfirmation: false,
+  });
   assert.equal(authClient.isValid, false);
   assert.equal(storage.getItem('minerva_local_users').includes('Senha123'), false);
 
@@ -402,7 +406,7 @@ test('explicit local mode isolates development from a configured Supabase projec
 
   assert.deepEqual(
     await authClient.signup('e2e@example.com', 'Senha123', 'Familia E2E'),
-    { success: true },
+    { success: true, authenticated: false, needsEmailConfirmation: false },
   );
   assert.equal(supabaseCreated, false);
 });
@@ -444,4 +448,49 @@ test('production requires a complete Supabase configuration', () => {
     }),
     /Supabase Auth e obrigatorio/i,
   );
+});
+
+test('Supabase signup reports whether the account is already authenticated', async () => {
+  const buildClient = (signUpResult) => createAuthClient({
+    supabaseUrl: 'https://projeto.supabase.co',
+    supabasePublishableKey: 'sb_publishable_key',
+    identityMode: 'supabase',
+    appEnv: 'development',
+    createSupabaseClient: () => ({
+      auth: {
+        getSession: async () => ({ data: { session: null }, error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+        signUp: async () => signUpResult,
+      },
+    }),
+  });
+
+  const withSession = await buildClient({
+    data: { user: { id: 'u1', email: 'mae@example.com' }, session: { user: { id: 'u1' } } },
+    error: null,
+  }).signup('mae@example.com', 'SenhaForte1', 'Mae');
+
+  assert.equal(withSession.success, true);
+  assert.equal(withSession.authenticated, true);
+  assert.equal(withSession.needsEmailConfirmation, false);
+
+  // Projeto com confirmação de e-mail ligada: usuário criado, mas sem sessão.
+  const pendingConfirmation = await buildClient({
+    data: { user: { id: 'u2', email: 'pai@example.com' }, session: null },
+    error: null,
+  }).signup('pai@example.com', 'SenhaForte1', 'Pai');
+
+  assert.equal(pendingConfirmation.success, true);
+  assert.equal(pendingConfirmation.authenticated, false);
+  assert.equal(pendingConfirmation.needsEmailConfirmation, true);
+});
+
+test('local signup never claims an authenticated session', async () => {
+  const client = createAuthClient({ storage: createMemoryStorage(), identityMode: 'local' });
+
+  const result = await client.signup('familia@example.com', 'SenhaForte1', 'Família');
+
+  assert.equal(result.success, true);
+  assert.equal(result.authenticated, false);
+  assert.equal(result.needsEmailConfirmation, false);
 });

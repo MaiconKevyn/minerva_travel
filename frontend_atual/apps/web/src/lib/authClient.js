@@ -182,7 +182,7 @@ export const createLocalAuthClient = (storage = globalThis.localStorage || creat
       };
       writeUsers(users);
 
-      return { success: true };
+      return { success: true, authenticated: false, needsEmailConfirmation: false };
     },
 
     async requestPasswordReset() {
@@ -301,7 +301,15 @@ export const createSupabaseAuthClient = ({
         setSession(data.session);
       }
 
-      return { success: true, data };
+      // O Supabase só devolve sessão quando a confirmação de e-mail está
+      // desativada. Sinalizamos isso aqui para a tela não precisar inspecionar
+      // o formato da resposta do provedor para decidir o próximo passo.
+      return {
+        success: true,
+        data,
+        authenticated: Boolean(data?.session),
+        needsEmailConfirmation: !data?.session && Boolean(data?.user),
+      };
     },
 
     async requestPasswordReset(email, redirectTo) {

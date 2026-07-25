@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { resolveInitialTheme, THEME_STORAGE_KEY } from '@/utils/theme.js';
 
 const ThemeContext = createContext();
 
@@ -12,13 +13,9 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      return savedTheme;
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  const [theme, setTheme] = useState(() =>
+    resolveInitialTheme(localStorage.getItem(THEME_STORAGE_KEY)),
+  );
 
   useEffect(() => {
     const root = document.documentElement;
@@ -27,7 +24,7 @@ export const ThemeProvider = ({ children }) => {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('theme', theme);
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
   const toggleTheme = () => {
