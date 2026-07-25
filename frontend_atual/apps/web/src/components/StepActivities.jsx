@@ -3,6 +3,7 @@ import { BookHeart, Check, Clock3, Palette, Pencil, Plane, Sparkles } from 'luci
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import { selectGuideLandmarks } from '@/utils/minerva-api.js';
+import { pluralize } from '@/utils/guide-form.js';
 import {
   LANDMARK_ACTIVITY_OPTIONS,
   MAX_OPTIONAL_ACTIVITIES_PER_GUIDE,
@@ -63,7 +64,11 @@ const StepActivities = () => {
           Escolha as brincadeiras que a criança encontrará depois de cada ponto turístico.
           Nenhuma atividade opcional vem marcada automaticamente.
         </p>
-        <p className="text-sm font-bold text-primary">{ageSummary}</p>
+        {/* Informação de apoio: chip suave, não texto na cor de ação/alerta. */}
+        <p className="inline-flex items-center gap-2 rounded-full bg-accent/15 px-4 py-1.5 text-sm font-bold text-foreground">
+          <Sparkles className="h-4 w-4 text-accent-foreground" aria-hidden="true" />
+          {ageSummary}
+        </p>
       </div>
 
       <section className="rounded-[2rem] border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6" aria-labelledby="mandatory-pages-title">
@@ -189,7 +194,9 @@ const StepActivities = () => {
                             <Pencil className="h-3 w-3" aria-hidden="true" /> {activity.materialLabel}
                           </span>
                         </div>
-                        <p className="text-xs font-bold text-primary">Será adaptada para {landmark.name}</p>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Será adaptada para {landmark.name}
+                        </p>
                       </div>
                     </label>
                   );
@@ -215,7 +222,7 @@ const StepActivities = () => {
         >
           {landmarkActivitySelections.length === 0
             ? 'Continuar sem atividades opcionais'
-            : `Continuar com ${landmarkActivitySelections.length} atividades`}
+            : `Continuar com ${pluralize(landmarkActivitySelections.length, 'atividade', 'atividades')}`}
         </Button>
       </div>
     </div>

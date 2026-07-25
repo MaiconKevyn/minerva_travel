@@ -14,6 +14,16 @@ import StepActivities from '@/components/StepActivities.jsx';
 import Step5Review from '@/components/Step5Review.jsx';
 import { Button } from '@/components/ui/button';
 
+const STEP_NAMES = {
+  1: 'Destinos da viagem',
+  2: 'Ritmo da família',
+  3: 'Pontos turísticos',
+  4: 'Quem vai viajar',
+  5: 'Atividades',
+  6: 'Foto da capa',
+  7: 'Revisão',
+};
+
 const CreateGuidePageContent = () => {
   const {
     currentStep,
@@ -95,8 +105,10 @@ const CreateGuidePageContent = () => {
               )}
             </div>
 
-            <div className="flex-1 max-w-xs mx-auto text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
+            {/* O nome da etapa dá contexto do que vem pela frente; só o número
+                deixava o usuário sem saber quanto falta de verdade. */}
+            <div className="mx-auto max-w-sm flex-1 text-center">
+              <div className="mb-2 flex items-center justify-center gap-2">
                 {visibleSteps.map((s) => (
                   <div
                     key={s}
@@ -106,7 +118,10 @@ const CreateGuidePageContent = () => {
                   />
                 ))}
               </div>
-              <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
+              <p className="text-base font-serif font-bold text-foreground">
+                {STEP_NAMES[currentStep] || 'Criar guia'}
+              </p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 Passo {currentStepPosition + 1} de {visibleSteps.length}
               </p>
             </div>

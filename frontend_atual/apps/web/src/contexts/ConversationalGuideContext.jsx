@@ -39,6 +39,18 @@ const ConversationalGuideContext = createContext();
 
 const GUIDE_DRAFT_SCHEMA_VERSION = 2;
 
+// Erros de rede do navegador chegam em inglês ("Failed to fetch", "Load failed").
+// O aviso de rascunho é secundário na tela, então nunca deve expor jargão técnico.
+const friendlyDraftError = (error) => {
+  const raw = String(error?.message || '').trim();
+  const isNetworkError = !raw
+    || /failed to fetch|load failed|networkerror|network request failed/i.test(raw);
+  if (isNetworkError) {
+    return 'Sem conexão para salvar agora. Continue: guardamos seu progresso assim que a conexão voltar.';
+  }
+  return raw;
+};
+
 const hasMeaningfulDraftContent = (payload) => Boolean(
   payload.builder_session_id ||
   payload.family_name ||
@@ -204,7 +216,7 @@ export const ConversationalGuideProvider = ({ children }) => {
           succeeded = false;
           if (mountedRef.current) {
             setDraftStatus('error');
-            setDraftError(error.message || 'Não foi possível salvar o rascunho. Tente novamente.');
+            setDraftError(friendlyDraftError(error));
           }
           break;
         }

@@ -99,6 +99,60 @@ const withOptimisticPageMove = (current, pageId, afterPageId) => {
   };
 };
 
+// Gerar uma página leva de 15 a 40 segundos. Um spinner mudo nesse tempo
+// parece travamento, então narramos o que está acontecendo. As etapas são
+// ilustrativas do processo real (ilustração + textos na mesma passada).
+const GENERATION_STAGES = [
+  'Preparando o cenário da página…',
+  'Desenhando a família na aquarela…',
+  'Pintando os detalhes do lugar…',
+  'Escrevendo os textos da página…',
+  'Dando os retoques finais…',
+];
+
+const STAGE_DURATION_MS = 7000;
+
+const GeneratingPagePlaceholder = () => {
+  const [stageIndex, setStageIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      // Segura na última etapa: a geração real pode passar do tempo estimado.
+      setStageIndex((current) => Math.min(current + 1, GENERATION_STAGES.length - 1));
+    }, STAGE_DURATION_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <>
+      <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden="true" />
+      <div className="w-full max-w-xs space-y-3">
+        <p className="font-bold text-foreground" role="status" aria-live="polite">
+          {GENERATION_STAGES[stageIndex]}
+        </p>
+        <div
+          className="flex justify-center gap-1.5"
+          role="progressbar"
+          aria-valuemin={1}
+          aria-valuemax={GENERATION_STAGES.length}
+          aria-valuenow={stageIndex + 1}
+          aria-label="Progresso da geração da página"
+        >
+          {GENERATION_STAGES.map((stage, index) => (
+            <span
+              key={stage}
+              className={`h-1.5 rounded-full transition-all duration-500 ${
+                index <= stageIndex ? 'w-8 bg-primary' : 'w-4 bg-border'
+              }`}
+            />
+          ))}
+        </div>
+        <p className="text-sm">A ilustração e os textos são produzidos juntos pela IA.</p>
+      </div>
+    </>
+  );
+};
+
 const GuideAssembly = ({ session: initialSession }) => {
   const [session, setSession] = useState(initialSession);
   const [selectedPageId, setSelectedPageId] = useState(
@@ -563,7 +617,9 @@ const GuideAssembly = ({ session: initialSession }) => {
       animate={{ opacity: 1, y: 0 }}
       className="mx-auto grid w-full max-w-6xl gap-6 py-10 lg:grid-cols-[280px_minmax(0,1fr)]"
     >
-      <aside className="h-fit rounded-[2rem] border-2 border-border/70 bg-card p-5 shadow-sm">
+      {/* No celular a área de trabalho vem primeiro: a lista de páginas é
+          navegação e empurrava o conteúdo quase duas telas para baixo. */}
+      <aside className="order-2 h-fit rounded-[2rem] border-2 border-border/70 bg-card p-5 shadow-sm lg:sticky lg:top-6 lg:order-1">
         <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
           Páginas do guia
         </p>
@@ -630,14 +686,16 @@ const GuideAssembly = ({ session: initialSession }) => {
         </ol>
       </aside>
 
-      <section className="space-y-6">
-        <div className="space-y-3 text-center lg:text-left">
-          <h2 className="text-3xl font-serif font-bold text-foreground md:text-4xl">
-            Gere e confira na ordem que preferir
+      <section className="order-1 space-y-6 lg:order-2">
+        <div className="space-y-2 text-center sm:space-y-3 lg:text-left">
+          <h2 className="text-2xl font-serif font-bold text-foreground sm:text-3xl md:text-4xl">
+            O livro da {session.title || 'sua família'}, página por página
           </h2>
-          <p className="text-lg font-medium text-muted-foreground">
-            Clique em qualquer página do guia. Você pode iniciar outra geração enquanto uma já
-            está em andamento; a sequência final continuará seguindo a numeração ao lado.
+          {/* No celular o texto de apoio empurraria a página gerada para fora
+              da primeira tela; o essencial já está nos botões de ação. */}
+          <p className="hidden text-lg font-medium text-muted-foreground sm:block">
+            Gere cada página, veja o resultado e aprove quando gostar. Dá para pedir ajustes
+            ou gerar outra versão quantas vezes precisar.
           </p>
         </div>
 
@@ -699,13 +757,11 @@ const GuideAssembly = ({ session: initialSession }) => {
                     className="mx-auto aspect-[2/3] max-h-[72vh] w-full bg-white object-contain"
                   />
                 ) : (
-                  <div className="flex min-h-[520px] flex-col items-center justify-center gap-4 px-6 text-center text-muted-foreground">
+                  // Mesma proporção da página final: o espaço já fica reservado
+                  // e a imagem entra sem empurrar o resto do layout.
+                  <div className="mx-auto flex aspect-[2/3] max-h-[72vh] w-full flex-col items-center justify-center gap-4 px-6 text-center text-muted-foreground">
                     {activePageBusyAction === 'generate' || activePage.status === 'generating' ? (
-                      <>
-                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                        <p className="font-bold text-foreground">Gerando a página completa...</p>
-                        <p className="max-w-sm text-sm">A ilustração e os textos serão produzidos juntos pela IA.</p>
-                      </>
+                      <GeneratingPagePlaceholder />
                     ) : (
                       <>
                         <ImageIcon className="h-12 w-12" />
@@ -870,7 +926,9 @@ const GuideAssembly = ({ session: initialSession }) => {
                     Página aprovada. Você pode abrir qualquer outra página na lista.
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  // Ações sempre alcançáveis: a página gerada é alta e, sem
+                  // isto, aprovar exigia rolar duas telas a cada página.
+                  <div className="sticky bottom-2 z-20 space-y-3 rounded-3xl border-2 border-border/70 bg-card/95 p-3 shadow-xl backdrop-blur xl:static xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none xl:backdrop-blur-none">
                     <Button
                       type="button"
                       variant={selectedAttempt ? 'outline' : 'default'}

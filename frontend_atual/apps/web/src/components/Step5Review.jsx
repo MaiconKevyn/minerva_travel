@@ -28,6 +28,9 @@ import {
 import {
   deriveChildAges,
   deriveChildNames,
+  guideDestinationSummaryItems,
+  paceLabel,
+  pluralize,
   PRIVACY_CONSENT_VERSION,
   serializeGuideDestinations,
 } from '@/utils/guide-form.js';
@@ -109,6 +112,7 @@ const Step5Review = () => {
   const childrenNames = childNamesList.join(', ');
   const childrenAges = deriveChildAges(childrenList);
   const destinationSummary = serializeGuideDestinations(destinationsList) || destination;
+  const destinationSummaryItems = guideDestinationSummaryItems(destinationsList);
   const parentsNames = parentsList.join(', ');
   const recommendedDays = (recommendedItinerary?.days || [])
     .map((day) => ({
@@ -288,12 +292,37 @@ const Step5Review = () => {
 
             <div>
               <h3 className="text-xl font-serif font-bold flex items-center gap-2 text-accent mb-3">
-                <MapPin className="w-5 h-5" /> Resumo do Destino
+                <MapPin className="w-5 h-5" /> Roteiro da viagem
               </h3>
-              <p className="whitespace-pre-line font-medium text-base text-muted-foreground line-clamp-5 italic">"{destinationSummary}"</p>
-              <p className="text-sm text-muted-foreground mt-2">Ano: {year}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Ritmo: {itineraryPreferences.pace} · Programas: {itineraryPreferences.interests.length > 0 ? itineraryPreferences.interests.join(', ') : 'sem categorias específicas'}
+              {destinationSummaryItems.length > 0 ? (
+                <ol className="space-y-3">
+                  {destinationSummaryItems.map((item) => (
+                    <li key={item.id} className="flex gap-3">
+                      <span
+                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-bold text-accent-foreground"
+                        aria-hidden="true"
+                      >
+                        {item.order}
+                      </span>
+                      <div className="text-sm">
+                        <p className="font-bold text-foreground">{item.place}</p>
+                        <p className="text-muted-foreground">
+                          {[item.timing, item.daysLabel].filter(Boolean).join(' · ')}
+                        </p>
+                        {item.landmarks.length > 0 && (
+                          <p className="text-muted-foreground">{item.landmarks.join(' · ')}</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="font-medium text-base text-muted-foreground">{destinationSummary}</p>
+              )}
+              <p className="mt-3 text-sm text-muted-foreground">
+                Ano da viagem: {year} · Ritmo {paceLabel(itineraryPreferences.pace).toLowerCase()}
+                {itineraryPreferences.interests.length > 0
+                  && ` · ${itineraryPreferences.interests.join(', ')}`}
               </p>
             </div>
           </div>
@@ -301,7 +330,10 @@ const Step5Review = () => {
 
         <div className="mt-12 pt-8 border-t border-border/50">
           <h3 className="mb-8 flex items-center gap-2 text-xl font-serif font-bold text-primary sm:text-2xl">
-            <Star className="w-6 h-6" /> O Roteiro Mágico ({finalLandmarks.length} locais selecionados)
+            <Star className="w-6 h-6" /> O Roteiro Mágico
+            <span className="font-sans text-sm font-bold text-muted-foreground">
+              {pluralize(finalLandmarks.length, 'local selecionado', 'locais selecionados')}
+            </span>
           </h3>
 
           <div className="space-y-8">
