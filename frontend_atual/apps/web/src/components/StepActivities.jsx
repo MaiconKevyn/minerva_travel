@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BookHeart, Check, Clock3, Palette, Pencil, Plane, Sparkles } from 'lucide-react';
+import { BookHeart, Check, Clock3, Palette, Pencil, Plane, Plus, Sparkles } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import { selectGuideLandmarks } from '@/utils/minerva-api.js';
@@ -149,10 +149,12 @@ const StepActivities = () => {
                     <label
                       key={activity.type}
                       htmlFor={inputId}
-                      className={`group relative cursor-pointer overflow-hidden rounded-3xl border-2 bg-background transition focus-within:ring-4 focus-within:ring-primary/25 ${
+                      // h-full + flex mantém todos os cards da linha alinhados
+                      // mesmo com descrições de tamanhos diferentes.
+                      className={`group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-3xl border-2 bg-background transition focus-within:ring-4 focus-within:ring-primary/25 ${
                         selected
-                          ? 'border-primary shadow-md'
-                          : 'border-border/70 hover:border-primary/45 hover:shadow-sm'
+                          ? 'border-primary shadow-lg ring-2 ring-primary/20'
+                          : 'border-border/70 hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-md'
                       }`}
                     >
                       <input
@@ -170,17 +172,31 @@ const StepActivities = () => {
                           className="h-full w-full object-cover object-top transition duration-300 group-hover:scale-[1.02]"
                         />
                         <span className="absolute left-3 top-3 rounded-full bg-foreground/85 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-background">
-                          Exemplo real
+                          Assim fica
                         </span>
-                        <span className={`absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-                          selected
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-white bg-white/90 text-transparent'
-                        }`} aria-hidden="true">
-                          <Check className="h-5 w-5" />
+                        {/* Marca de seleção sempre visível: o estado vazio antes
+                            era transparente e não parecia clicável. */}
+                        <span
+                          className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-sm transition ${
+                            selected
+                              ? 'border-primary bg-primary text-white'
+                              : 'border-white bg-white/90 text-muted-foreground/70 group-hover:text-primary'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {selected ? <Check className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+                        </span>
+                        <span
+                          className={`absolute inset-x-0 bottom-0 py-2 text-center text-xs font-bold text-white transition ${
+                            selected
+                              ? 'bg-primary/90'
+                              : 'bg-foreground/70 opacity-0 group-hover:opacity-100'
+                          }`}
+                        >
+                          {selected ? 'No guia' : 'Incluir no guia'}
                         </span>
                       </div>
-                      <div className="space-y-3 p-4">
+                      <div className="flex flex-1 flex-col space-y-3 p-4">
                         <h4 className="text-lg font-serif font-bold text-foreground">{activity.label}</h4>
                         <p id={`${inputId}-description`} className="text-sm font-medium leading-relaxed text-muted-foreground">
                           {activity.description}

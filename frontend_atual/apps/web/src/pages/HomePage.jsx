@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import Header from '@/components/Header.jsx';
 import FeatureBox from '@/components/FeatureBox.jsx';
+import HowItWorks from '@/components/HowItWorks.jsx';
+import PageGallery from '@/components/PageGallery.jsx';
 import { Flower, Airplane, Suitcase } from '@/components/DecorativeElements.jsx';
 
 const HomePage = () => {
@@ -74,13 +76,16 @@ const HomePage = () => {
               >
                 <div className="absolute inset-0 bg-secondary/20 rounded-[100px] blur-3xl transform rotate-12 scale-110"></div>
 
-                <div className="relative rounded-[40px] overflow-hidden border-8 border-card shadow-2xl transform rotate-2 hover:rotate-0 transition-transform duration-500">
+                {/* Capa real gerada pelo produto, servida do próprio domínio:
+                    a vitrine mostra exatamente o que a família recebe. */}
+                <div className="relative mx-auto w-full max-w-sm overflow-hidden rounded-[32px] border-8 border-card shadow-2xl transition-transform duration-500 rotate-2 hover:rotate-0">
                   <img
-                    src="https://horizons-cdn.hostinger.com/55ef0bc5-531f-4703-88b8-d7a7a370f5db/41b7627d2fe05fb459992abfe76821db.png"
-                    alt="Watercolor illustration of a happy family with backpacks and camera in front of European landmarks, surrounded by colorful flowers"
-                    className="w-full h-auto object-cover aspect-[4/3]"
+                    src="/activity-examples/cover-sample.webp"
+                    alt="Capa ilustrada de um guia: a família Oliveira em aquarela diante da Torre Eiffel e do Big Ben"
+                    width="1024"
+                    height="1497"
+                    className="aspect-[2/3] w-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-[#E87A5D] mix-blend-overlay opacity-20 pointer-events-none"></div>
                 </div>
 
                 <Suitcase className="absolute -bottom-6 -right-6 w-24 h-24 text-accent drop-shadow-lg transform -rotate-12" />
@@ -88,6 +93,10 @@ const HomePage = () => {
             </div>
           </div>
         </section>
+
+        <HowItWorks />
+
+        <PageGallery />
 
         {/* Guia Personalizado Showcase Section */}
         <section className="py-24 bg-card relative transition-colors duration-200 overflow-hidden border-t border-border/50">

@@ -288,3 +288,35 @@ test('dashboard shows the generated cover of each guide instead of text-only car
   assert.match(cover, /BookOpen/);
   assert.match(cover, /aspect-\[3\/4\]/);
 });
+
+test('home explains the flow and shows real product pages from our own domain', () => {
+  const home = readProjectFile('src/pages/HomePage.jsx');
+  const howItWorks = readProjectFile('src/components/HowItWorks.jsx');
+  const gallery = readProjectFile('src/components/PageGallery.jsx');
+  const featureBox = readProjectFile('src/components/FeatureBox.jsx');
+
+  assert.match(home, /HowItWorks/);
+  assert.match(home, /PageGallery/);
+  // O diferencial (aprovar página por página) precisa aparecer antes do cadastro.
+  assert.match(howItWorks, /Veja cada página nascer/);
+  assert.match(howItWorks, /Conte a viagem/);
+  assert.match(howItWorks, /Leve o livro na mala/);
+  assert.match(gallery, /activity-examples\/cover-sample\.webp/);
+  assert.match(gallery, /activity-examples\/route-sample\.webp/);
+
+  // Nenhuma imagem da vitrine pode depender de CDN de terceiros.
+  for (const source of [home, gallery, featureBox]) {
+    assert.doesNotMatch(source, /horizons-cdn|https?:\/\/[^"']+\.(png|jpe?g|webp)/);
+  }
+  assert.doesNotMatch(featureBox, /créditos de imagem/);
+});
+
+test('activity cards look selectable and keep a consistent grid height', () => {
+  const activities = readProjectFile('src/components/StepActivities.jsx');
+
+  assert.match(activities, /flex h-full cursor-pointer flex-col/);
+  assert.match(activities, /Incluir no guia/);
+  assert.match(activities, /No guia/);
+  assert.match(activities, /Assim fica/);
+  assert.doesNotMatch(activities, /Exemplo real/);
+});

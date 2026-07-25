@@ -18,36 +18,26 @@ const features = [
   {
     icon: Camera,
     title: 'Uma Capa Familiar',
-    description: 'Use uma foto de capa sanitizada. Se a ilustração não puder ser validada, o guia preserva a foto original.',
+    description: 'A foto de vocês vira uma ilustração em aquarela, com o nome da família e o ano da viagem na capa.',
     colorClass: 'text-secondary',
     bgClass: 'bg-secondary/10'
   },
   {
     icon: Heart,
     title: 'Atividades para a Viagem',
-    description: 'Inclua caça-palavras, desenho, idioma e memórias organizadas para antes, durante e depois do passeio.',
+    description: 'Caça-palavras, páginas para colorir, missões e espaço para memórias — no nível certo para a idade de cada criança.',
     colorClass: 'text-accent',
     bgClass: 'bg-accent/10'
   }
 ];
 
+// Páginas reais geradas pelo produto, servidas do próprio domínio: o
+// carrossel antes apontava para um CDN externo herdado do template.
 const carouselSlides = [
-  {
-    image: 'https://horizons-cdn.hostinger.com/55ef0bc5-531f-4703-88b8-d7a7a370f5db/8f98ee1e112586e509ab45c53e58575a.png',
-    title: 'Capa do Guia'
-  },
-  {
-    image: 'https://horizons-cdn.hostinger.com/55ef0bc5-531f-4703-88b8-d7a7a370f5db/d4ab8d32cbcde6fdd618b86f7429230d.png',
-    title: 'Cristo Redentor'
-  },
-  {
-    image: 'https://horizons-cdn.hostinger.com/55ef0bc5-531f-4703-88b8-d7a7a370f5db/224b98a18b73ae735d4fda8b6a861f87.png',
-    title: 'Desenhos para Colorir'
-  },
-  {
-    image: 'https://horizons-cdn.hostinger.com/55ef0bc5-531f-4703-88b8-d7a7a370f5db/9cc0439b39293a8a56d2b32382f3c02b.png',
-    title: 'Lugares Favoritos - Londres'
-  }
+  { image: '/activity-examples/cover-sample.webp', title: 'Capa do guia' },
+  { image: '/activity-examples/route-sample.webp', title: 'Roteiro ilustrado' },
+  { image: '/activity-examples/family-coloring-real.webp', title: 'Colorir em família' },
+  { image: '/activity-examples/painting-real.webp', title: 'Minha pintura' },
 ];
 
 const FeatureBox = () => {
@@ -102,7 +92,8 @@ const FeatureBox = () => {
             transition={{ delay: 0.2 }}
             className="text-xl text-muted-foreground font-medium"
           >
-            Um PDF A4 com roteiro confirmado, curiosidades, atividades e créditos de imagem
+            Um livro A4 para imprimir, com o roteiro de vocês, curiosidades do destino e
+            atividades para a criança fazer na viagem
           </motion.p>
         </div>
 
