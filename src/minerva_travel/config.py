@@ -159,6 +159,11 @@ def supabase_bucket_landmark_assets() -> str:
     return os.getenv("SUPABASE_BUCKET_LANDMARK_ASSETS", "landmark-assets")
 
 
+def supabase_bucket_generated_covers() -> str:
+    load_project_env()
+    return os.getenv("SUPABASE_BUCKET_GENERATED_COVERS", "generated-covers")
+
+
 def supabase_storage_enabled() -> bool:
     load_project_env()
     raw_value = os.getenv("SUPABASE_STORAGE_ENABLED", "true")

@@ -271,3 +271,20 @@ test('signup avoids a pointless login step and never lands on an empty form', ()
   assert.match(login, /location\.state\?\.email/);
   assert.match(login, /Sua conta está pronta!/);
 });
+
+test('dashboard shows the generated cover of each guide instead of text-only cards', () => {
+  const dashboard = readProjectFile('src/pages/DashboardPage.jsx');
+  const cover = readProjectFile('src/components/GuideCover.jsx');
+  const api = readProjectFile('src/utils/minerva-api.js');
+
+  assert.match(dashboard, /GuideCover/);
+  assert.match(dashboard, /coverUrl=\{guide\.cover_url\}/);
+  assert.match(api, /fetchGuideCoverObjectUrl/);
+  assert.match(api, /safeGuideCoverUrl/);
+  // Capa privada: precisa de token, então nunca vai direto no src da imagem.
+  assert.match(cover, /authenticatedFetch|fetchGuideCoverObjectUrl/);
+  assert.match(cover, /revokeObjectURL/);
+  // Guias antigos e falhas de rede caem no placeholder, sem imagem quebrada.
+  assert.match(cover, /BookOpen/);
+  assert.match(cover, /aspect-\[3\/4\]/);
+});

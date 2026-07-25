@@ -64,6 +64,15 @@ class GuideRecord:
                 if self.status == "succeeded" and self.pdf_filename and not self.is_expired
                 else None
             ),
+            # Guias gerados antes da miniatura existir não têm capa; o painel
+            # cai no placeholder ilustrado em vez de mostrar imagem quebrada.
+            "cover_url": (
+                f"/guides/{self.id}/cover"
+                if self.status == "succeeded"
+                and not self.is_expired
+                and self.metadata.get("cover_thumbnail")
+                else None
+            ),
         }
 
     def export_payload(self) -> dict[str, object]:

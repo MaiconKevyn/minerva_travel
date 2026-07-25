@@ -1623,3 +1623,84 @@ def test_api_generate_saves_browser_preview_and_serves_it_to_the_owner(tmp_path,
 
     missing = client.get("/guides/nao-existe/preview")
     assert missing.status_code == 404
+
+
+def test_api_generate_publishes_a_cover_thumbnail_for_the_dashboard(tmp_path, monkeypatch):
+    from io import BytesIO
+
+    from PIL import Image as PILImage
+
+    def _png_bytes(color: str, size=(900, 1200)) -> bytes:
+        buffer = BytesIO()
+        PILImage.new("RGB", size, color).save(buffer, format="PNG")
+        return buffer.getvalue()
+
+    class FakeGenerator:
+        def generate_cover(self, family_photo, output_path, title, destination_names):
+            output_path.write_bytes(_png_bytes("#4f86b7"))
+            return output_path
+
+        def generate_trip_summary(self, output_path, title, destination_names):
+            output_path.write_bytes(_png_bytes("#69b482"))
+            return output_path
+
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr("minerva_travel.app.get_image_generator", lambda _: FakeGenerator())
+    monkeypatch.setattr(
+        "minerva_travel.app.write_pdf",
+        lambda context, output_path: (
+            output_path.parent.mkdir(parents=True, exist_ok=True),
+            output_path.write_bytes(b"pdf"),
+            output_path,
+        )[-1],
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "title": "Guia de Paris",
+            "children_names": "Alice",
+            "parents_names": "Ana",
+            "year": "2026",
+            "selected_landmarks": ["paris:eiffel-tower"],
+        },
+        files={"family_photo": ("family.png", TEST_FAMILY_PHOTO, "image/png")},
+    )
+
+    assert response.status_code == 200
+    guide_id = response.json()["request_id"]
+
+    listed = client.get("/api/guides").json()["guides"]
+    guide = next(item for item in listed if item["id"] == guide_id)
+    assert guide["cover_url"] == f"/guides/{guide_id}/cover"
+
+    cover = client.get(guide["cover_url"])
+    assert cover.status_code == 200
+    assert cover.headers["content-type"] == "image/jpeg"
+    assert "private" in cover.headers["cache-control"]
+    # A miniatura precisa ser bem mais leve que a capa cheia para uma grade.
+    assert len(cover.content) < (tmp_path / "generated" / f"{guide_id}-cover.png").stat().st_size
+
+    assert client.get("/guides/guia-inexistente/cover").status_code == 404
+
+
+def test_guides_without_a_stored_cover_expose_no_cover_url(tmp_path, monkeypatch):
+    monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
+    repository = guide_repository()
+    repository.save_succeeded_guide(
+        guide_id="guia-antigo",
+        user_id="development-user",
+        title="Guia antigo",
+        pdf_filename="guia-antigo.pdf",
+        cover_fallback_used=False,
+        metadata={"destinations": []},
+        assets=[],
+    )
+    client = TestClient(app)
+
+    guide = client.get("/api/guides/guia-antigo").json()
+
+    # Guias anteriores à miniatura caem no placeholder do painel.
+    assert guide["cover_url"] is None
+    assert client.get("/guides/guia-antigo/cover").status_code == 404

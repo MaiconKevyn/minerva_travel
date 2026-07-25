@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import Header from '@/components/Header.jsx';
+import GuideCover from '@/components/GuideCover.jsx';
 import { Suitcase } from '@/components/DecorativeElements.jsx';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -298,27 +299,33 @@ const DashboardPage = () => {
                         key={guide.id}
                         className="group bg-card dark:bg-slate-800 rounded-3xl p-6 shadow-sm border border-border/50 dark:border-slate-700 hover:shadow-lg hover:border-primary/30 transition-all duration-300 flex flex-col h-full"
                       >
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between gap-3 mb-3">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="w-5 h-5 text-primary" aria-hidden="true" />
-                              <span className="text-sm font-bold text-primary tracking-wider uppercase">
-                                Viagem em família
+                        {/* A capa é o produto: cada item da lista é um livro,
+                            não um registro de texto. */}
+                        <div className="flex flex-1 gap-4">
+                          <GuideCover coverUrl={guide.cover_url} title={guide.title} />
+
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-3 flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-primary" aria-hidden="true" />
+                                <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                                  Viagem em família
+                                </span>
+                              </div>
+                              <span className={`rounded-full px-3 py-1 text-xs font-bold ${status.className}`}>
+                                {status.label}
                               </span>
                             </div>
-                            <span className={`rounded-full px-3 py-1 text-xs font-bold ${status.className}`}>
-                              {status.label}
-                            </span>
-                          </div>
 
-                          <h3 className="text-2xl font-serif font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
-                            {guide.title || 'Guia sem título'}
-                          </h3>
-                          {destinations.length > 0 && (
-                            <p className="text-muted-foreground font-medium mb-4 line-clamp-2">
-                              Destinos: {destinations.join(', ')}
-                            </p>
-                          )}
+                            <h3 className="mb-2 text-lg font-serif font-bold text-foreground transition-colors group-hover:text-primary xl:text-xl">
+                              {guide.title || 'Guia sem título'}
+                            </h3>
+                            {destinations.length > 0 && (
+                              <p className="line-clamp-2 text-sm font-medium text-muted-foreground">
+                                Destinos: {destinations.join(', ')}
+                              </p>
+                            )}
+                          </div>
                         </div>
 
                         <div className="mt-6 pt-4 border-t border-border space-y-4">

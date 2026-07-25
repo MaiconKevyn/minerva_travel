@@ -119,6 +119,11 @@ from minerva_travel.custom_landmarks import (
 )
 from minerva_travel.destination_facts import lookup_destination_facts
 from minerva_travel.guide_builder import build_guide_context
+from minerva_travel.guide_cover import (
+    load_cover_thumbnail,
+    store_cover_thumbnail,
+    write_cover_thumbnail,
+)
 from minerva_travel.image_generation import (
     CoverGenerationResult,
     generate_cover_with_guardrails,
@@ -295,6 +300,7 @@ class GuideResponse(BaseModel):
     cover_fallback_used: bool
     destinations: list[dict[str, Any]]
     download_url: str | None = None
+    cover_url: str | None = None
 
 
 class GuideListResponse(BaseModel):
@@ -2000,6 +2006,27 @@ def guide_preview(guide_id: str, current_user: CurrentUser) -> FileResponse:
             "Content-Security-Policy": (
                 "default-src 'none'; img-src data:; style-src 'unsafe-inline'"
             ),
+        },
+    )
+
+
+@app.get("/guides/{guide_id}/cover", include_in_schema=False)
+def guide_cover(guide_id: str, current_user: CurrentUser) -> FileResponse:
+    record = guide_repository().get_for_owner(guide_id, current_user.id)
+    if record is None or record.status != "succeeded":
+        raise HTTPException(status_code=404, detail="Cover not found")
+    if record.is_expired:
+        raise HTTPException(status_code=410, detail="Cover expired")
+    thumbnail = load_cover_thumbnail(record.id)
+    if thumbnail is None:
+        raise HTTPException(status_code=404, detail="Cover not found")
+    return FileResponse(
+        thumbnail,
+        media_type="image/jpeg",
+        headers={
+            # A capa é o retrato da família: privada, nunca em cache compartilhado.
+            "Cache-Control": "private, max-age=300",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 
@@ -3774,6 +3801,12 @@ async def generate_pdf_from_saved_photo(
     preview_output = storage.generated_path(f"{request_id}-preview.html")
     preview_output.parent.mkdir(parents=True, exist_ok=True)
     preview_output.write_text(render_guide_html(context, preview=True), encoding="utf-8")
+    # Miniatura da capa para o painel: leve o bastante para uma grade de
+    # guias e guardada tambem no bucket, ja que o disco da instancia some
+    # a cada deploy.
+    cover_thumbnail = write_cover_thumbnail(cover_path, request_id)
+    if cover_thumbnail is not None:
+        store_cover_thumbnail(request_id, cover_thumbnail)
     owned_assets = _owned_guide_assets(
         request_id=request_id,
         family_photo=photo_path,
@@ -3805,6 +3838,7 @@ async def generate_pdf_from_saved_photo(
                 ),
                 "privacy_consent": privacy_consent.metadata() if privacy_consent else None,
                 "preview_filename": preview_output.name,
+                "cover_thumbnail": bool(cover_thumbnail),
             },
             assets=owned_assets,
         )

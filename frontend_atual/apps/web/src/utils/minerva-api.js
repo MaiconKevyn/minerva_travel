@@ -912,6 +912,33 @@ const safeGuidePreviewUrl = (previewUrl) => {
   return resolvedUrl.toString();
 };
 
+const safeGuideCoverUrl = (coverUrl) => {
+  const browserOrigin = globalThis.location?.origin || DEFAULT_API_BASE_URL;
+  const baseUrl = new URL(
+    `${apiBaseUrl().replace(/\/$/, '')}/`,
+    `${browserOrigin.replace(/\/$/, '')}/`,
+  );
+  const resolvedUrl = new URL(String(coverUrl || ''), baseUrl);
+  const validPath = /^\/guides\/[A-Za-z0-9-]+\/cover$/.test(resolvedUrl.pathname);
+  if (resolvedUrl.origin !== baseUrl.origin || !validPath) {
+    throw new Error('Link de capa inválido.');
+  }
+  return resolvedUrl.toString();
+};
+
+// A capa é privada (retrato da família), então precisa do token no cabeçalho:
+// não dá para apontar um <img src> direto para a rota.
+export const fetchGuideCoverObjectUrl = async (coverUrl, { signal } = {}) => {
+  const response = await authenticatedFetch(safeGuideCoverUrl(coverUrl), {
+    headers: { Accept: 'image/jpeg' },
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, 'Não foi possível carregar a capa'));
+  }
+  return URL.createObjectURL(await response.blob());
+};
+
 export const fetchGuidePreviewHtml = async (previewUrl, { signal } = {}) => {
   const resolvedUrl = safeGuidePreviewUrl(previewUrl);
   const response = await authenticatedFetch(resolvedUrl, {

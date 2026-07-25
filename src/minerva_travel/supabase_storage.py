@@ -6,6 +6,7 @@ from urllib.parse import quote
 import httpx
 
 from minerva_travel.config import (
+    supabase_bucket_generated_covers,
     supabase_bucket_landmark_assets,
     supabase_service_role_key,
     supabase_storage_enabled,
@@ -19,6 +20,7 @@ class SupabaseStorageConfig:
     url: str
     service_role_key: str
     landmark_assets_bucket: str = "landmark-assets"
+    generated_covers_bucket: str = "generated-covers"
 
     @classmethod
     def from_env(cls) -> "SupabaseStorageConfig | None":
@@ -32,6 +34,7 @@ class SupabaseStorageConfig:
             url=url.rstrip("/"),
             service_role_key=service_role_key,
             landmark_assets_bucket=supabase_bucket_landmark_assets(),
+            generated_covers_bucket=supabase_bucket_generated_covers(),
         )
 
 
