@@ -9,10 +9,11 @@ import { PHRASEBOOK_COUNTRIES } from '@/utils/landmark-activities.js';
  * família e quanto custa. Nenhuma resposta aqui promete além do que o piloto
  * entrega hoje.
  *
- * `details/summary` nativo em vez do acordeão do Radix: aquele componente cai
- * numa segunda cópia do React no pré-bundle do Vite e derrubava a home
- * inteira. Aqui não há JavaScript nenhum, e teclado e leitor de tela já
- * funcionam de fábrica.
+ * `details/summary` nativo em vez do acordeão do Radix, de propósito: um FAQ
+ * estático não precisa de JavaScript nenhum. Teclado, leitor de tela e busca
+ * do navegador já funcionam de fábrica, nada quebra se o bundle falhar, e o
+ * pai pode abrir duas respostas ao mesmo tempo para comparar — o acordeão
+ * fecharia a anterior.
  */
 const QUESTIONS = [
   {
