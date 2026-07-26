@@ -47,6 +47,7 @@ from minerva_travel.activity_page_compositor import (
     INVESTIGATOR_INSTRUCTION,
     INVESTIGATOR_TITLE,
     LANDMARK_VISITED_LABEL,
+    MAZE_TITLE,
     NEWSPAPER_HEADLINE_TITLE,
     PAINTING_TITLE,
     TRAVEL_DIARY_TITLE,
@@ -2189,6 +2190,7 @@ _ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
     "here_vs_home": HERE_VS_HOME_TITLE,
     "anagram": ANAGRAM_TITLE,
     "cryptogram": CRYPTOGRAM_TITLE,
+    "maze": MAZE_TITLE,
 }
 
 WRITING_ACTIVITY_TYPES: frozenset[str] = frozenset(
@@ -2559,6 +2561,7 @@ def _activity_spec(
         ),
         "anagram": "Desembaralhe as palavras da sua viagem.",
         "cryptogram": "Use a chave secreta para descobrir a frase.",
+        "maze": f"Leve a família do A até {landmark.name} sem cruzar as paredes.",
     }
     spec: dict[str, Any] = {
         "instruction": instructions[activity_type],
@@ -2572,6 +2575,8 @@ def _activity_spec(
         spec["seed"] = landmark.selection_id
     elif activity_type == "cryptogram":
         spec["phrase"] = _cryptogram_phrase(landmark)
+        spec["seed"] = landmark.selection_id
+    elif activity_type == "maze":
         spec["seed"] = landmark.selection_id
     if activity_type == "detail_hunt":
         spec["clues"] = [
@@ -3374,6 +3379,8 @@ def generate_builder_page_attempt(
                 generator.generate_word_search_page(**common_activity_kwargs)
             elif activity_type == "drawing":
                 generator.generate_drawing_page(**common_activity_kwargs)
+            elif activity_type == "maze":
+                generator.generate_maze_page(**common_activity_kwargs)
             elif activity_type == "anagram":
                 generator.generate_anagram_page(**common_activity_kwargs)
             elif activity_type == "cryptogram":

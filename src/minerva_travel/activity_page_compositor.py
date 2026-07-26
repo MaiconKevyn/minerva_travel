@@ -17,6 +17,7 @@ from minerva_travel.investigator_activity import (
     InvestigatorChildProfile,
     InvestigatorMission,
 )
+from minerva_travel.maze import Maze
 from minerva_travel.puzzles import (
     ANAGRAM_MAX_WORDS,
     ANAGRAM_MIN_WORDS,
@@ -40,6 +41,11 @@ DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
 PAINTING_TITLE = "Minha pintura"
 INVESTIGATOR_TITLE = "Investigador"
+MAZE_TITLE = "Labirinto"
+MAZE_START_LABEL = "A"
+MAZE_GOAL_LABEL = "B"
+MAZE_WALL_WIDTH = 5
+MAZE_PADDING = 26
 ANAGRAM_TITLE = "Palavras embaralhadas"
 CRYPTOGRAM_TITLE = "Código secreto"
 NEWSPAPER_HEADLINE_TITLE = "Manchete do jornal"
@@ -479,6 +485,93 @@ def _writing_layout(fields: Sequence[tuple[str, int]]) -> tuple[int, int]:
 
 def _writing_field_height(rule_count: int, spacing: int) -> int:
     return WRITING_LABEL_BAND + rule_count * spacing + WRITING_FIELD_PADDING
+
+
+def compose_maze_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    landmark_name: str,
+    instruction: str,
+    maze: Maze,
+) -> Path:
+    """Draw the maze walls plus the labelled start and finish."""
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _puzzle_header(draw, MAZE_TITLE, landmark_name, instruction)
+
+    region_top, region_bottom = 306, 1436
+    cell = min(
+        (970 - 54 - 2 * MAZE_PADDING) // maze.columns,
+        (region_bottom - region_top - 2 * MAZE_PADDING) // maze.rows,
+    )
+    if cell < 24:
+        raise ActivityPageCompositionError("O labirinto não cabe na página impressa.")
+    width, height = cell * maze.columns, cell * maze.rows
+    left = (PAGE_IMAGE_SIZE[0] - width) // 2
+    top = region_top + (region_bottom - region_top - height) // 2
+    _panel(
+        draw,
+        (
+            left - MAZE_PADDING,
+            top - MAZE_PADDING,
+            left + width + MAZE_PADDING,
+            top + height + MAZE_PADDING,
+        ),
+        radius=22,
+    )
+
+    for row in range(maze.rows):
+        for column in range(maze.columns):
+            x, y = left + column * cell, top + row * cell
+            if maze.has_wall_right(column, row) and column < maze.columns - 1:
+                draw.line((x + cell, y, x + cell, y + cell), fill=INK, width=MAZE_WALL_WIDTH)
+            if maze.has_wall_down(column, row) and row < maze.rows - 1:
+                draw.line((x, y + cell, x + cell, y + cell), fill=INK, width=MAZE_WALL_WIDTH)
+    # A borda externa fecha o labirinto; as aberturas de entrada e saída são
+    # desenhadas por cima para a criança ver por onde começar.
+    draw.rectangle((left, top, left + width, top + height), outline=INK, width=MAZE_WALL_WIDTH)
+    draw.line(
+        (left, top + 3, left, top + cell - 3), fill=PAPER, width=MAZE_WALL_WIDTH + 2
+    )
+    draw.line(
+        (
+            left + width,
+            top + height - cell + 3,
+            left + width,
+            top + height - 3,
+        ),
+        fill=PAPER,
+        width=MAZE_WALL_WIDTH + 2,
+    )
+
+    _draw_maze_marker(draw, left, top, cell, maze.start, MAZE_START_LABEL)
+    _draw_maze_marker(draw, left, top, cell, maze.goal, MAZE_GOAL_LABEL)
+    return _atomic_save(image, output_path)
+
+
+def _draw_maze_marker(
+    draw: ImageDraw.ImageDraw,
+    left: int,
+    top: int,
+    cell: int,
+    position: tuple[int, int],
+    label: str,
+) -> None:
+    column, row = position
+    x, y = left + column * cell, top + row * cell
+    draw.rounded_rectangle(
+        (x + 4, y + 4, x + cell - 4, y + cell - 4), radius=6, fill=ACCENT, outline=ACCENT
+    )
+    _draw_centered_fit_box(
+        draw,
+        label,
+        (x + 5, y + 5, x + cell - 5, y + cell - 5),
+        maximum_size=max(12, cell // 2),
+        minimum_size=10,
+        bold=True,
+    )
 
 
 def compose_anagram_page(

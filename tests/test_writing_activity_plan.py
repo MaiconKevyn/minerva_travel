@@ -4,6 +4,7 @@ import pytest
 
 from minerva_travel.app import WRITING_ACTIVITY_TYPES, _builder_page_plan
 from minerva_travel.catalog import load_catalog
+from minerva_travel.maze import maze_size_for
 from minerva_travel.puzzles import build_anagrams, build_cryptogram
 
 
@@ -110,3 +111,30 @@ def test_cryptogram_phrase_falls_back_when_the_landmark_name_is_too_long():
 
     assert len(phrase) <= 62
     assert "Paris" in phrase
+
+
+def test_maze_grid_grows_with_the_children_ages():
+    catalog = load_catalog()
+
+    def _grid(ages):
+        pages, _ = _builder_page_plan(
+            {
+                "title": "Família Lima",
+                "year": 2026,
+                "children_ages": ages,
+                "activity_selections": [
+                    {
+                        "landmark_selection_id": "paris:eiffel-tower",
+                        "activity_type": "maze",
+                        "order": 1,
+                    }
+                ],
+            },
+            catalog.destinations,
+            ["paris:eiffel-tower"],
+        )
+        activity = next(page for page in pages if page.kind == "landmark_activity")
+        return maze_size_for(activity.metadata["age_complexity"])
+
+    # Uma grade de adulto frustra quem tem 4 anos; a de 4 anos entedia quem tem 11.
+    assert _grid([4])[0] * _grid([4])[1] < _grid([11])[0] * _grid([11])[1]

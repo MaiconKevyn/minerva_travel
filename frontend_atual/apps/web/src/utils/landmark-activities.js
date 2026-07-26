@@ -10,6 +10,7 @@ export const OPTIONAL_LANDMARK_ACTIVITY_TYPES = [
   'here_vs_home',
   'anagram',
   'cryptogram',
+  'maze',
 ];
 
 export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2;
@@ -74,6 +75,16 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     durationLabel: '10–15 min',
     materialLabel: 'Lápis',
     preview: '/activity-examples/word-search-real.webp',
+  },
+  {
+    type: 'maze',
+    category: 'puzzle',
+    label: 'Labirinto',
+    description: 'Leva a família pelo labirinto até o ponto turístico. A grade cresce com a idade.',
+    ageLabel: '4+',
+    durationLabel: '5–10 min',
+    materialLabel: 'Lápis',
+    preview: '/activity-examples/maze-real.webp',
   },
   {
     type: 'anagram',

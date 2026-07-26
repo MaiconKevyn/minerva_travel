@@ -33,6 +33,7 @@ from minerva_travel.activity_page_compositor import (
     compose_homecoming_page,
     compose_investigator_page,
     compose_landmark_visited_checkbox,
+    compose_maze_page,
     compose_word_search_page,
     compose_writing_page,
 )
@@ -53,6 +54,7 @@ from minerva_travel.investigator_activity import (
     normalize_investigator_children,
     parse_investigator_missions,
 )
+from minerva_travel.maze import MazeGenerationError, build_maze, maze_size_for
 from minerva_travel.puzzles import (
     PuzzleGenerationError,
     build_anagrams,
@@ -753,6 +755,58 @@ class OpenAIGuidePageGenerator:
         finally:
             artwork.unlink(missing_ok=True)
 
+    def generate_maze_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec, default=f"Leve a família do A até {name} sem cruzar as paredes."
+        )
+        seed = _activity_seed(activity_spec, landmark_context, name)
+        columns, rows = maze_size_for(age_complexity)
+        try:
+            maze = build_maze(columns=columns, rows=rows, seed=seed)
+        except MazeGenerationError as error:
+            raise PageGenerationError("Não foi possível montar o labirinto.") from error
+
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                activity_artwork_prompt(
+                    activity_type="maze",
+                    landmark_name=name,
+                    city=city,
+                    country=country,
+                    age_complexity=age_complexity,
+                    has_landmark_reference=(
+                        landmark_reference is not None or landmark_page_reference is not None
+                    ),
+                    has_revision_reference=reference_page is not None,
+                    revision_instruction=revision_instruction,
+                ),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_maze_page(
+                artwork,
+                output_path,
+                landmark_name=name,
+                instruction=instruction,
+                maze=maze,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar o labirinto.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
     def generate_anagram_page(
         self,
         *,
@@ -1375,6 +1429,12 @@ def activity_artwork_prompt(
         ),
         # As páginas de escrever recebem painéis opacos por cima: a arte só
         # aparece como moldura, então detalhe no centro seria desperdiçado.
+        "maze": (
+            "Create a subtle decorative travel background with a small recognizable watercolor "
+            "landmark vignette near the bottom edge and a winding dotted travel trail motif near "
+            "the perimeter. Keep the whole centre pale and completely free of detail so a large "
+            "printed maze grid stays readable."
+        ),
         "anagram": (
             "Create a subtle decorative travel background with a small recognizable watercolor "
             "landmark vignette near the bottom edge and a few scattered alphabet-block motifs "

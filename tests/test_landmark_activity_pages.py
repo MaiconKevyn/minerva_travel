@@ -147,7 +147,7 @@ def test_activity_selection_parser_is_strict_and_backward_compatible():
             [
                 {
                     "landmark_selection_id": "paris:eiffel-tower",
-                    "activity_type": "maze",
+                    "activity_type": "atividade_inexistente",
                     "order": 1,
                 }
             ]
@@ -290,7 +290,7 @@ def test_builder_api_rejects_malformed_unsupported_and_total_overflow(tmp_path, 
             activity_selections=[
                 {
                     "landmark_selection_id": "paris:eiffel-tower",
-                    "activity_type": "maze",
+                    "activity_type": "atividade_inexistente",
                     "order": 1,
                 }
             ]

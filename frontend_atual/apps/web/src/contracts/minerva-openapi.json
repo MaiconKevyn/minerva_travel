@@ -430,7 +430,8 @@
               "travel_diary",
               "here_vs_home",
               "anagram",
-              "cryptogram"
+              "cryptogram",
+              "maze"
             ],
             "title": "Activity Type",
             "type": "string"
@@ -696,7 +697,8 @@
                   "travel_diary",
                   "here_vs_home",
                   "anagram",
-                  "cryptogram"
+                  "cryptogram",
+                  "maze"
                 ],
                 "type": "string"
               },
@@ -8439,6 +8441,7 @@
     "travel_diary",
     "here_vs_home",
     "anagram",
-    "cryptogram"
+    "cryptogram",
+    "maze"
   ]
 }
