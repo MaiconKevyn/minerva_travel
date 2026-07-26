@@ -1,0 +1,101 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { ChevronDown } from 'lucide-react';
+import { PHRASEBOOK_COUNTRIES } from '@/utils/landmark-activities.js';
+
+/**
+ * As perguntas que decidem a compra e que ninguém conseguia responder sem
+ * criar uma conta antes: como o livro chega, o que acontece com a foto da
+ * família e quanto custa. Nenhuma resposta aqui promete além do que o piloto
+ * entrega hoje.
+ *
+ * `details/summary` nativo em vez do acordeão do Radix: aquele componente cai
+ * numa segunda cópia do React no pré-bundle do Vite e derrubava a home
+ * inteira. Aqui não há JavaScript nenhum, e teclado e leitor de tela já
+ * funcionam de fábrica.
+ */
+const QUESTIONS = [
+  {
+    question: 'Como o guia chega até mim?',
+    answer:
+      'Como um PDF em tamanho A4, para você imprimir em casa ou levar a uma gráfica e encadernar. Não enviamos nada pelo correio.',
+  },
+  {
+    question: 'Preciso mandar uma foto da família?',
+    answer: (
+      <>
+        Sim — é dela que nasce a capa ilustrada. A foto é processada só para gerar a ilustração,
+        não é usada para treinar modelos e você autoriza esse uso explicitamente antes de enviar.
+        Os detalhes estão na{' '}
+        <Link className="font-bold text-primary underline underline-offset-4" to="/privacy">
+          política de privacidade
+        </Link>
+        .
+      </>
+    ),
+  },
+  {
+    question: 'Serve para que idades?',
+    answer:
+      'As atividades começam aos 4 anos e vão até a adolescência. Você informa a idade de cada criança e a dificuldade é calibrada a partir dela — o mesmo labirinto sai maior para quem tem 11 do que para quem tem 5.',
+  },
+  {
+    question: 'E se eu não gostar de uma página?',
+    answer:
+      'Nenhuma página entra no livro sem a sua aprovação. Você acompanha cada uma sendo ilustrada, pede outra versão quantas vezes quiser e só depois fecha o PDF.',
+  },
+  {
+    question: 'O guia fala sobre o idioma do país?',
+    answer: `Quando a atividade "Sobrevivência no idioma" é escolhida, sim: a criança leva cinco frases para pedir sozinha, no idioma do destino. Hoje cobrimos ${PHRASEBOOK_COUNTRIES.size} países.`,
+  },
+  {
+    question: 'Quanto custa?',
+    answer: (
+      <>
+        Nada, por enquanto. Estamos em piloto e o checkout ainda não foi homologado — não há
+        cobrança nem promessa de entrega comercial. O escopo desta fase está na{' '}
+        <Link className="font-bold text-primary underline underline-offset-4" to="/pricing">
+          página do piloto
+        </Link>
+        .
+      </>
+    ),
+  },
+];
+
+const HomeFaq = () => (
+  <section className="border-t border-border/50 py-20 sm:py-24" aria-labelledby="faq-title">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+      <div className="text-center">
+        <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
+          Antes de começar
+        </p>
+        <h2 id="faq-title" className="mt-3 text-3xl font-serif font-bold text-foreground sm:text-4xl">
+          Perguntas que todo pai faz
+        </h2>
+      </div>
+
+      <div className="mt-10 space-y-3">
+        {QUESTIONS.map((item) => (
+          <details
+            key={item.question}
+            className="group rounded-2xl border-2 border-border/60 bg-card px-5 py-1 transition-colors open:border-primary/35"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-serif text-lg font-bold text-foreground marker:content-none">
+              {item.question}
+              <ChevronDown
+                className="h-5 w-5 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180"
+                aria-hidden="true"
+              />
+            </summary>
+            <p className="pb-5 pr-9 text-base font-medium leading-relaxed text-muted-foreground">
+              {item.answer}
+            </p>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+export default HomeFaq;

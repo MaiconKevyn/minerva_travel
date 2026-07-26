@@ -17,7 +17,8 @@ const PAGES = [
 
 const PageGallery = () => (
   <section
-    className="border-t border-border/50 bg-card py-20 sm:py-24"
+    id="paginas"
+    className="parchment-wash scroll-mt-20 border-t border-border/50 bg-card py-20 sm:py-24"
     aria-labelledby="paginas-title"
   >
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -46,14 +47,15 @@ const PageGallery = () => (
             transition={{ duration: 0.5, delay: (index % 3) * 0.08 }}
           >
             <figure className="group">
-              <div className="overflow-hidden rounded-2xl border-2 border-border/60 bg-background shadow-sm transition-shadow duration-300 group-hover:shadow-xl">
+              {/* A mesma moldura de filete duplo das páginas impressas. */}
+              <div className="page-frame transition-transform duration-300 group-hover:-translate-y-1">
                 <img
                   src={page.image}
                   alt={`Exemplo de página do guia: ${page.title}`}
                   loading="lazy"
                   width="1024"
-                  height="1497"
-                  className="aspect-[2/3] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                  height="1536"
+                  className="aspect-[2/3] w-full object-cover"
                 />
               </div>
               <figcaption className="mt-3 text-center">

@@ -1,137 +1,100 @@
-
 import React from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import { Heart, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
+import { ArrowRight, Heart } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
-import FeatureBox from '@/components/FeatureBox.jsx';
+import HomeHero from '@/components/HomeHero.jsx';
+import BookAnatomy from '@/components/BookAnatomy.jsx';
 import HowItWorks from '@/components/HowItWorks.jsx';
 import PageGallery from '@/components/PageGallery.jsx';
-import { Flower, Airplane, Suitcase } from '@/components/DecorativeElements.jsx';
+import ActivityShowcase from '@/components/ActivityShowcase.jsx';
+import HomeFaq from '@/components/HomeFaq.jsx';
 
-const HomePage = () => {
-  return (
-    <>
-      <Helmet>
-        <title>Minerva Travel - Diário infantil personalizado de viagem</title>
-        <meta name="description" content="Crie um diário infantil de viagem em PDF A4 com roteiro confirmado, atividades e uma capa familiar." />
-      </Helmet>
+const HomePage = () => (
+  <>
+    <Helmet>
+      <title>Minerva Travel - Livro de atividades da viagem da sua família</title>
+      <meta
+        name="description"
+        content="Transforme o roteiro que a sua família já marcou em um livro de atividades ilustrado, no nível de cada criança, em PDF A4 para imprimir."
+      />
+    </Helmet>
 
-      <div className="min-h-screen flex flex-col bg-background transition-colors duration-200">
-        <Header />
+    <div className="flex min-h-screen flex-col bg-background transition-colors duration-200">
+      <Header />
 
-        <main id="main-content" tabIndex={-1}>
-        {/* Storybook Hero Section */}
-        <section className="relative pt-12 pb-24 lg:pt-20 lg:pb-32 overflow-hidden flex-1 flex items-center">
-          <Flower className="absolute top-10 right-10 w-24 h-24 text-primary opacity-20" />
-          <Airplane className="absolute top-32 left-10 w-20 h-20 text-secondary opacity-20" />
-
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="space-y-8 text-center lg:text-left"
-              >
-                <div className="inline-flex items-center gap-2 bg-card px-4 py-2 rounded-full shadow-sm text-sm font-medium text-secondary border border-border/50">
-                  <Sparkles className="w-4 h-4" />
-                  Sua próxima aventura começa aqui
-                </div>
-
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold font-serif leading-[1.1] text-foreground">
-                  Crie o Guia de Viagem da <span className="text-primary relative inline-block">
-                    Sua Família
-                    <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
-                      <path d="M2 10C50 2 150 2 198 10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" opacity="0.3" />
-                    </svg>
-                  </span>
-                </h1>
-
-                <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto lg:mx-0 font-medium">
-                  Transforme o roteiro confirmado da família em um diário infantil A4 com atividades, memórias e uma capa personalizada.
-                </p>
-
-                <div className="pt-4">
-                  <Button
-                    asChild
-                    size="lg"
-                    className="rounded-full text-lg px-10 py-7 bg-primary hover:bg-primary/90 text-white shadow-[0_8px_30px_rgb(232,122,93,0.3)] hover:shadow-[0_8px_40px_rgb(232,122,93,0.4)] transition-all duration-300 hover:-translate-y-1"
-                  >
-                    <Link to="/create">
-                      Começar Agora
-                    </Link>
-                  </Button>
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                className="relative"
-              >
-                <div className="absolute inset-0 bg-secondary/20 rounded-[100px] blur-3xl transform rotate-12 scale-110"></div>
-
-                {/* Capa real gerada pelo produto, servida do próprio domínio:
-                    a vitrine mostra exatamente o que a família recebe. */}
-                <div className="relative mx-auto w-full max-w-sm overflow-hidden rounded-[32px] border-8 border-card shadow-2xl transition-transform duration-500 rotate-2 hover:rotate-0">
-                  <img
-                    src="/activity-examples/cover-sample.webp"
-                    alt="Capa ilustrada de um guia: a família Oliveira em aquarela diante da Torre Eiffel e do Big Ben"
-                    width="1024"
-                    height="1497"
-                    className="aspect-[2/3] w-full object-cover"
-                  />
-                </div>
-
-                <Suitcase className="absolute -bottom-6 -right-6 w-24 h-24 text-accent drop-shadow-lg transform -rotate-12" />
-              </motion.div>
-            </div>
-          </div>
-        </section>
-
+      <main id="main-content" tabIndex={-1} className="flex-1">
+        <HomeHero />
+        <BookAnatomy />
         <HowItWorks />
-
         <PageGallery />
+        <ActivityShowcase />
+        <HomeFaq />
 
-        {/* Guia Personalizado Showcase Section */}
-        <section className="py-24 bg-card relative transition-colors duration-200 overflow-hidden border-t border-border/50">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\' opacity=\'0.02\'/%3E%3C/svg%3E')] opacity-50 mix-blend-overlay"></div>
-
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <FeatureBox />
-          </div>
+        {/* Fechamento: quem rolou a página inteira não pode precisar subir
+            de volta até o topo para achar o botão. */}
+        <section
+          className="parchment-wash border-t border-border/50 bg-card py-20 sm:py-24"
+          aria-labelledby="comecar-title"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ duration: 0.5 }}
+            className="mx-auto max-w-2xl px-4 text-center sm:px-6 lg:px-8"
+          >
+            <h2
+              id="comecar-title"
+              className="text-3xl font-serif font-bold text-foreground sm:text-4xl"
+            >
+              A viagem já está marcada. Falta o livro.
+            </h2>
+            <p className="mt-4 text-lg font-medium text-muted-foreground">
+              Comece pelo roteiro que vocês já têm — em poucos minutos você vê a primeira página
+              ilustrada na tela.
+            </p>
+            <Button
+              asChild
+              size="lg"
+              className="group mt-8 rounded-full bg-primary px-8 py-6 text-base font-bold text-white shadow-[0_8px_30px_rgb(160,72,45,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary/90 sm:text-lg"
+            >
+              <Link to="/create">
+                Criar o guia da minha família
+                <ArrowRight className="ml-2.5 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </Link>
+            </Button>
+          </motion.div>
         </section>
-        </main>
+      </main>
 
-        {/* Footer */}
-        <footer className="bg-muted py-12 border-t border-border mt-auto relative overflow-hidden transition-colors duration-200">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\' opacity=\'0.02\'/%3E%3C/svg%3E')] opacity-50"></div>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-card rounded-xl shadow-sm flex items-center justify-center">
-                  <Heart className="w-5 h-5 text-primary" />
-                </div>
-                <span className="font-serif font-bold text-xl text-foreground">Minerva Travel</span>
+      <footer className="mt-auto border-t border-border bg-muted py-12 transition-colors duration-200">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
+            <div className="flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-card shadow-sm">
+                <Heart className="h-5 w-5 text-primary" aria-hidden="true" />
               </div>
-              <div className="flex gap-8 text-sm font-medium">
-                <Link className="text-muted-foreground hover:text-foreground transition-colors" to="/privacy">Política de Privacidade</Link>
-                <Link className="text-muted-foreground hover:text-foreground transition-colors" to="/terms">Termos de Uso</Link>
-              </div>
-              <p className="text-sm text-muted-foreground font-medium">
-                © 2026 Minerva Travel · Projeto em piloto
-              </p>
+              <span className="font-serif text-xl font-bold text-foreground">Minerva Travel</span>
             </div>
+            <div className="flex gap-8 text-sm font-medium">
+              <Link className="text-muted-foreground transition-colors hover:text-foreground" to="/privacy">
+                Política de Privacidade
+              </Link>
+              <Link className="text-muted-foreground transition-colors hover:text-foreground" to="/terms">
+                Termos de Uso
+              </Link>
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">
+              © 2026 Minerva Travel · Projeto em piloto
+            </p>
           </div>
-        </footer>
-      </div>
-    </>
-  );
-};
+        </div>
+      </footer>
+    </div>
+  </>
+);
 
 export default HomePage;

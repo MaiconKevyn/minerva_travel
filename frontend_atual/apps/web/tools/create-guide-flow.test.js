@@ -291,10 +291,11 @@ test('dashboard shows the generated cover of each guide instead of text-only car
 
 test('home explains the flow and shows real product pages from our own domain', () => {
   const home = readProjectFile('src/pages/HomePage.jsx');
+  const hero = readProjectFile('src/components/HomeHero.jsx');
   const howItWorks = readProjectFile('src/components/HowItWorks.jsx');
   const gallery = readProjectFile('src/components/PageGallery.jsx');
-  const featureBox = readProjectFile('src/components/FeatureBox.jsx');
 
+  assert.match(home, /HomeHero/);
   assert.match(home, /HowItWorks/);
   assert.match(home, /PageGallery/);
   // O diferencial (aprovar página por página) precisa aparecer antes do cadastro.
@@ -303,12 +304,30 @@ test('home explains the flow and shows real product pages from our own domain', 
   assert.match(howItWorks, /Leve o livro na mala/);
   assert.match(gallery, /activity-examples\/cover-sample\.webp/);
   assert.match(gallery, /activity-examples\/route-sample\.webp/);
+  // O herói mostra o livro, não uma capa solta: quem chega precisa ver que há
+  // atividades dentro antes de decidir criar uma conta.
+  assert.match(hero, /activity-examples\/cover-sample\.webp/);
+  assert.match(hero, /activity-examples\/route-sample\.webp/);
+  assert.match(hero, /activity-examples\/word-search-real\.webp/);
 
   // Nenhuma imagem da vitrine pode depender de CDN de terceiros.
-  for (const source of [home, gallery, featureBox]) {
+  for (const source of [home, hero, gallery]) {
     assert.doesNotMatch(source, /horizons-cdn|https?:\/\/[^"']+\.(png|jpe?g|webp)/);
   }
-  assert.doesNotMatch(featureBox, /créditos de imagem/);
+});
+
+test('home promises exactly the activity catalogue the product ships', () => {
+  const showcase = readProjectFile('src/components/ActivityShowcase.jsx');
+  const faq = readProjectFile('src/components/HomeFaq.jsx');
+
+  // Uma lista escrita à mão aqui envelheceria: a home prometeria doze
+  // atividades enquanto o produto já entrega dezoito.
+  assert.match(showcase, /activityOptionsByCategory/);
+  assert.doesNotMatch(showcase, /\b1[0-9] atividades\b/);
+  assert.match(faq, /PHRASEBOOK_COUNTRIES/);
+  // Enquanto o checkout não existe, a home não pode sugerir cobrança.
+  assert.match(faq, /piloto/i);
+  assert.doesNotMatch(faq, /R\$|€\s*\d/);
 });
 
 test('the catalogue is listed once and each card says where it was assigned', () => {

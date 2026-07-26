@@ -110,6 +110,40 @@
     text-wrap: balance;
   }
 
+  /* A moldura de filete duplo em ocre é a assinatura das páginas impressas.
+     Trazê-la para o site faz a vitrine parecer o mesmo produto, em vez de um
+     site genérico que por acaso mostra fotos de um livro. */
+  .page-frame {
+    padding: 6px;
+    background: #f3e7cd;
+    border: 2px solid #c9a961;
+    border-radius: 1.1rem;
+    box-shadow: 0 18px 40px -18px rgba(74, 55, 30, 0.45);
+  }
+
+  .page-frame > * {
+    border: 1px solid #c9a961;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    display: block;
+  }
+
+  .dark .page-frame {
+    background: #3a3226;
+    border-color: #8a7448;
+  }
+
+  .dark .page-frame > * {
+    border-color: #8a7448;
+  }
+
+  /* Papel envelhecido por baixo das seções de vitrine. */
+  .parchment-wash {
+    background-image:
+      radial-gradient(ellipse at 15% 0%, rgba(201, 169, 97, 0.14), transparent 55%),
+      radial-gradient(ellipse at 85% 100%, rgba(122, 145, 160, 0.12), transparent 55%);
+  }
+
   .storybook-shadow {
     box-shadow: 0 10px 40px -10px rgba(0,0,0,0.06), 0 0 15px -3px rgba(0,0,0,0.02);
   }
