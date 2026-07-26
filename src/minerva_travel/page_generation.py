@@ -35,10 +35,14 @@ from minerva_travel.activity_page_compositor import (
     compose_homecoming_page,
     compose_investigator_page,
     compose_landmark_visited_checkbox,
+    compose_language_page,
     compose_maze_page,
+    compose_passport_page,
+    compose_postcard_page,
     compose_word_search_page,
     compose_writing_page,
 )
+from minerva_travel.child_phrasebook import phrasebook_for_country
 from minerva_travel.config import (
     openai_activity_model,
     openai_api_base_url,
@@ -760,6 +764,149 @@ class OpenAIGuidePageGenerator:
             )
         except (ActivityPageCompositionError, OSError, ValueError) as error:
             raise PageGenerationError("Não foi possível finalizar a página de desenho.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_language_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec, default="Cinco frases para você pedir sozinho, sem precisar dos pais."
+        )
+        phrasebook = phrasebook_for_country(country)
+        if phrasebook is None:
+            raise PageGenerationError("Não temos o idioma conferido para este país.")
+
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                activity_artwork_prompt(
+                    activity_type="language_survival",
+                    landmark_name=name,
+                    city=city,
+                    country=country,
+                    age_complexity=age_complexity,
+                    has_landmark_reference=(
+                        landmark_reference is not None or landmark_page_reference is not None
+                    ),
+                    has_revision_reference=reference_page is not None,
+                    revision_instruction=revision_instruction,
+                ),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_language_page(
+                artwork,
+                output_path,
+                country=country,
+                instruction=instruction,
+                phrasebook=phrasebook,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar o guia de frases.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_postcard_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec, default="Escreva o cartão, recorte e mande pelo correio de verdade."
+        )
+        sender = _bounded_mapping_text(activity_spec, ("sender",), default="", maximum=80)
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                activity_artwork_prompt(
+                    activity_type="postcard",
+                    landmark_name=name,
+                    city=city,
+                    country=country,
+                    age_complexity=age_complexity,
+                    has_landmark_reference=(
+                        landmark_reference is not None or landmark_page_reference is not None
+                    ),
+                    has_revision_reference=reference_page is not None,
+                    revision_instruction=revision_instruction,
+                ),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_postcard_page(
+                artwork,
+                output_path,
+                landmark_name=name,
+                instruction=instruction,
+                sender=sender,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar o cartão-postal.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_passport_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec, default="Cole aqui o bilhete de entrada ou o carimbo que você ganhou."
+        )
+        child_name = _bounded_mapping_text(activity_spec, ("child_name",), default="", maximum=90)
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                activity_artwork_prompt(
+                    activity_type="passport_stamp",
+                    landmark_name=name,
+                    city=city,
+                    country=country,
+                    age_complexity=age_complexity,
+                    has_landmark_reference=(
+                        landmark_reference is not None or landmark_page_reference is not None
+                    ),
+                    has_revision_reference=reference_page is not None,
+                    revision_instruction=revision_instruction,
+                ),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_passport_page(
+                artwork,
+                output_path,
+                country=country or city or name,
+                instruction=instruction,
+                child_name=child_name,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError(
+                "Não foi possível finalizar a página de passaporte."
+            ) from error
         finally:
             artwork.unlink(missing_ok=True)
 
@@ -1548,6 +1695,21 @@ def activity_artwork_prompt(
         ),
         # As páginas de escrever recebem painéis opacos por cima: a arte só
         # aparece como moldura, então detalhe no centro seria desperdiçado.
+        "language_survival": (
+            "Create a decorative phrasebook background: a small recognizable watercolor landmark "
+            "vignette near the bottom edge and speech-bubble motifs around the perimeter. Keep "
+            "the whole centre pale and plain for code-owned phrase cards."
+        ),
+        "postcard": (
+            "Create a classic postcard front: one large recognizable watercolor view of the "
+            "landmark filling the upper 38 percent of the page edge to edge, with a soft white "
+            "border. Keep everything below that band plain and pale for the code-owned card back."
+        ),
+        "passport_stamp": (
+            "Create a decorative passport-page background: aged paper texture, faint travel stamp "
+            "rings and a small watercolor landmark vignette near the perimeter. Keep the whole "
+            "centre pale and plain so glued tickets and printed frames stay readable."
+        ),
         "dot_to_dot": (
             "Convert the landmark into one large, simple black-and-white silhouette line drawing "
             "with a single clean outer contour and no interior detail, filling the middle of the "

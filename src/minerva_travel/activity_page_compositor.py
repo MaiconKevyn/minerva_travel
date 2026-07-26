@@ -13,6 +13,7 @@ from typing import cast
 
 from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 
+from minerva_travel.child_phrasebook import PHRASES_PER_PAGE, ChildPhrasebook
 from minerva_travel.crossword import Crossword
 from minerva_travel.dot_to_dot import DotToDot
 from minerva_travel.investigator_activity import (
@@ -43,6 +44,10 @@ DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
 PAINTING_TITLE = "Minha pintura"
 INVESTIGATOR_TITLE = "Investigador"
+LANGUAGE_TITLE = "Sobrevivência no idioma"
+POSTCARD_TITLE = "Cartão-postal"
+POSTCARD_REGION = (600, 1480)
+PASSPORT_TITLE = "Passaporte de viagem"
 DOT_TO_DOT_TITLE = "Ligue os pontos"
 CROSSWORD_TITLE = "Cruzadinha da viagem"
 CROSSWORD_CLUE_HEIGHT = 84
@@ -490,6 +495,179 @@ def _writing_layout(fields: Sequence[tuple[str, int]]) -> tuple[int, int]:
 
 def _writing_field_height(rule_count: int, spacing: int) -> int:
     return WRITING_LABEL_BAND + rule_count * spacing + WRITING_FIELD_PADDING
+
+
+def compose_language_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    country: str,
+    instruction: str,
+    phrasebook: ChildPhrasebook,
+) -> Path:
+    """One card per phrase: what to say, how to read it, and what it means."""
+
+    if len(phrasebook.phrases) != PHRASES_PER_PAGE:
+        raise ActivityPageCompositionError("O guia de frases está incompleto.")
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _panel(draw, (38, 30, 986, 268))
+    _draw_centered_fit(draw, LANGUAGE_TITLE, 46, 50, 30, 884, bold=True)
+    _draw_centered_fit(
+        draw,
+        f"{phrasebook.language} • {_bounded(country, 'country', 90)}",
+        118,
+        32,
+        20,
+        884,
+        bold=True,
+    )
+    _draw_wrapped(
+        draw,
+        _bounded(instruction, "instruction", 240),
+        (82, 178, 942, 256),
+        font=_font(23),
+        fill=MUTED_INK,
+        align="center",
+    )
+
+    top, bottom = 306, 1490
+    height = (bottom - top) // PHRASES_PER_PAGE
+    for index, phrase in enumerate(phrasebook.phrases):
+        y = top + index * height
+        _panel(draw, (54, y, 970, y + height - 16), radius=20)
+        _draw_wrapped(
+            draw,
+            phrase.phrase,
+            (92, y + 20, 932, y + 78),
+            font=_font(36, bold=True),
+            fill=INK,
+        )
+        # A pronúncia é o que a criança realmente fala; fica destacada.
+        draw.text((92, y + 92), f"fale assim: {phrase.pronunciation}",
+                  font=_font(25, bold=True), fill=ACCENT)
+        draw.text((92, y + 142), phrase.meaning, font=_font(23), fill=MUTED_INK)
+    return _atomic_save(image, output_path)
+
+
+def compose_postcard_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    landmark_name: str,
+    instruction: str,
+    sender: str,
+) -> Path:
+    """Lay out a real postcard back: message on the left, address on the right.
+
+    A arte do ponto turístico fica na metade de cima como a frente do cartão;
+    a criança escreve embaixo, recorta e o cartão pode ser postado de verdade.
+    """
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _panel(draw, (38, 30, 986, 252))
+    _draw_centered_fit(draw, POSTCARD_TITLE, 46, 50, 32, 884, bold=True)
+    _draw_centered_fit(draw, _bounded(landmark_name, "landmark_name", 100), 116, 31, 20, 884,
+                       bold=True)
+    _draw_wrapped(
+        draw,
+        _bounded(instruction, "instruction", 240),
+        (82, 170, 942, 242),
+        font=_font(23),
+        fill=MUTED_INK,
+        align="center",
+    )
+
+    # Linha de corte: o cartão precisa sair da folha para ser postado.
+    top, bottom = POSTCARD_REGION
+    for x in range(60, 964, 22):
+        draw.line((x, top - 18, x + 12, top - 18), fill=MUTED_INK, width=2)
+    draw.text((60, top - 46), "Recorte aqui", font=_font(19), fill=MUTED_INK)
+
+    _panel(draw, (54, top, 970, bottom), radius=18)
+    middle = 512
+    draw.line((middle, top + 28, middle, bottom - 28), fill=PANEL_OUTLINE, width=3)
+
+    draw.text((92, top + 26), "Mensagem:", font=_font(24, bold=True), fill=INK)
+    for index in range(6):
+        rule_y = top + 122 + index * 78
+        draw.line((92, rule_y, middle - 40, rule_y), fill=PANEL_OUTLINE, width=3)
+    draw.text((92, bottom - 66), f"De: {_bounded(sender, 'sender', 80)}",
+              font=_font(21, bold=True), fill=MUTED_INK)
+
+    stamp = (middle + 300, top + 30, middle + 430, top + 190)
+    draw.rounded_rectangle(stamp, radius=8, outline=MUTED_INK, width=3)
+    _draw_centered_fit_box(draw, "SELO", (stamp[0] + 8, stamp[1] + 60, stamp[2] - 8, stamp[3] - 60),
+                           maximum_size=22, minimum_size=14, bold=True)
+    draw.text((middle + 40, top + 232), "Para:", font=_font(24, bold=True), fill=INK)
+    for index in range(4):
+        rule_y = top + 322 + index * 78
+        draw.line((middle + 40, rule_y, 932, rule_y), fill=PANEL_OUTLINE, width=3)
+    return _atomic_save(image, output_path)
+
+
+def compose_passport_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    country: str,
+    instruction: str,
+    child_name: str,
+) -> Path:
+    """A passport page per country, with a frame to glue the real ticket in."""
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _panel(draw, (38, 30, 986, 268))
+    _draw_centered_fit(draw, PASSPORT_TITLE, 46, 50, 32, 884, bold=True)
+    _draw_centered_fit(draw, _bounded(country, "country", 100).upper(), 116, 40, 22, 884,
+                       bold=True)
+    _draw_wrapped(
+        draw,
+        _bounded(instruction, "instruction", 240),
+        (82, 178, 942, 256),
+        font=_font(23),
+        fill=MUTED_INK,
+        align="center",
+    )
+
+    _panel(draw, (54, 306, 970, 512), radius=22)
+    draw.text((92, 332), "Passaporte de:", font=_font(24, bold=True), fill=INK)
+    draw.text((92, 382), _bounded(child_name, "child_name", 90), font=_font(34, bold=True),
+              fill=INK)
+    draw.text((92, 452), "Cheguei no dia:", font=_font(22, bold=True), fill=MUTED_INK)
+    draw.line((320, 482, 620, 482), fill=PANEL_OUTLINE, width=3)
+
+    # Moldura tracejada: espaço declarado para colar o bilhete ou o carimbo real.
+    frame = (54, 556, 970, 1240)
+    _panel(draw, frame, radius=22)
+    inner = (frame[0] + 40, frame[1] + 78, frame[2] - 40, frame[3] - 40)
+    draw.text((frame[0] + 40, frame[1] + 26), "Cole aqui o bilhete ou o carimbo:",
+              font=_font(24, bold=True), fill=INK)
+    _draw_dashed_rectangle(draw, inner, dash=22, gap=16)
+
+    _panel(draw, (54, 1284, 970, 1490), radius=22)
+    draw.text((92, 1310), "O que eu mais gostei neste país:", font=_font(24, bold=True), fill=INK)
+    for index in range(2):
+        draw.line((92, 1396 + index * 74, 932, 1396 + index * 74), fill=PANEL_OUTLINE, width=3)
+    return _atomic_save(image, output_path)
+
+
+def _draw_dashed_rectangle(
+    draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], *, dash: int, gap: int
+) -> None:
+    left, top, right, bottom = box
+    step = dash + gap
+    for x in range(left, right, step):
+        end = min(x + dash, right)
+        draw.line((x, top, end, top), fill=MUTED_INK, width=3)
+        draw.line((x, bottom, end, bottom), fill=MUTED_INK, width=3)
+    for y in range(top, bottom, step):
+        end = min(y + dash, bottom)
+        draw.line((left, y, left, end), fill=MUTED_INK, width=3)
+        draw.line((right, y, right, end), fill=MUTED_INK, width=3)
 
 
 def compose_dot_to_dot_page(

@@ -49,9 +49,12 @@ from minerva_travel.activity_page_compositor import (
     INVESTIGATOR_INSTRUCTION,
     INVESTIGATOR_TITLE,
     LANDMARK_VISITED_LABEL,
+    LANGUAGE_TITLE,
     MAZE_TITLE,
     NEWSPAPER_HEADLINE_TITLE,
     PAINTING_TITLE,
+    PASSPORT_TITLE,
+    POSTCARD_TITLE,
     TRAVEL_DIARY_TITLE,
     WORD_SEARCH_TITLE,
     coloring_instruction_for,
@@ -95,6 +98,7 @@ from minerva_travel.builder import (
     select_page_attempt,
 )
 from minerva_travel.catalog import load_catalog
+from minerva_travel.child_phrasebook import country_has_phrasebook
 from minerva_travel.config import (
     app_environment,
     async_guide_jobs_enabled,
@@ -2195,6 +2199,9 @@ _ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
     "maze": MAZE_TITLE,
     "crossword": CROSSWORD_TITLE,
     "dot_to_dot": DOT_TO_DOT_TITLE,
+    "postcard": POSTCARD_TITLE,
+    "passport_stamp": PASSPORT_TITLE,
+    "language_survival": LANGUAGE_TITLE,
 }
 
 WRITING_ACTIVITY_TYPES: frozenset[str] = frozenset(
@@ -2213,6 +2220,23 @@ def _travel_vocabulary(landmark: LandmarkActivityContext) -> list[str]:
         "AVENTURA",
     ]
     return list(dict.fromkeys(word.upper() for word in candidates if word))
+
+
+def _first_child_name(form: dict[str, Any]) -> str:
+    """First child's name for keepsake pages, without demanding a valid age.
+
+    O Investigador precisa de nome e idade para calibrar a missão; um
+    cartão-postal só precisa saber de quem ele é, então uma idade faltando
+    não pode impedir a página.
+    """
+
+    raw_names = form.get("children_names", [])
+    names = _split_names(raw_names) if isinstance(raw_names, str) else list(raw_names or [])
+    for name in names:
+        cleaned = " ".join(str(name).split())
+        if cleaned:
+            return cleaned[:90]
+    return ""
 
 
 def _crossword_clues_for(landmark: LandmarkActivityContext) -> list[dict[str, str]]:
@@ -2574,6 +2598,7 @@ def _activity_spec(
     activity_type: OptionalLandmarkActivityType,
     landmark: LandmarkActivityContext,
     children: list[InvestigatorChildProfile] | None = None,
+    child_name: str = "",
 ) -> dict[str, Any]:
     instructions = {
         "coloring": coloring_instruction_for(landmark.name),
@@ -2594,6 +2619,11 @@ def _activity_spec(
         "maze": f"Leve a família do A até {landmark.name} sem cruzar as paredes.",
         "crossword": "Complete a cruzadinha com as palavras da viagem.",
         "dot_to_dot": f"Ligue os números e descubra {landmark.name}.",
+        "postcard": "Escreva o cartão, recorte e mande pelo correio de verdade.",
+        "passport_stamp": (
+            "Cole aqui o bilhete de entrada ou o carimbo que você ganhou."
+        ),
+        "language_survival": "Cinco frases para você pedir sozinho, sem precisar dos pais.",
     }
     spec: dict[str, Any] = {
         "instruction": instructions[activity_type],
@@ -2612,6 +2642,17 @@ def _activity_spec(
         spec["seed"] = landmark.selection_id
     elif activity_type == "crossword":
         spec["clues"] = _crossword_clues_for(landmark)
+    elif activity_type == "postcard":
+        # Um cartão sem remetente é papel em branco: é o nome que o torna dela.
+        spec["sender"] = child_name
+    elif activity_type == "passport_stamp":
+        spec["child_name"] = child_name
+    elif activity_type == "language_survival" and not country_has_phrasebook(landmark.country):
+        # Sem idioma conferido, inventar pronúncia ensinaria errado à criança.
+        raise ActivitySelectionInputError(
+            "activity_language_unavailable",
+            f"Ainda não temos o guia de frases para {landmark.country or 'este país'}.",
+        )
     if activity_type == "detail_hunt":
         spec["clues"] = [
             "Uma forma geométrica interessante",
@@ -2645,6 +2686,7 @@ def _builder_activity_page(
     family_title: str,
     trip_date: str,
     children: list[InvestigatorChildProfile] | None = None,
+    child_name: str = "",
     position: int = 0,
 ) -> BuilderPage:
     """Build one activity page from trusted persisted landmark context."""
@@ -2667,7 +2709,7 @@ def _builder_activity_page(
         "source_image_available": landmark.source_image_available,
         "linked_landmark_page_id": landmark.landmark_page_id,
     }
-    spec = _activity_spec(activity_type, landmark, children)
+    spec = _activity_spec(activity_type, landmark, children, child_name)
     activity_label = _ACTIVITY_LABELS[activity_type]
     required_copy = [activity_label, landmark.name, str(spec["instruction"])]
     if activity_type == "family_coloring":
@@ -2841,6 +2883,7 @@ def _builder_page_plan(
                     curiosity_label,
                     landmark.curiosity,
                     LANDMARK_VISITED_LABEL,
+    LANGUAGE_TITLE,
                 ],
                 metadata={
                     **private_context,
@@ -2858,6 +2901,7 @@ def _builder_page_plan(
                     family_title=str(form.get("title") or "Guia da família"),
                     trip_date=trip_date,
                     children=investigator_children,
+                    child_name=_first_child_name(form),
                     position=next_position,
                 )
             )
@@ -3019,6 +3063,7 @@ def _new_session_activity_page(
             if activity_type == "investigator"
             else None
         ),
+        child_name=_first_child_name(session.form),
     )
 
 
@@ -3413,6 +3458,12 @@ def generate_builder_page_attempt(
                 generator.generate_word_search_page(**common_activity_kwargs)
             elif activity_type == "drawing":
                 generator.generate_drawing_page(**common_activity_kwargs)
+            elif activity_type == "language_survival":
+                generator.generate_language_page(**common_activity_kwargs)
+            elif activity_type == "postcard":
+                generator.generate_postcard_page(**common_activity_kwargs)
+            elif activity_type == "passport_stamp":
+                generator.generate_passport_page(**common_activity_kwargs)
             elif activity_type == "dot_to_dot":
                 generator.generate_dot_to_dot_page(**common_activity_kwargs)
             elif activity_type == "crossword":

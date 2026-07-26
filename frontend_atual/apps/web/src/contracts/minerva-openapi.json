@@ -433,7 +433,10 @@
               "cryptogram",
               "maze",
               "crossword",
-              "dot_to_dot"
+              "dot_to_dot",
+              "postcard",
+              "passport_stamp",
+              "language_survival"
             ],
             "title": "Activity Type",
             "type": "string"
@@ -702,7 +705,10 @@
                   "cryptogram",
                   "maze",
                   "crossword",
-                  "dot_to_dot"
+                  "dot_to_dot",
+                  "postcard",
+                  "passport_stamp",
+                  "language_survival"
                 ],
                 "type": "string"
               },
@@ -8448,6 +8454,9 @@
     "cryptogram",
     "maze",
     "crossword",
-    "dot_to_dot"
+    "dot_to_dot",
+    "postcard",
+    "passport_stamp",
+    "language_survival"
   ]
 }

@@ -152,3 +152,32 @@ def test_crossword_clues_come_from_this_trip_and_interlock():
     crossword = build_crossword([(item["answer"], item["clue"]) for item in clues])
     assert len(crossword.entries) >= 4
     assert crossword.across and crossword.down
+
+
+@pytest.mark.parametrize(
+    ("activity_type", "spec_key"),
+    [("postcard", "sender"), ("passport_stamp", "child_name")],
+)
+def test_keepsake_pages_carry_the_child_name(activity_type, spec_key):
+    catalog = load_catalog()
+    pages, _ = _builder_page_plan(
+        {
+            "title": "Família Lima",
+            "year": 2026,
+            "children_ages": [9],
+            "children_names": ["Aurora"],
+            "activity_selections": [
+                {
+                    "landmark_selection_id": "paris:eiffel-tower",
+                    "activity_type": activity_type,
+                    "order": 1,
+                }
+            ],
+        },
+        catalog.destinations,
+        ["paris:eiffel-tower"],
+    )
+    activity = next(page for page in pages if page.kind == "landmark_activity")
+
+    # Cartão sem remetente e passaporte sem dono são papel em branco.
+    assert activity.metadata["activity_spec"][spec_key] == "Aurora"

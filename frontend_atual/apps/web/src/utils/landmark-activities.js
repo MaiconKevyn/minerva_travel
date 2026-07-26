@@ -13,6 +13,9 @@ export const OPTIONAL_LANDMARK_ACTIVITY_TYPES = [
   'maze',
   'crossword',
   'dot_to_dot',
+  'postcard',
+  'passport_stamp',
+  'language_survival',
 ];
 
 export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2;
@@ -161,6 +164,36 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     preview: '/activity-examples/painting-real.webp',
   },
   {
+    type: 'language_survival',
+    category: 'writing',
+    label: 'Sobrevivência no idioma',
+    description: 'Cinco frases do país para a criança pedir sozinha, com a pronúncia escrita.',
+    ageLabel: '6+',
+    durationLabel: '5–10 min',
+    materialLabel: 'Só a boca',
+    preview: '/activity-examples/language-survival-real.webp',
+  },
+  {
+    type: 'postcard',
+    category: 'writing',
+    label: 'Cartão-postal',
+    description: 'Frente com a arte do lugar e verso para escrever, recortar e postar de verdade.',
+    ageLabel: '7+',
+    durationLabel: '10–15 min',
+    materialLabel: 'Caneta e tesoura',
+    preview: '/activity-examples/postcard-real.webp',
+  },
+  {
+    type: 'passport_stamp',
+    category: 'writing',
+    label: 'Passaporte de viagem',
+    description: 'Uma página por país, com moldura para colar o bilhete ou o carimbo real.',
+    ageLabel: 'Todas',
+    durationLabel: '5 min',
+    materialLabel: 'Cola e caneta',
+    preview: '/activity-examples/passport-real.webp',
+  },
+  {
     type: 'travel_diary',
     category: 'writing',
     label: 'Diário do dia',
@@ -192,6 +225,32 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     preview: '/activity-examples/here-vs-home-real.webp',
   },
 ];
+
+/**
+ * Países com guia de frases conferido. Sem isso na lista, o backend recusa a
+ * atividade — então nem oferecemos o card, em vez de deixar a família escolher
+ * uma página que não vai existir.
+ */
+export const PHRASEBOOK_COUNTRIES = new Set([
+  'franca', 'france', 'belgica',
+  'reino unido', 'inglaterra', 'united kingdom', 'escocia', 'irlanda',
+  'estados unidos', 'united states', 'canada', 'australia', 'nova zelandia',
+  'espanha', 'spain', 'argentina', 'chile', 'uruguai', 'mexico', 'peru', 'colombia',
+  'italia', 'italy',
+  'alemanha', 'germany', 'austria', 'suica',
+  'japao', 'japan',
+]);
+
+const withoutAccents = (value) =>
+  String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+export const countryHasPhrasebook = (country) =>
+  PHRASEBOOK_COUNTRIES.has(withoutAccents(country));
+
+export const activityOptionsForCountry = (country) =>
+  LANDMARK_ACTIVITY_OPTIONS.filter(
+    (option) => option.type !== 'language_survival' || countryHasPhrasebook(country),
+  );
 
 export const activityOptionsByCategory = (options = LANDMARK_ACTIVITY_OPTIONS) =>
   ACTIVITY_CATEGORIES.map((category) => ({

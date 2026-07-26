@@ -6,6 +6,7 @@ import { selectGuideLandmarks } from '@/utils/minerva-api.js';
 import { pluralize } from '@/utils/guide-form.js';
 import {
   activityOptionsByCategory,
+  activityOptionsForCountry,
   MAX_OPTIONAL_ACTIVITIES_PER_GUIDE,
   MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
   toggleLandmarkActivitySelection,
@@ -28,7 +29,6 @@ const StepActivities = () => {
     () => selectGuideLandmarks(parsedData.landmarks, selectedLandmarks),
     [parsedData.landmarks, selectedLandmarks],
   );
-  const categories = useMemo(() => activityOptionsByCategory(), []);
   const childAges = childrenList
     .map((child) => Number.parseInt(child.age, 10))
     .filter((age) => Number.isFinite(age) && age > 0);
@@ -112,6 +112,11 @@ const StepActivities = () => {
             (selection) => selection.landmark_selection_id === selectionId,
           ).length;
           const location = [landmark.city, landmark.country].filter(Boolean).join(', ');
+          // O guia de frases só existe para países conferidos; nos demais o
+          // card some em vez de prometer uma página que não seria gerada.
+          const categories = activityOptionsByCategory(
+            activityOptionsForCountry(landmark.country),
+          );
 
           return (
             <section
