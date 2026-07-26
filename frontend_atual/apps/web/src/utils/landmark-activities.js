@@ -136,7 +136,7 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     type: 'spot_the_difference',
     category: 'puzzle',
     label: 'Ache os erros',
-    description: 'Dois desenhos do lugar com seis diferenças conferidas uma a uma antes de imprimir.',
+    description: 'Dois desenhos do lugar; a página conta as diferenças conferidas antes de imprimir.',
     ageLabel: '6+',
     durationLabel: '10–15 min',
     materialLabel: 'Lápis',
