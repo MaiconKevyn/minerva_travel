@@ -156,3 +156,62 @@ def test_the_two_family_activities_share_the_house_style_too():
         has_revision_reference=False,
     )
     assert "ornate double-rule border frame" in investigator
+
+
+def test_every_page_of_the_guide_shares_the_house_style():
+    """Capa, sumário, destino, ponto turístico e as duas páginas finais.
+
+    Um livro em que só as atividades compartilham a linguagem continua sendo
+    uma colagem — e as páginas dos pontos turísticos são as mais numerosas
+    depois delas.
+    """
+
+    from minerva_travel import page_generation as generation
+
+    family = {
+        "family_title": "Família Lima",
+        "trip_date": "Julho de 2026",
+        "landmark_names": ["Coliseu"],
+        "has_revision_reference": False,
+    }
+    pages = {
+        "capa": generation.cover_page_prompt(
+            **family, expected_visible_family_member_count=3
+        ),
+        "sumario": generation.summary_page_prompt(
+            **family, expected_visible_family_member_count=3
+        ),
+        "destino": generation.destination_intro_page_prompt(
+            title="Roma",
+            city="Roma",
+            country="Itália",
+            learning_points=["Roma tem muitas fontes."],
+            curiosity="O Coliseu recebia jogos.",
+            curiosity_label="Você sabia?",
+            landmark_names=["Coliseu"],
+            has_revision_reference=False,
+        ),
+        "ponto": generation.landmark_page_prompt(
+            family_title="Família Lima",
+            trip_date="Julho de 2026",
+            landmark_name="Coliseu",
+            city="Roma",
+            country="Itália",
+            description="Um anfiteatro romano.",
+            curiosity="Cabiam milhares de pessoas.",
+            curiosity_label="Você sabia?",
+            include_family=False,
+            expected_visible_family_member_count=None,
+            has_revision_reference=False,
+        ),
+        "melhor_memoria": generation.best_memory_artwork_prompt(
+            **family, age_complexity="early_reader"
+        ),
+        "volta_para_casa": generation.homecoming_page_prompt(
+            **family, age_complexity="early_reader", expected_visible_family_member_count=3
+        ),
+    }
+    for page, prompt in pages.items():
+        assert "HOUSE STYLE" in prompt, page
+        assert "ornate double-rule border frame" in prompt, page
+        assert "aged cream, golden ochre, muted navy blue" in prompt, page

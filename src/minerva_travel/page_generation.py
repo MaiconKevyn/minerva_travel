@@ -1536,6 +1536,43 @@ def get_guide_page_generator() -> GuidePageGenerator:
     return OpenAIGuidePageGenerator()
 
 
+# Identidade visual única do caderno, tirada do guia impresso que serve de
+# referência do produto. Sem isto cada atividade saía com um fundo próprio e o
+# caderno parecia uma colagem de fontes diferentes.
+_HOUSE_STYLE = (
+    "HOUSE STYLE — every page of this book shares one look. Warm aged cream "
+    "parchment background with a subtle paper grain, edges slightly darker than the centre. "
+    "An ornate double-rule border frame in soft golden ochre runs just inside the page edge, "
+    "with small decorative scrollwork at each corner. Near the top edge place a faint circular "
+    "vintage travel postmark, a small navy-blue airplane and a fine dashed flight-path curve. "
+    "Any illustration is vintage children's storybook watercolour with fine ink linework, warm "
+    "and soft, softly blended into the parchment with no hard photographic edges and no white "
+    "box around it. Palette: aged cream, golden ochre, muted navy blue, soft sage and dusty "
+    "rose. No neon, no flat vector shapes, no modern UI look, no drop shadows."
+)
+
+# O "ache os erros" recorta a arte em dois painéis, então a moldura é jogada
+# fora de qualquer jeito — e o excesso de ornamento fazia o editor devolver a
+# cena quase intacta, sem diferenças achaveis. Mesma paleta e mesmo traço,
+# sem moldura.
+_HOUSE_STYLE_PLAIN = (
+    "HOUSE STYLE — vintage children's storybook watercolour with fine ink linework, warm and "
+    "soft, on a calm pale sky-and-parchment background. Palette: aged cream, golden ochre, "
+    "muted navy blue, soft sage and dusty rose. No border frame, no postmark, no ornament, no "
+    "paper grain overlay. No neon, no flat vector shapes, no modern UI look, no drop shadows."
+)
+
+# Páginas em traço puro. A moldura do estilo padrão vira borda preta torta
+# depois da conversão monocromática, e no "ligue os pontos" o traçador de
+# silhueta segue a moldura em vez do monumento — o enigma sai um retângulo.
+_HOUSE_STYLE_LINEART = (
+    "HOUSE STYLE — pure black line art on plain white, in the same vintage children's storybook "
+    "hand as the rest of the book: confident ink outlines, generous closed shapes, no shading. "
+    "Absolutely no border frame, no corner ornament, no postmark, no parchment texture, no "
+    "background wash and no colour — the sheet outside the drawing must stay pure white."
+)
+
+
 def cover_page_prompt(
     *,
     family_title: str,
@@ -1562,6 +1599,7 @@ def cover_page_prompt(
     revision = _revision_directive(revision_instruction, has_revision_reference)
     return f"""
 Create a complete vertical cover for a premium children's illustrated family travel book.
+{_HOUSE_STYLE}
 {inputs}
 Transform the supplied family photo into a warm hand-painted watercolor storybook illustration.
 Preserve the family's recognizable composition, approximate ages, hair, glasses, expressions
@@ -1599,6 +1637,7 @@ def summary_page_prompt(
     revision = _revision_directive(revision_instruction, has_revision_reference)
     return f"""
 Create page 2 of a premium vertical children's illustrated family travel guide.
+{_HOUSE_STYLE}
 Design a joyful watercolor-and-gouache itinerary infographic with one distinct recognizable
 illustrated vignette for every confirmed stop below, connected in order by a playful dotted route.
 {family}
@@ -1653,6 +1692,7 @@ def destination_intro_page_prompt(
     return f"""
 Create a complete vertical destination-introduction page for a premium children's illustrated
 family travel guide about {location}.
+{_HOUSE_STYLE}
 
 Use an original child-friendly travel-journal hierarchy inspired by classic exploration books:
 a large destination title, two short learning notes with small decorative star icons, one
@@ -1722,6 +1762,7 @@ def landmark_page_prompt(
     revision = _revision_directive(revision_instruction, has_revision_reference)
     return f"""
 Create a complete vertical page for a premium children's illustrated family travel guide.
+{_HOUSE_STYLE}
 Show a recognizable, accurate watercolor-and-gouache storybook illustration of {landmark_name}
 in {location}, {subject}.
 
@@ -1771,42 +1812,6 @@ Do not redraw, restyle or recolour anything else. Do not add any letter, number,
 circle, marker or caption.
 """.strip()
 
-
-# Identidade visual única do caderno, tirada do guia impresso que serve de
-# referência do produto. Sem isto cada atividade saía com um fundo próprio e o
-# caderno parecia uma colagem de fontes diferentes.
-_HOUSE_STYLE = (
-    "HOUSE STYLE — every page of this book shares one look. Warm aged cream "
-    "parchment background with a subtle paper grain, edges slightly darker than the centre. "
-    "An ornate double-rule border frame in soft golden ochre runs just inside the page edge, "
-    "with small decorative scrollwork at each corner. Near the top edge place a faint circular "
-    "vintage travel postmark, a small navy-blue airplane and a fine dashed flight-path curve. "
-    "Any illustration is vintage children's storybook watercolour with fine ink linework, warm "
-    "and soft, softly blended into the parchment with no hard photographic edges and no white "
-    "box around it. Palette: aged cream, golden ochre, muted navy blue, soft sage and dusty "
-    "rose. No neon, no flat vector shapes, no modern UI look, no drop shadows."
-)
-
-# O "ache os erros" recorta a arte em dois painéis, então a moldura é jogada
-# fora de qualquer jeito — e o excesso de ornamento fazia o editor devolver a
-# cena quase intacta, sem diferenças achaveis. Mesma paleta e mesmo traço,
-# sem moldura.
-_HOUSE_STYLE_PLAIN = (
-    "HOUSE STYLE — vintage children's storybook watercolour with fine ink linework, warm and "
-    "soft, on a calm pale sky-and-parchment background. Palette: aged cream, golden ochre, "
-    "muted navy blue, soft sage and dusty rose. No border frame, no postmark, no ornament, no "
-    "paper grain overlay. No neon, no flat vector shapes, no modern UI look, no drop shadows."
-)
-
-# Páginas em traço puro. A moldura do estilo padrão vira borda preta torta
-# depois da conversão monocromática, e no "ligue os pontos" o traçador de
-# silhueta segue a moldura em vez do monumento — o enigma sai um retângulo.
-_HOUSE_STYLE_LINEART = (
-    "HOUSE STYLE — pure black line art on plain white, in the same vintage children's storybook "
-    "hand as the rest of the book: confident ink outlines, generous closed shapes, no shading. "
-    "Absolutely no border frame, no corner ornament, no postmark, no parchment texture, no "
-    "background wash and no colour — the sheet outside the drawing must stay pure white."
-)
 
 _WRITING_ARTWORK_CONTRACT = (
     "Create a decorative border-only illustration for a writing page: {motif}, arranged around "
@@ -2188,6 +2193,7 @@ def best_memory_artwork_prompt(
     revision = _activity_revision_directive(revision_instruction, has_revision_reference)
     return f"""
 Create only the decorative visual layer for a premium vertical children's travel-memory page.
+{_HOUSE_STYLE}
 Trip context: {family_title}; {trip_date}; confirmed places: {landmarks}.
 Age-complexity band: {age_complexity}. {reference}
 
@@ -2223,7 +2229,8 @@ def homecoming_page_prompt(
     revision = _homecoming_revision_directive(revision_instruction, has_revision_reference)
     return f"""
 Create only the decorative artwork layer for the final homecoming page of a premium vertical
-children's family travel guide. Trip context: {family_title}; {trip_date}; places remembered:
+children's family travel guide.
+{_HOUSE_STYLE} Trip context: {family_title}; {trip_date}; places remembered:
 {landmarks}. Age-complexity band: {age_complexity}.
 
 Illustrate the complete canonical family together in a warm watercolor-and-gouache storybook
