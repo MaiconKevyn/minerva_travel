@@ -237,6 +237,140 @@ class GuidePageGenerator(Protocol):
         reference_page: Path | None = None,
     ) -> Path: ...
 
+    def generate_anagram_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_crossword_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_cryptogram_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_dot_to_dot_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_language_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_maze_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_passport_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_postcard_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_spot_the_difference_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_writing_page(
+        self,
+        *,
+        activity_type: str,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    # Única página de atividade que não nasce de um ponto turístico: ela abre
+    # o país inteiro, então recebe o país e as paradas, não um landmark.
+    def generate_flight_vocabulary_page(
+        self,
+        *,
+        output_path: Path,
+        country: str,
+        landmark_names: list[str],
+        instruction: str,
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
     def generate_drawing_page(
         self,
         *,
@@ -1834,6 +1968,7 @@ WRITING_ACTIVITY_TITLES = {
     "here_vs_home": HERE_VS_HOME_TITLE,
 }
 
+
 def spot_the_difference_variant_prompt(*, landmark_name: str) -> str:
     """Ask for exactly the kind of change a child can spot side by side."""
 
@@ -2590,9 +2725,7 @@ def _word_search_vocabulary(
         return raw
     # Idem: cidade e país entram por palavra, não colados.
     tokens = [
-        token
-        for token in re.split(r"[^\wÀ-ÿ]+", f"{name} {city} {country}")
-        if len(token) >= 3
+        token for token in re.split(r"[^\wÀ-ÿ]+", f"{name} {city} {country}") if len(token) >= 3
     ]
     return [*tokens, "viagem", "aventura"]
 

@@ -2449,7 +2449,8 @@ def _cryptogram_phrase(landmark: LandmarkActivityContext) -> str:
             continue
         return candidate
     raise ActivitySelectionInputError(
-        "Este ponto turístico não tem nome curto o bastante para o código secreto."
+        "cryptogram_phrase_unavailable",
+        "Este ponto turístico não tem nome curto o bastante para o código secreto.",
     )
 
 
@@ -2776,18 +2777,14 @@ def _activity_spec(
             f"Você é o repórter de {landmark.name}. Escreva a manchete da sua visita."
         ),
         "travel_diary": f"Conte como foi o seu dia em {landmark.city or landmark.name}.",
-        "here_vs_home": (
-            f"Compare {landmark.city or landmark.name} com a rua onde você mora."
-        ),
+        "here_vs_home": (f"Compare {landmark.city or landmark.name} com a rua onde você mora."),
         "anagram": "Desembaralhe as palavras da sua viagem.",
         "cryptogram": "Use a chave secreta para descobrir a frase.",
         "maze": f"Leve a família do A até {landmark.name} sem cruzar as paredes.",
         "crossword": "Complete a cruzadinha com as palavras da viagem.",
         "dot_to_dot": f"Ligue os números e descubra {landmark.name}.",
         "postcard": "Escreva o cartão, recorte e mande pelo correio de verdade.",
-        "passport_stamp": (
-            "Cole aqui o bilhete de entrada ou o carimbo que você ganhou."
-        ),
+        "passport_stamp": ("Cole aqui o bilhete de entrada ou o carimbo que você ganhou."),
         "language_survival": "Cinco frases para você pedir sozinho, sem precisar dos pais.",
         "spot_the_difference": "Compare os dois desenhos e ache as diferenças.",
     }
@@ -2903,9 +2900,7 @@ def _builder_activity_page(
     )
 
 
-FLIGHT_VOCABULARY_INSTRUCTION = (
-    "Treine no avião e marque cada palavra que você conseguir falar."
-)
+FLIGHT_VOCABULARY_INSTRUCTION = "Treine no avião e marque cada palavra que você conseguir falar."
 
 
 def _country_key(country: str) -> str:

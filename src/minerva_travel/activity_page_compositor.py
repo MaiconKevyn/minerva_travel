@@ -70,6 +70,8 @@ FLIGHT_VOCABULARY_TITLE_PREFIX = "Primeiras palavras em"
 
 def flight_vocabulary_title(language: str) -> str:
     return f"{FLIGHT_VOCABULARY_TITLE_PREFIX} {language}"
+
+
 POSTCARD_TITLE = "Cartão-postal"
 POSTCARD_REGION = (600, 1480)
 PASSPORT_TITLE = "Passaporte de viagem"
@@ -583,9 +585,7 @@ def compose_spot_the_difference_page(
     for index, scene in enumerate((base, variant)):
         top = SPOT_PANEL_TOP + index * (panel_height + SPOT_PANEL_GAP)
         image.paste(scene.resize(SPOT_PANEL_SIZE, Image.LANCZOS), (70, top))
-        draw.rectangle(
-            (70, top, 70 + panel_width, top + panel_height), outline=INK, width=4
-        )
+        draw.rectangle((70, top, 70 + panel_width, top + panel_height), outline=INK, width=4)
         badge = "1" if index == 0 else "2"
         draw.ellipse((80, top + 10, 128, top + 58), fill=ACCENT, outline=ACCENT)
         _draw_centered_fit_box(
@@ -691,8 +691,12 @@ def compose_language_page(
             fill=INK,
         )
         # A pronúncia é o que a criança realmente fala; fica destacada.
-        draw.text((92, y + 92), f"fale assim: {phrase.pronunciation}",
-                  font=_font(25, bold=True), fill=ACCENT)
+        draw.text(
+            (92, y + 92),
+            f"fale assim: {phrase.pronunciation}",
+            font=_font(25, bold=True),
+            fill=ACCENT,
+        )
         draw.text((92, y + 142), phrase.meaning, font=_font(23), fill=MUTED_INK)
     return _atomic_save(image, output_path)
 
@@ -794,8 +798,9 @@ def compose_postcard_page(
     draw = ImageDraw.Draw(image)
     _panel(draw, (38, 30, 986, 252))
     _draw_centered_fit(draw, POSTCARD_TITLE, 46, 50, 32, 884, bold=True)
-    _draw_centered_fit(draw, _bounded(landmark_name, "landmark_name", 100), 116, 31, 20, 884,
-                       bold=True)
+    _draw_centered_fit(
+        draw, _bounded(landmark_name, "landmark_name", 100), 116, 31, 20, 884, bold=True
+    )
     _draw_wrapped(
         draw,
         _bounded(instruction, "instruction", 240),
@@ -822,13 +827,23 @@ def compose_postcard_page(
     for index in range(6):
         rule_y = top + 122 + index * 78
         draw.line((92, rule_y, middle - 40, rule_y), fill=PANEL_OUTLINE, width=3)
-    draw.text((92, bottom - 66), f"De: {_bounded(sender, 'sender', 80)}",
-              font=_font(21, bold=True), fill=MUTED_INK)
+    draw.text(
+        (92, bottom - 66),
+        f"De: {_bounded(sender, 'sender', 80)}",
+        font=_font(21, bold=True),
+        fill=MUTED_INK,
+    )
 
     stamp = (middle + 300, top + 30, middle + 430, top + 190)
     draw.rounded_rectangle(stamp, radius=8, outline=MUTED_INK, width=3)
-    _draw_centered_fit_box(draw, "SELO", (stamp[0] + 8, stamp[1] + 60, stamp[2] - 8, stamp[3] - 60),
-                           maximum_size=22, minimum_size=14, bold=True)
+    _draw_centered_fit_box(
+        draw,
+        "SELO",
+        (stamp[0] + 8, stamp[1] + 60, stamp[2] - 8, stamp[3] - 60),
+        maximum_size=22,
+        minimum_size=14,
+        bold=True,
+    )
     draw.text((middle + 40, top + 232), "Para:", font=_font(24, bold=True), fill=INK)
     for index in range(4):
         rule_y = top + 322 + index * 78
@@ -850,8 +865,7 @@ def compose_passport_page(
     draw = ImageDraw.Draw(image)
     _panel(draw, (38, 30, 986, 268))
     _draw_centered_fit(draw, PASSPORT_TITLE, 46, 50, 32, 884, bold=True)
-    _draw_centered_fit(draw, _bounded(country, "country", 100).upper(), 116, 40, 22, 884,
-                       bold=True)
+    _draw_centered_fit(draw, _bounded(country, "country", 100).upper(), 116, 40, 22, 884, bold=True)
     _draw_wrapped(
         draw,
         _bounded(instruction, "instruction", 240),
@@ -863,8 +877,9 @@ def compose_passport_page(
 
     _panel(draw, (54, 306, 970, 512), radius=22)
     draw.text((92, 332), "Passaporte de:", font=_font(24, bold=True), fill=INK)
-    draw.text((92, 382), _bounded(child_name, "child_name", 90), font=_font(34, bold=True),
-              fill=INK)
+    draw.text(
+        (92, 382), _bounded(child_name, "child_name", 90), font=_font(34, bold=True), fill=INK
+    )
     draw.text((92, 452), "Cheguei no dia:", font=_font(22, bold=True), fill=MUTED_INK)
     draw.line((320, 482, 620, 482), fill=PANEL_OUTLINE, width=3)
 
@@ -872,8 +887,12 @@ def compose_passport_page(
     frame = (54, 556, 970, 1240)
     _panel(draw, frame, radius=22)
     inner = (frame[0] + 40, frame[1] + 78, frame[2] - 40, frame[3] - 40)
-    draw.text((frame[0] + 40, frame[1] + 26), "Cole aqui o bilhete ou o carimbo:",
-              font=_font(24, bold=True), fill=INK)
+    draw.text(
+        (frame[0] + 40, frame[1] + 26),
+        "Cole aqui o bilhete ou o carimbo:",
+        font=_font(24, bold=True),
+        fill=INK,
+    )
     _draw_dashed_rectangle(draw, inner, dash=22, gap=16)
 
     _panel(draw, (54, 1284, 970, 1490), radius=22)
@@ -970,7 +989,7 @@ def compose_crossword_page(
 
     numbers = {(entry.column, entry.row): entry.number for entry in crossword.entries}
     number_font = _font(max(11, cell // 4), bold=True)
-    for (column, row) in letters:
+    for column, row in letters:
         x, y = left + column * cell, top + row * cell
         draw.rectangle((x, y, x + cell, y + cell), fill="white", outline=INK, width=3)
         number = numbers.get((column, row))
@@ -1061,9 +1080,7 @@ def compose_maze_page(
     # A borda externa fecha o labirinto; as aberturas de entrada e saída são
     # desenhadas por cima para a criança ver por onde começar.
     draw.rectangle((left, top, left + width, top + height), outline=INK, width=MAZE_WALL_WIDTH)
-    draw.line(
-        (left, top + 3, left, top + cell - 3), fill=PAPER, width=MAZE_WALL_WIDTH + 2
-    )
+    draw.line((left, top + 3, left, top + cell - 3), fill=PAPER, width=MAZE_WALL_WIDTH + 2)
     draw.line(
         (
             left + width,
@@ -1180,8 +1197,10 @@ def compose_cryptogram_page(
     legend_rows = math.ceil(len(puzzle.legend) / columns)
     _panel(draw, (54, legend_top, 970, legend_top + 96 + legend_rows * 74), radius=22)
     draw.text(
-        (92, legend_top + 22), "Chave secreta (algumas já vêm prontas):",
-        font=_font(25, bold=True), fill=INK,
+        (92, legend_top + 22),
+        "Chave secreta (algumas já vêm prontas):",
+        font=_font(25, bold=True),
+        fill=INK,
     )
     for index, (letter, code) in enumerate(puzzle.legend):
         column, row = index % columns, index // columns
@@ -1299,8 +1318,9 @@ def _puzzle_header(
 ) -> None:
     _panel(draw, (38, 30, 986, 268))
     _draw_centered_fit(draw, title, 48, 52, 34, 884, bold=True)
-    _draw_centered_fit(draw, _bounded(landmark_name, "landmark_name", 100), 120, 32, 20, 884,
-                       bold=True)
+    _draw_centered_fit(
+        draw, _bounded(landmark_name, "landmark_name", 100), 120, 32, 20, 884, bold=True
+    )
     _draw_wrapped(
         draw,
         _bounded(instruction, "instruction", 240),

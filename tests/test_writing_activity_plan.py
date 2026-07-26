@@ -206,3 +206,44 @@ def test_a_guide_is_refused_when_no_selected_landmark_resolves():
         )
 
     assert raised.value.code == "landmark_selection_unresolved"
+
+
+def test_a_landmark_without_a_short_phrase_is_refused_with_a_readable_message(monkeypatch):
+    """O caminho de erro do criptograma levantava TypeError, não o 422.
+
+    `ActivitySelectionInputError` exige código e mensagem; passando só a
+    mensagem, a falha rara virava "erro no servidor" sem dizer o motivo.
+    """
+    from minerva_travel import app as app_module
+    from minerva_travel.app import ActivitySelectionInputError, _cryptogram_phrase
+    from minerva_travel.models import LandmarkActivityContext
+    from minerva_travel.puzzles import PuzzleGenerationError
+
+    def always_fails(*_args, **_kwargs):
+        raise PuzzleGenerationError("frase longa demais")
+
+    monkeypatch.setattr(app_module, "build_cryptogram", always_fails)
+
+    landmark = LandmarkActivityContext(
+        destination_id="d1",
+        selection_id="s1",
+        name="Ponto Turístico",
+        city="Cidade",
+        country="País",
+        description="Uma descrição.",
+        curiosity="Uma curiosidade.",
+        curiosity_kind="trusted",
+        itinerary_order=1,
+        landmark_page_id="landmark-1",
+        age_complexity="older_child",
+    )
+
+    with pytest.raises(ActivitySelectionInputError) as raised:
+        _cryptogram_phrase(landmark)
+
+    assert raised.value.code == "cryptogram_phrase_unavailable"
+    assert "código secreto" in raised.value.message
+    assert raised.value.as_detail() == {
+        "code": "cryptogram_phrase_unavailable",
+        "message": raised.value.message,
+    }
