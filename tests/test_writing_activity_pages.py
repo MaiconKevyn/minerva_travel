@@ -81,3 +81,41 @@ def test_writing_page_keeps_white_paper_even_over_dark_artwork(tmp_path: Path):
     with Image.open(output) as page:
         band = page.convert("RGB").crop((120, 400, 900, 420))
     assert all(minimum >= 248 for minimum, _maximum in band.getextrema())
+
+
+def test_every_activity_artwork_asks_for_the_same_house_style():
+    """Uma identidade só para o caderno inteiro.
+
+    Sem contrato compartilhado, cada atividade saía com fundo próprio e o
+    guia parecia uma colagem de fontes diferentes.
+    """
+
+    from minerva_travel.models import OPTIONAL_LANDMARK_ACTIVITY_TYPES
+    from minerva_travel.page_generation import activity_artwork_prompt
+
+    visual_types = [
+        activity_type
+        for activity_type in OPTIONAL_LANDMARK_ACTIVITY_TYPES
+        if activity_type not in {"family_coloring", "investigator"}
+    ]
+    for activity_type in visual_types:
+        prompt = activity_artwork_prompt(
+            activity_type=activity_type,
+            landmark_name="Coliseu",
+            city="Roma",
+            country="Itália",
+            age_complexity="early_reader",
+            has_landmark_reference=False,
+            has_revision_reference=False,
+        )
+        assert "HOUSE STYLE" in prompt, activity_type
+        # Paleta e traço são o que faz o caderno parecer um caderno só.
+        assert "vintage children's storybook watercolour" in prompt, activity_type
+        assert "aged cream, golden ochre, muted navy blue" in prompt, activity_type
+        # O texto exato continua sendo composto por código, nunca desenhado.
+        assert "text-free" in prompt.lower(), activity_type
+
+        # A moldura ornamentada é a variante padrão; o "ache os erros" recorta
+        # a arte em painéis e a moldura seria descartada.
+        framed = "ornate double-rule border frame" in prompt
+        assert framed is (activity_type != "spot_the_difference"), activity_type

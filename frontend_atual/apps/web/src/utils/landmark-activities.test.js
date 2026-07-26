@@ -153,3 +153,27 @@ test('every activity offers a longer description for the expanded view', () => {
     assert.ok(activity.about.length > activity.description.length, activity.type);
   }
 });
+
+test('the catalogue shows many landmarks, not the same one eighteen times', () => {
+  // Abrir dezoito cards e ver a mesma Torre Eiffel não mostra que a página se
+  // adapta a cada parada — mostra o contrário.
+  const sources = LANDMARK_ACTIVITY_OPTIONS.flatMap((activity) =>
+    activityGallery(activity).map((item) => item.src),
+  );
+
+  assert.equal(new Set(sources).size, sources.length);
+  assert.ok(sources.every((src) => src.startsWith('/activity-examples/')));
+  assert.ok(sources.every((src) => src.endsWith('.webp')));
+});
+
+test('spot the difference shows both scenes whole, not only the composed page', () => {
+  const activity = LANDMARK_ACTIVITY_OPTIONS.find(
+    (option) => option.type === 'spot_the_difference',
+  );
+  const gallery = activityGallery(activity);
+
+  // Comparar dois desenhos exige ver os dois; a página montada os reduz.
+  assert.equal(gallery.length, 3);
+  assert.match(gallery[1].src, /scene-1/);
+  assert.match(gallery[2].src, /scene-2/);
+});

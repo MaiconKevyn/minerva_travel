@@ -169,6 +169,23 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
   },
   {
     type: 'spot_the_difference',
+    gallery: [
+      {
+        src: '/activity-examples/spot-the-difference-real.webp',
+        label: 'A página',
+        caption: 'A folha como a criança recebe, com a lista para marcar.',
+      },
+      {
+        src: '/activity-examples/spot-the-difference-scene-1.webp',
+        label: 'Cena 1',
+        caption: 'O primeiro desenho inteiro, do jeito que sai impresso.',
+      },
+      {
+        src: '/activity-examples/spot-the-difference-scene-2.webp',
+        label: 'Cena 2',
+        caption: 'O segundo desenho inteiro: as diferenças estão aqui.',
+      },
+    ],
     about:
       'Dois desenhos do mesmo lugar com pequenas diferenças. Elas são conferidas uma a uma antes da impressão, e a página só diz o número que realmente existe.',
     category: 'puzzle',

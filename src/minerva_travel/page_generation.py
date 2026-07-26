@@ -1772,6 +1772,32 @@ circle, marker or caption.
 """.strip()
 
 
+# Identidade visual única do caderno, tirada do guia impresso que serve de
+# referência do produto. Sem isto cada atividade saía com um fundo próprio e o
+# caderno parecia uma colagem de fontes diferentes.
+_HOUSE_STYLE = (
+    "HOUSE STYLE — every page of this book shares one look. Warm aged cream "
+    "parchment background with a subtle paper grain, edges slightly darker than the centre. "
+    "An ornate double-rule border frame in soft golden ochre runs just inside the page edge, "
+    "with small decorative scrollwork at each corner. Near the top edge place a faint circular "
+    "vintage travel postmark, a small navy-blue airplane and a fine dashed flight-path curve. "
+    "Any illustration is vintage children's storybook watercolour with fine ink linework, warm "
+    "and soft, softly blended into the parchment with no hard photographic edges and no white "
+    "box around it. Palette: aged cream, golden ochre, muted navy blue, soft sage and dusty "
+    "rose. No neon, no flat vector shapes, no modern UI look, no drop shadows."
+)
+
+# O "ache os erros" recorta a arte em dois painéis, então a moldura é jogada
+# fora de qualquer jeito — e o excesso de ornamento fazia o editor devolver a
+# cena quase intacta, sem diferenças achaveis. Mesma paleta e mesmo traço,
+# sem moldura.
+_HOUSE_STYLE_PLAIN = (
+    "HOUSE STYLE — vintage children's storybook watercolour with fine ink linework, warm and "
+    "soft, on a calm pale sky-and-parchment background. Palette: aged cream, golden ochre, "
+    "muted navy blue, soft sage and dusty rose. No border frame, no postmark, no ornament, no "
+    "paper grain overlay. No neon, no flat vector shapes, no modern UI look, no drop shadows."
+)
+
 _WRITING_ARTWORK_CONTRACT = (
     "Create a decorative border-only illustration for a writing page: {motif}, arranged around "
     "the outer edges as a calm watercolor frame. Keep the entire central 80 percent pale, plain "
@@ -1826,9 +1852,11 @@ def activity_artwork_prompt(
         # As páginas de escrever recebem painéis opacos por cima: a arte só
         # aparece como moldura, então detalhe no centro seria desperdiçado.
         "spot_the_difference": (
-            "Create one wide, cheerful watercolor scene of the landmark with a handful of large, "
-            "clearly separated elements — a bird, a balloon, a bench, a flag, a tree, a cloud — "
-            "spread around it on a calm background. Keep the composition simple and uncluttered."
+            "Create one wide, cheerful scene of the landmark carrying EXACTLY six large, "
+            "clearly separated stand-alone objects around it — for example a bird, a hot-air "
+            "balloon, a bench, a flag, a lone tree and a boat. Each object must be big, solid "
+            "and sit on empty background with nothing overlapping it, so it could be removed "
+            "without disturbing the rest. Keep everything else plain and uncluttered."
         ),
         "language_survival": (
             "Create a decorative phrasebook background: a small recognizable watercolor landmark "
@@ -1907,6 +1935,7 @@ def activity_artwork_prompt(
     return f"""
 Create only the visual artwork layer for a premium vertical printable children's travel activity.
 Activity: {activity_type}. Landmark: {landmark_name}. Location: {location}.
+{_HOUSE_STYLE_PLAIN if activity_type == "spot_the_difference" else _HOUSE_STYLE}
 Age-complexity band: {age_complexity}.
 {source_contract}{revision_contract}
 
@@ -2439,8 +2468,13 @@ def _word_search_vocabulary(
         if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
             raise PageGenerationError("As palavras do caça-palavras são inválidas.")
         return raw
-    place_tokens = [token for token in re.split(r"[^\wÀ-ÿ]+", name) if len(token) >= 3]
-    return [city, *place_tokens, country, "viagem", "aventura"]
+    # Idem: cidade e país entram por palavra, não colados.
+    tokens = [
+        token
+        for token in re.split(r"[^\wÀ-ÿ]+", f"{name} {city} {country}")
+        if len(token) >= 3
+    ]
+    return [*tokens, "viagem", "aventura"]
 
 
 def _bounded_mapping_text(

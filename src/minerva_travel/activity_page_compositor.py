@@ -35,11 +35,16 @@ INK = "#153451"
 MUTED_INK = "#42617a"
 ACCENT = "#db8b45"
 PAPER = "#fffdf8"
-PANEL_OUTLINE = "#b9ccda"
+# Ocre suave em vez do azul-acinzentado: as réguas e molduras passam a ser as
+# mesmas do guia impresso que serve de referência do produto.
+PANEL_OUTLINE = "#c9ad78"
 # Vermelho do gabarito: nunca aparece na página que a criança recebe, só na
 # versão resolvida que mostramos como exemplo no seletor.
 SOLUTION_INK = "#c0392b"
 SOLUTION_WIDTH = 7
+# Faixa translúcida em vez de risco cheio: riscar por cima apagava as letras
+# justamente na hora de conferir se a palavra está certa.
+SOLUTION_HIGHLIGHT = (192, 57, 43, 76)
 COLORING_TITLE = "Atividade para colorir"
 COLORING_INSTRUCTION_TEMPLATE = "Agora é a vez de colorir {landmark_name} do seu jeito."
 FAMILY_COLORING_TITLE = "Família de férias para colorir"
@@ -362,25 +367,17 @@ def compose_word_search_page(
         for column_index, letter in enumerate(row):
             x0 = left + column_index * cell
             y0 = top + row_index * cell
-            draw.rectangle((x0, y0, x0 + cell, y0 + cell), outline="#7898af", width=2)
+            draw.rectangle((x0, y0, x0 + cell, y0 + cell), outline=PANEL_OUTLINE, width=2)
             bbox = draw.textbbox((0, 0), letter, font=letter_font)
             x = x0 + (cell - (bbox[2] - bbox[0])) / 2
             y = y0 + (cell - (bbox[3] - bbox[1])) / 2 - bbox[1]
             draw.text((x, y), letter, font=letter_font, fill=INK)
 
     if solution:
-        placements = locate_words(list(normalized_grid), list(normalized_words))
-        for row, column, row_end, column_end in placements:
-            draw.line(
-                (
-                    left + column * cell + cell // 2,
-                    top + row * cell + cell // 2,
-                    left + column_end * cell + cell // 2,
-                    top + row_end * cell + cell // 2,
-                ),
-                fill=SOLUTION_INK,
-                width=SOLUTION_WIDTH,
-            )
+        image = _highlight_found_words(
+            image, normalized_grid, normalized_words, left=left, top=top, cell=cell
+        )
+        draw = ImageDraw.Draw(image)
 
     list_top = top + grid_width + 52
     list_bottom = min(1450, list_top + 260)
@@ -399,6 +396,34 @@ def compose_word_search_page(
             fill=INK,
         )
     return _atomic_save(image, output_path)
+
+
+def _highlight_found_words(
+    image: Image.Image,
+    grid: Sequence[str],
+    words: Sequence[str],
+    *,
+    left: int,
+    top: int,
+    cell: int,
+) -> Image.Image:
+    """Band each found word in translucent red, letters still readable through it."""
+
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    painter = ImageDraw.Draw(overlay)
+    inset = max(3, cell // 10)
+    for row, column, row_end, column_end in locate_words(list(grid), list(words)):
+        painter.rounded_rectangle(
+            (
+                left + column * cell + inset,
+                top + row * cell + inset,
+                left + (column_end + 1) * cell - inset,
+                top + (row_end + 1) * cell - inset,
+            ),
+            radius=cell // 2,
+            fill=SOLUTION_HIGHLIGHT,
+        )
+    return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
 
 
 def compose_drawing_page(
@@ -693,11 +718,14 @@ def compose_postcard_page(
         align="center",
     )
 
-    # Linha de corte: o cartão precisa sair da folha para ser postado.
+    # Linha de corte: o cartão precisa sair da folha para ser postado. Ela cai
+    # em cima da ilustração, então ganha uma tarja clara própria — sem isso a
+    # instrução some contra a aquarela e ninguém sabe onde cortar.
     top, bottom = POSTCARD_REGION
+    draw.rectangle((38, top - 56, 986, top - 8), fill=PAPER)
     for x in range(60, 964, 22):
-        draw.line((x, top - 18, x + 12, top - 18), fill=MUTED_INK, width=2)
-    draw.text((60, top - 46), "Recorte aqui", font=_font(19), fill=MUTED_INK)
+        draw.line((x, top - 18, x + 12, top - 18), fill=MUTED_INK, width=3)
+    draw.text((60, top - 50), "Recorte aqui", font=_font(19, bold=True), fill=MUTED_INK)
 
     _panel(draw, (54, top, 970, bottom), radius=18)
     middle = 512

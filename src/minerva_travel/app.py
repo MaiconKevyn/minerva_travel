@@ -2214,10 +2214,13 @@ WRITING_ACTIVITY_TYPES: frozenset[str] = frozenset(
 def _travel_vocabulary(landmark: LandmarkActivityContext) -> list[str]:
     """Words from this trip that a child can recognise once unscrambled."""
 
+    # Cada nome entra quebrado em palavras: "Reino Unido" inteiro vira
+    # "REINOUNIDO" na grade, que não é palavra nenhuma para uma criança.
     candidates = [
-        *re.findall(r"[A-Za-zÀ-ÿ]{4,}", landmark.name),
-        landmark.city,
-        landmark.country,
+        *re.findall(
+            r"[A-Za-zÀ-ÿ]{3,}",
+            f"{landmark.name} {landmark.city} {landmark.country}",
+        ),
         "VIAGEM",
         "AVENTURA",
     ]
