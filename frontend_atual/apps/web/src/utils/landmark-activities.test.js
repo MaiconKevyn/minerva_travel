@@ -6,6 +6,7 @@ import {
   MAX_OPTIONAL_ACTIVITIES_PER_GUIDE,
   MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
   OPTIONAL_LANDMARK_ACTIVITY_TYPES,
+  activityGallery,
   normalizeLandmarkActivitySelections,
   pruneLandmarkActivitySelections,
   toggleLandmarkActivitySelection,
@@ -119,4 +120,36 @@ test('activity selections are pruned when a landmark is removed', () => {
   assert.deepEqual(pruneLandmarkActivitySelections(selections, ['paris:louvre']), [
     { landmark_selection_id: 'paris:louvre', activity_type: 'drawing', order: 1 },
   ]);
+});
+
+test('activity gallery falls back to the single printed page', () => {
+  const detailHunt = LANDMARK_ACTIVITY_OPTIONS.find((option) => option.type === 'detail_hunt');
+  const gallery = activityGallery(detailHunt);
+
+  assert.equal(gallery.length, 1);
+  assert.equal(gallery[0].src, detailHunt.preview);
+  assert.ok(gallery[0].caption);
+});
+
+test('puzzles show the solved page next to the blank one', () => {
+  // Ver a atividade pronta é o que responde "o que isso é" para um pai que
+  // nunca viu a página.
+  for (const type of ['word_search', 'maze', 'crossword', 'dot_to_dot']) {
+    const activity = LANDMARK_ACTIVITY_OPTIONS.find((option) => option.type === type);
+    const gallery = activityGallery(activity);
+
+    assert.equal(gallery.length, 2, type);
+    assert.notEqual(gallery[0].src, gallery[1].src, type);
+    assert.match(gallery[1].src, /-solved\.webp$/, type);
+    assert.ok(gallery.every((item) => item.label && item.caption), type);
+  }
+});
+
+test('every activity offers a longer description for the expanded view', () => {
+  for (const activity of LANDMARK_ACTIVITY_OPTIONS) {
+    assert.ok(activity.about, activity.type);
+    // O modal existe para dizer mais que o card; repetir não serviria.
+    assert.notEqual(activity.about, activity.description, activity.type);
+    assert.ok(activity.about.length > activity.description.length, activity.type);
+  }
 });

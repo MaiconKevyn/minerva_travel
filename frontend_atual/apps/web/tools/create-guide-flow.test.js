@@ -320,3 +320,16 @@ test('activity cards look selectable and keep a consistent grid height', () => {
   assert.match(activities, /Assim fica/);
   assert.doesNotMatch(activities, /Exemplo real/);
 });
+
+test('the eye opens the full page without selecting the activity', () => {
+  const activities = readProjectFile('src/components/StepActivities.jsx');
+  const dialog = readProjectFile('src/components/ActivityPreviewDialog.jsx');
+
+  // O card inteiro é um <label>: sem cancelar o clique, a lupa marcaria a
+  // atividade em vez de só mostrá-la.
+  assert.match(activities, /Ver a página de \$\{activity\.label\} inteira/);
+  assert.match(activities, /event\.preventDefault\(\);\s*\n\s*event\.stopPropagation\(\);/);
+  assert.match(activities, /<ActivityPreviewDialog/);
+  assert.match(dialog, /activityGallery/);
+  assert.match(dialog, /role="tab"/);
+});

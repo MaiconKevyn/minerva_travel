@@ -28,6 +28,7 @@ from minerva_travel.puzzles import (
     Cryptogram,
 )
 from minerva_travel.spot_the_difference import DifferenceRegion
+from minerva_travel.word_search import locate_words
 
 PAGE_IMAGE_SIZE = (1024, 1536)
 INK = "#153451"
@@ -35,6 +36,10 @@ MUTED_INK = "#42617a"
 ACCENT = "#db8b45"
 PAPER = "#fffdf8"
 PANEL_OUTLINE = "#b9ccda"
+# Vermelho do gabarito: nunca aparece na página que a criança recebe, só na
+# versão resolvida que mostramos como exemplo no seletor.
+SOLUTION_INK = "#c0392b"
+SOLUTION_WIDTH = 7
 COLORING_TITLE = "Atividade para colorir"
 COLORING_INSTRUCTION_TEMPLATE = "Agora é a vez de colorir {landmark_name} do seu jeito."
 FAMILY_COLORING_TITLE = "Família de férias para colorir"
@@ -329,6 +334,7 @@ def compose_word_search_page(
     instruction: str,
     grid: Sequence[str],
     words: Sequence[str],
+    solution: bool = False,
 ) -> Path:
     normalized_grid, normalized_words = _validate_word_search(grid, words)
     image = _load_artwork(artwork_path)
@@ -361,6 +367,20 @@ def compose_word_search_page(
             x = x0 + (cell - (bbox[2] - bbox[0])) / 2
             y = y0 + (cell - (bbox[3] - bbox[1])) / 2 - bbox[1]
             draw.text((x, y), letter, font=letter_font, fill=INK)
+
+    if solution:
+        placements = locate_words(list(normalized_grid), list(normalized_words))
+        for row, column, row_end, column_end in placements:
+            draw.line(
+                (
+                    left + column * cell + cell // 2,
+                    top + row * cell + cell // 2,
+                    left + column_end * cell + cell // 2,
+                    top + row_end * cell + cell // 2,
+                ),
+                fill=SOLUTION_INK,
+                width=SOLUTION_WIDTH,
+            )
 
     list_top = top + grid_width + 52
     list_bottom = min(1450, list_top + 260)
@@ -770,6 +790,7 @@ def compose_dot_to_dot_page(
     landmark_name: str,
     instruction: str,
     puzzle: DotToDot,
+    solution: bool = False,
 ) -> Path:
     """Print the numbered dots over a clean sheet, scaled into the page."""
 
@@ -783,6 +804,17 @@ def compose_dot_to_dot_page(
     scale = min((right - left - 96) / puzzle.width, (bottom - top - 96) / puzzle.height)
     offset_x = left + ((right - left) - puzzle.width * scale) / 2
     offset_y = top + ((bottom - top) - puzzle.height * scale) / 2
+
+    if solution:
+        draw.line(
+            [
+                (offset_x + x * scale, offset_y + y * scale)
+                for x, y in (*puzzle.points, puzzle.points[0])
+            ],
+            fill=SOLUTION_INK,
+            width=SOLUTION_WIDTH,
+            joint="curve",
+        )
 
     number_font = _font(24, bold=True)
     for index, (x, y) in enumerate(puzzle.points, start=1):
@@ -804,6 +836,7 @@ def compose_crossword_page(
     landmark_name: str,
     instruction: str,
     crossword: Crossword,
+    solution: bool = False,
 ) -> Path:
     """Draw the interlocked grid with start numbers, then the two clue lists."""
 
@@ -828,6 +861,15 @@ def compose_crossword_page(
         number = numbers.get((column, row))
         if number is not None:
             draw.text((x + 5, y + 3), str(number), font=number_font, fill=MUTED_INK)
+        if solution:
+            _draw_centered_fit_box(
+                draw,
+                letters[(column, row)],
+                (x + 6, y + int(cell * 0.28), x + cell - 6, y + cell - 6),
+                maximum_size=max(16, int(cell * 0.5)),
+                minimum_size=12,
+                bold=True,
+            )
 
     clues_top = top + height + 52
     tallest = max(len(crossword.across), len(crossword.down))
@@ -865,6 +907,7 @@ def compose_maze_page(
     landmark_name: str,
     instruction: str,
     maze: Maze,
+    solution: bool = False,
 ) -> Path:
     """Draw the maze walls plus the labelled start and finish."""
 
@@ -916,6 +959,17 @@ def compose_maze_page(
         fill=PAPER,
         width=MAZE_WALL_WIDTH + 2,
     )
+
+    if solution:
+        draw.line(
+            [
+                (left + column * cell + cell // 2, top + row * cell + cell // 2)
+                for column, row in maze.solution
+            ],
+            fill=SOLUTION_INK,
+            width=max(4, cell // 6),
+            joint="curve",
+        )
 
     _draw_maze_marker(draw, left, top, cell, maze.start, MAZE_START_LABEL)
     _draw_maze_marker(draw, left, top, cell, maze.goal, MAZE_GOAL_LABEL)

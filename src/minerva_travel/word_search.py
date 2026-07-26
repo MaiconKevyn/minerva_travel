@@ -91,3 +91,36 @@ def _fits(
         if current is not None and current != letter:
             return False
     return True
+
+
+def locate_words(grid: list[str], words: list[str]) -> list[tuple[int, int, int, int]]:
+    """Find each word in the finished grid as (row, column, row_end, column_end).
+
+    Recuperar a posicao a partir da grade pronta evita carregar coordenadas
+    junto com a pagina: o gabarito e sempre derivado do que foi impresso.
+    """
+
+    found: list[tuple[int, int, int, int]] = []
+    size = len(grid)
+    for word in words:
+        normalized = normalize_word_for_grid(word)
+        length = len(normalized)
+        placement = None
+        for row in range(size):
+            for column in range(size - length + 1):
+                if "".join(grid[row][column : column + length]) == normalized:
+                    placement = (row, column, row, column + length - 1)
+                    break
+            if placement:
+                break
+        if placement is None:
+            for column in range(size):
+                for row in range(size - length + 1):
+                    if "".join(grid[row + index][column] for index in range(length)) == normalized:
+                        placement = (row, column, row + length - 1, column)
+                        break
+                if placement:
+                    break
+        if placement is not None:
+            found.append(placement)
+    return found

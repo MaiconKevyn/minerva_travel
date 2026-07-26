@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { BookHeart, Check, Clock3, Palette, Pencil, Plane, Plus, Sparkles } from 'lucide-react';
+import { BookHeart, Check, Clock3, Eye, Palette, Pencil, Plane, Plus, Sparkles } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
+import ActivityPreviewDialog from '@/components/ActivityPreviewDialog.jsx';
 import { selectGuideLandmarks } from '@/utils/minerva-api.js';
 import { pluralize } from '@/utils/guide-form.js';
 import {
@@ -24,6 +25,9 @@ const StepActivities = () => {
     nextStep,
   } = useConversationalGuide();
   const [selectionError, setSelectionError] = useState('');
+  // Uma atividade por vez em detalhe: guardamos ponto + tipo porque o mesmo
+  // tipo aparece em todos os pontos turísticos.
+  const [previewing, setPreviewing] = useState(null);
 
   const landmarks = useMemo(
     () => selectGuideLandmarks(parsedData.landmarks, selectedLandmarks),
@@ -219,6 +223,21 @@ const StepActivities = () => {
                                   <Plus className="h-4 w-4" />
                                 )}
                               </span>
+                              {/* O card inteiro é um <label>, então qualquer clique
+                                  marcaria a atividade: a lupa precisa cancelar isso
+                                  para só abrir a página em tamanho de leitura. */}
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  setPreviewing({ selectionId, type: activity.type });
+                                }}
+                                aria-label={`Ver a página de ${activity.label} inteira`}
+                                className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-white/90 text-muted-foreground shadow-sm transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                              >
+                                <Eye className="h-4 w-4" aria-hidden="true" />
+                              </button>
                               <span
                                 className={`absolute inset-x-0 bottom-0 py-1 text-center text-[11px] font-bold text-white transition ${
                                   selected
@@ -256,6 +275,17 @@ const StepActivities = () => {
                                 </span>
                               </div>
                             </div>
+                            <ActivityPreviewDialog
+                              activity={activity}
+                              landmarkName={landmark.name}
+                              selected={selected}
+                              onToggle={() => toggleActivity(selectionId, activity.type)}
+                              open={
+                                previewing?.selectionId === selectionId &&
+                                previewing?.type === activity.type
+                              }
+                              onOpenChange={(next) => setPreviewing(next ? previewing : null)}
+                            />
                           </label>
                         );
                       })}
