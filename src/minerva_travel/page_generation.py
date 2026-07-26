@@ -39,8 +39,10 @@ from minerva_travel.activity_page_compositor import (
     compose_maze_page,
     compose_passport_page,
     compose_postcard_page,
+    compose_spot_the_difference_page,
     compose_word_search_page,
     compose_writing_page,
+    crop_scene_for_panel,
 )
 from minerva_travel.child_phrasebook import phrasebook_for_country
 from minerva_travel.config import (
@@ -72,9 +74,16 @@ from minerva_travel.puzzles import (
     build_anagrams,
     build_cryptogram,
 )
+from minerva_travel.spot_the_difference import (
+    MIN_DIFFERENCES,
+    DifferenceRegion,
+    SpotTheDifferenceError,
+    find_difference_regions,
+)
 from minerva_travel.word_search import build_word_search_grid
 
 PAGE_IMAGE_SIZE = (1024, 1536)
+SPOT_DIFFERENCE_ATTEMPTS = 2
 PAGE_IMAGE_SIZE_PARAM = "1024x1536"
 MAX_PAGE_IMAGE_BYTES = 25 * 1024 * 1024
 
@@ -766,6 +775,108 @@ class OpenAIGuidePageGenerator:
             raise PageGenerationError("Não foi possível finalizar a página de desenho.") from error
         finally:
             artwork.unlink(missing_ok=True)
+
+    def generate_spot_the_difference_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        """Generate a scene, edit a copy of it, and only print if the diff holds up.
+
+        O provedor não promete quantas alterações fez. Sem conferir, a página
+        prometeria seis erros com dois achaveis — pior que não ter a atividade.
+        """
+
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec, default="Compare os dois desenhos e ache as diferenças."
+        )
+        base_artwork = _provider_artwork_path(output_path)
+        variant_artwork = base_artwork.with_suffix(".variant.png")
+        base_panel = base_artwork.with_suffix(".base-panel.png")
+        variant_panel = base_artwork.with_suffix(".variant-panel.png")
+        try:
+            _persist_page_image(
+                self._generate_activity_artwork(
+                    activity_artwork_prompt(
+                        activity_type="spot_the_difference",
+                        landmark_name=name,
+                        city=city,
+                        country=country,
+                        age_complexity=age_complexity,
+                        has_landmark_reference=(
+                            landmark_reference is not None or landmark_page_reference is not None
+                        ),
+                        has_revision_reference=reference_page is not None,
+                        revision_instruction=revision_instruction,
+                    ),
+                    _activity_references(
+                        landmark_reference, landmark_page_reference, reference_page
+                    ),
+                ),
+                base_artwork,
+            )
+            crop_scene_for_panel(base_artwork, base_panel)
+            regions = self._spot_the_difference_variant(
+                landmark_name=name,
+                base_artwork=base_artwork,
+                variant_artwork=variant_artwork,
+                base_panel=base_panel,
+                variant_panel=variant_panel,
+            )
+            return compose_spot_the_difference_page(
+                base_panel,
+                variant_panel,
+                output_path,
+                landmark_name=name,
+                instruction=instruction,
+                regions=regions,
+            )
+        except SpotTheDifferenceError as error:
+            raise PageGenerationError(str(error)) from error
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar o ache os erros.") from error
+        finally:
+            for path in (base_artwork, variant_artwork, base_panel, variant_panel):
+                path.unlink(missing_ok=True)
+
+    def _spot_the_difference_variant(
+        self,
+        *,
+        landmark_name: str,
+        base_artwork: Path,
+        variant_artwork: Path,
+        base_panel: Path,
+        variant_panel: Path,
+    ) -> list[DifferenceRegion]:
+        """Ask for the edited copy, retrying once when the edit is unusable.
+
+        A falha é aleatória — a mesma instrução já devolveu uma alteração só e
+        uma cena inteira redesenhada —, então uma segunda tentativa vale mais
+        que recusar a página de primeira.
+        """
+
+        last_error: SpotTheDifferenceError | None = None
+        for _attempt in range(SPOT_DIFFERENCE_ATTEMPTS):
+            _persist_page_image(
+                self._edit_with_references(
+                    spot_the_difference_variant_prompt(landmark_name=landmark_name),
+                    [base_artwork],
+                ),
+                variant_artwork,
+            )
+            crop_scene_for_panel(variant_artwork, variant_panel)
+            try:
+                return find_difference_regions(base_panel, variant_panel)
+            except SpotTheDifferenceError as error:
+                last_error = error
+        raise last_error or SpotTheDifferenceError("A arte não gerou diferenças utilizáveis.")
 
     def generate_language_page(
         self,
@@ -1642,6 +1753,25 @@ WRITING_ACTIVITY_TITLES = {
     "here_vs_home": HERE_VS_HOME_TITLE,
 }
 
+def spot_the_difference_variant_prompt(*, landmark_name: str) -> str:
+    """Ask for exactly the kind of change a child can spot side by side."""
+
+    return f"""
+Return the same illustration of {landmark_name}, changed in exactly {MIN_DIFFERENCES + 1} places.
+Keep the framing, the palette, the style and the landmark itself pixel-for-pixel identical.
+
+Each of the {MIN_DIFFERENCES + 1} changes must be BOLD AND OBVIOUS at a glance, and must be a
+whole separate object, not a detail: delete an entire object so only background remains, add a
+whole new object where there was only background, or repaint one whole object in a strongly
+contrasting colour. Every changed object must be at least as large as one twelfth of the image
+width, and the changes must sit far apart from each other across the whole picture.
+
+Subtle edits, texture changes, shifted positions and edits smaller than that are failures.
+Do not redraw, restyle or recolour anything else. Do not add any letter, number, word, arrow,
+circle, marker or caption.
+""".strip()
+
+
 _WRITING_ARTWORK_CONTRACT = (
     "Create a decorative border-only illustration for a writing page: {motif}, arranged around "
     "the outer edges as a calm watercolor frame. Keep the entire central 80 percent pale, plain "
@@ -1695,6 +1825,11 @@ def activity_artwork_prompt(
         ),
         # As páginas de escrever recebem painéis opacos por cima: a arte só
         # aparece como moldura, então detalhe no centro seria desperdiçado.
+        "spot_the_difference": (
+            "Create one wide, cheerful watercolor scene of the landmark with a handful of large, "
+            "clearly separated elements — a bird, a balloon, a bench, a flag, a tree, a cloud — "
+            "spread around it on a calm background. Keep the composition simple and uncluttered."
+        ),
         "language_survival": (
             "Create a decorative phrasebook background: a small recognizable watercolor landmark "
             "vignette near the bottom edge and speech-bubble motifs around the perimeter. Keep "

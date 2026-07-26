@@ -55,6 +55,7 @@ from minerva_travel.activity_page_compositor import (
     PAINTING_TITLE,
     PASSPORT_TITLE,
     POSTCARD_TITLE,
+    SPOT_DIFFERENCE_TITLE,
     TRAVEL_DIARY_TITLE,
     WORD_SEARCH_TITLE,
     coloring_instruction_for,
@@ -2202,6 +2203,7 @@ _ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
     "postcard": POSTCARD_TITLE,
     "passport_stamp": PASSPORT_TITLE,
     "language_survival": LANGUAGE_TITLE,
+    "spot_the_difference": SPOT_DIFFERENCE_TITLE,
 }
 
 WRITING_ACTIVITY_TYPES: frozenset[str] = frozenset(
@@ -2624,6 +2626,7 @@ def _activity_spec(
             "Cole aqui o bilhete de entrada ou o carimbo que você ganhou."
         ),
         "language_survival": "Cinco frases para você pedir sozinho, sem precisar dos pais.",
+        "spot_the_difference": "Compare os dois desenhos e ache as diferenças.",
     }
     spec: dict[str, Any] = {
         "instruction": instructions[activity_type],
@@ -3458,6 +3461,8 @@ def generate_builder_page_attempt(
                 generator.generate_word_search_page(**common_activity_kwargs)
             elif activity_type == "drawing":
                 generator.generate_drawing_page(**common_activity_kwargs)
+            elif activity_type == "spot_the_difference":
+                generator.generate_spot_the_difference_page(**common_activity_kwargs)
             elif activity_type == "language_survival":
                 generator.generate_language_page(**common_activity_kwargs)
             elif activity_type == "postcard":

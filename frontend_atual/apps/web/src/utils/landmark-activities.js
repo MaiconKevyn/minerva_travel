@@ -16,6 +16,7 @@ export const OPTIONAL_LANDMARK_ACTIVITY_TYPES = [
   'postcard',
   'passport_stamp',
   'language_survival',
+  'spot_the_difference',
 ];
 
 export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2;
@@ -130,6 +131,16 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     durationLabel: '15–20 min',
     materialLabel: 'Lápis',
     preview: '/activity-examples/cryptogram-real.webp',
+  },
+  {
+    type: 'spot_the_difference',
+    category: 'puzzle',
+    label: 'Ache os erros',
+    description: 'Dois desenhos do lugar com seis diferenças conferidas uma a uma antes de imprimir.',
+    ageLabel: '6+',
+    durationLabel: '10–15 min',
+    materialLabel: 'Lápis',
+    preview: '/activity-examples/spot-the-difference-real.webp',
   },
   {
     type: 'coloring',

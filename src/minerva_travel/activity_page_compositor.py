@@ -27,6 +27,7 @@ from minerva_travel.puzzles import (
     AnagramEntry,
     Cryptogram,
 )
+from minerva_travel.spot_the_difference import DifferenceRegion
 
 PAGE_IMAGE_SIZE = (1024, 1536)
 INK = "#153451"
@@ -44,6 +45,12 @@ DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
 PAINTING_TITLE = "Minha pintura"
 INVESTIGATOR_TITLE = "Investigador"
+SPOT_DIFFERENCE_TITLE = "Ache os erros"
+# O painel é largo e a arte é alta: a cena precisa ser cortada antes de
+# validar, senão contaríamos diferenças que o corte esconde da criança.
+SPOT_PANEL_SIZE = (884, 470)
+SPOT_PANEL_GAP = 40
+SPOT_PANEL_TOP = 300
 LANGUAGE_TITLE = "Sobrevivência no idioma"
 POSTCARD_TITLE = "Cartão-postal"
 POSTCARD_REGION = (600, 1480)
@@ -495,6 +502,92 @@ def _writing_layout(fields: Sequence[tuple[str, int]]) -> tuple[int, int]:
 
 def _writing_field_height(rule_count: int, spacing: int) -> int:
     return WRITING_LABEL_BAND + rule_count * spacing + WRITING_FIELD_PADDING
+
+
+def compose_spot_the_difference_page(
+    base_path: Path,
+    variant_path: Path,
+    output_path: Path,
+    *,
+    landmark_name: str,
+    instruction: str,
+    regions: Sequence[DifferenceRegion],
+) -> Path:
+    """Stack the two scenes with a counted checklist the child ticks off."""
+
+    if not regions:
+        raise ActivityPageCompositionError("A página de erros não tem diferenças confirmadas.")
+
+    base = _load_panel_scene(base_path)
+    variant = _load_panel_scene(variant_path)
+    if base.size != variant.size:
+        raise ActivityPageCompositionError("As duas cenas não têm o mesmo recorte.")
+    image = Image.new("RGB", PAGE_IMAGE_SIZE, PAPER)
+    draw = ImageDraw.Draw(image)
+    _puzzle_header(draw, SPOT_DIFFERENCE_TITLE, landmark_name, instruction)
+
+    panel_width, panel_height = SPOT_PANEL_SIZE
+    for index, scene in enumerate((base, variant)):
+        top = SPOT_PANEL_TOP + index * (panel_height + SPOT_PANEL_GAP)
+        image.paste(scene.resize(SPOT_PANEL_SIZE, Image.LANCZOS), (70, top))
+        draw.rectangle(
+            (70, top, 70 + panel_width, top + panel_height), outline=INK, width=4
+        )
+        badge = "1" if index == 0 else "2"
+        draw.ellipse((80, top + 10, 128, top + 58), fill=ACCENT, outline=ACCENT)
+        _draw_centered_fit_box(
+            draw, badge, (84, top + 14, 124, top + 54), maximum_size=28, minimum_size=16, bold=True
+        )
+
+    checklist_top = SPOT_PANEL_TOP + 2 * (panel_height + SPOT_PANEL_GAP)
+    _panel(draw, (54, checklist_top, 970, 1490), radius=22)
+    draw.text(
+        (92, checklist_top + 24),
+        f"Marque cada diferença que encontrar ({len(regions)} no total):",
+        font=_font(24, bold=True),
+        fill=INK,
+    )
+    box_size = 44
+    for index in range(len(regions)):
+        x = 92 + (index % 6) * 142
+        y = checklist_top + 84 + (index // 6) * 70
+        draw.rounded_rectangle(
+            (x, y, x + box_size, y + box_size), radius=6, outline=INK, width=4, fill="white"
+        )
+        draw.text((x + box_size + 12, y + 8), str(index + 1), font=_font(26, bold=True), fill=INK)
+    return _atomic_save(image, output_path)
+
+
+def _load_panel_scene(path: Path) -> Image.Image:
+    """Load a scene already cropped to the panel aspect by crop_scene_for_panel."""
+
+    try:
+        with Image.open(path) as opened:
+            if opened.format != "PNG":
+                raise ActivityPageCompositionError("A cena dos erros não é PNG.")
+            scene = opened.convert("RGB")
+    except (UnidentifiedImageError, OSError) as error:
+        raise ActivityPageCompositionError("A cena dos erros é inválida.") from error
+    panel_width, panel_height = SPOT_PANEL_SIZE
+    if abs(scene.width / scene.height - panel_width / panel_height) > 0.02:
+        raise ActivityPageCompositionError("A cena dos erros não tem o recorte do painel.")
+    return scene
+
+
+def crop_scene_for_panel(artwork_path: Path, output_path: Path) -> Path:
+    """Crop tall page artwork to the printed panel's aspect, before validation.
+
+    Validar a arte inteira contaria diferenças fora do recorte impresso, e a
+    criança procuraria por um erro que não está na página dela.
+    """
+
+    scene = _load_artwork(artwork_path)
+    width, height = scene.size
+    panel_width, panel_height = SPOT_PANEL_SIZE
+    crop_height = min(height, int(width * panel_height / panel_width))
+    top = (height - crop_height) // 2
+    scene.crop((0, top, width, top + crop_height)).save(output_path, "PNG")
+    return output_path
 
 
 def compose_language_page(

@@ -436,7 +436,8 @@
               "dot_to_dot",
               "postcard",
               "passport_stamp",
-              "language_survival"
+              "language_survival",
+              "spot_the_difference"
             ],
             "title": "Activity Type",
             "type": "string"
@@ -708,7 +709,8 @@
                   "dot_to_dot",
                   "postcard",
                   "passport_stamp",
-                  "language_survival"
+                  "language_survival",
+                  "spot_the_difference"
                 ],
                 "type": "string"
               },
@@ -8457,6 +8459,7 @@
     "dot_to_dot",
     "postcard",
     "passport_stamp",
-    "language_survival"
+    "language_survival",
+    "spot_the_difference"
   ]
 }
