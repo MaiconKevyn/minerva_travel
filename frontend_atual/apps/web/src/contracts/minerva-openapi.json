@@ -425,7 +425,10 @@
               "investigator",
               "detail_hunt",
               "word_search",
-              "drawing"
+              "drawing",
+              "newspaper_headline",
+              "travel_diary",
+              "here_vs_home"
             ],
             "title": "Activity Type",
             "type": "string"
@@ -686,7 +689,10 @@
                   "investigator",
                   "detail_hunt",
                   "word_search",
-                  "drawing"
+                  "drawing",
+                  "newspaper_headline",
+                  "travel_diary",
+                  "here_vs_home"
                 ],
                 "type": "string"
               },
@@ -8424,6 +8430,9 @@
     "investigator",
     "detail_hunt",
     "word_search",
-    "drawing"
+    "drawing",
+    "newspaper_headline",
+    "travel_diary",
+    "here_vs_home"
   ]
 }

@@ -5,70 +5,144 @@ export const OPTIONAL_LANDMARK_ACTIVITY_TYPES = [
   'coloring',
   'family_coloring',
   'investigator',
+  'newspaper_headline',
+  'travel_diary',
+  'here_vs_home',
 ];
 
 export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2;
 export const MAX_OPTIONAL_ACTIVITIES_PER_GUIDE = 8;
 
+/**
+ * Onde a atividade acontece. Com poucas opções a lista corrida bastava; com o
+ * catálogo cheio, o pai precisa saber num relance o que dá para fazer em pé na
+ * fila e o que precisa de mesa e lápis de cor.
+ */
+export const ACTIVITY_CATEGORIES = [
+  {
+    id: 'onsite',
+    label: 'No lugar',
+    hint: 'Para fazer em pé, durante a visita.',
+  },
+  {
+    id: 'puzzle',
+    label: 'Quebra-cabeças',
+    hint: 'Para a espera, o avião ou a noite no hotel.',
+  },
+  {
+    id: 'art',
+    label: 'Arte',
+    hint: 'Precisa de mesa e lápis de cor.',
+  },
+  {
+    id: 'writing',
+    label: 'Escrever e lembrar',
+    hint: 'Para quem já escreve sozinho.',
+  },
+];
+
 export const LANDMARK_ACTIVITY_OPTIONS = [
   {
     type: 'detail_hunt',
+    category: 'onsite',
     label: 'Caça aos detalhes',
     description: 'Observe a ilustração e marque detalhes especiais do lugar.',
-    ageLabel: 'A partir de 5 anos',
+    ageLabel: '5+',
     durationLabel: '5–10 min',
     materialLabel: 'Lápis',
     preview: '/activity-examples/detail-hunt-real.webp',
   },
   {
-    type: 'word_search',
-    label: 'Caça-palavras',
-    description: 'Encontre palavras ligadas ao ponto turístico e à cidade.',
-    ageLabel: 'A partir de 6 anos',
-    durationLabel: '10–15 min',
-    materialLabel: 'Lápis',
-    preview: '/activity-examples/word-search-real.webp',
-  },
-  {
-    type: 'drawing',
-    label: 'Minha pintura',
-    description: 'Use o espaço em branco para criar uma pintura do lugar do seu jeito.',
-    ageLabel: 'A partir de 4 anos',
-    durationLabel: '10–20 min',
-    materialLabel: 'Tinta, pincel ou lápis de cor',
-    preview: '/activity-examples/painting-real.webp',
-  },
-  {
-    type: 'coloring',
-    label: 'Página para colorir',
-    description:
-      'Um desenho do ponto turístico com traços limpos, formas grandes e uma frase personalizada para colorir.',
-    ageLabel: 'A partir de 4 anos',
-    durationLabel: '15–25 min',
-    materialLabel: 'Lápis de cor',
-    preview: '/activity-examples/coloring-real.webp',
-  },
-  {
     type: 'investigator',
+    category: 'onsite',
     label: 'Investigador',
     description:
       'Cada criança recebe uma pista e uma missão diferente, adaptada à idade e ao ponto turístico.',
-    ageLabel: 'Para todas as idades',
+    ageLabel: 'Todas',
     durationLabel: '10–20 min',
     materialLabel: 'Lápis',
     preview: '/activity-examples/investigator-real.webp',
   },
   {
+    type: 'word_search',
+    category: 'puzzle',
+    label: 'Caça-palavras',
+    description: 'Encontre palavras ligadas ao ponto turístico e à cidade.',
+    ageLabel: '6+',
+    durationLabel: '10–15 min',
+    materialLabel: 'Lápis',
+    preview: '/activity-examples/word-search-real.webp',
+  },
+  {
+    type: 'coloring',
+    category: 'art',
+    label: 'Página para colorir',
+    description:
+      'Um desenho do ponto turístico com traços limpos, formas grandes e uma frase personalizada para colorir.',
+    ageLabel: '4+',
+    durationLabel: '15–25 min',
+    materialLabel: 'Lápis de cor',
+    preview: '/activity-examples/coloring-real.webp',
+  },
+  {
     type: 'family_coloring',
+    category: 'art',
     label: 'Família de férias para colorir',
     description:
       'Usa a foto enviada como referência para transformar a família em um desenho fofo de férias no ponto turístico.',
-    ageLabel: 'A partir de 4 anos',
+    ageLabel: '4+',
     durationLabel: '15–25 min',
     materialLabel: 'Lápis de cor',
     preview: '/activity-examples/family-coloring-real.webp',
   },
+  {
+    type: 'drawing',
+    category: 'art',
+    label: 'Minha pintura',
+    description: 'Use o espaço em branco para criar uma pintura do lugar do seu jeito.',
+    ageLabel: '4+',
+    durationLabel: '10–20 min',
+    materialLabel: 'Tinta ou lápis',
+    preview: '/activity-examples/painting-real.webp',
+  },
+  {
+    type: 'travel_diary',
+    category: 'writing',
+    label: 'Diário do dia',
+    description:
+      'Melhor momento, a surpresa do dia, uma palavra nova aprendida e a nota da criança.',
+    ageLabel: '8+',
+    durationLabel: '10–15 min',
+    materialLabel: 'Caneta',
+    preview: '/activity-examples/travel-diary-real.webp',
+  },
+  {
+    type: 'newspaper_headline',
+    category: 'writing',
+    label: 'Manchete do jornal',
+    description: 'A criança vira repórter do ponto turístico e escreve a manchete da visita.',
+    ageLabel: '9+',
+    durationLabel: '10–15 min',
+    materialLabel: 'Caneta',
+    preview: '/activity-examples/newspaper-headline-real.webp',
+  },
+  {
+    type: 'here_vs_home',
+    category: 'writing',
+    label: 'Aqui e na minha rua',
+    description: 'Compara as ruas e as casas do destino com a rua onde a criança mora.',
+    ageLabel: '8+',
+    durationLabel: '10–15 min',
+    materialLabel: 'Caneta',
+    preview: '/activity-examples/here-vs-home-real.webp',
+  },
 ];
+
+export const activityOptionsByCategory = (options = LANDMARK_ACTIVITY_OPTIONS) =>
+  ACTIVITY_CATEGORIES.map((category) => ({
+    ...category,
+    options: options.filter((option) => option.category === category.id),
+  })).filter((category) => category.options.length > 0);
 
 const allowedTypes = new Set(OPTIONAL_LANDMARK_ACTIVITY_TYPES);
 

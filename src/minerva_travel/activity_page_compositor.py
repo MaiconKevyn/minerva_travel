@@ -34,6 +34,26 @@ DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
 PAINTING_TITLE = "Minha pintura"
 INVESTIGATOR_TITLE = "Investigador"
+NEWSPAPER_HEADLINE_TITLE = "Manchete do jornal"
+TRAVEL_DIARY_TITLE = "Diário do dia"
+HERE_VS_HOME_TITLE = "Aqui e na minha rua"
+
+# Geometria única das páginas de escrever. Manchete, diário e comparação só
+# diferem no texto: repetir três layouts quase iguais desalinharia as pautas
+# entre as páginas do mesmo caderno.
+WRITING_BODY_REGION = (54, 290, 970, 1496)
+WRITING_LABEL_OFFSET = 22
+WRITING_LABEL_BAND = 52
+# Entre ~1,1 cm e ~1,8 cm impressos. A folga cresce até preencher a página:
+# pauta apertada com um terço da folha vazio parece página inacabada.
+WRITING_MIN_RULE_SPACING = 58
+WRITING_MAX_RULE_SPACING = 104
+WRITING_FIELD_PADDING = 16
+WRITING_MIN_FIELD_GAP = 18
+# Folga maior que isso solta os painéis uns dos outros e a página deixa de
+# parecer uma folha só.
+WRITING_MAX_FIELD_GAP = 56
+WRITING_MAX_FIELDS = 5
 INVESTIGATOR_INSTRUCTION = (
     "Cada criança tem uma missão secreta. Observem com atenção e trabalhem em equipe!"
 )
@@ -357,6 +377,100 @@ def compose_drawing_page(
     draw.text((96, 1401), "Data:", font=_font(23, bold=True), fill=INK)
     draw.line((172, 1431, 430, 1431), fill=INK, width=3)
     return _atomic_save(image, output_path, blank_regions=[DRAWING_BLANK_REGION])
+
+
+def compose_writing_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    title: str,
+    subtitle: str,
+    instruction: str,
+    fields: Sequence[tuple[str, int]],
+) -> Path:
+    """Compose a ruled writing page from exact labels and line counts.
+
+    ``fields`` pairs each printed label with how many ruled lines follow it.
+    The page fails to build rather than silently cropping: a child who runs
+    out of room mid-sentence is a worse outcome than a rejected layout.
+    """
+
+    normalized_fields = _validated_writing_fields(fields)
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+
+    _panel(draw, (38, 34, 986, 262))
+    _draw_centered_fit(draw, _bounded(title, "title", 60), 50, 52, 34, 884, bold=True)
+    _draw_centered_fit(draw, _bounded(subtitle, "subtitle", 100), 122, 33, 20, 884, bold=True)
+    _draw_wrapped(
+        draw,
+        _bounded(instruction, "instruction", 240),
+        (82, 178, 942, 250),
+        font=_font(24),
+        fill=MUTED_INK,
+        align="center",
+    )
+
+    left, top, right, bottom = WRITING_BODY_REGION
+    spacing, gap = _writing_layout(normalized_fields)
+    y = top
+    blank_regions: list[tuple[int, int, int, int]] = []
+    for label, rule_count in normalized_fields:
+        height = _writing_field_height(rule_count, spacing)
+        _panel(draw, (left, y, right, y + height), radius=22)
+        draw.text((left + 34, y + WRITING_LABEL_OFFSET), label, font=_font(25, bold=True), fill=INK)
+        first_rule = y + WRITING_LABEL_BAND + spacing
+        for index in range(rule_count):
+            rule_y = first_rule + index * spacing
+            draw.line((left + 34, rule_y, right - 34, rule_y), fill=PANEL_OUTLINE, width=3)
+        # Conferimos a faixa entre o rótulo e a primeira pauta: é escrita de
+        # verdade e não contém régua, então dá para exigir branco puro ali.
+        blank_regions.append((left + 40, y + WRITING_LABEL_BAND + 4, right - 40, first_rule - 6))
+        y += height + gap
+
+    if y - gap > bottom:
+        raise ActivityPageCompositionError("Os campos de escrita não cabem na página.")
+    return _atomic_save(image, output_path, blank_regions=blank_regions)
+
+
+def _validated_writing_fields(fields: Sequence[tuple[str, int]]) -> list[tuple[str, int]]:
+    normalized = [(" ".join(str(label).split()), int(count)) for label, count in fields]
+    if not 1 <= len(normalized) <= WRITING_MAX_FIELDS:
+        raise ActivityPageCompositionError("Quantidade inválida de campos de escrita.")
+    if any(not label or len(label) > 90 for label, _count in normalized):
+        raise ActivityPageCompositionError("Rótulo inválido em um campo de escrita.")
+    if any(not 1 <= count <= 6 for _label, count in normalized):
+        raise ActivityPageCompositionError("Número de linhas inválido em um campo de escrita.")
+    if len({label for label, _count in normalized}) != len(normalized):
+        raise ActivityPageCompositionError("Rótulos duplicados nos campos de escrita.")
+    _writing_layout(normalized)
+    return normalized
+
+
+def _writing_layout(fields: Sequence[tuple[str, int]]) -> tuple[int, int]:
+    """Pick the rule spacing and field gap that fill the page without overflowing.
+
+    Linhas mais largas cabem letras maiores, então a folga cresce até o teto
+    antes de sobrar espaço em branco no rodapé.
+    """
+
+    _left, top, _right, bottom = WRITING_BODY_REGION
+    available = bottom - top
+    rules = sum(count for _label, count in fields)
+    fixed = len(fields) * (WRITING_LABEL_BAND + WRITING_FIELD_PADDING)
+    slack = available - fixed - WRITING_MIN_FIELD_GAP * (len(fields) - 1)
+    if slack < rules * WRITING_MIN_RULE_SPACING:
+        raise ActivityPageCompositionError("Os campos de escrita não cabem na página.")
+
+    spacing = min(WRITING_MAX_RULE_SPACING, slack // rules)
+    used = fixed + rules * spacing
+    gaps = max(1, len(fields) - 1)
+    gap = min(WRITING_MAX_FIELD_GAP, (available - used) // gaps)
+    return spacing, max(WRITING_MIN_FIELD_GAP, gap)
+
+
+def _writing_field_height(rule_count: int, spacing: int) -> int:
+    return WRITING_LABEL_BAND + rule_count * spacing + WRITING_FIELD_PADDING
 
 
 def compose_best_memory_page(

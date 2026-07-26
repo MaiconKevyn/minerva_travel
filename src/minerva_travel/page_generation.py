@@ -19,6 +19,9 @@ import httpx
 from PIL import Image, UnidentifiedImageError
 
 from minerva_travel.activity_page_compositor import (
+    HERE_VS_HOME_TITLE,
+    NEWSPAPER_HEADLINE_TITLE,
+    TRAVEL_DIARY_TITLE,
     ActivityPageCompositionError,
     compose_best_memory_page,
     compose_coloring_page,
@@ -29,6 +32,7 @@ from minerva_travel.activity_page_compositor import (
     compose_investigator_page,
     compose_landmark_visited_checkbox,
     compose_word_search_page,
+    compose_writing_page,
 )
 from minerva_travel.config import (
     openai_activity_model,
@@ -742,6 +746,61 @@ class OpenAIGuidePageGenerator:
         finally:
             artwork.unlink(missing_ok=True)
 
+    def generate_writing_page(
+        self,
+        *,
+        activity_type: str,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        """Render one ruled writing page. Title, prompt and fields come from the spec."""
+
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        title = _bounded_mapping_text(
+            activity_spec,
+            ("title",),
+            default=WRITING_ACTIVITY_TITLES[activity_type],
+            maximum=60,
+        )
+        instruction = _activity_instruction(activity_spec, default=f"Escreva sobre {name}.")
+        fields = _writing_fields(activity_spec)
+        prompt = activity_artwork_prompt(
+            activity_type=activity_type,
+            landmark_name=name,
+            city=city,
+            country=country,
+            age_complexity=age_complexity,
+            has_landmark_reference=(
+                landmark_reference is not None or landmark_page_reference is not None
+            ),
+            has_revision_reference=reference_page is not None,
+            revision_instruction=revision_instruction,
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                prompt,
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_writing_page(
+                artwork,
+                output_path,
+                title=title,
+                subtitle=name,
+                instruction=instruction,
+                fields=fields,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar a página de escrita.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
     def generate_best_memory_page(
         self,
         *,
@@ -1140,6 +1199,20 @@ mockup border or UI. Output the finished flat guide page.
 """.strip()
 
 
+WRITING_ACTIVITY_TITLES = {
+    "newspaper_headline": NEWSPAPER_HEADLINE_TITLE,
+    "travel_diary": TRAVEL_DIARY_TITLE,
+    "here_vs_home": HERE_VS_HOME_TITLE,
+}
+
+_WRITING_ARTWORK_CONTRACT = (
+    "Create a decorative border-only illustration for a writing page: {motif}, arranged around "
+    "the outer edges as a calm watercolor frame. Keep the entire central 80 percent pale, plain "
+    "and free of detail — trusted code paints opaque ruled panels over it. Do not draw lines, "
+    "rules, boxes, paper sheets or writing areas anywhere."
+)
+
+
 def activity_artwork_prompt(
     *,
     activity_type: str,
@@ -1182,6 +1255,18 @@ def activity_artwork_prompt(
             "vignette near the perimeter plus a simple paint palette and two clean brushes. Keep "
             "the large central 70 percent completely empty and pure white as a blank painting "
             "canvas. Do not paint, sketch, trace, shade, or place guide marks inside that canvas."
+        ),
+        # As páginas de escrever recebem painéis opacos por cima: a arte só
+        # aparece como moldura, então detalhe no centro seria desperdiçado.
+        "newspaper_headline": _WRITING_ARTWORK_CONTRACT.format(
+            motif="a vintage newspaper stand, a rolled newspaper and a small printing ornament"
+        ),
+        "travel_diary": _WRITING_ARTWORK_CONTRACT.format(
+            motif="a travel journal, a pen and a few pressed leaves or ticket stubs"
+        ),
+        "here_vs_home": _WRITING_ARTWORK_CONTRACT.format(
+            motif="two small facing vignettes, the landmark on one side and a simple cozy "
+            "residential street on the other"
         ),
     }
     try:
@@ -1683,6 +1768,24 @@ def _detail_hunt_clues(specification: dict[str, Any], landmark_name: str) -> lis
     if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
         raise PageGenerationError("As pistas do caça aos detalhes são inválidas.")
     return raw
+
+
+def _writing_fields(specification: dict[str, Any]) -> list[tuple[str, int]]:
+    """Read the exact printed labels and their line counts from the activity spec."""
+
+    raw = specification.get("fields")
+    if not isinstance(raw, list) or not raw:
+        raise PageGenerationError("Os campos da página de escrita são inválidos.")
+    fields: list[tuple[str, int]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise PageGenerationError("Os campos da página de escrita são inválidos.")
+        label = item.get("label")
+        lines = item.get("lines")
+        if not isinstance(label, str) or not isinstance(lines, int) or isinstance(lines, bool):
+            raise PageGenerationError("Os campos da página de escrita são inválidos.")
+        fields.append((label, lines))
+    return fields
 
 
 def _word_search_vocabulary(

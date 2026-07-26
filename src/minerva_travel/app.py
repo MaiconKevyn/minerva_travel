@@ -40,11 +40,14 @@ from minerva_travel.activity_page_compositor import (
     COLORING_TITLE,
     DETAIL_HUNT_TITLE,
     FAMILY_COLORING_TITLE,
+    HERE_VS_HOME_TITLE,
     HOMECOMING_REQUIRED_COPY,
     INVESTIGATOR_INSTRUCTION,
     INVESTIGATOR_TITLE,
     LANDMARK_VISITED_LABEL,
+    NEWSPAPER_HEADLINE_TITLE,
     PAINTING_TITLE,
+    TRAVEL_DIARY_TITLE,
     WORD_SEARCH_TITLE,
     coloring_instruction_for,
     family_coloring_instruction_for,
@@ -2178,7 +2181,44 @@ _ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
     "detail_hunt": DETAIL_HUNT_TITLE,
     "word_search": WORD_SEARCH_TITLE,
     "drawing": PAINTING_TITLE,
+    "newspaper_headline": NEWSPAPER_HEADLINE_TITLE,
+    "travel_diary": TRAVEL_DIARY_TITLE,
+    "here_vs_home": HERE_VS_HOME_TITLE,
 }
+
+WRITING_ACTIVITY_TYPES: frozenset[str] = frozenset(
+    {"newspaper_headline", "travel_diary", "here_vs_home"}
+)
+
+
+def _writing_activity_fields(
+    activity_type: OptionalLandmarkActivityType,
+    landmark: LandmarkActivityContext,
+) -> list[dict[str, Any]]:
+    """Exact printed labels per writing activity, anchored to this landmark.
+
+    Cada rótulo cita o lugar ou a cidade: uma folha pautada genérica não
+    lembraria nada da viagem seis meses depois.
+    """
+
+    place = landmark.city or landmark.name
+    if activity_type == "newspaper_headline":
+        return [
+            {"label": f"A manchete sobre {landmark.name} é:", "lines": 2},
+            {"label": "O que aconteceu na visita:", "lines": 4},
+            {"label": "Quem estava lá comigo:", "lines": 2},
+        ]
+    if activity_type == "travel_diary":
+        return [
+            {"label": "O melhor momento de hoje foi:", "lines": 3},
+            {"label": f"Uma coisa que me surpreendeu em {place}:", "lines": 3},
+            {"label": "Uma palavra nova que eu aprendi:", "lines": 2},
+        ]
+    return [
+        {"label": f"Em {place} as ruas e as casas são:", "lines": 3},
+        {"label": "Na minha rua elas são:", "lines": 3},
+        {"label": "Uma coisa que existe aqui e não existe lá:", "lines": 2},
+    ]
 
 
 def _activity_complexity_for_ages(
@@ -2469,11 +2509,21 @@ def _activity_spec(
         "detail_hunt": f"Observe {landmark.name} e marque cada detalhe que encontrar.",
         "word_search": f"Encontre no quadro as palavras ligadas a {landmark.name}.",
         "drawing": (f"Agora é a sua vez de criar uma pintura de {landmark.name} do seu jeito."),
+        "newspaper_headline": (
+            f"Você é o repórter de {landmark.name}. Escreva a manchete da sua visita."
+        ),
+        "travel_diary": f"Conte como foi o seu dia em {landmark.city or landmark.name}.",
+        "here_vs_home": (
+            f"Compare {landmark.city or landmark.name} com a rua onde você mora."
+        ),
     }
     spec: dict[str, Any] = {
         "instruction": instructions[activity_type],
         "prompt": instructions[activity_type],
     }
+    if activity_type in WRITING_ACTIVITY_TYPES:
+        spec["title"] = _ACTIVITY_LABELS[activity_type]
+        spec["fields"] = _writing_activity_fields(activity_type, landmark)
     if activity_type == "detail_hunt":
         spec["clues"] = [
             "Uma forma geométrica interessante",
@@ -2536,6 +2586,8 @@ def _builder_activity_page(
         required_copy.insert(1, family_title)
     elif activity_type == "investigator":
         required_copy.extend([f"Missão de {child.name}" for child in children or []] + ["Concluí"])
+    elif activity_type in WRITING_ACTIVITY_TYPES:
+        required_copy.extend(str(field["label"]) for field in spec["fields"])
     return BuilderPage(
         id=f"activity-{landmark.itinerary_order}-{activity_type.replace('_', '-')}",
         kind="landmark_activity",
@@ -3273,6 +3325,11 @@ def generate_builder_page_attempt(
                 generator.generate_word_search_page(**common_activity_kwargs)
             elif activity_type == "drawing":
                 generator.generate_drawing_page(**common_activity_kwargs)
+            elif activity_type in WRITING_ACTIVITY_TYPES:
+                generator.generate_writing_page(
+                    **common_activity_kwargs,
+                    activity_type=activity_type,
+                )
             else:
                 raise PageGenerationError("Tipo de atividade não suportado.")
         elif page_kind == "best_memory":

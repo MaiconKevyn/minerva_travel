@@ -24,7 +24,8 @@ test('painting replaces the free drawing activity without changing persisted typ
   assert.equal(painting.label, 'Minha pintura');
   assert.equal(painting.preview, '/activity-examples/painting-real.webp');
   assert.match(painting.description, /criar uma pintura/);
-  assert.match(painting.materialLabel, /Tinta, pincel/);
+  // O rótulo encurtou para caber no card compacto, mas segue anunciando tinta.
+  assert.match(painting.materialLabel, /Tinta/);
 });
 
 test('family vacation coloring uses the private family photo and an original visual description', () => {
