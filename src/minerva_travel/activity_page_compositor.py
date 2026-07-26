@@ -17,6 +17,12 @@ from minerva_travel.investigator_activity import (
     InvestigatorChildProfile,
     InvestigatorMission,
 )
+from minerva_travel.puzzles import (
+    ANAGRAM_MAX_WORDS,
+    ANAGRAM_MIN_WORDS,
+    AnagramEntry,
+    Cryptogram,
+)
 
 PAGE_IMAGE_SIZE = (1024, 1536)
 INK = "#153451"
@@ -34,6 +40,8 @@ DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
 PAINTING_TITLE = "Minha pintura"
 INVESTIGATOR_TITLE = "Investigador"
+ANAGRAM_TITLE = "Palavras embaralhadas"
+CRYPTOGRAM_TITLE = "Código secreto"
 NEWSPAPER_HEADLINE_TITLE = "Manchete do jornal"
 TRAVEL_DIARY_TITLE = "Diário do dia"
 HERE_VS_HOME_TITLE = "Aqui e na minha rua"
@@ -471,6 +479,203 @@ def _writing_layout(fields: Sequence[tuple[str, int]]) -> tuple[int, int]:
 
 def _writing_field_height(rule_count: int, spacing: int) -> int:
     return WRITING_LABEL_BAND + rule_count * spacing + WRITING_FIELD_PADDING
+
+
+def compose_anagram_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    landmark_name: str,
+    instruction: str,
+    entries: Sequence[AnagramEntry],
+) -> Path:
+    """Print scrambled travel words with one lettered box per answer letter."""
+
+    if not ANAGRAM_MIN_WORDS <= len(entries) <= ANAGRAM_MAX_WORDS:
+        raise ActivityPageCompositionError("O anagrama não possui palavras suficientes.")
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _puzzle_header(draw, ANAGRAM_TITLE, landmark_name, instruction)
+
+    top, bottom = 300, 1490
+    row_height = min(206, (bottom - top) // len(entries))
+    for index, entry in enumerate(entries):
+        y = top + index * row_height
+        _panel(draw, (54, y, 970, y + row_height - 16), radius=22)
+        draw.text((92, y + 22), entry.scrambled, font=_font(46, bold=True), fill=ACCENT)
+        _draw_answer_boxes(draw, entry.answer, top=y + 88, hint=entry.hint)
+    return _atomic_save(image, output_path)
+
+
+def _draw_answer_boxes(draw: ImageDraw.ImageDraw, answer: str, *, top: int, hint: str) -> None:
+    size = min(58, 820 // max(len(answer), 1))
+    left = 92
+    for position, _letter in enumerate(answer):
+        x = left + position * (size + 8)
+        draw.rounded_rectangle(
+            (x, top, x + size, top + size), radius=6, fill="white", outline=INK, width=3
+        )
+    # A primeira letra vem impressa: sem ela a criança trava na palavra maior.
+    bbox = draw.textbbox((0, 0), hint, font=_font(int(size * 0.62), bold=True))
+    draw.text(
+        (left + (size - (bbox[2] - bbox[0])) / 2, top + (size - (bbox[3] - bbox[1])) / 2 - bbox[1]),
+        hint,
+        font=_font(int(size * 0.62), bold=True),
+        fill=MUTED_INK,
+    )
+
+
+def compose_cryptogram_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    landmark_name: str,
+    instruction: str,
+    puzzle: Cryptogram,
+) -> Path:
+    """Print the coded sentence plus the partial legend that unlocks it."""
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _puzzle_header(draw, CRYPTOGRAM_TITLE, landmark_name, instruction)
+
+    legend_top = 300
+    revealed = set(puzzle.revealed)
+    columns = 9
+    cell = 92
+    legend_rows = math.ceil(len(puzzle.legend) / columns)
+    _panel(draw, (54, legend_top, 970, legend_top + 96 + legend_rows * 74), radius=22)
+    draw.text(
+        (92, legend_top + 22), "Chave secreta (algumas já vêm prontas):",
+        font=_font(25, bold=True), fill=INK,
+    )
+    for index, (letter, code) in enumerate(puzzle.legend):
+        column, row = index % columns, index // columns
+        x = 92 + column * cell
+        y = legend_top + 76 + row * 74
+        draw.rounded_rectangle(
+            (x, y, x + 62, y + 46), radius=6, fill="white", outline=PANEL_OUTLINE, width=3
+        )
+        _draw_centered_fit_box(
+            draw,
+            letter if letter in revealed else "?",
+            (x + 4, y + 4, x + 58, y + 42),
+            maximum_size=28,
+            minimum_size=16,
+            bold=True,
+        )
+        _draw_centered_fit_box(
+            draw, str(code), (x, y + 48, x + 62, y + 70), maximum_size=22, minimum_size=14
+        )
+
+    phrase_top = legend_top + 96 + legend_rows * 74 + 40
+    rows = _cryptogram_rows(puzzle)
+    phrase_height = 96 + rows * CRYPTOGRAM_ROW_HEIGHT
+    if phrase_top + phrase_height > 1490:
+        raise ActivityPageCompositionError("A frase secreta não cabe na página.")
+    _panel(draw, (54, phrase_top, 970, phrase_top + phrase_height), radius=22)
+    draw.text((92, phrase_top + 26), "A frase secreta:", font=_font(25, bold=True), fill=INK)
+    _draw_cryptogram_phrase(draw, puzzle, top=phrase_top + 96)
+
+    # Decifrar letra por letra deixa a frase picotada; copiá-la inteira é o
+    # fecho da atividade e ocupa o rodapé que sobraria em branco.
+    answer_top = phrase_top + phrase_height + 40
+    _panel(draw, (54, answer_top, 970, min(1490, answer_top + 300)), radius=22)
+    draw.text(
+        (92, answer_top + 26),
+        "Agora escreva a frase inteira:",
+        font=_font(25, bold=True),
+        fill=INK,
+    )
+    for index in range(2):
+        rule_y = answer_top + 152 + index * 84
+        draw.line((92, rule_y, 932, rule_y), fill=PANEL_OUTLINE, width=3)
+    return _atomic_save(image, output_path)
+
+
+CRYPTOGRAM_CELL = 56
+CRYPTOGRAM_CELL_GAP = 8
+CRYPTOGRAM_ROW_HEIGHT = CRYPTOGRAM_CELL + 48
+CRYPTOGRAM_LEFT = 92
+CRYPTOGRAM_RIGHT = 932
+
+
+def _cryptogram_cells(puzzle: Cryptogram) -> list[tuple[str, int, int, int]]:
+    """Place every coded letter on a grid, breaking rows between words.
+
+    Quebrar uma palavra no meio da linha faria a criança procurar a
+    continuação; palavras inteiras mantêm a frase legível.
+    """
+
+    per_row = (CRYPTOGRAM_RIGHT - CRYPTOGRAM_LEFT + CRYPTOGRAM_CELL_GAP) // (
+        CRYPTOGRAM_CELL + CRYPTOGRAM_CELL_GAP
+    )
+    placed: list[tuple[str, int, int, int]] = []
+    column = row = 0
+    for word in puzzle.phrase.split(" "):
+        length = len(word)
+        if length > per_row:
+            raise ActivityPageCompositionError("Uma palavra da frase secreta é longa demais.")
+        if column and column + length > per_row:
+            column, row = 0, row + 1
+        for letter in word:
+            code = next(code for char, code in puzzle.legend if char == letter)
+            placed.append((letter, code, column, row))
+            column += 1
+        column += 1  # espaço entre palavras
+    return placed
+
+
+def _cryptogram_rows(puzzle: Cryptogram) -> int:
+    return max(row for _letter, _code, _column, row in _cryptogram_cells(puzzle)) + 1
+
+
+def _draw_cryptogram_phrase(draw: ImageDraw.ImageDraw, puzzle: Cryptogram, *, top: int) -> None:
+    revealed = set(puzzle.revealed)
+    for letter, code, column, row in _cryptogram_cells(puzzle):
+        x = CRYPTOGRAM_LEFT + column * (CRYPTOGRAM_CELL + CRYPTOGRAM_CELL_GAP)
+        y = top + row * CRYPTOGRAM_ROW_HEIGHT
+        draw.rounded_rectangle(
+            (x, y, x + CRYPTOGRAM_CELL, y + CRYPTOGRAM_CELL),
+            radius=6,
+            fill="white",
+            outline=INK,
+            width=3,
+        )
+        if letter in revealed:
+            _draw_centered_fit_box(
+                draw,
+                letter,
+                (x + 4, y + 4, x + CRYPTOGRAM_CELL - 4, y + CRYPTOGRAM_CELL - 4),
+                maximum_size=34,
+                minimum_size=18,
+                bold=True,
+            )
+        _draw_centered_fit_box(
+            draw,
+            str(code),
+            (x, y + CRYPTOGRAM_CELL + 4, x + CRYPTOGRAM_CELL, y + CRYPTOGRAM_CELL + 34),
+            maximum_size=24,
+            minimum_size=14,
+        )
+
+
+def _puzzle_header(
+    draw: ImageDraw.ImageDraw, title: str, landmark_name: str, instruction: str
+) -> None:
+    _panel(draw, (38, 30, 986, 268))
+    _draw_centered_fit(draw, title, 48, 52, 34, 884, bold=True)
+    _draw_centered_fit(draw, _bounded(landmark_name, "landmark_name", 100), 120, 32, 20, 884,
+                       bold=True)
+    _draw_wrapped(
+        draw,
+        _bounded(instruction, "instruction", 240),
+        (82, 178, 942, 256),
+        font=_font(23),
+        fill=MUTED_INK,
+        align="center",
+    )
 
 
 def compose_best_memory_page(

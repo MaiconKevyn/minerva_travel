@@ -428,7 +428,9 @@
               "drawing",
               "newspaper_headline",
               "travel_diary",
-              "here_vs_home"
+              "here_vs_home",
+              "anagram",
+              "cryptogram"
             ],
             "title": "Activity Type",
             "type": "string"
@@ -692,7 +694,9 @@
                   "drawing",
                   "newspaper_headline",
                   "travel_diary",
-                  "here_vs_home"
+                  "here_vs_home",
+                  "anagram",
+                  "cryptogram"
                 ],
                 "type": "string"
               },
@@ -8433,6 +8437,8 @@
     "drawing",
     "newspaper_headline",
     "travel_diary",
-    "here_vs_home"
+    "here_vs_home",
+    "anagram",
+    "cryptogram"
   ]
 }

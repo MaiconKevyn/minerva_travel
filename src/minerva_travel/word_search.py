@@ -7,11 +7,16 @@ GRID_SIZE = 10
 FILLER_LETTERS = "ABCDEFGHIJLMNOPRSTUV"
 MAX_WORDS = 6
 
+LIGATURES = str.maketrans({"œ": "oe", "Œ": "OE", "æ": "ae", "Æ": "AE", "ß": "ss"})
+
 
 def normalize_word_for_grid(word: str) -> str:
-    decomposed = unicodedata.normalize("NFD", word)
-    ascii_only = "".join(char for char in decomposed if not unicodedata.combining(char))
-    return "".join(char for char in ascii_only.upper() if char.isalpha())
+    # NFD nao desfaz ligaduras: sem isso, "Sacre-Coeur" chegaria com "OE" ligado
+    # e a grade inteira seria recusada por conter caractere nao-ASCII.
+    expanded = str(word).translate(LIGATURES)
+    decomposed = unicodedata.normalize("NFD", expanded)
+    without_accents = "".join(char for char in decomposed if not unicodedata.combining(char))
+    return "".join(char for char in without_accents.upper() if char.isascii() and char.isalpha())
 
 
 def build_word_search_grid(

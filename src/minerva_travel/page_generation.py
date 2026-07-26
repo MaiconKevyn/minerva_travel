@@ -23,8 +23,10 @@ from minerva_travel.activity_page_compositor import (
     NEWSPAPER_HEADLINE_TITLE,
     TRAVEL_DIARY_TITLE,
     ActivityPageCompositionError,
+    compose_anagram_page,
     compose_best_memory_page,
     compose_coloring_page,
+    compose_cryptogram_page,
     compose_detail_hunt_page,
     compose_drawing_page,
     compose_family_coloring_page,
@@ -50,6 +52,11 @@ from minerva_travel.investigator_activity import (
     investigator_mission_response_schema,
     normalize_investigator_children,
     parse_investigator_missions,
+)
+from minerva_travel.puzzles import (
+    PuzzleGenerationError,
+    build_anagrams,
+    build_cryptogram,
 )
 from minerva_travel.word_search import build_word_search_grid
 
@@ -746,6 +753,116 @@ class OpenAIGuidePageGenerator:
         finally:
             artwork.unlink(missing_ok=True)
 
+    def generate_anagram_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec, default="Desembaralhe as palavras da sua viagem."
+        )
+        seed = _activity_seed(activity_spec, landmark_context, name)
+        words = _word_search_vocabulary(activity_spec, name=name, city=city, country=country)
+        try:
+            entries = build_anagrams(words, seed=seed)
+        except PuzzleGenerationError as error:
+            raise PageGenerationError(
+                "Não foi possível montar as palavras embaralhadas."
+            ) from error
+
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                activity_artwork_prompt(
+                    activity_type="anagram",
+                    landmark_name=name,
+                    city=city,
+                    country=country,
+                    age_complexity=age_complexity,
+                    has_landmark_reference=(
+                        landmark_reference is not None or landmark_page_reference is not None
+                    ),
+                    has_revision_reference=reference_page is not None,
+                    revision_instruction=revision_instruction,
+                ),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_anagram_page(
+                artwork,
+                output_path,
+                landmark_name=name,
+                instruction=instruction,
+                entries=entries,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError(
+                "Não foi possível finalizar as palavras embaralhadas."
+            ) from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_cryptogram_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec, default="Use a chave secreta para descobrir a frase."
+        )
+        phrase = _bounded_mapping_text(
+            activity_spec, ("phrase",), default=f"{name} fica em {city}", maximum=62
+        )
+        seed = _activity_seed(activity_spec, landmark_context, name)
+        try:
+            puzzle = build_cryptogram(phrase, seed=seed)
+        except PuzzleGenerationError as error:
+            raise PageGenerationError("Não foi possível montar o código secreto.") from error
+
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                activity_artwork_prompt(
+                    activity_type="cryptogram",
+                    landmark_name=name,
+                    city=city,
+                    country=country,
+                    age_complexity=age_complexity,
+                    has_landmark_reference=(
+                        landmark_reference is not None or landmark_page_reference is not None
+                    ),
+                    has_revision_reference=reference_page is not None,
+                    revision_instruction=revision_instruction,
+                ),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_cryptogram_page(
+                artwork,
+                output_path,
+                landmark_name=name,
+                instruction=instruction,
+                puzzle=puzzle,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar o código secreto.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
     def generate_writing_page(
         self,
         *,
@@ -1258,6 +1375,16 @@ def activity_artwork_prompt(
         ),
         # As páginas de escrever recebem painéis opacos por cima: a arte só
         # aparece como moldura, então detalhe no centro seria desperdiçado.
+        "anagram": (
+            "Create a subtle decorative travel background with a small recognizable watercolor "
+            "landmark vignette near the bottom edge and a few scattered alphabet-block motifs "
+            "around the perimeter. Keep the whole centre pale and free of detail for the puzzle."
+        ),
+        "cryptogram": (
+            "Create a subtle decorative spy-notebook background with a small recognizable "
+            "watercolor landmark vignette near the bottom edge, a magnifying glass and a wax "
+            "seal near the perimeter. Keep the whole centre pale and free of detail."
+        ),
         "newspaper_headline": _WRITING_ARTWORK_CONTRACT.format(
             motif="a vintage newspaper stand, a rolled newspaper and a small printing ornament"
         ),
@@ -1768,6 +1895,19 @@ def _detail_hunt_clues(specification: dict[str, Any], landmark_name: str) -> lis
     if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
         raise PageGenerationError("As pistas do caça aos detalhes são inválidas.")
     return raw
+
+
+def _activity_seed(
+    specification: dict[str, Any], landmark_context: dict[str, Any], default: str
+) -> str:
+    """Same guide, same puzzle: reimprimir não pode trocar o enigma resolvido."""
+
+    return _bounded_mapping_text(
+        specification,
+        ("seed",),
+        default=_context_value(landmark_context, "selection_id", "id", default=default),
+        maximum=160,
+    )
 
 
 def _writing_fields(specification: dict[str, Any]) -> list[tuple[str, int]]:

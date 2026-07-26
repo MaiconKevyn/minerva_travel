@@ -4,6 +4,7 @@ import pytest
 
 from minerva_travel.app import WRITING_ACTIVITY_TYPES, _builder_page_plan
 from minerva_travel.catalog import load_catalog
+from minerva_travel.puzzles import build_anagrams, build_cryptogram
 
 
 def _writing_pages(activity_type: str, selected: list[str]):
@@ -69,3 +70,43 @@ def test_headline_asks_about_the_landmark_and_diary_about_the_city():
     # A manchete é sobre o monumento; o diário fecha o dia inteiro na cidade.
     assert headline.metadata["name"] in headline_labels
     assert "Paris" in diary_labels
+
+
+@pytest.mark.parametrize("activity_type", ["anagram", "cryptogram"])
+def test_letter_puzzles_are_seeded_by_the_landmark_and_stay_solvable(activity_type):
+    pages = _writing_pages(activity_type, ["paris:eiffel-tower"])
+    spec = pages[0].metadata["activity_spec"]
+
+    assert spec["seed"] == "paris:eiffel-tower"
+    if activity_type == "anagram":
+        entries = build_anagrams(spec["words"], seed=spec["seed"])
+        assert all(sorted(item.scrambled) == sorted(item.answer) for item in entries)
+    else:
+        puzzle = build_cryptogram(spec["phrase"], seed=spec["seed"])
+        # A frase precisa ser verdadeira e citar o lugar da página.
+        assert "EIFFEL" in puzzle.phrase
+        assert puzzle.revealed
+
+
+def test_cryptogram_phrase_falls_back_when_the_landmark_name_is_too_long():
+    from minerva_travel.app import _cryptogram_phrase
+    from minerva_travel.models import LandmarkActivityContext
+
+    landmark = LandmarkActivityContext(
+        destination_id="d1",
+        selection_id="s1",
+        name="Basilica do Sagrado Coracao de Jesus de Montmartre em Paris",
+        city="Paris",
+        country="Franca",
+        description="Uma basilica no alto de Montmartre.",
+        curiosity="Fica no ponto mais alto da cidade.",
+        curiosity_kind="trusted",
+        itinerary_order=1,
+        landmark_page_id="landmark-1",
+        age_complexity="older_child",
+    )
+
+    phrase = _cryptogram_phrase(landmark)
+
+    assert len(phrase) <= 62
+    assert "Paris" in phrase

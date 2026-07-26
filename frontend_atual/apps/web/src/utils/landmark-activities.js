@@ -8,6 +8,8 @@ export const OPTIONAL_LANDMARK_ACTIVITY_TYPES = [
   'newspaper_headline',
   'travel_diary',
   'here_vs_home',
+  'anagram',
+  'cryptogram',
 ];
 
 export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2;
@@ -72,6 +74,26 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     durationLabel: '10–15 min',
     materialLabel: 'Lápis',
     preview: '/activity-examples/word-search-real.webp',
+  },
+  {
+    type: 'anagram',
+    category: 'puzzle',
+    label: 'Palavras embaralhadas',
+    description: 'Desembaralha os nomes do lugar, da cidade e do país, com a primeira letra de dica.',
+    ageLabel: '7+',
+    durationLabel: '5–10 min',
+    materialLabel: 'Lápis',
+    preview: '/activity-examples/anagram-real.webp',
+  },
+  {
+    type: 'cryptogram',
+    category: 'puzzle',
+    label: 'Código secreto',
+    description: 'Decifra com a chave numérica uma frase verdadeira sobre o ponto turístico.',
+    ageLabel: '9+',
+    durationLabel: '15–20 min',
+    materialLabel: 'Lápis',
+    preview: '/activity-examples/cryptogram-real.webp',
   },
   {
     type: 'coloring',

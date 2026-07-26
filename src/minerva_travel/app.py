@@ -36,8 +36,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from minerva_travel import storage
 from minerva_travel.activity_page_compositor import (
+    ANAGRAM_TITLE,
     BEST_MEMORY_REQUIRED_COPY,
     COLORING_TITLE,
+    CRYPTOGRAM_TITLE,
     DETAIL_HUNT_TITLE,
     FAMILY_COLORING_TITLE,
     HERE_VS_HOME_TITLE,
@@ -199,6 +201,7 @@ from minerva_travel.privacy import (
     PrivacyConsentError,
     validate_photo_processing_consent,
 )
+from minerva_travel.puzzles import PuzzleGenerationError, build_cryptogram
 from minerva_travel.request_control import (
     ConcurrencyLease,
     IdempotencyInProgressError,
@@ -2184,11 +2187,49 @@ _ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
     "newspaper_headline": NEWSPAPER_HEADLINE_TITLE,
     "travel_diary": TRAVEL_DIARY_TITLE,
     "here_vs_home": HERE_VS_HOME_TITLE,
+    "anagram": ANAGRAM_TITLE,
+    "cryptogram": CRYPTOGRAM_TITLE,
 }
 
 WRITING_ACTIVITY_TYPES: frozenset[str] = frozenset(
     {"newspaper_headline", "travel_diary", "here_vs_home"}
 )
+
+
+def _travel_vocabulary(landmark: LandmarkActivityContext) -> list[str]:
+    """Words from this trip that a child can recognise once unscrambled."""
+
+    candidates = [
+        *re.findall(r"[A-Za-zÀ-ÿ]{4,}", landmark.name),
+        landmark.city,
+        landmark.country,
+        "VIAGEM",
+        "AVENTURA",
+    ]
+    return list(dict.fromkeys(word.upper() for word in candidates if word))
+
+
+def _cryptogram_phrase(landmark: LandmarkActivityContext) -> str:
+    """Pick a short sentence that is true for this landmark and decodable.
+
+    Só usamos nome, cidade e país — dados já verificados. Uma curiosidade em
+    texto livre traria números e pontuação, que a cifra não sabe imprimir.
+    """
+
+    for candidate in (
+        f"{landmark.name} fica em {landmark.city}",
+        f"Estamos em {landmark.city} no {landmark.country}",
+        f"Hoje conhecemos {landmark.name}",
+        f"Nossa viagem passa por {landmark.city}",
+    ):
+        try:
+            build_cryptogram(candidate, seed=landmark.selection_id)
+        except PuzzleGenerationError:
+            continue
+        return candidate
+    raise ActivitySelectionInputError(
+        "Este ponto turístico não tem nome curto o bastante para o código secreto."
+    )
 
 
 def _writing_activity_fields(
@@ -2516,6 +2557,8 @@ def _activity_spec(
         "here_vs_home": (
             f"Compare {landmark.city or landmark.name} com a rua onde você mora."
         ),
+        "anagram": "Desembaralhe as palavras da sua viagem.",
+        "cryptogram": "Use a chave secreta para descobrir a frase.",
     }
     spec: dict[str, Any] = {
         "instruction": instructions[activity_type],
@@ -2524,6 +2567,12 @@ def _activity_spec(
     if activity_type in WRITING_ACTIVITY_TYPES:
         spec["title"] = _ACTIVITY_LABELS[activity_type]
         spec["fields"] = _writing_activity_fields(activity_type, landmark)
+    elif activity_type == "anagram":
+        spec["words"] = _travel_vocabulary(landmark)
+        spec["seed"] = landmark.selection_id
+    elif activity_type == "cryptogram":
+        spec["phrase"] = _cryptogram_phrase(landmark)
+        spec["seed"] = landmark.selection_id
     if activity_type == "detail_hunt":
         spec["clues"] = [
             "Uma forma geométrica interessante",
@@ -3325,6 +3374,10 @@ def generate_builder_page_attempt(
                 generator.generate_word_search_page(**common_activity_kwargs)
             elif activity_type == "drawing":
                 generator.generate_drawing_page(**common_activity_kwargs)
+            elif activity_type == "anagram":
+                generator.generate_anagram_page(**common_activity_kwargs)
+            elif activity_type == "cryptogram":
+                generator.generate_cryptogram_page(**common_activity_kwargs)
             elif activity_type in WRITING_ACTIVITY_TYPES:
                 generator.generate_writing_page(
                     **common_activity_kwargs,

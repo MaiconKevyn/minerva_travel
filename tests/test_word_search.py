@@ -40,3 +40,14 @@ def test_build_word_search_grid_skips_words_too_long_or_short():
 
     assert placed == ["VIAGEM"]
     assert len(rows) == 10
+
+
+def test_ligatures_do_not_break_the_grid_for_real_landmark_names():
+    # "Sacre-Coeur" chegava com "OE" ligado e derrubava a validacao ASCII da
+    # grade inteira, levando junto a pagina de caca-palavras.
+    assert normalize_word_for_grid("Sacré-Cœur") == "SACRECOEUR"
+
+    grid, placed = build_word_search_grid(["Cœur", "Paris", "Viagem"], seed="sacre-coeur")
+
+    assert "COEUR" in placed
+    assert all(row.isascii() and row.isalpha() for row in grid)
