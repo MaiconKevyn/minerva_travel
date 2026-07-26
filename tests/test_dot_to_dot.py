@@ -68,3 +68,16 @@ def test_impossible_dot_counts_are_refused(tmp_path: Path):
     for dots in (5, 200):
         with pytest.raises(DotToDotGenerationError):
             build_dot_to_dot(lineart, dots=dots)
+
+
+def test_a_decorative_page_frame_is_refused_as_a_silhouette(tmp_path: Path):
+    # A moldura vira duas colunas retas: ligar os números desenharia um
+    # retângulo, e a criança nunca veria o monumento aparecer.
+    path = tmp_path / "framed.png"
+    image = Image.new("L", (400, 600), 255)
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((20, 20, 380, 580), outline=0, width=8)
+    image.save(path, "PNG")
+
+    with pytest.raises(DotToDotGenerationError):
+        build_dot_to_dot(path, dots=30)

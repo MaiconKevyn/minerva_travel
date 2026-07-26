@@ -1798,12 +1798,34 @@ _HOUSE_STYLE_PLAIN = (
     "paper grain overlay. No neon, no flat vector shapes, no modern UI look, no drop shadows."
 )
 
+# Páginas em traço puro. A moldura do estilo padrão vira borda preta torta
+# depois da conversão monocromática, e no "ligue os pontos" o traçador de
+# silhueta segue a moldura em vez do monumento — o enigma sai um retângulo.
+_HOUSE_STYLE_LINEART = (
+    "HOUSE STYLE — pure black line art on plain white, in the same vintage children's storybook "
+    "hand as the rest of the book: confident ink outlines, generous closed shapes, no shading. "
+    "Absolutely no border frame, no corner ornament, no postmark, no parchment texture, no "
+    "background wash and no colour — the sheet outside the drawing must stay pure white."
+)
+
 _WRITING_ARTWORK_CONTRACT = (
     "Create a decorative border-only illustration for a writing page: {motif}, arranged around "
     "the outer edges as a calm watercolor frame. Keep the entire central 80 percent pale, plain "
     "and free of detail — trusted code paints opaque ruled panels over it. Do not draw lines, "
     "rules, boxes, paper sheets or writing areas anywhere."
 )
+
+
+# Traço puro: a arte vira silhueta ou desenho de colorir e não pode ter moldura.
+_LINEART_ACTIVITIES = frozenset({"coloring", "family_coloring", "dot_to_dot"})
+
+
+def _house_style_for(activity_type: str) -> str:
+    if activity_type in _LINEART_ACTIVITIES:
+        return _HOUSE_STYLE_LINEART
+    if activity_type == "spot_the_difference":
+        return _HOUSE_STYLE_PLAIN
+    return _HOUSE_STYLE
 
 
 def activity_artwork_prompt(
@@ -1935,7 +1957,7 @@ def activity_artwork_prompt(
     return f"""
 Create only the visual artwork layer for a premium vertical printable children's travel activity.
 Activity: {activity_type}. Landmark: {landmark_name}. Location: {location}.
-{_HOUSE_STYLE_PLAIN if activity_type == "spot_the_difference" else _HOUSE_STYLE}
+{_house_style_for(activity_type)}
 Age-complexity band: {age_complexity}.
 {source_contract}{revision_contract}
 
@@ -2013,6 +2035,7 @@ def family_coloring_artwork_prompt(
     return f"""
 Create only the visual artwork layer for a premium vertical printable children's family travel
 coloring page set at {landmark_name} in {location}.
+{_HOUSE_STYLE_LINEART}
 {" ".join(reference_roles)}
 
 Show the complete referenced family enjoying one warm, affectionate vacation moment together,
@@ -2100,6 +2123,7 @@ def investigator_artwork_prompt(
     return f"""
 Create only the visual artwork layer for a premium vertical printable children's travel activity
 at {landmark_name} in {location}. The family is playing a warm, collaborative detective game.
+{_HOUSE_STYLE}
 {" ".join(reference_roles)}
 
 Preserve each family member's identity, age relationship, hair, glasses, body proportions and major

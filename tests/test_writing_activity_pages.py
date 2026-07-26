@@ -84,21 +84,20 @@ def test_writing_page_keeps_white_paper_even_over_dark_artwork(tmp_path: Path):
 
 
 def test_every_activity_artwork_asks_for_the_same_house_style():
-    """Uma identidade só para o caderno inteiro.
+    """Uma identidade só para o caderno, em três variantes de meio.
 
-    Sem contrato compartilhado, cada atividade saía com fundo próprio e o
-    guia parecia uma colagem de fontes diferentes.
+    Aplicar a moldura a tudo quebrou duas páginas: em colorir ela virou borda
+    preta torta na conversão monocromática, e no ligue os pontos o traçador
+    seguiu a moldura em vez do monumento.
     """
 
     from minerva_travel.models import OPTIONAL_LANDMARK_ACTIVITY_TYPES
     from minerva_travel.page_generation import activity_artwork_prompt
 
-    visual_types = [
-        activity_type
-        for activity_type in OPTIONAL_LANDMARK_ACTIVITY_TYPES
-        if activity_type not in {"family_coloring", "investigator"}
-    ]
-    for activity_type in visual_types:
+    lineart = {"coloring", "dot_to_dot"}
+    for activity_type in OPTIONAL_LANDMARK_ACTIVITY_TYPES:
+        if activity_type in {"investigator", "family_coloring"}:
+            continue  # têm prompt próprio, cobertos abaixo
         prompt = activity_artwork_prompt(
             activity_type=activity_type,
             landmark_name="Coliseu",
@@ -109,13 +108,51 @@ def test_every_activity_artwork_asks_for_the_same_house_style():
             has_revision_reference=False,
         )
         assert "HOUSE STYLE" in prompt, activity_type
-        # Paleta e traço são o que faz o caderno parecer um caderno só.
-        assert "vintage children's storybook watercolour" in prompt, activity_type
-        assert "aged cream, golden ochre, muted navy blue" in prompt, activity_type
-        # O texto exato continua sendo composto por código, nunca desenhado.
+        assert "vintage children's storybook" in prompt, activity_type
         assert "text-free" in prompt.lower(), activity_type
 
-        # A moldura ornamentada é a variante padrão; o "ache os erros" recorta
-        # a arte em painéis e a moldura seria descartada.
-        framed = "ornate double-rule border frame" in prompt
-        assert framed is (activity_type != "spot_the_difference"), activity_type
+        if activity_type in lineart:
+            # Traço puro: qualquer moldura reaparece como borda preta e, no
+            # ligue os pontos, vira a própria resposta do enigma.
+            assert "pure black line art" in prompt, activity_type
+            assert "no border frame" in prompt.lower(), activity_type
+        else:
+            assert "aged cream, golden ochre, muted navy blue" in prompt, activity_type
+            framed = "ornate double-rule border frame" in prompt
+            assert framed is (activity_type != "spot_the_difference"), activity_type
+
+
+def test_the_two_family_activities_share_the_house_style_too():
+    """Elas têm prompt próprio e ficaram de fora na primeira passada."""
+
+    from minerva_travel.page_generation import (
+        family_coloring_artwork_prompt,
+        investigator_artwork_prompt,
+    )
+
+    coloring = family_coloring_artwork_prompt(
+        landmark_name="Coliseu",
+        city="Roma",
+        country="Itália",
+        age_complexity="early_reader",
+        expected_visible_family_member_count=3,
+        has_family_cover=True,
+        has_landmark_reference=False,
+        has_landmark_page_reference=False,
+        has_revision_reference=False,
+    )
+    assert "pure black line art" in coloring
+
+    investigator = investigator_artwork_prompt(
+        child_count=2,
+        landmark_name="Coliseu",
+        city="Roma",
+        country="Itália",
+        age_complexity="early_reader",
+        expected_visible_family_member_count=3,
+        has_family_cover=True,
+        has_landmark_reference=False,
+        has_landmark_page_reference=False,
+        has_revision_reference=False,
+    )
+    assert "ornate double-rule border frame" in investigator

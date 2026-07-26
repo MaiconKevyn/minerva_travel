@@ -22,6 +22,8 @@ DEFAULT_DOT_COUNT = DOT_COUNTS["early_reader"]
 
 INK_THRESHOLD = 128
 MIN_SILHOUETTE_ROWS = 24
+# Um contorno que quase não varia de largura é moldura, não monumento.
+MIN_SILHOUETTE_SPREAD = 0.15
 
 
 class DotToDotGenerationError(ValueError):
@@ -62,6 +64,7 @@ def build_dot_to_dot(lineart_path, *, dots: int) -> DotToDot:
         right_edge.append((dark[-1], row))
     if len(left_edge) < MIN_SILHOUETTE_ROWS:
         raise DotToDotGenerationError("O desenho não tem silhueta suficiente para ligar pontos.")
+    _reject_page_border(left_edge, right_edge, width)
 
     # Sobe pelo lado direito para fechar o contorno num laço só.
     outline = left_edge + list(reversed(right_edge))
@@ -80,6 +83,28 @@ def minimum_dot_gap(width: int, height: int) -> int:
     """
 
     return max(24, min(width, height) // 24)
+
+
+def _reject_page_border(
+    left_edge: list[tuple[int, int]],
+    right_edge: list[tuple[int, int]],
+    width: int,
+) -> None:
+    """Refuse a silhouette that is really the page frame.
+
+    Uma moldura decorativa vira duas colunas retas de pontos: ligá-las desenha
+    um retângulo, não o monumento. É melhor recusar do que imprimir um enigma
+    cuja resposta é a borda da folha.
+    """
+
+    spread = max(
+        max(x for x, _y in left_edge) - min(x for x, _y in left_edge),
+        max(x for x, _y in right_edge) - min(x for x, _y in right_edge),
+    )
+    if spread < width * MIN_SILHOUETTE_SPREAD:
+        raise DotToDotGenerationError(
+            "O contorno encontrado é a moldura da página, não o ponto turístico."
+        )
 
 
 def _sample(
