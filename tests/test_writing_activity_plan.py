@@ -181,3 +181,28 @@ def test_keepsake_pages_carry_the_child_name(activity_type, spec_key):
 
     # Cartão sem remetente e passaporte sem dono são papel em branco.
     assert activity.metadata["activity_spec"][spec_key] == "Aurora"
+
+
+def test_a_guide_is_refused_when_no_selected_landmark_resolves():
+    """Ids sem definição derrubavam a viagem inteira em silêncio.
+
+    O guia saía com capa, sumário e páginas finais — nenhuma parada — e a
+    capa, sem lugares confirmados no prompt, inventava um cenário: um roteiro
+    no Japão voltava com a Torre Eiffel.
+    """
+    from minerva_travel.app import ActivitySelectionInputError
+
+    catalog = load_catalog()
+    with pytest.raises(ActivitySelectionInputError) as raised:
+        _builder_page_plan(
+            {
+                "title": "Família Silva",
+                "year": 2026,
+                "children_ages": [7],
+                "activity_selections": [],
+            },
+            catalog.destinations,
+            ["custom-toquio:templo-sensoji", "custom-honshu:monte-fuji"],
+        )
+
+    assert raised.value.code == "landmark_selection_unresolved"

@@ -2753,6 +2753,15 @@ def _builder_page_plan(
     raw_ages = form.get("children_ages", [])
     children_ages = [age for age in raw_ages if isinstance(age, int)]
     landmarks = _selected_builder_landmarks(destinations, selected, children_ages)
+    if not landmarks:
+        # Ids que não resolvem eram descartados em silêncio: o guia saía sem
+        # nenhuma página de ponto turístico e a capa, sem lugares confirmados,
+        # inventava um cenário — uma viagem ao Japão virava Paris.
+        raise ActivitySelectionInputError(
+            "landmark_selection_unresolved",
+            "Não reconhecemos os pontos turísticos enviados. "
+            "Volte ao roteiro e confirme os locais antes de gerar o guia.",
+        )
     destination_contexts = _selected_builder_destinations(destinations, landmarks)
     destination_context_by_id = {
         context.destination_id: context for context in destination_contexts

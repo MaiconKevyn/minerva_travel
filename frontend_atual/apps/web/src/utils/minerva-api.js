@@ -478,15 +478,16 @@ export const appendGuideLandmarks = (formData, guideData) => {
     .filter(Boolean);
   const customLandmarks = landmarks.filter((landmark) => !landmark.is_catalog_landmark);
 
-  if (catalogLandmarkIds.length > 0) {
-    catalogLandmarkIds.forEach((selectionId) => {
+  // Só enviamos ids que o próprio frontend conseguiu resolver. O fallback
+  // anterior mandava a lista crua de selectedLandmarks quando NADA resolvia —
+  // o backend recebia ids sem definição, descartava todos e montava um guia
+  // sem paradas, cuja capa inventava o destino.
+  const resolvedIds = landmarks.map((landmark) => landmark.selection_id || landmark.id);
+  [...catalogLandmarkIds, ...(catalogLandmarkIds.length ? [] : resolvedIds)]
+    .filter(Boolean)
+    .forEach((selectionId) => {
       formData.append('selected_landmarks', selectionId);
     });
-  } else if (guideData.selectedLandmarks?.length > 0) {
-    guideData.selectedLandmarks.forEach((selectionId) => {
-      formData.append('selected_landmarks', selectionId);
-    });
-  }
 
   if (customLandmarks.length > 0) {
     const customLandmarksPayload = JSON.stringify(

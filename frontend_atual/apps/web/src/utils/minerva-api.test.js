@@ -1306,3 +1306,39 @@ test('guide download rejects external URLs before sending the owner token', asyn
     /Link de download inválido/,
   );
 });
+
+test('landmark ids are never sent without the definitions that explain them', () => {
+  // Quando nada resolve, mandar a lista crua fazia o backend descartar tudo e
+  // montar um guia sem paradas — a capa então inventava o destino.
+  const orphaned = new FormData();
+  minervaApi.appendGuideLandmarks(orphaned, {
+    landmarks: [],
+    selectedLandmarks: ['custom-toquio:templo-sensoji', 'custom-honshu:monte-fuji'],
+  });
+
+  assert.deepEqual(orphaned.getAll('selected_landmarks'), []);
+  assert.equal(orphaned.get('custom_landmarks'), null);
+});
+
+test('custom landmarks travel with their ids so the guide can resolve them', () => {
+  const formData = new FormData();
+  minervaApi.appendGuideLandmarks(formData, {
+    landmarks: [
+      {
+        id: 'custom-toquio:templo-sensoji',
+        selection_id: 'custom-toquio:templo-sensoji',
+        name: 'Templo Sensoji',
+        city: 'Tóquio',
+        country: 'Japão',
+        description: 'O templo mais antigo de Tóquio.',
+        is_catalog_landmark: false,
+      },
+    ],
+    selectedLandmarks: ['custom-toquio:templo-sensoji'],
+  });
+
+  assert.deepEqual(formData.getAll('selected_landmarks'), ['custom-toquio:templo-sensoji']);
+  const custom = JSON.parse(formData.get('custom_landmarks'));
+  assert.equal(custom[0].name, 'Templo Sensoji');
+  assert.equal(custom[0].country, 'Japão');
+});
