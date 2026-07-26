@@ -39,8 +39,10 @@ from minerva_travel.activity_page_compositor import (
     ANAGRAM_TITLE,
     BEST_MEMORY_REQUIRED_COPY,
     COLORING_TITLE,
+    CROSSWORD_TITLE,
     CRYPTOGRAM_TITLE,
     DETAIL_HUNT_TITLE,
+    DOT_TO_DOT_TITLE,
     FAMILY_COLORING_TITLE,
     HERE_VS_HOME_TITLE,
     HOMECOMING_REQUIRED_COPY,
@@ -2191,6 +2193,8 @@ _ACTIVITY_LABELS: dict[OptionalLandmarkActivityType, str] = {
     "anagram": ANAGRAM_TITLE,
     "cryptogram": CRYPTOGRAM_TITLE,
     "maze": MAZE_TITLE,
+    "crossword": CROSSWORD_TITLE,
+    "dot_to_dot": DOT_TO_DOT_TITLE,
 }
 
 WRITING_ACTIVITY_TYPES: frozenset[str] = frozenset(
@@ -2209,6 +2213,32 @@ def _travel_vocabulary(landmark: LandmarkActivityContext) -> list[str]:
         "AVENTURA",
     ]
     return list(dict.fromkeys(word.upper() for word in candidates if word))
+
+
+def _crossword_clues_for(landmark: LandmarkActivityContext) -> list[dict[str, str]]:
+    """Answers and clues drawn from this trip, never from generic word lists.
+
+    A criança confere a resposta olhando o próprio guia: a cidade, o país e o
+    nome do lugar estão nas páginas anteriores.
+    """
+
+    tokens = [token for token in re.findall(r"[A-Za-zÀ-ÿ]{4,}", landmark.name)]
+    candidates: list[tuple[str, str]] = []
+    if landmark.city:
+        candidates.append((landmark.city, f"A cidade onde fica {landmark.name}"))
+    if landmark.country:
+        candidates.append((landmark.country, "O país desta viagem"))
+    for token in tokens[:2]:
+        candidates.append((token, f"Uma palavra do nome de {landmark.name}"))
+    candidates.extend(
+        [
+            ("VIAGEM", "O que a família está fazendo"),
+            ("MAPA", "Onde a gente vê onde fica cada lugar"),
+            ("MALA", "Onde a roupa vai para o passeio"),
+            ("FOTO", "O que a gente tira para lembrar do lugar"),
+        ]
+    )
+    return [{"answer": answer, "clue": clue} for answer, clue in candidates]
 
 
 def _cryptogram_phrase(landmark: LandmarkActivityContext) -> str:
@@ -2562,6 +2592,8 @@ def _activity_spec(
         "anagram": "Desembaralhe as palavras da sua viagem.",
         "cryptogram": "Use a chave secreta para descobrir a frase.",
         "maze": f"Leve a família do A até {landmark.name} sem cruzar as paredes.",
+        "crossword": "Complete a cruzadinha com as palavras da viagem.",
+        "dot_to_dot": f"Ligue os números e descubra {landmark.name}.",
     }
     spec: dict[str, Any] = {
         "instruction": instructions[activity_type],
@@ -2578,6 +2610,8 @@ def _activity_spec(
         spec["seed"] = landmark.selection_id
     elif activity_type == "maze":
         spec["seed"] = landmark.selection_id
+    elif activity_type == "crossword":
+        spec["clues"] = _crossword_clues_for(landmark)
     if activity_type == "detail_hunt":
         spec["clues"] = [
             "Uma forma geométrica interessante",
@@ -3379,6 +3413,10 @@ def generate_builder_page_attempt(
                 generator.generate_word_search_page(**common_activity_kwargs)
             elif activity_type == "drawing":
                 generator.generate_drawing_page(**common_activity_kwargs)
+            elif activity_type == "dot_to_dot":
+                generator.generate_dot_to_dot_page(**common_activity_kwargs)
+            elif activity_type == "crossword":
+                generator.generate_crossword_page(**common_activity_kwargs)
             elif activity_type == "maze":
                 generator.generate_maze_page(**common_activity_kwargs)
             elif activity_type == "anagram":

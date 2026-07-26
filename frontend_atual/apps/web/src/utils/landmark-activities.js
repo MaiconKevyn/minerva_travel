@@ -11,6 +11,8 @@ export const OPTIONAL_LANDMARK_ACTIVITY_TYPES = [
   'anagram',
   'cryptogram',
   'maze',
+  'crossword',
+  'dot_to_dot',
 ];
 
 export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2;
@@ -87,6 +89,16 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     preview: '/activity-examples/maze-real.webp',
   },
   {
+    type: 'dot_to_dot',
+    category: 'puzzle',
+    label: 'Ligue os pontos',
+    description: 'Liga os números e a silhueta do ponto turístico aparece. Menos pontos para os menores.',
+    ageLabel: '4+',
+    durationLabel: '5–10 min',
+    materialLabel: 'Lápis',
+    preview: '/activity-examples/dot-to-dot-real.webp',
+  },
+  {
     type: 'anagram',
     category: 'puzzle',
     label: 'Palavras embaralhadas',
@@ -95,6 +107,16 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     durationLabel: '5–10 min',
     materialLabel: 'Lápis',
     preview: '/activity-examples/anagram-real.webp',
+  },
+  {
+    type: 'crossword',
+    category: 'puzzle',
+    label: 'Cruzadinha da viagem',
+    description: 'Palavras cruzadas com dicas sobre a cidade, o país e o ponto turístico.',
+    ageLabel: '9+',
+    durationLabel: '15–20 min',
+    materialLabel: 'Lápis',
+    preview: '/activity-examples/crossword-real.webp',
   },
   {
     type: 'cryptogram',

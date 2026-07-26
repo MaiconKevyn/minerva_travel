@@ -4,6 +4,7 @@ import pytest
 
 from minerva_travel.app import WRITING_ACTIVITY_TYPES, _builder_page_plan
 from minerva_travel.catalog import load_catalog
+from minerva_travel.crossword import build_crossword
 from minerva_travel.maze import maze_size_for
 from minerva_travel.puzzles import build_anagrams, build_cryptogram
 
@@ -138,3 +139,16 @@ def test_maze_grid_grows_with_the_children_ages():
 
     # Uma grade de adulto frustra quem tem 4 anos; a de 4 anos entedia quem tem 11.
     assert _grid([4])[0] * _grid([4])[1] < _grid([11])[0] * _grid([11])[1]
+
+
+def test_crossword_clues_come_from_this_trip_and_interlock():
+    page = _writing_pages("crossword", ["paris:eiffel-tower"])[0]
+    clues = page.metadata["activity_spec"]["clues"]
+
+    joined = " ".join(item["clue"] for item in clues)
+    assert "Paris" in " ".join(item["answer"] for item in clues)
+    assert page.metadata["name"] in joined
+
+    crossword = build_crossword([(item["answer"], item["clue"]) for item in clues])
+    assert len(crossword.entries) >= 4
+    assert crossword.across and crossword.down

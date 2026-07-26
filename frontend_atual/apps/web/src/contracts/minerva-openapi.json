@@ -431,7 +431,9 @@
               "here_vs_home",
               "anagram",
               "cryptogram",
-              "maze"
+              "maze",
+              "crossword",
+              "dot_to_dot"
             ],
             "title": "Activity Type",
             "type": "string"
@@ -698,7 +700,9 @@
                   "here_vs_home",
                   "anagram",
                   "cryptogram",
-                  "maze"
+                  "maze",
+                  "crossword",
+                  "dot_to_dot"
                 ],
                 "type": "string"
               },
@@ -8442,6 +8446,8 @@
     "here_vs_home",
     "anagram",
     "cryptogram",
-    "maze"
+    "maze",
+    "crossword",
+    "dot_to_dot"
   ]
 }

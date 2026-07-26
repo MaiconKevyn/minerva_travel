@@ -13,6 +13,8 @@ from typing import cast
 
 from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 
+from minerva_travel.crossword import Crossword
+from minerva_travel.dot_to_dot import DotToDot
 from minerva_travel.investigator_activity import (
     InvestigatorChildProfile,
     InvestigatorMission,
@@ -41,6 +43,9 @@ DETAIL_HUNT_TITLE = "Caça aos detalhes"
 WORD_SEARCH_TITLE = "Caça-palavras"
 PAINTING_TITLE = "Minha pintura"
 INVESTIGATOR_TITLE = "Investigador"
+DOT_TO_DOT_TITLE = "Ligue os pontos"
+CROSSWORD_TITLE = "Cruzadinha da viagem"
+CROSSWORD_CLUE_HEIGHT = 84
 MAZE_TITLE = "Labirinto"
 MAZE_START_LABEL = "A"
 MAZE_GOAL_LABEL = "B"
@@ -485,6 +490,101 @@ def _writing_layout(fields: Sequence[tuple[str, int]]) -> tuple[int, int]:
 
 def _writing_field_height(rule_count: int, spacing: int) -> int:
     return WRITING_LABEL_BAND + rule_count * spacing + WRITING_FIELD_PADDING
+
+
+def compose_dot_to_dot_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    landmark_name: str,
+    instruction: str,
+    puzzle: DotToDot,
+) -> Path:
+    """Print the numbered dots over a clean sheet, scaled into the page."""
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _puzzle_header(draw, DOT_TO_DOT_TITLE, landmark_name, instruction)
+
+    region = (70, 300, 954, 1470)
+    left, top, right, bottom = region
+    _panel(draw, region, radius=22)
+    scale = min((right - left - 96) / puzzle.width, (bottom - top - 96) / puzzle.height)
+    offset_x = left + ((right - left) - puzzle.width * scale) / 2
+    offset_y = top + ((bottom - top) - puzzle.height * scale) / 2
+
+    number_font = _font(24, bold=True)
+    for index, (x, y) in enumerate(puzzle.points, start=1):
+        center_x = offset_x + x * scale
+        center_y = offset_y + y * scale
+        draw.ellipse(
+            (center_x - 5, center_y - 5, center_x + 5, center_y + 5), fill=INK, outline=INK
+        )
+        # Número deslocado para fora do ponto: em cima dele, o lápis da criança
+        # apagaria a referência assim que ela começasse a ligar.
+        draw.text((center_x + 10, center_y - 30), str(index), font=number_font, fill=MUTED_INK)
+    return _atomic_save(image, output_path)
+
+
+def compose_crossword_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    landmark_name: str,
+    instruction: str,
+    crossword: Crossword,
+) -> Path:
+    """Draw the interlocked grid with start numbers, then the two clue lists."""
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _puzzle_header(draw, CROSSWORD_TITLE, landmark_name, instruction)
+
+    letters = crossword.letters
+    cell = min(62, 760 // max(crossword.columns, 1), 520 // max(crossword.rows, 1))
+    if cell < 30:
+        raise ActivityPageCompositionError("A cruzadinha não cabe na página impressa.")
+    width, height = cell * crossword.columns, cell * crossword.rows
+    left = (PAGE_IMAGE_SIZE[0] - width) // 2
+    top = 300
+    _panel(draw, (left - 24, top - 24, left + width + 24, top + height + 24), radius=22)
+
+    numbers = {(entry.column, entry.row): entry.number for entry in crossword.entries}
+    number_font = _font(max(11, cell // 4), bold=True)
+    for (column, row) in letters:
+        x, y = left + column * cell, top + row * cell
+        draw.rectangle((x, y, x + cell, y + cell), fill="white", outline=INK, width=3)
+        number = numbers.get((column, row))
+        if number is not None:
+            draw.text((x + 5, y + 3), str(number), font=number_font, fill=MUTED_INK)
+
+    clues_top = top + height + 52
+    tallest = max(len(crossword.across), len(crossword.down))
+    clues_height = 96 + tallest * CROSSWORD_CLUE_HEIGHT
+    if clues_top + clues_height > 1490:
+        raise ActivityPageCompositionError("As dicas da cruzadinha não cabem na página.")
+    _panel(draw, (54, clues_top, 970, clues_top + clues_height), radius=22)
+    _draw_crossword_clues(draw, crossword, top=clues_top + 26)
+    return _atomic_save(image, output_path)
+
+
+def _draw_crossword_clues(draw: ImageDraw.ImageDraw, crossword: Crossword, *, top: int) -> None:
+    label_font, clue_font = _font(24, bold=True), _font(21)
+    for index, (title, entries) in enumerate(
+        (("Horizontais", crossword.across), ("Verticais", crossword.down))
+    ):
+        column_left = 92 + index * 452
+        draw.text((column_left, top), title, font=label_font, fill=INK)
+        y = top + 44
+        for entry in entries:
+            _draw_wrapped(
+                draw,
+                f"{entry.number}. {entry.clue}",
+                (column_left, y, column_left + 388, y + 78),
+                font=clue_font,
+                fill=INK,
+            )
+            y += CROSSWORD_CLUE_HEIGHT
 
 
 def compose_maze_page(

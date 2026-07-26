@@ -38,6 +38,8 @@ OptionalLandmarkActivityType = Literal[
     "anagram",
     "cryptogram",
     "maze",
+    "crossword",
+    "dot_to_dot",
 ]
 
 OPTIONAL_LANDMARK_ACTIVITY_TYPES: tuple[OptionalLandmarkActivityType, ...] = (
@@ -53,6 +55,8 @@ OPTIONAL_LANDMARK_ACTIVITY_TYPES: tuple[OptionalLandmarkActivityType, ...] = (
     "anagram",
     "cryptogram",
     "maze",
+    "crossword",
+    "dot_to_dot",
 )
 MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2
 MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE = 8

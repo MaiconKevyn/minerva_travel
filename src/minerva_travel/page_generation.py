@@ -26,8 +26,10 @@ from minerva_travel.activity_page_compositor import (
     compose_anagram_page,
     compose_best_memory_page,
     compose_coloring_page,
+    compose_crossword_page,
     compose_cryptogram_page,
     compose_detail_hunt_page,
+    compose_dot_to_dot_page,
     compose_drawing_page,
     compose_family_coloring_page,
     compose_homecoming_page,
@@ -44,6 +46,12 @@ from minerva_travel.config import (
     openai_image_model,
     openai_image_quality,
     openai_image_timeout_seconds,
+)
+from minerva_travel.crossword import CrosswordGenerationError, build_crossword
+from minerva_travel.dot_to_dot import (
+    DotToDotGenerationError,
+    build_dot_to_dot,
+    dot_count_for,
 )
 from minerva_travel.image_generation import simplify_child_coloring_lineart
 from minerva_travel.investigator_activity import (
@@ -755,6 +763,117 @@ class OpenAIGuidePageGenerator:
         finally:
             artwork.unlink(missing_ok=True)
 
+    def generate_dot_to_dot_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        """Trace the numbered dots from a silhouette drawn for this landmark."""
+
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec, default=f"Ligue os números e descubra {name}."
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                activity_artwork_prompt(
+                    activity_type="dot_to_dot",
+                    landmark_name=name,
+                    city=city,
+                    country=country,
+                    age_complexity=age_complexity,
+                    has_landmark_reference=(
+                        landmark_reference is not None or landmark_page_reference is not None
+                    ),
+                    has_revision_reference=reference_page is not None,
+                    revision_instruction=revision_instruction,
+                ),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            # A silhueta vira pontos e some: imprimir o contorno junto entregaria
+            # a resposta antes de a criança ligar o primeiro número.
+            simplify_child_coloring_lineart(artwork)
+            puzzle = build_dot_to_dot(artwork, dots=dot_count_for(age_complexity))
+            blank = _provider_artwork_path(output_path).with_suffix(".blank.png")
+            Image.new("RGB", PAGE_IMAGE_SIZE, "#fffdf8").save(blank, "PNG")
+            try:
+                return compose_dot_to_dot_page(
+                    blank,
+                    output_path,
+                    landmark_name=name,
+                    instruction=instruction,
+                    puzzle=puzzle,
+                )
+            finally:
+                blank.unlink(missing_ok=True)
+        except (
+            ActivityPageCompositionError,
+            DotToDotGenerationError,
+            OSError,
+            ValueError,
+        ) as error:
+            raise PageGenerationError("Não foi possível finalizar o ligue os pontos.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_crossword_page(
+        self,
+        *,
+        output_path: Path,
+        landmark_reference: Path | None,
+        landmark_page_reference: Path | None,
+        landmark_context: dict[str, Any],
+        activity_spec: dict[str, Any],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        name, city, country, age_complexity = _activity_context(landmark_context)
+        instruction = _activity_instruction(
+            activity_spec, default="Complete a cruzadinha com as palavras da viagem."
+        )
+        try:
+            crossword = build_crossword(_crossword_clues(activity_spec))
+        except CrosswordGenerationError as error:
+            raise PageGenerationError("Não foi possível montar a cruzadinha.") from error
+
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                activity_artwork_prompt(
+                    activity_type="crossword",
+                    landmark_name=name,
+                    city=city,
+                    country=country,
+                    age_complexity=age_complexity,
+                    has_landmark_reference=(
+                        landmark_reference is not None or landmark_page_reference is not None
+                    ),
+                    has_revision_reference=reference_page is not None,
+                    revision_instruction=revision_instruction,
+                ),
+                _activity_references(landmark_reference, landmark_page_reference, reference_page),
+            )
+            _persist_page_image(response, artwork)
+            return compose_crossword_page(
+                artwork,
+                output_path,
+                landmark_name=name,
+                instruction=instruction,
+                crossword=crossword,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar a cruzadinha.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
     def generate_maze_page(
         self,
         *,
@@ -1429,6 +1548,18 @@ def activity_artwork_prompt(
         ),
         # As páginas de escrever recebem painéis opacos por cima: a arte só
         # aparece como moldura, então detalhe no centro seria desperdiçado.
+        "dot_to_dot": (
+            "Convert the landmark into one large, simple black-and-white silhouette line drawing "
+            "with a single clean outer contour and no interior detail, filling the middle of the "
+            "page. No shading, texture, windows, bricks or small elements. Keep the upper 20 "
+            "percent completely white and empty."
+        ),
+        "crossword": (
+            "Create a subtle decorative travel background with a small recognizable watercolor "
+            "landmark vignette near the bottom edge and a pencil and eraser near the perimeter. "
+            "Keep the whole centre pale and completely free of detail so a printed grid stays "
+            "readable."
+        ),
         "maze": (
             "Create a subtle decorative travel background with a small recognizable watercolor "
             "landmark vignette near the bottom edge and a winding dotted travel trail motif near "
@@ -1955,6 +2086,21 @@ def _detail_hunt_clues(specification: dict[str, Any], landmark_name: str) -> lis
     if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
         raise PageGenerationError("As pistas do caça aos detalhes são inválidas.")
     return raw
+
+
+def _crossword_clues(specification: dict[str, Any]) -> list[tuple[str, str]]:
+    raw = specification.get("clues")
+    if not isinstance(raw, list) or not raw:
+        raise PageGenerationError("As dicas da cruzadinha são inválidas.")
+    clues: list[tuple[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise PageGenerationError("As dicas da cruzadinha são inválidas.")
+        answer, clue = item.get("answer"), item.get("clue")
+        if not isinstance(answer, str) or not isinstance(clue, str):
+            raise PageGenerationError("As dicas da cruzadinha são inválidas.")
+        clues.append((answer, clue))
+    return clues
 
 
 def _activity_seed(
