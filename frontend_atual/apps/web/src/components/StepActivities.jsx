@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import ActivityLandmarkPicker from '@/components/ActivityLandmarkPicker.jsx';
 import ActivityPlanSummary from '@/components/ActivityPlanSummary.jsx';
 import ActivityPreviewDialog from '@/components/ActivityPreviewDialog.jsx';
+import FlightVocabularyCard from '@/components/FlightVocabularyCard.jsx';
 import { selectGuideLandmarks } from '@/utils/minerva-api.js';
 import { pluralize } from '@/utils/guide-form.js';
 import {
@@ -25,6 +26,8 @@ const StepActivities = () => {
     childrenList,
     landmarkActivitySelections,
     setLandmarkActivitySelections,
+    flightVocabularyPages,
+    setFlightVocabularyPages,
     nextStep,
   } = useConversationalGuide();
   const [selectionError, setSelectionError] = useState('');
@@ -99,6 +102,12 @@ const StepActivities = () => {
         landmarks={landmarks}
         selections={landmarkActivitySelections}
         onRemove={toggleActivity}
+      />
+
+      <FlightVocabularyCard
+        landmarks={landmarks}
+        enabled={flightVocabularyPages}
+        onChange={setFlightVocabularyPages}
       />
 
       <section className="rounded-[2rem] border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6" aria-labelledby="mandatory-pages-title">

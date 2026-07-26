@@ -19,9 +19,11 @@ import {
   MIN_GUIDE_YEAR,
 } from '../src/utils/guide-form.js';
 import {
+  FLIGHT_VOCABULARY_LANGUAGES,
   MAX_OPTIONAL_ACTIVITIES_PER_GUIDE,
   MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
   OPTIONAL_LANDMARK_ACTIVITY_TYPES,
+  PHRASEBOOK_COUNTRIES,
 } from '../src/utils/landmark-activities.js';
 
 const projectRoot = dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
@@ -149,5 +151,19 @@ test('frontend product limits match the backend contract source', () => {
   assert.deepEqual(
     new Set(contract['x-minerva-optional-landmark-activity-types']),
     new Set(OPTIONAL_LANDMARK_ACTIVITY_TYPES),
+  );
+});
+
+test('the flight vocabulary languages the screen promises match the ones the guide prints', () => {
+  // A tela precisa nomear o idioma antes de gerar nada, então mantém uma
+  // cópia da lista. Sem esta comparação ela envelheceria em silêncio e
+  // prometeria um idioma que o backend não sabe imprimir.
+  assert.deepEqual(
+    FLIGHT_VOCABULARY_LANGUAGES,
+    contract['x-minerva-flight-vocabulary-languages'],
+  );
+  assert.equal(
+    Object.keys(FLIGHT_VOCABULARY_LANGUAGES).length,
+    PHRASEBOOK_COUNTRIES.size,
   );
 });

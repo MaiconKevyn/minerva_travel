@@ -44,6 +44,7 @@ class FakePageGenerator:
             "cover": "#4f86b7",
             "summary": "#69b482",
             "destination": "#6f9fb8",
+            "flight_vocabulary": "#c58f4a",
             "landmark": "#c9a94d",
             "activity": "#8f79b8",
             "memory": "#d69b79",
@@ -58,6 +59,9 @@ class FakePageGenerator:
 
     def generate_summary_page(self, *, output_path, **kwargs):
         return self._write("summary", output_path, kwargs)
+
+    def generate_flight_vocabulary_page(self, *, output_path, **kwargs):
+        return self._write("flight_vocabulary", output_path, kwargs)
 
     def generate_destination_intro_page(self, *, output_path, **kwargs):
         return self._write("destination", output_path, kwargs)
@@ -167,8 +171,10 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
     assert [page["kind"] for page in created["pages"]] == [
         "cover",
         "trip_summary",
+        "flight_vocabulary",
         "destination_intro",
         "landmark",
+        "flight_vocabulary",
         "destination_intro",
         "landmark",
         "best_memory",
@@ -211,8 +217,10 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
 
     for page_id, kind in (
         ("summary", "summary"),
+        ("flight-vocabulary-franca", "flight_vocabulary"),
         ("destination-1", "destination"),
         ("landmark-1", "landmark"),
+        ("flight-vocabulary-italia", "flight_vocabulary"),
         ("destination-2", "destination"),
         ("landmark-2", "landmark"),
         ("best-memory", "memory"),
@@ -251,7 +259,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
     completed = client.post(f"/api/guide-builder/{session_id}/complete")
     assert completed.status_code == 200, completed.text
     payload = completed.json()
-    assert len(payload["pages"]) == 8
+    assert len(payload["pages"]) == len(created["pages"])
     assert all(page["asset_url"].startswith("/guide-builder/") for page in payload["pages"])
     assert "download_url" not in payload
     assert "preview_url" not in payload
@@ -267,7 +275,7 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         "session_id": session_id,
         "download_url": f"/guide-builder/{session_id}/pdf",
         "filename": "familia-moraes-minerva-travel.pdf",
-        "page_count": 8,
+        "page_count": len(created["pages"]),
     }
     pdf_path = tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf"
     first_bytes = pdf_path.read_bytes()
@@ -803,16 +811,9 @@ def test_account_deletion_removes_builder_session_photo_and_pages(tmp_path, monk
     client, _generator = _setup(monkeypatch, tmp_path)
     created = _create_session(client)
     session_id = created["session_id"]
-    for page_id in (
-        "cover",
-        "summary",
-        "destination-1",
-        "landmark-1",
-        "destination-2",
-        "landmark-2",
-        "best-memory",
-        "homecoming",
-    ):
+    # Derivado da sessão: aprovar uma lista fixa deixaria de cobrir as páginas
+    # novas justamente no teste que exige o guia inteiro aprovado.
+    for page_id in [page["id"] for page in created["pages"]]:
         generated = _generate(client, session_id, page_id, f"delete-{page_id}")
         assert generated.status_code == 200
         page = next(item for item in generated.json()["pages"] if item["id"] == page_id)

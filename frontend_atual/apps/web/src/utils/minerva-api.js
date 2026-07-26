@@ -542,6 +542,11 @@ export const appendGuideMetadata = (formData, guideData = {}) => {
   if (guideData.restaurantRecommendationsExtra) {
     formData.append('restaurant_recommendations_extra', 'true');
   }
+  // Só mandamos quando a família desliga. O backend trata a ausência como
+  // ligado, então um cliente antigo não perde a página em silêncio.
+  if (guideData.flightVocabularyPages === false) {
+    formData.append('flight_vocabulary_pages', 'false');
+  }
   if (guideData.itinerary) {
     formData.append('itinerary_json', JSON.stringify(guideData.itinerary));
   }

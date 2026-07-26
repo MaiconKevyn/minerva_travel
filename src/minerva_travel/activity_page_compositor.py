@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 from minerva_travel.child_phrasebook import PHRASES_PER_PAGE, ChildPhrasebook
 from minerva_travel.crossword import Crossword
 from minerva_travel.dot_to_dot import DotToDot
+from minerva_travel.flight_vocabulary import WORDS_PER_PAGE, FlightVocabulary
 from minerva_travel.investigator_activity import (
     InvestigatorChildProfile,
     InvestigatorMission,
@@ -62,6 +63,13 @@ SPOT_PANEL_SIZE = (884, 470)
 SPOT_PANEL_GAP = 40
 SPOT_PANEL_TOP = 300
 LANGUAGE_TITLE = "Sobrevivência no idioma"
+# O idioma entra no título: "Primeiras palavras" sozinho não diz de qual país
+# é a página, e num guia com dois países há duas delas.
+FLIGHT_VOCABULARY_TITLE_PREFIX = "Primeiras palavras em"
+
+
+def flight_vocabulary_title(language: str) -> str:
+    return f"{FLIGHT_VOCABULARY_TITLE_PREFIX} {language}"
 POSTCARD_TITLE = "Cartão-postal"
 POSTCARD_REGION = (600, 1480)
 PASSPORT_TITLE = "Passaporte de viagem"
@@ -686,6 +694,85 @@ def compose_language_page(
         draw.text((92, y + 92), f"fale assim: {phrase.pronunciation}",
                   font=_font(25, bold=True), fill=ACCENT)
         draw.text((92, y + 142), phrase.meaning, font=_font(23), fill=MUTED_INK)
+    return _atomic_save(image, output_path)
+
+
+def compose_flight_vocabulary_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    vocabulary: FlightVocabulary,
+    instruction: str,
+) -> Path:
+    """As primeiras palavras do país, para treinar antes de pousar.
+
+    Uma linha por palavra: como se escreve, como se fala e o que quer dizer.
+    O quadradinho no fim não é enfeite — é o que transforma a lista numa
+    atividade, porque a criança volta à página para marcar o que já falou.
+    """
+
+    if len(vocabulary.words) != WORDS_PER_PAGE:
+        raise ActivityPageCompositionError("A lista de palavras está incompleta.")
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+    _panel(draw, (38, 30, 986, 268))
+    _draw_centered_fit(
+        draw,
+        flight_vocabulary_title(vocabulary.language),
+        46,
+        50,
+        28,
+        884,
+        bold=True,
+    )
+    _draw_centered_fit(
+        draw,
+        _bounded(vocabulary.country, "country", 90),
+        118,
+        32,
+        20,
+        884,
+        bold=True,
+    )
+    _draw_wrapped(
+        draw,
+        _bounded(instruction, "instruction", 240),
+        (82, 178, 942, 256),
+        font=_font(23),
+        fill=MUTED_INK,
+        align="center",
+    )
+
+    top, bottom = 306, 1490
+    height = (bottom - top) // WORDS_PER_PAGE
+    for index, entry in enumerate(vocabulary.words):
+        y = top + index * height
+        _panel(draw, (54, y, 970, y + height - 14), radius=18)
+        _draw_wrapped(
+            draw,
+            entry.word,
+            (88, y + 14, 590, y + 70),
+            font=_font(31, bold=True),
+            fill=INK,
+        )
+        # A pronúncia é o que a criança realmente fala; fica destacada.
+        draw.text(
+            (88, y + 76),
+            f"fale assim: {entry.pronunciation}",
+            font=_font(23, bold=True),
+            fill=ACCENT,
+        )
+        _draw_wrapped(
+            draw,
+            entry.meaning,
+            (546, y + 30, 892, y + height - 30),
+            font=_font(23),
+            fill=MUTED_INK,
+        )
+        draw.rounded_rectangle(
+            (912, y + 40, 950, y + 78), radius=5, outline=INK, width=4, fill="white"
+        )
     return _atomic_save(image, output_path)
 
 

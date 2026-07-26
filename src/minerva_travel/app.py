@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sqlite3
+import unicodedata
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
@@ -60,6 +61,7 @@ from minerva_travel.activity_page_compositor import (
     WORD_SEARCH_TITLE,
     coloring_instruction_for,
     family_coloring_instruction_for,
+    flight_vocabulary_title,
 )
 from minerva_travel.asset_policy import (
     AssetProvenanceError,
@@ -135,6 +137,10 @@ from minerva_travel.custom_landmarks import (
     slugify,
 )
 from minerva_travel.destination_facts import lookup_destination_facts
+from minerva_travel.flight_vocabulary import (
+    country_flight_vocabulary_languages,
+    flight_vocabulary_for,
+)
 from minerva_travel.guide_builder import build_guide_context
 from minerva_travel.guide_cover import (
     load_cover_thumbnail,
@@ -253,7 +259,12 @@ CUSTOM_LANDMARK_IMAGE_HOSTS = {
 CUSTOM_LANDMARK_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 LINEART_CANVAS_SIZE = (1200, 850)
 MAX_PROGRESSIVE_BUILDER_PAGES = (
-    4 + MAX_GUIDE_DESTINATIONS + MAX_GUIDE_LANDMARKS + MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE
+    4
+    + MAX_GUIDE_DESTINATIONS
+    # Uma página de palavras por país, e no pior caso cada destino é um país.
+    + MAX_GUIDE_DESTINATIONS
+    + MAX_GUIDE_LANDMARKS
+    + MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE
 )
 DEFAULT_BUILDER_PAGE_GENERATION_QUOTA = max(64, MAX_PROGRESSIVE_BUILDER_PAGES)
 DEFAULT_BUILDER_PAGE_GENERATION_RATE_LIMIT = 16
@@ -519,6 +530,7 @@ class BuilderPageResponse(BaseModel):
         "cover",
         "trip_summary",
         "destination_intro",
+        "flight_vocabulary",
         "landmark",
         "landmark_activity",
         "best_memory",
@@ -643,6 +655,7 @@ class MinervaFastAPI(FastAPI):
         schema["x-minerva-optional-landmark-activity-types"] = list(
             OPTIONAL_LANDMARK_ACTIVITY_TYPES
         )
+        schema["x-minerva-flight-vocabulary-languages"] = country_flight_vocabulary_languages()
         return schema
 
 
@@ -1034,6 +1047,9 @@ class GuideGenerationFormRequest(StrictRequestModel):
         max_length=MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE,
     )
     restaurant_recommendations_extra: bool = False
+    # Ausente significa ligado: a página de palavras entra por padrão, e um
+    # cliente antigo que não conhece o campo não deve perdê-la em silêncio.
+    flight_vocabulary_pages: bool = True
     photo_processing_consent: bool = False
     privacy_consent_version: str | None = Field(default=None, max_length=100)
     privacy_consent_at: str | None = Field(default=None, max_length=100)
@@ -1554,6 +1570,7 @@ def parse_guide_generation_form(
     itinerary_json: Annotated[str | None, Form()] = None,
     activity_selections_json: Annotated[str | None, Form()] = None,
     restaurant_recommendations_extra: Annotated[bool | None, Form()] = None,
+    flight_vocabulary_pages: Annotated[bool | None, Form()] = None,
     photo_processing_consent: Annotated[bool, Form()] = False,
     privacy_consent_version: Annotated[str | None, Form()] = None,
     privacy_consent_at: Annotated[str | None, Form()] = None,
@@ -1572,6 +1589,9 @@ def parse_guide_generation_form(
             itinerary_json=itinerary_json,
             activity_selections=activity_selections,
             restaurant_recommendations_extra=bool(restaurant_recommendations_extra),
+            flight_vocabulary_pages=(
+                True if flight_vocabulary_pages is None else flight_vocabulary_pages
+            ),
             photo_processing_consent=photo_processing_consent,
             privacy_consent_version=privacy_consent_version,
             privacy_consent_at=privacy_consent_at,
@@ -2883,6 +2903,19 @@ def _builder_activity_page(
     )
 
 
+FLIGHT_VOCABULARY_INSTRUCTION = (
+    "Treine no avião e marque cada palavra que você conseguir falar."
+)
+
+
+def _country_key(country: str) -> str:
+    """França e "franca" são o mesmo país; o nome chega como a família digitou."""
+
+    decomposed = unicodedata.normalize("NFD", str(country or "").strip().lower())
+    stripped = "".join(char for char in decomposed if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", "-", stripped).strip("-")
+
+
 def _builder_page_plan(
     form: dict[str, Any],
     destinations: list[Destination],
@@ -2958,7 +2991,47 @@ def _builder_page_plan(
     ]
     next_position = 3
     introduced_destination_ids: set[str] = set()
+    # Uma página de palavras por país, não por destino: Paris e Lyon são a
+    # mesma França, e ensinar francês duas vezes seria papel jogado fora.
+    introduced_countries: set[str] = set()
+    include_flight_vocabulary = bool(form.get("flight_vocabulary_pages", True))
+    landmarks_by_country: dict[str, list[str]] = {}
     for landmark in landmarks:
+        landmarks_by_country.setdefault(_country_key(landmark.country), []).append(landmark.name)
+
+    for landmark in landmarks:
+        country_key = _country_key(landmark.country)
+        if include_flight_vocabulary and country_key and country_key not in introduced_countries:
+            introduced_countries.add(country_key)
+            vocabulary = flight_vocabulary_for(
+                landmark.country, landmarks_by_country.get(country_key, [])
+            )
+            if vocabulary is not None:
+                instruction = FLIGHT_VOCABULARY_INSTRUCTION
+                pages.append(
+                    BuilderPage(
+                        id=f"flight-vocabulary-{country_key}",
+                        kind="flight_vocabulary",
+                        title=f"Primeiras palavras em {vocabulary.language}",
+                        position=next_position,
+                        required_copy=[
+                            flight_vocabulary_title(vocabulary.language),
+                            vocabulary.country,
+                            instruction,
+                            *(word.word for word in vocabulary.words),
+                            *(word.meaning for word in vocabulary.words),
+                        ],
+                        metadata={
+                            "country": landmark.country,
+                            "language": vocabulary.language,
+                            "landmark_names": landmarks_by_country.get(country_key, []),
+                            "instruction": instruction,
+                            "trip_date": trip_date,
+                        },
+                    )
+                )
+                next_position += 1
+
         if landmark.destination_id not in introduced_destination_ids:
             destination_context = destination_context_by_id[landmark.destination_id]
             destination_private_context = destination_context.model_dump(mode="json")
@@ -3038,7 +3111,6 @@ def _builder_page_plan(
                     curiosity_label,
                     landmark.curiosity,
                     LANDMARK_VISITED_LABEL,
-    LANGUAGE_TITLE,
                 ],
                 metadata={
                     **private_context,
@@ -3410,7 +3482,7 @@ def generate_builder_page_attempt(
                     "family_coloring",
                     "investigator",
                 }
-            elif page.kind in {"destination_intro", "best_memory"}:
+            elif page.kind in {"destination_intro", "flight_vocabulary", "best_memory"}:
                 include_family = False
             else:
                 include_family = True
@@ -3530,6 +3602,15 @@ def generate_builder_page_attempt(
                 trip_date=str(metadata["trip_date"]),
                 landmark_names=list(metadata["landmark_names"]),
                 expected_visible_family_member_count=expected_people,
+                revision_instruction=revision_instruction,
+                reference_page=reference_page,
+            )
+        elif page_kind == "flight_vocabulary":
+            generator.generate_flight_vocabulary_page(
+                output_path=output,
+                country=str(metadata["country"]),
+                landmark_names=list(metadata["landmark_names"]),
+                instruction=str(metadata["instruction"]),
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )

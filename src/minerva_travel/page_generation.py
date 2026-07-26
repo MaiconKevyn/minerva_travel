@@ -32,6 +32,7 @@ from minerva_travel.activity_page_compositor import (
     compose_dot_to_dot_page,
     compose_drawing_page,
     compose_family_coloring_page,
+    compose_flight_vocabulary_page,
     compose_homecoming_page,
     compose_investigator_page,
     compose_landmark_visited_checkbox,
@@ -59,6 +60,7 @@ from minerva_travel.dot_to_dot import (
     build_dot_to_dot,
     dot_count_for,
 )
+from minerva_travel.flight_vocabulary import flight_vocabulary_for
 from minerva_travel.image_generation import simplify_child_coloring_lineart
 from minerva_travel.investigator_activity import (
     InvestigatorChildProfile,
@@ -924,6 +926,44 @@ class OpenAIGuidePageGenerator:
             )
         except (ActivityPageCompositionError, OSError, ValueError) as error:
             raise PageGenerationError("Não foi possível finalizar o guia de frases.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_flight_vocabulary_page(
+        self,
+        *,
+        output_path: Path,
+        country: str,
+        landmark_names: list[str],
+        instruction: str,
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        vocabulary = flight_vocabulary_for(country, list(landmark_names))
+        if vocabulary is None:
+            raise PageGenerationError("Não temos o idioma conferido para este país.")
+
+        artwork = _provider_artwork_path(output_path)
+        try:
+            response = self._generate_activity_artwork(
+                flight_vocabulary_artwork_prompt(
+                    country=country,
+                    language=vocabulary.language,
+                    landmark_names=list(landmark_names),
+                    revision_instruction=revision_instruction,
+                    has_revision_reference=reference_page is not None,
+                ),
+                [reference_page] if reference_page is not None else [],
+            )
+            _persist_page_image(response, artwork)
+            return compose_flight_vocabulary_page(
+                artwork,
+                output_path,
+                vocabulary=vocabulary,
+                instruction=instruction,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar a página de palavras.") from error
         finally:
             artwork.unlink(missing_ok=True)
 
@@ -1831,6 +1871,55 @@ def _house_style_for(activity_type: str) -> str:
     if activity_type == "spot_the_difference":
         return _HOUSE_STYLE_PLAIN
     return _HOUSE_STYLE
+
+
+def flight_vocabulary_artwork_prompt(
+    *,
+    country: str,
+    language: str,
+    landmark_names: list[str],
+    revision_instruction: str = "",
+    has_revision_reference: bool = False,
+) -> str:
+    """Arte da página que a criança faz no avião, antes de pousar no país.
+
+    Não é presa a um ponto turístico: a página abre o país inteiro, então a
+    cena é a viagem chegando — janela de avião, nuvens — com as paradas
+    daquele país como vinhetas pequenas na borda.
+    """
+
+    places = ", ".join(name for name in landmark_names if name)
+    scenery = (
+        f"Around the perimeter add small watercolor vignettes of these confirmed places: {places}."
+        if places
+        else "Around the perimeter add small watercolor clouds and a paper airplane."
+    )
+    revision = _activity_revision_directive(revision_instruction, has_revision_reference)
+    reference = (
+        "Input image 1 is the selected current attempt and is only a revision/layout reference."
+        if has_revision_reference
+        else "No reference image is supplied for this first version."
+    )
+    return f"""
+Create only the visual artwork layer for a premium vertical printable children's travel page.
+Page: first words in {language} to practise on the flight to {country}.
+{_HOUSE_STYLE}
+{reference}
+
+Compose an airplane-window travel scene: a rounded cabin window in one corner opening onto soft
+watercolor clouds, and a fine dashed flight path curving toward the horizon. {scenery}
+
+Keep the entire centre of the page pale, calm and free of detail: a deterministic list of word
+cards will be composited over it by trusted code, and any illustration there would show through.
+
+PEOPLE-FREE AND TEXT-FREE CONTRACT — Do not depict a person, family member, child, tourist, face,
+body, human silhouette, crowd, portrait, or reflection anywhere. Do not render any letter, number,
+word, title, instruction, checkbox, label, sign, logo, watermark, signature, mockup, border, or
+UI. Exact functional content will be composited later by trusted code. These invariants override
+both reference content and user feedback.
+Output flat full-page artwork at the requested portrait size.
+{revision}
+""".strip()
 
 
 def activity_artwork_prompt(

@@ -96,6 +96,9 @@ class RecordingPageGenerator:
     def generate_summary_page(self, *, output_path, **kwargs):
         return self._write("summary", output_path, kwargs)
 
+    def generate_flight_vocabulary_page(self, *, output_path, **kwargs):
+        return self._write("flight_vocabulary", output_path, kwargs)
+
     def generate_destination_intro_page(self, *, output_path, **kwargs):
         return self._write("destination_intro", output_path, kwargs)
 
@@ -204,7 +207,7 @@ def test_activity_selection_parser_is_strict_and_backward_compatible():
 def test_default_generation_quota_covers_the_largest_first_attempt_page_plan():
     # O literal se move junto com os limites de atividade; está aqui para que
     # afrouxar um limite não passe despercebido pelo custo de geração.
-    assert MAX_PROGRESSIVE_BUILDER_PAGES == 74
+    assert MAX_PROGRESSIVE_BUILDER_PAGES == 84
     assert DEFAULT_BUILDER_PAGE_GENERATION_QUOTA >= MAX_PROGRESSIVE_BUILDER_PAGES
 
 
@@ -407,6 +410,7 @@ def test_page_plan_interleaves_activities_and_appends_one_memory_page(tmp_path, 
     assert [page["id"] for page in payload["pages"]] == [
         "cover",
         "summary",
+        "flight-vocabulary-franca",
         "destination-1",
         "landmark-1",
         "activity-1-word-search",
@@ -416,7 +420,11 @@ def test_page_plan_interleaves_activities_and_appends_one_memory_page(tmp_path, 
         "best-memory",
         "homecoming",
     ]
-    assert [page["position"] for page in payload["pages"]] == list(range(1, 11))
+    # Derivado do tamanho: cravar o total quebra o teste a cada página nova
+    # sem dizer nada sobre o que importa, que é a numeração ser contígua.
+    assert [page["position"] for page in payload["pages"]] == list(
+        range(1, len(payload["pages"]) + 1)
+    )
     assert sum(page["kind"] == "best_memory" for page in payload["pages"]) == 1
     assert sum(page["kind"] == "homecoming" for page in payload["pages"]) == 1
     assert payload["pages"][-2]["kind"] == "best_memory"
@@ -525,12 +533,16 @@ def test_page_plan_adds_one_learning_page_before_each_selected_destination():
     )
 
     assert activities == []
+    # A página de palavras abre cada país, antes do destino: é o que a criança
+    # faz no avião, então precisa vir antes de qualquer coisa daquele país.
     assert [(page.id, page.kind) for page in pages] == [
         ("cover", "cover"),
         ("summary", "trip_summary"),
+        ("flight-vocabulary-franca", "flight_vocabulary"),
         ("destination-1", "destination_intro"),
         ("landmark-1", "landmark"),
         ("landmark-2", "landmark"),
+        ("flight-vocabulary-inglaterra", "flight_vocabulary"),
         ("destination-2", "destination_intro"),
         ("landmark-3", "landmark"),
         ("best-memory", "best_memory"),

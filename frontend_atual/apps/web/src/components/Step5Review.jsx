@@ -13,6 +13,7 @@ import {
   AlertCircle,
   PenLine,
   Plane,
+  PlaneTakeoff,
   Puzzle,
   RefreshCcw,
 } from 'lucide-react';
@@ -36,7 +37,10 @@ import {
   serializeGuideDestinations,
 } from '@/utils/guide-form.js';
 import GuideAssembly from '@/components/GuideAssembly.jsx';
-import { activityOptionForType } from '@/utils/landmark-activities.js';
+import {
+  activityOptionForType,
+  guideFlightVocabularyCountries,
+} from '@/utils/landmark-activities.js';
 import { toast } from 'sonner';
 
 const Step5Review = () => {
@@ -58,6 +62,7 @@ const Step5Review = () => {
     itineraryPreferences,
     recommendedItinerary,
     restaurantRecommendationsExtra,
+    flightVocabularyPages,
     setRestaurantRecommendationsExtra,
     year,
     builderSessionId,
@@ -111,6 +116,7 @@ const Step5Review = () => {
 
   // Derive the rich data from the IDs
   const finalLandmarks = selectGuideLandmarks(parsedData.landmarks, selectedLandmarks);
+  const flightVocabularyCountries = guideFlightVocabularyCountries(finalLandmarks);
   const childNamesList = deriveChildNames(childrenList);
   const childrenNames = childNamesList.join(', ');
   const childrenAges = deriveChildAges(childrenList);
@@ -149,6 +155,7 @@ const Step5Review = () => {
       landmarkActivitySelections,
       itinerary,
       restaurantRecommendationsExtra,
+      flightVocabularyPages,
     };
   };
 
@@ -420,6 +427,28 @@ const Step5Review = () => {
             )}
           </div>
         </div>
+
+        {/* A página do avião é a única que entra ligada por padrão: quem não
+            a revê aqui só descobre que existe quando o guia já está pronto. */}
+        {flightVocabularyPages && flightVocabularyCountries.length > 0 && (
+          <div className="mt-8 rounded-3xl border-2 border-primary/25 bg-primary/5 p-5 sm:p-6">
+            <div className="flex items-start gap-4">
+              <PlaneTakeoff className="mt-1 h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
+              <div>
+                <h3 className="text-xl font-serif font-bold text-foreground">
+                  Primeiras palavras, para treinar no avião
+                </h3>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">
+                  Uma página antes de cada país:{' '}
+                  {flightVocabularyCountries
+                    .map((item) => `${item.country} (${item.language})`)
+                    .join(', ')}
+                  .
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 rounded-3xl border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6">
           <div className="flex items-start gap-4">

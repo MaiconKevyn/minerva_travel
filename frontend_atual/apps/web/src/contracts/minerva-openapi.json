@@ -197,6 +197,17 @@
             "title": "Family Photo",
             "type": "string"
           },
+          "flight_vocabulary_pages": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flight Vocabulary Pages"
+          },
           "itinerary_json": {
             "anyOf": [
               {
@@ -340,6 +351,17 @@
             "contentMediaType": "application/octet-stream",
             "title": "Family Photo",
             "type": "string"
+          },
+          "flight_vocabulary_pages": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flight Vocabulary Pages"
           },
           "itinerary_json": {
             "anyOf": [
@@ -983,6 +1005,7 @@
               "cover",
               "trip_summary",
               "destination_intro",
+              "flight_vocabulary",
               "landmark",
               "landmark_activity",
               "best_memory",
@@ -9095,6 +9118,37 @@
     "max_optional_activity_pages_per_guide": 30,
     "max_visible_family_members": 20,
     "min_guide_year": 2024
+  },
+  "x-minerva-flight-vocabulary-languages": {
+    "alemanha": "alemão",
+    "argentina": "espanhol",
+    "australia": "inglês",
+    "austria": "alemão",
+    "belgica": "francês",
+    "canada": "inglês",
+    "chile": "espanhol",
+    "colombia": "espanhol",
+    "escocia": "inglês",
+    "espanha": "espanhol",
+    "estados unidos": "inglês",
+    "franca": "francês",
+    "france": "francês",
+    "germany": "alemão",
+    "inglaterra": "inglês",
+    "irlanda": "inglês",
+    "italia": "italiano",
+    "italy": "italiano",
+    "japan": "japonês",
+    "japao": "japonês",
+    "mexico": "espanhol",
+    "nova zelandia": "inglês",
+    "peru": "espanhol",
+    "reino unido": "inglês",
+    "spain": "espanhol",
+    "suica": "alemão",
+    "united kingdom": "inglês",
+    "united states": "inglês",
+    "uruguai": "espanhol"
   },
   "x-minerva-optional-landmark-activity-types": [
     "coloring",

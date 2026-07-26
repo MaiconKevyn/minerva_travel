@@ -314,21 +314,52 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
  * atividade — então nem oferecemos o card, em vez de deixar a família escolher
  * uma página que não vai existir.
  */
-export const PHRASEBOOK_COUNTRIES = new Set([
-  'franca', 'france', 'belgica',
-  'reino unido', 'inglaterra', 'united kingdom', 'escocia', 'irlanda',
-  'estados unidos', 'united states', 'canada', 'australia', 'nova zelandia',
-  'espanha', 'spain', 'argentina', 'chile', 'uruguai', 'mexico', 'peru', 'colombia',
-  'italia', 'italy',
-  'alemanha', 'germany', 'austria', 'suica',
-  'japao', 'japan',
-]);
+/**
+ * Pa\u00eds \u2192 idioma conferido, espelho de `x-minerva-flight-vocabulary-languages`.
+ *
+ * A tela precisa dizer de qual idioma ser\u00e3o as palavras antes de gerar nada,
+ * ent\u00e3o a lista vive aqui tamb\u00e9m. Um teste de contrato compara os dois: sem
+ * ele, a tela prometeria um idioma que o guia n\u00e3o sabe imprimir.
+ */
+export const FLIGHT_VOCABULARY_LANGUAGES = {
+  alemanha: 'alem\u00e3o', argentina: 'espanhol', australia: 'ingl\u00eas', austria: 'alem\u00e3o',
+  belgica: 'franc\u00eas', canada: 'ingl\u00eas', chile: 'espanhol', colombia: 'espanhol',
+  escocia: 'ingl\u00eas', espanha: 'espanhol', 'estados unidos': 'ingl\u00eas', franca: 'franc\u00eas',
+  france: 'franc\u00eas', germany: 'alem\u00e3o', inglaterra: 'ingl\u00eas', irlanda: 'ingl\u00eas',
+  italia: 'italiano', italy: 'italiano', japan: 'japon\u00eas', japao: 'japon\u00eas',
+  mexico: 'espanhol', 'nova zelandia': 'ingl\u00eas', peru: 'espanhol', 'reino unido': 'ingl\u00eas',
+  spain: 'espanhol', suica: 'alem\u00e3o', 'united kingdom': 'ingl\u00eas', 'united states': 'ingl\u00eas',
+  uruguai: 'espanhol',
+};
+
+export const PHRASEBOOK_COUNTRIES = new Set(Object.keys(FLIGHT_VOCABULARY_LANGUAGES));
 
 const withoutAccents = (value) =>
   String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 
 export const countryHasPhrasebook = (country) =>
   PHRASEBOOK_COUNTRIES.has(withoutAccents(country));
+
+export const flightVocabularyLanguage = (country) =>
+  FLIGHT_VOCABULARY_LANGUAGES[withoutAccents(country)] || '';
+
+export const countryHasFlightVocabulary = (country) => Boolean(flightVocabularyLanguage(country));
+
+/**
+ * Os pa\u00edses que ganham p\u00e1gina de palavras, na ordem em que a fam\u00edlia visita \u2014
+ * a mesma ordem em que as p\u00e1ginas saem impressas.
+ */
+export const guideFlightVocabularyCountries = (landmarks = []) => {
+  const seen = new Map();
+  landmarks.forEach((landmark) => {
+    const country = String(landmark?.country || '').trim();
+    const language = flightVocabularyLanguage(country);
+    if (language && !seen.has(withoutAccents(country))) {
+      seen.set(withoutAccents(country), { country, language });
+    }
+  });
+  return [...seen.values()];
+};
 
 /**
  * Imagens que a lupa mostra. Sem galeria declarada, a própria miniatura é a
