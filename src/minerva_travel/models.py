@@ -66,8 +66,13 @@ OPTIONAL_LANDMARK_ACTIVITY_TYPES: tuple[OptionalLandmarkActivityType, ...] = (
     "language_survival",
     "spot_the_difference",
 )
-MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2
-MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE = 8
+# Limites afrouxados para a fase de desenvolvimento, para dar de exercitar o
+# catálogo inteiro num guia só. O custo é real: cada atividade escolhida é uma
+# geração de imagem (duas no "ache os erros"), então isto volta a apertar antes
+# de abrir para famílias.
+MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 10
+# Sem subir este junto, o limite por ponto acima seria inalcançável.
+MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE = 30
 MAX_ACTIVITY_SELECTIONS_JSON_BYTES = 20_000
 
 

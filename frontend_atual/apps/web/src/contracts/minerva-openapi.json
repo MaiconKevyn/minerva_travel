@@ -8437,8 +8437,8 @@
     "max_guide_landmarks": 30,
     "max_guide_parents": 10,
     "max_guide_year": 2100,
-    "max_optional_activities_per_landmark": 2,
-    "max_optional_activity_pages_per_guide": 8,
+    "max_optional_activities_per_landmark": 10,
+    "max_optional_activity_pages_per_guide": 30,
     "max_visible_family_members": 20,
     "min_guide_year": 2024
   },

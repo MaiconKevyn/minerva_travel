@@ -21,7 +21,12 @@ from minerva_travel.app import (
 from minerva_travel.builder import BuilderSession, load_builder_session
 from minerva_travel.catalog import load_catalog
 from minerva_travel.custom_landmarks import CustomLandmarkInput, build_custom_destinations
-from minerva_travel.models import LandmarkActivitySelection
+from minerva_travel.models import (
+    MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
+    MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE,
+    OPTIONAL_LANDMARK_ACTIVITY_TYPES,
+    LandmarkActivitySelection,
+)
 
 
 def _family_photo() -> bytes:
@@ -46,6 +51,25 @@ def _builder_data(*, activity_selections: object | None = None) -> dict:
             else json.dumps(activity_selections)
         )
     return data
+
+
+def _over_landmark_limit(selection_id: str = "paris:eiffel-tower") -> list[dict]:
+    """One activity more than a single point accepts, all of distinct types.
+
+    Derivado do limite para o teste continuar valendo quando ele mudar: com um
+    número fixo, afrouxar o limite faria o teste passar sem testar nada.
+    """
+
+    types = OPTIONAL_LANDMARK_ACTIVITY_TYPES[: MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK + 1]
+    assert len(types) == MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK + 1
+    return [
+        {
+            "landmark_selection_id": selection_id,
+            "activity_type": activity_type,
+            "order": min(index + 1, MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK),
+        }
+        for index, activity_type in enumerate(types)
+    ]
 
 
 def _post_builder(client: TestClient, data: dict):
@@ -178,7 +202,9 @@ def test_activity_selection_parser_is_strict_and_backward_compatible():
 
 
 def test_default_generation_quota_covers_the_largest_first_attempt_page_plan():
-    assert MAX_PROGRESSIVE_BUILDER_PAGES == 52
+    # O literal se move junto com os limites de atividade; está aqui para que
+    # afrouxar um limite não passe despercebido pelo custo de geração.
+    assert MAX_PROGRESSIVE_BUILDER_PAGES == 74
     assert DEFAULT_BUILDER_PAGE_GENERATION_QUOTA >= MAX_PROGRESSIVE_BUILDER_PAGES
 
 
@@ -236,21 +262,7 @@ def test_activity_snapshot_is_canonical_for_idempotency_hashing():
             ],
             "activity_selection_duplicate",
         ),
-        (
-            [
-                {
-                    "landmark_selection_id": "paris:eiffel-tower",
-                    "activity_type": activity_type,
-                    "order": order,
-                }
-                for activity_type, order in (
-                    ("coloring", 1),
-                    ("drawing", 2),
-                    ("word_search", 1),
-                )
-            ],
-            "activity_selection_landmark_limit",
-        ),
+        (_over_landmark_limit(), "activity_selection_landmark_limit"),
     ],
 )
 def test_activity_selection_rejects_unknown_unselected_duplicates_and_per_point_limit(
@@ -308,7 +320,7 @@ def test_builder_api_rejects_malformed_unsupported_and_total_overflow(tmp_path, 
                     "activity_type": "coloring",
                     "order": 1,
                 }
-                for _ in range(9)
+                for _ in range(MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE + 1)
             ]
         ),
     )
@@ -358,21 +370,7 @@ def test_builder_api_rejects_unknown_unselected_duplicate_and_per_point_overflow
             ],
             "activity_selection_duplicate",
         ),
-        (
-            [
-                {
-                    "landmark_selection_id": "paris:eiffel-tower",
-                    "activity_type": activity_type,
-                    "order": order,
-                }
-                for activity_type, order in (
-                    ("coloring", 1),
-                    ("drawing", 2),
-                    ("detail_hunt", 1),
-                )
-            ],
-            "activity_selection_landmark_limit",
-        ),
+        (_over_landmark_limit(), "activity_selection_landmark_limit"),
     ]
     for selections, expected_code in invalid_requests:
         data = _builder_data(activity_selections=selections)

@@ -850,9 +850,12 @@ test('appendGuideMetadata sends normalized optional activities linked to canonic
     ],
   });
 
+  // O tipo desconhecido cai fora e a ordem é atribuída em sequência; o corte
+  // por limite de ponto é exercitado em landmark-activities.test.js.
   assert.deepEqual(JSON.parse(formData.get('activity_selections_json')), [
     { landmark_selection_id: 'paris:eiffel', activity_type: 'coloring', order: 1 },
     { landmark_selection_id: 'paris:eiffel', activity_type: 'word_search', order: 2 },
+    { landmark_selection_id: 'paris:eiffel', activity_type: 'drawing', order: 3 },
   ]);
 });
 

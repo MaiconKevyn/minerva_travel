@@ -19,8 +19,11 @@ export const OPTIONAL_LANDMARK_ACTIVITY_TYPES = [
   'spot_the_difference',
 ];
 
-export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 2;
-export const MAX_OPTIONAL_ACTIVITIES_PER_GUIDE = 8;
+// Limites afrouxados para a fase de desenvolvimento. Precisam bater com
+// MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK e MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE
+// no backend — o contrato de limites é verificado em teste.
+export const MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK = 10;
+export const MAX_OPTIONAL_ACTIVITIES_PER_GUIDE = 30;
 
 /**
  * Onde a atividade acontece. Com poucas opções a lista corrida bastava; com o

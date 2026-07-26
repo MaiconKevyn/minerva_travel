@@ -5,6 +5,7 @@ import {
   LANDMARK_ACTIVITY_OPTIONS,
   MAX_OPTIONAL_ACTIVITIES_PER_GUIDE,
   MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
+  OPTIONAL_LANDMARK_ACTIVITY_TYPES,
   normalizeLandmarkActivitySelections,
   pruneLandmarkActivitySelections,
   toggleLandmarkActivitySelection,
@@ -70,27 +71,39 @@ test('activity selections are normalized to canonical point ids and supported ty
   );
 });
 
-test('activity selection enforces two pages per landmark', () => {
+test('activity selection enforces the per-landmark limit', () => {
+  // Derivado do limite: com um número fixo, afrouxá-lo faria o teste passar
+  // sem exercitar a regra.
   let selections = [];
-  selections = toggleLandmarkActivitySelection(selections, 'paris:eiffel', 'detail_hunt').selections;
-  selections = toggleLandmarkActivitySelection(selections, 'paris:eiffel', 'word_search').selections;
-  const rejected = toggleLandmarkActivitySelection(selections, 'paris:eiffel', 'coloring');
+  OPTIONAL_LANDMARK_ACTIVITY_TYPES.slice(0, MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK).forEach(
+    (type) => {
+      selections = toggleLandmarkActivitySelection(selections, 'paris:eiffel', type).selections;
+    },
+  );
+  const oneTooMany = OPTIONAL_LANDMARK_ACTIVITY_TYPES[MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK];
+  const rejected = toggleLandmarkActivitySelection(selections, 'paris:eiffel', oneTooMany);
 
   assert.equal(selections.length, MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK);
   assert.equal(rejected.selections.length, MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK);
-  assert.match(rejected.error, /no máximo 2 atividades por ponto turístico/);
+  assert.match(
+    rejected.error,
+    new RegExp(`no máximo ${MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK} atividades por ponto`),
+  );
 });
 
 test('activity selection enforces the guide quota and permits deselection', () => {
   let selections = [];
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; selections.length < MAX_OPTIONAL_ACTIVITIES_PER_GUIDE; index += 1) {
     selections = toggleLandmarkActivitySelection(selections, `point-${index}`, 'drawing').selections;
     selections = toggleLandmarkActivitySelection(selections, `point-${index}`, 'coloring').selections;
   }
 
-  const rejected = toggleLandmarkActivitySelection(selections, 'point-5', 'word_search');
+  const rejected = toggleLandmarkActivitySelection(selections, 'point-999', 'word_search');
   assert.equal(selections.length, MAX_OPTIONAL_ACTIVITIES_PER_GUIDE);
-  assert.match(rejected.error, /no máximo 8 atividades opcionais por guia/);
+  assert.match(
+    rejected.error,
+    new RegExp(`no máximo ${MAX_OPTIONAL_ACTIVITIES_PER_GUIDE} atividades opcionais por guia`),
+  );
 
   const removed = toggleLandmarkActivitySelection(selections, 'point-0', 'drawing');
   assert.equal(removed.error, '');
