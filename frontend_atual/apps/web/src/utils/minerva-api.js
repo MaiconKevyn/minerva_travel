@@ -830,6 +830,58 @@ export const discardGuideDraft = async (draftId, { signal } = {}) => {
   return (await response.json())?.deleted === true;
 };
 
+const familyProfileUrl = () => `${apiBaseUrl()}/api/family-profile`;
+
+export const getFamilyProfile = async ({ signal } = {}) => {
+  const response = await authenticatedFetch(familyProfileUrl(), {
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) {
+    throw await responseApiError(response, 'Não foi possível carregar os dados da família');
+  }
+  const payload = await response.json();
+  return payload?.profile || null;
+};
+
+/**
+ * Grava o perfil inteiro. `revision` ausente significa "ainda não havia nada
+ * salvo"; se outra aba já tiver criado um perfil, isso volta como conflito em
+ * vez de apagar o que ela salvou.
+ */
+export const saveFamilyProfile = async (
+  { familyName = '', parents = [], children = [], revision = null },
+  { signal } = {},
+) => {
+  const response = await authenticatedFetch(familyProfileUrl(), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      family_name: familyName,
+      parents,
+      children,
+      ...(Number.isInteger(revision) && revision > 0 ? { revision } : {}),
+    }),
+    signal,
+  });
+  if (!response.ok) {
+    throw await responseApiError(response, 'Não foi possível salvar os dados da família');
+  }
+  return response.json();
+};
+
+export const deleteFamilyProfile = async ({ signal } = {}) => {
+  const response = await authenticatedFetch(familyProfileUrl(), {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) {
+    throw await responseApiError(response, 'Não foi possível apagar os dados da família');
+  }
+  return (await response.json())?.deleted === true;
+};
+
 export const getGuide = async (guideId, { signal } = {}) => {
   const response = await authenticatedFetch(guideDetailsUrl(guideId), {
     headers: { Accept: 'application/json' },

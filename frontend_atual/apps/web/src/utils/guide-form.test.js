@@ -273,3 +273,58 @@ test('tripYearOptions cobre os próximos anos e mantém o já escolhido', () => 
   assert.deepEqual(guideForm.tripYearOptions(0, 2026), [2026, 2027, 2028, 2029]);
   assert.deepEqual(guideForm.tripYearOptions(2031, 2026), [2026, 2027, 2028, 2029, 2031]);
 });
+
+test('o perfil salvo guarda o ano de nascimento, não a idade que envelhece', () => {
+  const form = {
+    familyName: '  Família Lima  ',
+    parents: [{ id: 'p1', name: ' Marina ' }],
+    children: [{ id: 'c1', name: 'Aurora', age: 6 }],
+  };
+
+  const profile = guideForm.familyProfileFromForm(form, 2026);
+
+  assert.equal(profile.familyName, 'Família Lima');
+  assert.deepEqual(profile.parents, [{ id: 'p1', name: 'Marina' }]);
+  assert.deepEqual(profile.children, [{ id: 'c1', name: 'Aurora', birth_year: 2020 }]);
+});
+
+test('carregar recalcula a idade para o ano desta viagem', () => {
+  const profile = {
+    family_name: 'Família Lima',
+    parents: [{ id: 'p1', name: 'Marina' }],
+    children: [{ id: 'c1', name: 'Aurora', birth_year: 2020 }],
+  };
+
+  // Mesma criança, duas viagens: a idade impressa acompanha o ano.
+  assert.equal(guideForm.familyFormFromProfile(profile, 2026).children[0].age, 6);
+  assert.equal(guideForm.familyFormFromProfile(profile, 2029).children[0].age, 9);
+  assert.equal(guideForm.familyFormFromProfile(profile, 2026).familyName, 'Família Lima');
+  assert.deepEqual(guideForm.familyFormFromProfile(profile, 2026).needingAgeReview, []);
+});
+
+test('idade fora da faixa do guia volta em branco em vez de ser recusada no fim', () => {
+  const profile = {
+    family_name: 'Família Lima',
+    parents: [{ id: 'p1', name: 'Marina' }],
+    children: [
+      { id: 'c1', name: 'Aurora', birth_year: 2004 },
+      { id: 'c2', name: 'Bento', birth_year: 2030 },
+      { id: 'c3', name: 'Clara', birth_year: 2020 },
+    ],
+  };
+
+  const form = guideForm.familyFormFromProfile(profile, 2026);
+
+  // Já passou dos 17 e ainda não nasceu: as duas contas viram pedido de correção.
+  assert.deepEqual(form.children.map((child) => child.age), ['', '', 6]);
+  assert.deepEqual(form.needingAgeReview, ['Aurora', 'Bento']);
+});
+
+test('a conversão idade e ano de nascimento fecha nos dois sentidos', () => {
+  for (let age = 1; age <= guideForm.MAX_GUIDE_CHILD_AGE; age += 1) {
+    const born = guideForm.childBirthYear(age, 2027);
+    assert.equal(guideForm.childAgeForTripYear(born, 2027), age);
+  }
+  assert.equal(guideForm.childBirthYear(0, 2027), 0);
+  assert.equal(guideForm.childAgeForTripYear('', 2027), 0);
+});

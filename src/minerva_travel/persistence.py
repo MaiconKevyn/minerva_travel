@@ -170,6 +170,40 @@ class GuideDraftRecord:
 
 
 @dataclass(frozen=True)
+class FamilyProfileRecord:
+    """Os dados reutilizáveis da família, um registro por dono.
+
+    Guarda o ano de nascimento, não a idade: uma idade salva envelhece em
+    silêncio e o guia é calibrado por faixa etária — a criança de 6 anos
+    voltaria como criança de 6 anos na viagem do ano seguinte.
+
+    Nada de foto, consentimento, destino ou roteiro entra aqui: cada guia
+    pede a foto e o consentimento de novo, de propósito.
+    """
+
+    user_id: str
+    family_name: str
+    parents: list[dict[str, Any]]
+    children: list[dict[str, Any]]
+    revision: int
+    created_at: str
+    updated_at: str
+
+    def public_payload(self) -> dict[str, object]:
+        return {
+            "family_name": self.family_name,
+            "parents": self.parents,
+            "children": self.children,
+            "revision": self.revision,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    def export_payload(self) -> dict[str, object]:
+        return self.public_payload()
+
+
+@dataclass(frozen=True)
 class GuideJobRecord:
     id: str
     user_id: str
@@ -300,6 +334,14 @@ class GuideRepository:
                 );
                 CREATE INDEX IF NOT EXISTS guide_drafts_owner_updated_idx
                     ON guide_drafts(user_id, status, updated_at DESC);
+                CREATE TABLE IF NOT EXISTS family_profiles (
+                    user_id TEXT PRIMARY KEY,
+                    family_name TEXT NOT NULL DEFAULT '',
+                    members_json TEXT NOT NULL DEFAULT '{}',
+                    revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS guide_jobs (
                     id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL,
@@ -458,6 +500,75 @@ class GuideRepository:
                 (now_value,),
             )
         return result.rowcount
+
+    def family_profile_for_owner(self, user_id: str) -> FamilyProfileRecord | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM family_profiles WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return self._family_profile_from_row(row) if row else None
+
+    def save_family_profile(
+        self,
+        *,
+        user_id: str,
+        family_name: str,
+        parents: list[dict[str, object]],
+        children: list[dict[str, object]],
+        expected_revision: int | None,
+    ) -> FamilyProfileRecord | None:
+        """Grava o perfil inteiro de uma vez. Devolve ``None`` em conflito.
+
+        O perfil é sempre lido e escrito como um bloco só, então uma escrita
+        parcial não existe: ou a lista de membros nova entra inteira, ou a
+        anterior fica como está. ``expected_revision`` ausente significa "não
+        havia perfil"; se outra aba já criou um, isso é conflito e não
+        sobrescrita.
+        """
+
+        serialized = _serialized_family_members(parents, children)
+        now_value = datetime.now(UTC).isoformat()
+        with self._connection() as connection:
+            current = connection.execute(
+                "SELECT revision FROM family_profiles WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+            if current is None:
+                if expected_revision is not None:
+                    return None
+                connection.execute(
+                    """
+                    INSERT INTO family_profiles (
+                        user_id, family_name, members_json, revision, created_at, updated_at
+                    ) VALUES (?, ?, ?, 1, ?, ?)
+                    """,
+                    (user_id, family_name[:160], serialized, now_value, now_value),
+                )
+            else:
+                if expected_revision != int(current["revision"]):
+                    return None
+                connection.execute(
+                    """
+                    UPDATE family_profiles
+                    SET family_name = ?, members_json = ?, revision = revision + 1,
+                        updated_at = ?
+                    WHERE user_id = ? AND revision = ?
+                    """,
+                    (family_name[:160], serialized, now_value, user_id, expected_revision),
+                )
+        record = self.family_profile_for_owner(user_id)
+        if record is None:  # pragma: no cover - database invariant
+            raise RuntimeError("Family profile persistence failed.")
+        return record
+
+    def delete_family_profile(self, user_id: str) -> bool:
+        with self._connection() as connection:
+            result = connection.execute(
+                "DELETE FROM family_profiles WHERE user_id = ?",
+                (user_id,),
+            )
+        return result.rowcount == 1
 
     def save_succeeded_guide(
         self,
@@ -947,6 +1058,7 @@ class GuideRepository:
             )
             connection.execute("DELETE FROM guide_jobs WHERE user_id = ?", (user_id,))
             connection.execute("DELETE FROM guide_drafts WHERE user_id = ?", (user_id,))
+            connection.execute("DELETE FROM family_profiles WHERE user_id = ?", (user_id,))
         return result.rowcount
 
     def mark_deleted(self, guide_id: str, user_id: str) -> bool:
@@ -1066,6 +1178,45 @@ class GuideRepository:
             updated_at=row["updated_at"],
             expires_at=row["expires_at"],
         )
+
+    @staticmethod
+    def _family_profile_from_row(row: sqlite3.Row) -> FamilyProfileRecord:
+        try:
+            members = json.loads(row["members_json"])
+        except (json.JSONDecodeError, TypeError):
+            members = {}
+        if not isinstance(members, dict):
+            members = {}
+
+        def _member_list(key: str) -> list[dict[str, Any]]:
+            values = members.get(key)
+            if not isinstance(values, list):
+                return []
+            return [item for item in values if isinstance(item, dict)]
+
+        return FamilyProfileRecord(
+            user_id=row["user_id"],
+            family_name=row["family_name"],
+            parents=_member_list("parents"),
+            children=_member_list("children"),
+            revision=int(row["revision"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+
+def _serialized_family_members(
+    parents: list[dict[str, object]],
+    children: list[dict[str, object]],
+) -> str:
+    members = {"parents": parents, "children": children}
+    try:
+        serialized = json.dumps(members, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError) as error:
+        raise ValueError("Family profile members must be JSON serializable.") from error
+    if len(serialized.encode()) > 16 * 1024:
+        raise ValueError("Family profile members exceed 16 KiB.")
+    return serialized
 
 
 def _serialized_draft_payload(payload: dict[str, object]) -> str:

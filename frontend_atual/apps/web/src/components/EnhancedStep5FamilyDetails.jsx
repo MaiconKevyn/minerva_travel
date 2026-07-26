@@ -7,6 +7,7 @@ import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.js
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import SavedFamilyPanel from '@/components/SavedFamilyPanel.jsx';
 import {
   createGuideItemId,
   MAX_GUIDE_CHILDREN,
@@ -119,9 +120,10 @@ const EnhancedStep5FamilyDetails = () => {
     clearValidationError();
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
+  // Uma validação só para seguir e para salvar: guardar uma família pela
+  // metade seria pior do que não guardar nada — voltaria incompleta no
+  // próximo guia sem ninguém perceber.
+  const collectFamilyData = () => {
     const normalizedFamilyName = localFamilyName.trim();
     const touchedChildren = children.filter(c => c.name.trim() !== '' || String(c.age || '').trim() !== '');
     const validChildren = validGuideChildren(children);
@@ -129,7 +131,7 @@ const EnhancedStep5FamilyDetails = () => {
 
     if (!normalizedFamilyName) {
       showValidationError(validationMessages.familyName, 'familyName');
-      return;
+      return null;
     }
 
     if (validChildren.length === 0) {
@@ -139,7 +141,7 @@ const EnhancedStep5FamilyDetails = () => {
         validationMessages.children,
         childInputId(firstIncompleteChild.id, firstIncompleteField),
       );
-      return;
+      return null;
     }
 
     if (touchedChildren.length !== validChildren.length) {
@@ -151,20 +153,43 @@ const EnhancedStep5FamilyDetails = () => {
         validationMessages.incompleteChildren,
         childInputId(incompleteChild?.id || children[0].id, incompleteField),
       );
-      return;
+      return null;
     }
 
     if (validParents.length === 0) {
       showValidationError(validationMessages.parents, parentInputId(parents[0].id));
-      return;
+      return null;
     }
 
-    // Save to context
-    updateFamilyName(normalizedFamilyName);
-    setChildrenList(validChildren);
-    setParentsList(validParents.map(p => p.name.trim()));
-
     clearValidationError();
+    return {
+      familyName: normalizedFamilyName,
+      children: validChildren,
+      parents: validParents.map((parent) => ({ id: parent.id, name: parent.name.trim() })),
+    };
+  };
+
+  const handleLoadSavedFamily = (form) => {
+    setLocalFamilyName(form.familyName);
+    setChildren(form.children.length > 0
+      ? form.children
+      : [{ id: generateId(), name: '', age: '' }]);
+    setParents(form.parents.length > 0
+      ? form.parents
+      : [{ id: generateId(), name: '' }]);
+    clearValidationError();
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const collected = collectFamilyData();
+    if (!collected) return;
+
+    // Save to context
+    updateFamilyName(collected.familyName);
+    setChildrenList(collected.children);
+    setParentsList(collected.parents.map((parent) => parent.name));
+
     nextStep();
   };
 
@@ -180,6 +205,12 @@ const EnhancedStep5FamilyDetails = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        <SavedFamilyPanel
+          tripYear={year}
+          collectFamilyData={collectFamilyData}
+          onLoad={handleLoadSavedFamily}
+        />
+
         {/* Family Name Section */}
         <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-accent/10">
           <Label htmlFor="familyName" className="mb-6 flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">

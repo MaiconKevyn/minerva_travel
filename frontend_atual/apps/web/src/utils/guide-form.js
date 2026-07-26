@@ -3,6 +3,7 @@ export const MAX_GUIDE_PARENTS = 10;
 export const MAX_GUIDE_DESTINATIONS = 10;
 export const MAX_GUIDE_LANDMARKS = 30;
 export const MAX_VISIBLE_FAMILY_MEMBERS = 20;
+export const MAX_GUIDE_CHILD_AGE = 17;
 export const MIN_GUIDE_YEAR = 2024;
 export const MAX_GUIDE_YEAR = 2100;
 export const FAMILY_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
@@ -353,6 +354,70 @@ export const deriveChildAges = (children = []) =>
 
 export const guideChildRecordsForSubmit = (children = []) =>
   validGuideChildren(children).map(({ name, age }) => ({ name, age }));
+
+/**
+ * O perfil salvo guarda o ano de nascimento, não a idade.
+ *
+ * Uma idade literal envelhece em silêncio: a criança de 6 anos salva hoje
+ * voltaria como criança de 6 anos na viagem do ano que vem, e é a idade que
+ * calibra a dificuldade de cada atividade impressa. O ano de referência é o
+ * ano da viagem — o mesmo que sai na capa.
+ */
+export const childBirthYear = (age, tripYear) => {
+  const years = normalizePositiveInteger(age);
+  const reference = normalizeTripYear(tripYear) || new Date().getFullYear();
+  return years > 0 ? reference - years : 0;
+};
+
+/**
+ * A idade estimada é aproximada por definição: sem a data exata, quem viaja
+ * perto do aniversário pode precisar corrigir um ano. Fora da faixa aceita
+ * volta 0, para o formulário pedir a correção em vez de mandar ao backend um
+ * valor que ele recusaria.
+ */
+export const childAgeForTripYear = (birthYear, tripYear) => {
+  const born = Number.parseInt(birthYear, 10);
+  const reference = normalizeTripYear(tripYear) || new Date().getFullYear();
+  if (!Number.isFinite(born)) return 0;
+  const age = reference - born;
+  return age >= 1 && age <= MAX_GUIDE_CHILD_AGE ? age : 0;
+};
+
+/** O formulário desta viagem virando o perfil reutilizável que fica salvo. */
+export const familyProfileFromForm = ({ familyName, children, parents }, tripYear) => ({
+  familyName: String(familyName || '').trim(),
+  parents: parents.map((parent) => ({ id: parent.id, name: String(parent.name || '').trim() })),
+  children: children.map((child) => ({
+    id: child.id,
+    name: String(child.name || '').trim(),
+    birth_year: childBirthYear(child.age, tripYear),
+  })),
+});
+
+/**
+ * Traduz o perfil salvo de volta para o formulário desta viagem.
+ *
+ * A idade não vem guardada, e sim recalculada a partir do ano de nascimento:
+ * quem tinha 6 anos na viagem passada tem 7 na próxima. Quando a conta cai
+ * fora da faixa aceita, a idade volta em branco de propósito — é melhor pedir
+ * a correção aqui do que ser recusado no fim, na hora de gerar o guia.
+ */
+export const familyFormFromProfile = (profile, tripYear) => {
+  const children = (profile?.children || []).map((child) => ({
+    id: child.id || createGuideItemId('family-member'),
+    name: String(child.name || ''),
+    age: childAgeForTripYear(child.birth_year, tripYear) || '',
+  }));
+  return {
+    familyName: String(profile?.family_name || ''),
+    children,
+    parents: (profile?.parents || []).map((parent) => ({
+      id: parent.id || createGuideItemId('family-member'),
+      name: String(parent.name || ''),
+    })),
+    needingAgeReview: children.filter((child) => !child.age).map((child) => child.name),
+  };
+};
 
 export const deriveExpectedFamilyMemberCount = ({
   childrenList = [],

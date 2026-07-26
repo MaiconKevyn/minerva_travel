@@ -31,7 +31,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, UnidentifiedImageError
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from minerva_travel import storage
@@ -115,12 +115,15 @@ from minerva_travel.config import (
     pilot_restaurant_recommendations_enabled,
 )
 from minerva_travel.contract_limits import (
+    MAX_CHILD_BIRTH_YEAR,
+    MAX_GUIDE_CHILD_AGE,
     MAX_GUIDE_CHILDREN,
     MAX_GUIDE_DESTINATIONS,
     MAX_GUIDE_LANDMARKS,
     MAX_GUIDE_PARENTS,
     MAX_GUIDE_YEAR,
     MAX_VISIBLE_FAMILY_MEMBERS,
+    MIN_CHILD_BIRTH_YEAR,
     MIN_GUIDE_YEAR,
     public_contract_limits,
 )
@@ -620,6 +623,7 @@ class AccountExportResponse(BaseModel):
     account: AccountExportIdentityResponse
     guides: list[dict[str, Any]]
     drafts: list[dict[str, Any]]
+    family_profile: dict[str, Any] | None = None
 
 
 API_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
@@ -742,7 +746,14 @@ async def security_and_request_headers(request: Request, call_next):
     if app_environment() == "production":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.url.path.startswith(
-        ("/api/account", "/api/drafts", "/api/guides", "/api/jobs", "/download/")
+        (
+            "/api/account",
+            "/api/drafts",
+            "/api/family-profile",
+            "/api/guides",
+            "/api/jobs",
+            "/download/",
+        )
     ):
         response.headers["Cache-Control"] = "private, no-store, max-age=0"
     emit_event(
@@ -781,6 +792,28 @@ async def request_control_error_handler(
     )
 
 
+def _serializable_validation_errors(error: RequestValidationError) -> list[dict[str, Any]]:
+    """Erro de validação que não vira JSON virava 500 — e some o campo errado.
+
+    Quando um validador levanta ``ValueError``, o Pydantic guarda a exceção
+    crua em ``ctx``. O encoder não sabe serializá-la, então a resposta de
+    "revise este campo" morria como "erro no servidor" e o usuário ficava sem
+    saber o que corrigir.
+    """
+
+    sanitized: list[dict[str, Any]] = []
+    for item in error.errors():
+        entry = dict(item)
+        context = entry.get("ctx")
+        if isinstance(context, dict):
+            entry["ctx"] = {
+                key: value if isinstance(value, str | int | float | bool | None) else str(value)
+                for key, value in context.items()
+            }
+        sanitized.append(entry)
+    return sanitized
+
+
 @app.exception_handler(RequestValidationError)
 async def request_validation_error_handler(
     request: Request,
@@ -789,7 +822,7 @@ async def request_validation_error_handler(
     return _error_response(
         request,
         status_code=422,
-        detail=error.errors(),
+        detail=_serializable_validation_errors(error),
     )
 
 
@@ -923,12 +956,67 @@ class GuideDraftUpdateRequest(GuideDraftCreateRequest):
     revision: int = Field(ge=1)
 
 
+class FamilyProfileMemberRequest(StrictRequestModel):
+    id: Annotated[str, Field(min_length=1, max_length=120)]
+    name: Annotated[str, Field(min_length=1, max_length=100)]
+
+
+class FamilyProfileChildRequest(FamilyProfileMemberRequest):
+    birth_year: int = Field(ge=MIN_CHILD_BIRTH_YEAR, le=MAX_CHILD_BIRTH_YEAR)
+
+
+class FamilyProfileSaveRequest(StrictRequestModel):
+    """Perfil inteiro em uma requisição só — nunca um membro isolado."""
+
+    family_name: Annotated[str, Field(min_length=1, max_length=160)]
+    parents: list[FamilyProfileMemberRequest] = Field(
+        min_length=1,
+        max_length=MAX_GUIDE_PARENTS,
+    )
+    children: list[FamilyProfileChildRequest] = Field(
+        min_length=1,
+        max_length=MAX_GUIDE_CHILDREN,
+    )
+    # Ausente significa "ainda não havia perfil". Enviar a revisão observada é
+    # o que impede uma aba aberta há uma hora de apagar o que a outra salvou.
+    revision: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _members_have_unique_ids(self) -> "FamilyProfileSaveRequest":
+        identifiers = [member.id for member in (*self.parents, *self.children)]
+        if len(set(identifiers)) != len(identifiers):
+            raise ValueError("Cada pessoa da família precisa de um identificador próprio.")
+        return self
+
+
+class FamilyProfileMemberResponse(BaseModel):
+    id: str
+    name: str
+
+
+class FamilyProfileChildResponse(FamilyProfileMemberResponse):
+    birth_year: int
+
+
+class FamilyProfileResponse(BaseModel):
+    family_name: str
+    parents: list[FamilyProfileMemberResponse]
+    children: list[FamilyProfileChildResponse]
+    revision: int
+    created_at: str
+    updated_at: str
+
+
+class CurrentFamilyProfileResponse(BaseModel):
+    profile: FamilyProfileResponse | None
+
+
 class GuideGenerationFormRequest(StrictRequestModel):
     title: str = Field(min_length=1, max_length=160)
     children_names: str = Field(min_length=1, max_length=MAX_GUIDE_CHILDREN * 102)
     parents_names: str = Field(min_length=1, max_length=MAX_GUIDE_PARENTS * 102)
     year: int = Field(ge=MIN_GUIDE_YEAR, le=MAX_GUIDE_YEAR)
-    children_ages: list[Annotated[int, Field(ge=0, le=17)]] = Field(
+    children_ages: list[Annotated[int, Field(ge=0, le=MAX_GUIDE_CHILD_AGE)]] = Field(
         default_factory=list,
         max_length=MAX_GUIDE_CHILDREN,
     )
@@ -1956,6 +2044,56 @@ def delete_draft(draft_id: str, current_user: CurrentUser) -> DeletedResponse:
     return DeletedResponse(deleted=True)
 
 
+@app.get("/api/family-profile", response_model=CurrentFamilyProfileResponse)
+def get_family_profile(current_user: CurrentUser) -> CurrentFamilyProfileResponse:
+    profile = guide_repository().family_profile_for_owner(current_user.id)
+    return CurrentFamilyProfileResponse(
+        profile=FamilyProfileResponse.model_validate(profile.public_payload()) if profile else None
+    )
+
+
+@app.put("/api/family-profile", response_model=FamilyProfileResponse)
+def save_family_profile(
+    payload: FamilyProfileSaveRequest,
+    current_user: CurrentUser,
+) -> FamilyProfileResponse:
+    repository = guide_repository()
+    try:
+        profile = repository.save_family_profile(
+            user_id=current_user.id,
+            family_name=payload.family_name,
+            parents=[member.model_dump() for member in payload.parents],
+            children=[member.model_dump() for member in payload.children],
+            expected_revision=payload.revision,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "family_profile_invalid", "message": str(error)},
+        ) from error
+    if profile is not None:
+        emit_event("family_profile_saved", user_id=current_user.id, outcome="succeeded")
+        return FamilyProfileResponse.model_validate(profile.public_payload())
+    existing = repository.family_profile_for_owner(current_user.id)
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "family_profile_revision_conflict",
+            "message": "Os dados da família foram alterados em outra aba. Recarregue a página.",
+            "revision": existing.revision if existing else None,
+        },
+    )
+
+
+@app.delete("/api/family-profile", response_model=DeletedResponse)
+def delete_family_profile(current_user: CurrentUser) -> DeletedResponse:
+    # Idempotente de propósito: apagar duas vezes é o mesmo resultado, e o
+    # 404 só serviria para contar ao chamador se o perfil existia.
+    guide_repository().delete_family_profile(current_user.id)
+    emit_event("family_profile_deleted", user_id=current_user.id, outcome="succeeded")
+    return DeletedResponse(deleted=True)
+
+
 @app.get("/api/jobs", response_model=GuideJobListResponse)
 def list_jobs(current_user: CurrentUser) -> GuideJobListResponse:
     jobs = guide_repository().list_jobs_for_owner(current_user.id)
@@ -1991,6 +2129,7 @@ def export_account_data(current_user: CurrentUser) -> JSONResponse:
     repository = guide_repository()
     records = repository.list_for_export(current_user.id)
     drafts = repository.list_drafts_for_export(current_user.id)
+    family_profile = repository.family_profile_for_owner(current_user.id)
     return JSONResponse(
         content={
             "schema_version": 1,
@@ -2001,6 +2140,7 @@ def export_account_data(current_user: CurrentUser) -> JSONResponse:
             },
             "guides": [record.export_payload() for record in records],
             "drafts": [draft.export_payload() for draft in drafts],
+            "family_profile": family_profile.export_payload() if family_profile else None,
         },
         headers={
             "Cache-Control": "private, no-store, max-age=0",

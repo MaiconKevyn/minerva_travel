@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from minerva_travel.contract_limits import (
+    MAX_GUIDE_CHILD_AGE,
     MAX_GUIDE_CHILDREN,
     MAX_GUIDE_DESTINATIONS,
     MAX_GUIDE_LANDMARKS,
@@ -189,7 +190,7 @@ class GuideRequest(StrictRequestModel):
         min_length=1,
         max_length=MAX_GUIDE_CHILDREN,
     )
-    children_ages: list[Annotated[int, Field(ge=0, le=17)]] = Field(
+    children_ages: list[Annotated[int, Field(ge=0, le=MAX_GUIDE_CHILD_AGE)]] = Field(
         default_factory=list,
         max_length=MAX_GUIDE_CHILDREN,
     )

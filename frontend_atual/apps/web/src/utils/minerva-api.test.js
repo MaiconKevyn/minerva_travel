@@ -1342,3 +1342,71 @@ test('custom landmarks travel with their ids so the guide can resolve them', () 
   assert.equal(custom[0].name, 'Templo Sensoji');
   assert.equal(custom[0].country, 'Japão');
 });
+
+test('salvar o perfil da família só manda revisão quando já existe algo salvo', async () => {
+  const originalFetch = globalThis.fetch;
+  const captured = [];
+  await authClient.signup('familia@example.com', 'Senha123', 'Família Lima');
+  await authClient.login('familia@example.com', 'Senha123');
+  globalThis.fetch = async (url, options = {}) => {
+    captured.push({ url: String(url), method: options.method, body: JSON.parse(options.body) });
+    return new Response(JSON.stringify({ family_name: 'Família Lima', revision: 1 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  try {
+    const members = {
+      familyName: 'Família Lima',
+      parents: [{ id: 'p1', name: 'Marina' }],
+      children: [{ id: 'c1', name: 'Aurora', birth_year: 2020 }],
+    };
+    await minervaApi.saveFamilyProfile({ ...members, revision: null });
+    await minervaApi.saveFamilyProfile({ ...members, revision: 3 });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+
+  assert.ok(captured[0].url.endsWith('/api/family-profile'));
+  assert.equal(captured[0].method, 'PUT');
+  // Sem perfil salvo não há revisão a informar; mandar uma inventada faria o
+  // backend recusar a primeira gravação da conta.
+  assert.equal('revision' in captured[0].body, false);
+  assert.equal(captured[0].body.family_name, 'Família Lima');
+  assert.deepEqual(captured[0].body.children, [{ id: 'c1', name: 'Aurora', birth_year: 2020 }]);
+  assert.equal(captured[1].body.revision, 3);
+});
+
+test('o conflito de revisão do perfil chega ao chamador com o código, não só o texto', async () => {
+  const originalFetch = globalThis.fetch;
+  await authClient.signup('conflito@example.com', 'Senha123', 'Família Lima');
+  await authClient.login('conflito@example.com', 'Senha123');
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    detail: {
+      code: 'family_profile_revision_conflict',
+      message: 'Os dados da família foram alterados em outra aba.',
+      revision: 4,
+    },
+  }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+
+  try {
+    await assert.rejects(
+      minervaApi.saveFamilyProfile({
+        familyName: 'Família Lima',
+        parents: [{ id: 'p1', name: 'Marina' }],
+        children: [{ id: 'c1', name: 'Aurora', birth_year: 2020 }],
+        revision: 1,
+      }),
+      (error) => {
+        assert.equal(error.code, 'family_profile_revision_conflict');
+        assert.equal(error.status, 409);
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});

@@ -9,6 +9,7 @@ import {
   FAMILY_PHOTO_MAX_HEIGHT,
   FAMILY_PHOTO_MAX_PIXELS,
   FAMILY_PHOTO_MAX_WIDTH,
+  MAX_GUIDE_CHILD_AGE,
   MAX_GUIDE_CHILDREN,
   MAX_GUIDE_DESTINATIONS,
   MAX_GUIDE_LANDMARKS,
@@ -74,6 +75,9 @@ test('frontend API operations and consumed response fields match the backend Ope
     ['/api/drafts', 'post', ['id', 'payload', 'revision'], '201'],
     ['/api/drafts/{draft_id}', 'put', ['id', 'payload', 'revision']],
     ['/api/drafts/{draft_id}', 'delete', ['deleted']],
+    ['/api/family-profile', 'get', ['profile']],
+    ['/api/family-profile', 'put', ['family_name', 'parents', 'children', 'revision']],
+    ['/api/family-profile', 'delete', ['deleted']],
     ['/api/jobs/{job_id}', 'get', ['id', 'status', 'stage', 'progress', 'result', 'error']],
   ];
 
@@ -131,6 +135,7 @@ test('frontend product limits match the backend contract source', () => {
     image_upload_max_height: FAMILY_PHOTO_MAX_HEIGHT,
     image_upload_max_pixels: FAMILY_PHOTO_MAX_PIXELS,
     image_upload_max_width: FAMILY_PHOTO_MAX_WIDTH,
+    max_guide_child_age: MAX_GUIDE_CHILD_AGE,
     max_guide_children: MAX_GUIDE_CHILDREN,
     max_guide_destinations: MAX_GUIDE_DESTINATIONS,
     max_guide_landmarks: MAX_GUIDE_LANDMARKS,
