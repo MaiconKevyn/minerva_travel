@@ -447,3 +447,27 @@ export const toggleLandmarkActivitySelection = (
 
 export const activityOptionForType = (activityType) =>
   LANDMARK_ACTIVITY_OPTIONS.find((option) => option.type === activityType) || null;
+
+/**
+ * O plano visto por ponto turístico, para a família conferir a distribuição.
+ *
+ * O catálogo é escolhido por atividade ("quero uma página de colorir"), mas o
+ * que sai impresso é por parada — sem esta visão, ninguém percebe que deixou
+ * um ponto sem nada e empilhou seis no primeiro.
+ */
+export const activityPlanByLandmark = (selections = [], landmarks = []) =>
+  landmarks.map((landmark) => {
+    const selectionId = landmark.selection_id || landmark.id;
+    const chosen = selections
+      .filter((selection) => selection.landmark_selection_id === selectionId)
+      .map((selection) =>
+        LANDMARK_ACTIVITY_OPTIONS.find((option) => option.type === selection.activity_type),
+      )
+      .filter(Boolean);
+    return { landmark, selectionId, activities: chosen };
+  });
+
+export const landmarksWithActivity = (selections = [], activityType = '') =>
+  selections
+    .filter((selection) => selection.activity_type === activityType)
+    .map((selection) => selection.landmark_selection_id);

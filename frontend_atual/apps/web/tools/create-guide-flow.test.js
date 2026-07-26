@@ -85,7 +85,7 @@ test('activity selection comes after family details and before cover photo and r
   assert.match(activitiesStep, /Atividades da aventura/);
   assert.match(activitiesStep, /Minha melhor memória/);
   assert.match(activitiesStep, /Hora de voltar para casa/);
-  assert.match(activitiesStep, /Nenhuma atividade opcional vem marcada automaticamente/);
+  assert.match(activitiesStep, /Nenhuma vem marcada automaticamente/);
   assert.match(activitiesStep, /MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK/);
   assert.match(activitiesStep, /MAX_OPTIONAL_ACTIVITIES_PER_GUIDE/);
   assert.match(activitiesStep, /activity\.preview/);
@@ -311,25 +311,30 @@ test('home explains the flow and shows real product pages from our own domain', 
   assert.doesNotMatch(featureBox, /créditos de imagem/);
 });
 
-test('activity cards look selectable and keep a consistent grid height', () => {
+test('the catalogue is listed once and each card says where it was assigned', () => {
   const activities = readProjectFile('src/components/StepActivities.jsx');
 
-  assert.match(activities, /flex h-full cursor-pointer flex-col/);
-  assert.match(activities, /Incluir no guia/);
-  assert.match(activities, /No guia/);
-  assert.match(activities, /Assim fica/);
+  // Repetir o catálogo por parada enchia a tela de cards idênticos; ele
+  // aparece uma vez e o destino vira uma escolha dentro do card.
+  assert.match(activities, /flex h-full flex-col/);
+  assert.match(activities, /ActivityLandmarkPicker/);
+  assert.match(activities, /ActivityPlanSummary/);
+  assert.match(activities, /landmarksWithActivity/);
+  assert.doesNotMatch(activities, /landmarks\.map\(\(landmark, landmarkIndex\)/);
   assert.doesNotMatch(activities, /Exemplo real/);
 });
 
-test('the eye opens the full page without selecting the activity', () => {
+test('the eye opens the full page and assigning stays an explicit act', () => {
   const activities = readProjectFile('src/components/StepActivities.jsx');
   const dialog = readProjectFile('src/components/ActivityPreviewDialog.jsx');
 
-  // O card inteiro é um <label>: sem cancelar o clique, a lupa marcaria a
-  // atividade em vez de só mostrá-la.
+  // Nada no card marca a atividade por acidente: o corpo é um <article> e a
+  // escolha do ponto tem controle próprio.
   assert.match(activities, /Ver a página de \$\{activity\.label\} inteira/);
-  assert.match(activities, /event\.preventDefault\(\);\s*\n\s*event\.stopPropagation\(\);/);
+  assert.match(activities, /<article/);
+  assert.doesNotMatch(activities, /<label/);
   assert.match(activities, /<ActivityPreviewDialog/);
   assert.match(dialog, /activityGallery/);
   assert.match(dialog, /role="tab"/);
+  assert.match(dialog, /Em quais paradas esta página entra\?/);
 });

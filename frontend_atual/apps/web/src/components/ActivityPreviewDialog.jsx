@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Clock3, Pencil, Plus, Users } from 'lucide-react';
+import { Check, Clock3, MapPin, Pencil, Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -7,8 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { activityGallery } from '@/utils/landmark-activities.js';
+import { activityGallery, countryHasPhrasebook } from '@/utils/landmark-activities.js';
 
 /**
  * Página inteira da atividade em tamanho de leitura.
@@ -18,7 +17,7 @@ import { activityGallery } from '@/utils/landmark-activities.js';
  * quebra-cabeças vê também a versão resolvida, que é o que responde de
  * verdade "o que essa atividade é".
  */
-const ActivityPreviewDialog = ({ activity, landmarkName, selected, onToggle, open, onOpenChange }) => {
+const ActivityPreviewDialog = ({ activity, landmarks, chosenIds, onToggle, open, onOpenChange }) => {
   const gallery = activityGallery(activity);
   const [shownIndex, setShownIndex] = useState(0);
   const shown = gallery[Math.min(shownIndex, gallery.length - 1)];
@@ -86,25 +85,45 @@ const ActivityPreviewDialog = ({ activity, landmarkName, selected, onToggle, ope
           </figcaption>
         </figure>
 
-        <div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-medium text-muted-foreground">
-            Será adaptada para {landmarkName}.
+        {/* Decidir aqui evita fechar o modal só para marcar a parada: a
+            página inteira continua à vista enquanto a família escolhe. */}
+        <div className="space-y-2 border-t border-border/60 pt-4">
+          <p className="flex items-center gap-1.5 text-sm font-bold text-foreground">
+            <MapPin className="h-4 w-4 text-primary" aria-hidden="true" />
+            Em quais paradas esta página entra?
           </p>
-          <Button
-            type="button"
-            onClick={() => {
-              onToggle();
-              onOpenChange(false);
-            }}
-            variant={selected ? 'outline' : 'default'}
-            className="rounded-full px-6 py-5 font-bold"
-          >
-            {selected ? (
-              <><Check className="mr-2 h-4 w-4" aria-hidden="true" /> Tirar do guia</>
-            ) : (
-              <><Plus className="mr-2 h-4 w-4" aria-hidden="true" /> Incluir no guia</>
-            )}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {landmarks.map((landmark) => {
+              const id = landmark.selection_id || landmark.id;
+              const chosen = chosenIds.includes(id);
+              const blocked =
+                activity.type === 'language_survival' && !countryHasPhrasebook(landmark.country);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={blocked && !chosen}
+                  onClick={() => onToggle(id, activity.type)}
+                  title={
+                    blocked
+                      ? `Ainda não temos o guia de frases para ${landmark.country || 'este país'}`
+                      : undefined
+                  }
+                  className={`flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                    chosen
+                      ? 'border-primary bg-primary text-white'
+                      : 'border-border/70 bg-background text-muted-foreground hover:border-primary/45 hover:text-foreground'
+                  }`}
+                >
+                  {chosen && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+                  {landmark.name}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs font-medium text-muted-foreground">
+            A página é adaptada para cada parada que você marcar.
+          </p>
         </div>
       </DialogContent>
     </Dialog>

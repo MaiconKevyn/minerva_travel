@@ -2,12 +2,15 @@ import React, { useMemo, useState } from 'react';
 import { BookHeart, Check, Clock3, Eye, Palette, Pencil, Plane, Plus, Sparkles } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
+import ActivityLandmarkPicker from '@/components/ActivityLandmarkPicker.jsx';
+import ActivityPlanSummary from '@/components/ActivityPlanSummary.jsx';
 import ActivityPreviewDialog from '@/components/ActivityPreviewDialog.jsx';
 import { selectGuideLandmarks } from '@/utils/minerva-api.js';
 import { pluralize } from '@/utils/guide-form.js';
 import {
   activityOptionsByCategory,
-  activityOptionsForCountry,
+  countryHasPhrasebook,
+  landmarksWithActivity,
   MAX_OPTIONAL_ACTIVITIES_PER_GUIDE,
   MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK,
   toggleLandmarkActivitySelection,
@@ -25,14 +28,27 @@ const StepActivities = () => {
     nextStep,
   } = useConversationalGuide();
   const [selectionError, setSelectionError] = useState('');
-  // Uma atividade por vez em detalhe: guardamos ponto + tipo porque o mesmo
-  // tipo aparece em todos os pontos turísticos.
   const [previewing, setPreviewing] = useState(null);
 
   const landmarks = useMemo(
     () => selectGuideLandmarks(parsedData.landmarks, selectedLandmarks),
     [parsedData.landmarks, selectedLandmarks],
   );
+  // O catálogo aparece uma vez, não uma vez por parada: são os mesmos cards em
+  // todos os pontos, e repeti-los enterrava o plano num scroll interminável.
+  const categories = useMemo(
+    () =>
+      activityOptionsByCategory().map((category) => ({
+        ...category,
+        options: category.options.filter(
+          (option) =>
+            option.type !== 'language_survival' ||
+            landmarks.some((landmark) => countryHasPhrasebook(landmark.country)),
+        ),
+      })).filter((category) => category.options.length > 0),
+    [landmarks],
+  );
+
   const childAges = childrenList
     .map((child) => Number.parseInt(child.age, 10))
     .filter((age) => Number.isFinite(age) && age > 0);
@@ -40,20 +56,20 @@ const StepActivities = () => {
     ? `Adaptaremos os desafios para ${childAges.join(', ')} anos.`
     : 'Adaptaremos os desafios para a família.';
 
-  const isSelected = (selectionId, activityType) => landmarkActivitySelections.some(
-    (selection) =>
-      selection.landmark_selection_id === selectionId &&
-      selection.activity_type === activityType,
-  );
+  const guideFull = landmarkActivitySelections.length >= MAX_OPTIONAL_ACTIVITIES_PER_GUIDE;
+  const onlyLandmark = landmarks.length === 1 ? landmarkSelectionId(landmarks[0]) : null;
 
+  // Atualização funcional de propósito: no seletor a família marca duas
+  // paradas em sequência, e ler o estado do closure faria o segundo clique
+  // apagar o primeiro.
   const toggleActivity = (selectionId, activityType) => {
-    const result = toggleLandmarkActivitySelection(
-      landmarkActivitySelections,
-      selectionId,
-      activityType,
-    );
-    setLandmarkActivitySelections(result.selections);
-    setSelectionError(result.error);
+    let error = '';
+    setLandmarkActivitySelections((current) => {
+      const result = toggleLandmarkActivitySelection(current, selectionId, activityType);
+      error = result.error;
+      return result.selections;
+    });
+    setSelectionError(error);
   };
 
   return (
@@ -66,20 +82,24 @@ const StepActivities = () => {
           Atividades da aventura
         </h2>
         <p className="text-lg font-medium text-muted-foreground">
-          Escolha as brincadeiras que a criança encontrará depois de cada ponto turístico.
-          Nenhuma atividade opcional vem marcada automaticamente.
+          Escolha uma brincadeira e diga em quais paradas ela entra.
+          <br />
+          Nenhuma vem marcada automaticamente.
         </p>
-        {/* Dito uma vez: com o catálogo cheio, um selo "Assim fica" por card
-            cobriria boa parte da miniatura. */}
         <p className="text-sm font-medium text-muted-foreground">
-          Assim fica: cada miniatura é a página impressa de verdade.
+          Toque na lupa de cada card para ver a página inteira antes de decidir.
         </p>
-        {/* Informação de apoio: chip suave, não texto na cor de ação/alerta. */}
         <p className="inline-flex items-center gap-2 rounded-full bg-accent/15 px-4 py-1.5 text-sm font-bold text-foreground">
           <Sparkles className="h-4 w-4 text-accent-foreground" aria-hidden="true" />
           {ageSummary}
         </p>
       </div>
+
+      <ActivityPlanSummary
+        landmarks={landmarks}
+        selections={landmarkActivitySelections}
+        onRemove={toggleActivity}
+      />
 
       <section className="rounded-[2rem] border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6" aria-labelledby="mandatory-pages-title">
         <h3 id="mandatory-pages-title" className="sr-only">Páginas finais obrigatórias</h3>
@@ -110,192 +130,122 @@ const StepActivities = () => {
       </section>
 
       <div className="space-y-8">
-        {landmarks.map((landmark, landmarkIndex) => {
-          const selectionId = landmarkSelectionId(landmark);
-          const selectedForPoint = landmarkActivitySelections.filter(
-            (selection) => selection.landmark_selection_id === selectionId,
-          ).length;
-          const location = [landmark.city, landmark.country].filter(Boolean).join(', ');
-          // O guia de frases só existe para países conferidos; nos demais o
-          // card some em vez de prometer uma página que não seria gerada.
-          const categories = activityOptionsByCategory(
-            activityOptionsForCountry(landmark.country),
-          );
-
-          return (
-            <section
-              key={selectionId}
-              className="overflow-hidden rounded-[2rem] border-2 border-border/70 bg-card shadow-sm"
-              aria-labelledby={`activity-landmark-${landmarkIndex}`}
-            >
-              <div className="flex flex-col gap-4 border-b border-border/70 bg-muted/35 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-                <div className="flex items-center gap-4">
-                  {landmark.image ? (
-                    <img
-                      src={landmark.image}
-                      alt=""
-                      className="h-20 w-20 rounded-2xl bg-muted object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <Sparkles className="h-8 w-8" aria-hidden="true" />
+        {categories.map((category) => (
+          <section key={category.id} aria-labelledby={`activity-category-${category.id}`}>
+            <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
+              <h3
+                id={`activity-category-${category.id}`}
+                className="text-sm font-bold uppercase tracking-[0.14em] text-foreground"
+              >
+                {category.label}
+              </h3>
+              <span className="text-xs font-medium text-muted-foreground">{category.hint}</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {category.options.map((activity) => {
+                const chosenIds = landmarksWithActivity(landmarkActivitySelections, activity.type);
+                const chosen = chosenIds.length > 0;
+                const inputId = `activity-${activity.type}`;
+                return (
+                  <article
+                    key={activity.type}
+                    className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border-2 bg-background transition ${
+                      chosen
+                        ? 'border-primary shadow-md ring-2 ring-primary/20'
+                        : 'border-border/70 hover:border-primary/45 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="relative aspect-[3/2] overflow-hidden bg-muted">
+                      <img
+                        src={activity.preview}
+                        alt={`Exemplo visual de ${activity.label}`}
+                        loading="lazy"
+                        className="h-full w-full object-cover object-top transition duration-300 group-hover:scale-[1.03]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPreviewing(activity.type)}
+                        aria-label={`Ver a página de ${activity.label} inteira`}
+                        className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-white/90 text-muted-foreground shadow-sm transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <Eye className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                      {chosen && (
+                        <span className="absolute right-2 top-2 flex h-7 items-center gap-1 rounded-full border-2 border-primary bg-primary px-2 text-[11px] font-bold text-white shadow-sm">
+                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                          {chosenIds.length}
+                        </span>
+                      )}
                     </div>
-                  )}
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">
-                      Ponto {landmarkIndex + 1}
-                    </p>
-                    <h3 id={`activity-landmark-${landmarkIndex}`} className="text-2xl font-serif font-bold text-foreground">
-                      {landmark.name}
-                    </h3>
-                    {location && <p className="text-sm font-medium text-muted-foreground">{location}</p>}
-                  </div>
-                </div>
-                <div className="sm:text-right">
-                  <span className="inline-block w-fit rounded-full bg-background px-4 py-2 text-sm font-bold text-muted-foreground">
-                    {selectedForPoint}/{MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK} escolhidas
-                  </span>
-                  {/* Dito uma vez por ponto: antes repetia em cada card. */}
-                  <p className="mt-1.5 text-xs font-medium text-muted-foreground">
-                    Cada atividade será adaptada para {landmark.name}.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-6 p-5 sm:p-6">
-                {categories.map((category) => (
-                  <div key={category.id}>
-                    <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
-                      <h4 className="text-sm font-bold uppercase tracking-[0.14em] text-foreground">
-                        {category.label}
+                    <div className="flex flex-1 flex-col gap-1.5 p-3">
+                      <h4 className="text-sm font-bold leading-snug text-foreground">
+                        {activity.label}
                       </h4>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {category.hint}
-                      </span>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {category.options.map((activity) => {
-                        const selected = isSelected(selectionId, activity.type);
-                        const inputId = `${selectionId}-${activity.type}`.replace(
-                          /[^a-zA-Z0-9_-]/g,
-                          '-',
-                        );
-                        return (
-                          <label
-                            key={activity.type}
-                            htmlFor={inputId}
-                            // h-full + flex mantém todos os cards da linha alinhados
-                            // mesmo com descrições de tamanhos diferentes.
-                            className={`group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border-2 bg-background transition focus-within:ring-4 focus-within:ring-primary/25 ${
-                              selected
-                                ? 'border-primary shadow-md ring-2 ring-primary/20'
-                                : 'border-border/70 hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-md'
+                      <p
+                        id={`${inputId}-description`}
+                        className="line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground"
+                      >
+                        {activity.description}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 pt-1 text-[10px] font-bold text-muted-foreground">
+                        <span className="rounded-full bg-muted px-2 py-0.5">{activity.ageLabel}</span>
+                        <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
+                          <Clock3 className="h-2.5 w-2.5" aria-hidden="true" />
+                          {activity.durationLabel}
+                        </span>
+                        <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
+                          <Pencil className="h-2.5 w-2.5" aria-hidden="true" />
+                          {activity.materialLabel}
+                        </span>
+                      </div>
+                      <div className="mt-auto pt-2">
+                        {/* Com uma parada só, escolher onde seria uma pergunta
+                            com uma resposta possível: o card decide direto. */}
+                        {onlyLandmark ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleActivity(onlyLandmark, activity.type)}
+                            aria-describedby={`${inputId}-description`}
+                            className={`flex w-full items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-2 text-xs font-bold transition ${
+                              chosen
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border/70 bg-background text-muted-foreground hover:border-primary/45 hover:text-foreground'
                             }`}
                           >
-                            <input
-                              id={inputId}
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => toggleActivity(selectionId, activity.type)}
-                              className="sr-only"
-                              aria-describedby={`${inputId}-description`}
-                            />
-                            <div className="relative aspect-[3/2] overflow-hidden bg-muted">
-                              <img
-                                src={activity.preview}
-                                alt={`Exemplo visual de ${activity.label}`}
-                                loading="lazy"
-                                className="h-full w-full object-cover object-top transition duration-300 group-hover:scale-[1.03]"
-                              />
-                              {/* Marca de seleção sempre visível: o estado vazio antes
-                                  era transparente e não parecia clicável. */}
-                              <span
-                                className={`absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 shadow-sm transition ${
-                                  selected
-                                    ? 'border-primary bg-primary text-white'
-                                    : 'border-white bg-white/90 text-muted-foreground/70 group-hover:text-primary'
-                                }`}
-                                aria-hidden="true"
-                              >
-                                {selected ? (
-                                  <Check className="h-4 w-4" />
-                                ) : (
-                                  <Plus className="h-4 w-4" />
-                                )}
-                              </span>
-                              {/* O card inteiro é um <label>, então qualquer clique
-                                  marcaria a atividade: a lupa precisa cancelar isso
-                                  para só abrir a página em tamanho de leitura. */}
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  setPreviewing({ selectionId, type: activity.type });
-                                }}
-                                aria-label={`Ver a página de ${activity.label} inteira`}
-                                className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-white/90 text-muted-foreground shadow-sm transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                              >
-                                <Eye className="h-4 w-4" aria-hidden="true" />
-                              </button>
-                              <span
-                                className={`absolute inset-x-0 bottom-0 py-1 text-center text-[11px] font-bold text-white transition ${
-                                  selected
-                                    ? 'bg-primary/90'
-                                    : 'bg-foreground/70 opacity-0 group-hover:opacity-100'
-                                }`}
-                              >
-                                {selected ? 'No guia' : 'Incluir no guia'}
-                              </span>
-                            </div>
-                            <div className="flex flex-1 flex-col gap-1.5 p-3">
-                              <h5 className="text-sm font-bold leading-snug text-foreground">
-                                {activity.label}
-                              </h5>
-                              <p
-                                id={`${inputId}-description`}
-                                className="line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground"
-                              >
-                                {activity.description}
-                              </p>
-                              <div className="mt-auto flex flex-wrap gap-1.5 pt-1 text-[10px] font-bold text-muted-foreground">
-                                <span className="rounded-full bg-muted px-2 py-0.5">
-                                  {activity.ageLabel}
-                                </span>
-                                <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
-                                  <Clock3 className="h-2.5 w-2.5" aria-hidden="true" />
-                                  {activity.durationLabel}
-                                </span>
-                                <span
-                                  className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5"
-                                  title={activity.materialLabel}
-                                >
-                                  <Pencil className="h-2.5 w-2.5" aria-hidden="true" />
-                                  {activity.materialLabel}
-                                </span>
-                              </div>
-                            </div>
-                            <ActivityPreviewDialog
-                              activity={activity}
-                              landmarkName={landmark.name}
-                              selected={selected}
-                              onToggle={() => toggleActivity(selectionId, activity.type)}
-                              open={
-                                previewing?.selectionId === selectionId &&
-                                previewing?.type === activity.type
-                              }
-                              onOpenChange={(next) => setPreviewing(next ? previewing : null)}
-                            />
-                          </label>
-                        );
-                      })}
+                            {chosen ? (
+                              <><Check className="h-3.5 w-3.5" aria-hidden="true" /> No guia</>
+                            ) : (
+                              <><Plus className="h-3.5 w-3.5" aria-hidden="true" /> Incluir no guia</>
+                            )}
+                          </button>
+                        ) : (
+                          <ActivityLandmarkPicker
+                            activity={activity}
+                            landmarks={landmarks}
+                            selections={landmarkActivitySelections}
+                            perLandmarkLimit={MAX_OPTIONAL_ACTIVITIES_PER_LANDMARK}
+                            guideFull={guideFull}
+                            chosenIds={chosenIds}
+                            onToggle={(id) => toggleActivity(id, activity.type)}
+                          />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          );
-        })}
+
+                    <ActivityPreviewDialog
+                      activity={activity}
+                      landmarks={landmarks}
+                      chosenIds={chosenIds}
+                      onToggle={toggleActivity}
+                      open={previewing === activity.type}
+                      onOpenChange={(next) => setPreviewing(next ? activity.type : null)}
+                    />
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
 
       <div className="sticky bottom-4 z-10 rounded-3xl border-2 border-border/70 bg-card/95 p-4 shadow-xl backdrop-blur sm:flex sm:items-center sm:justify-between sm:gap-6">
