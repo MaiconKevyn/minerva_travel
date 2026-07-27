@@ -110,12 +110,13 @@ class GuidePageGenerator(Protocol):
     def generate_cover_page(
         self,
         *,
-        family_photo: Path,
+        family_photo: Path | None,
         output_path: Path,
         family_title: str,
         trip_date: str,
         landmark_names: list[str],
         expected_visible_family_member_count: int | None = None,
+        cover_brief: str = "",
         revision_instruction: str = "",
         reference_page: Path | None = None,
     ) -> Path: ...
@@ -123,13 +124,10 @@ class GuidePageGenerator(Protocol):
     def generate_summary_page(
         self,
         *,
-        family_photo: Path,
-        family_cover: Path,
         output_path: Path,
         family_title: str,
         trip_date: str,
         landmark_names: list[str],
-        expected_visible_family_member_count: int | None = None,
         revision_instruction: str = "",
         reference_page: Path | None = None,
     ) -> Path: ...
@@ -398,8 +396,8 @@ class GuidePageGenerator(Protocol):
     def generate_homecoming_page(
         self,
         *,
-        family_photo: Path,
-        family_cover: Path,
+        family_photo: Path | None,
+        family_cover: Path | None,
         output_path: Path,
         family_title: str,
         trip_date: str,
@@ -447,12 +445,13 @@ class OpenAIGuidePageGenerator:
     def generate_cover_page(
         self,
         *,
-        family_photo: Path,
+        family_photo: Path | None,
         output_path: Path,
         family_title: str,
         trip_date: str,
         landmark_names: list[str],
         expected_visible_family_member_count: int | None = None,
+        cover_brief: str = "",
         revision_instruction: str = "",
         reference_page: Path | None = None,
     ) -> Path:
@@ -461,25 +460,22 @@ class OpenAIGuidePageGenerator:
             trip_date=trip_date,
             landmark_names=landmark_names,
             expected_visible_family_member_count=expected_visible_family_member_count,
+            cover_brief=cover_brief,
+            has_family_photo=family_photo is not None,
             revision_instruction=revision_instruction,
             has_revision_reference=reference_page is not None,
         )
-        references = [family_photo]
-        if reference_page is not None:
-            references.append(reference_page)
-        response = self._edit_with_references(prompt, references)
+        references = [path for path in (family_photo, reference_page) if path is not None]
+        response = self._generate_activity_artwork(prompt, references)
         return _persist_page_image(response, output_path)
 
     def generate_summary_page(
         self,
         *,
-        family_photo: Path,
-        family_cover: Path,
         output_path: Path,
         family_title: str,
         trip_date: str,
         landmark_names: list[str],
-        expected_visible_family_member_count: int | None = None,
         revision_instruction: str = "",
         reference_page: Path | None = None,
     ) -> Path:
@@ -487,14 +483,13 @@ class OpenAIGuidePageGenerator:
             family_title=family_title,
             trip_date=trip_date,
             landmark_names=landmark_names,
-            expected_visible_family_member_count=expected_visible_family_member_count,
             revision_instruction=revision_instruction,
             has_revision_reference=reference_page is not None,
         )
-        references = [family_photo, family_cover]
-        if reference_page is not None:
-            references.append(reference_page)
-        response = self._edit_with_references(prompt, references)
+        # Sem foto e sem capa como referência: a página é só do roteiro, e
+        # passar a família como entrada é o que a fazia reaparecer.
+        references = [reference_page] if reference_page is not None else []
+        response = self._generate_activity_artwork(prompt, references)
         return _persist_page_image(response, output_path)
 
     def generate_destination_intro_page(
@@ -1564,8 +1559,8 @@ class OpenAIGuidePageGenerator:
     def generate_homecoming_page(
         self,
         *,
-        family_photo: Path,
-        family_cover: Path,
+        family_photo: Path | None,
+        family_cover: Path | None,
         output_path: Path,
         family_title: str,
         trip_date: str,
@@ -1581,15 +1576,16 @@ class OpenAIGuidePageGenerator:
             landmark_names=landmark_names,
             age_complexity=age_complexity,
             expected_visible_family_member_count=expected_visible_family_member_count,
+            has_family_photo=family_photo is not None,
             revision_instruction=revision_instruction,
             has_revision_reference=reference_page is not None,
         )
-        references = [family_photo, family_cover]
-        if reference_page is not None:
-            references.append(reference_page)
+        references = [
+            path for path in (family_photo, family_cover, reference_page) if path is not None
+        ]
         artwork = _provider_artwork_path(output_path)
         try:
-            response = self._edit_with_references(prompt, references)
+            response = self._generate_activity_artwork(prompt, references)
             _persist_page_image(response, artwork)
             return compose_homecoming_page(artwork, output_path)
         except (ActivityPageCompositionError, OSError, ValueError) as error:
@@ -1753,10 +1749,52 @@ def cover_page_prompt(
     trip_date: str,
     landmark_names: list[str],
     expected_visible_family_member_count: int | None = None,
+    cover_brief: str = "",
+    has_family_photo: bool = True,
     revision_instruction: str = "",
     has_revision_reference: bool = False,
 ) -> str:
     landmarks = ", ".join(landmark_names)
+    revision = _revision_directive(revision_instruction, has_revision_reference)
+
+    if not has_family_photo:
+        # Sem foto, a capa nasce do que a família pediu por escrito. Descrição
+        # vazia cai numa cena dos próprios lugares — nunca numa família
+        # inventada, que é o que o modelo faz quando não recebe direção.
+        brief = (cover_brief or "").strip()
+        subject = (
+            f"Paint this cover subject, described by the family: {brief}"
+            if brief
+            else "Paint a warm travel scene built only from the confirmed places below, with no "
+            "people in it."
+        )
+        reference = (
+            "The supplied input image is the selected cover to revise; it is only a "
+            "layout/composition reference."
+            if has_revision_reference
+            else "No reference image is supplied for this first version."
+        )
+        return f"""
+Create a complete vertical cover for a premium children's illustrated family travel book.
+{_HOUSE_STYLE}
+{reference}
+{subject}
+Add subtle scenery inspired only by these confirmed places: {landmarks}.
+Do not invent a specific real family or portrait-like faces; no photographic likeness of anyone.
+
+TEXT CONTRACT — render exactly these two lines, verbatim, once each:
+"{family_title}"
+"{trip_date}"
+
+Typography: large, elegant, highly legible Portuguese title; clean spacing; strong contrast;
+correct accents; no broken or invented letters. The title belongs near the upper third and the
+date near the lower third.
+
+Do not include any other readable text. No logos, watermark, signature, mockup border or UI.
+Output the finished flat cover artwork, not a book photographed in a scene.
+{revision}
+""".strip()
+
     people = ""
     if expected_visible_family_member_count:
         people = (
@@ -1770,7 +1808,15 @@ def cover_page_prompt(
         if has_revision_reference
         else "The supplied input image is the original family photo."
     )
-    revision = _revision_directive(revision_instruction, has_revision_reference)
+    # A descrição escrita também vale quando há foto: ela diz o cenário, sem
+    # nunca poder alterar quem aparece.
+    brief = (cover_brief or "").strip()
+    styling = (
+        f"\nThe family asked for this cover: {brief}\nFollow it for scene, mood and setting only; "
+        "it never changes who appears or how many people there are."
+        if brief
+        else ""
+    )
     return f"""
 Create a complete vertical cover for a premium children's illustrated family travel book.
 {_HOUSE_STYLE}
@@ -1779,7 +1825,7 @@ Transform the supplied family photo into a warm hand-painted watercolor storyboo
 Preserve the family's recognizable composition, approximate ages, hair, glasses, expressions
 and poses.
 {people}
-Add subtle scenery inspired only by these confirmed places: {landmarks}.
+Add subtle scenery inspired only by these confirmed places: {landmarks}.{styling}
 
 TEXT CONTRACT — render exactly these two lines, verbatim, once each:
 "{family_title}"
@@ -1800,24 +1846,34 @@ def summary_page_prompt(
     family_title: str,
     trip_date: str,
     landmark_names: list[str],
-    expected_visible_family_member_count: int | None = None,
     revision_instruction: str = "",
     has_revision_reference: bool = False,
 ) -> str:
+    """O roteiro sozinho: quem olha esta página quer ver as paradas.
+
+    A família saiu daqui de propósito. Ela ocupava a metade da página com um
+    retrato repetido da capa e empurrava as vinhetas das paradas para o canto
+    — e é a parada que a criança procura quando abre o sumário.
+    """
+
     numbered = "\n".join(f'{index}. "{name}"' for index, name in enumerate(landmark_names, 1))
-    family = _family_continuity_directive(
-        expected_visible_family_member_count, has_revision_reference
-    )
     revision = _revision_directive(revision_instruction, has_revision_reference)
+    reference = (
+        "The supplied input image is the selected current-page attempt and is only a "
+        "layout/revision reference."
+        if has_revision_reference
+        else "No reference image is supplied for this first version."
+    )
     return f"""
 Create page 2 of a premium vertical children's illustrated family travel guide.
 {_HOUSE_STYLE}
 Design a joyful watercolor-and-gouache itinerary infographic with one distinct recognizable
 illustrated vignette for every confirmed stop below, connected in order by a playful dotted route.
-{family}
+{reference}
 
-Place the complete canonical family together in one principal travel vignette. If a family member
-appears again near another stop, repeat the exact same character design and traits.
+PEOPLE-FREE CONTRACT — This page is about the places, not the travellers. Do not depict a person,
+family member, child, tourist, face, body, human silhouette, crowd or portrait anywhere. Give the
+whole page to the stops and the route between them.
 
 TEXT CONTRACT — render every quoted string verbatim, exactly once, with no spelling changes:
 "Nosso roteiro"
@@ -2443,24 +2499,40 @@ def homecoming_page_prompt(
     landmark_names: list[str],
     age_complexity: str,
     expected_visible_family_member_count: int | None = None,
+    has_family_photo: bool = True,
     revision_instruction: str = "",
     has_revision_reference: bool = False,
 ) -> str:
     landmarks = ", ".join(landmark_names)
-    family = _family_continuity_directive(
-        expected_visible_family_member_count, has_revision_reference
-    )
     revision = _homecoming_revision_directive(revision_instruction, has_revision_reference)
+    if has_family_photo:
+        family = _family_continuity_directive(
+            expected_visible_family_member_count, has_revision_reference
+        )
+        scene = """Illustrate the complete canonical family together in a warm
+watercolor-and-gouache storybook airport or travel-terminal scene, calmly preparing to
+return home with simple luggage. Convey a gentle, joyful end-of-adventure mood. Keep the
+family prominent in the middle half of the page, fully visible and uncropped. Use subtle
+travel motifs without adding new tourist landmarks."""
+    else:
+        # Sem foto não há família canônica para reencontrar aqui: a página
+        # fecha a viagem pelos objetos dela, não por pessoas inventadas.
+        family = (
+            "PEOPLE-FREE CONTRACT — Do not depict a person, family member, child, tourist, face, "
+            "body, human silhouette, crowd, portrait, or reflection anywhere."
+        )
+        scene = """Illustrate a warm watercolor-and-gouache storybook airport or
+travel-terminal corner at the end of a trip: a packed suitcase with travel stickers, a hat,
+a teddy bear peeking out, a boarding pass and a window onto the runway at golden hour.
+Convey a gentle, joyful end-of-adventure mood with no people in the scene. Use subtle
+travel motifs without adding new tourist landmarks."""
     return f"""
 Create only the decorative artwork layer for the final homecoming page of a premium vertical
 children's family travel guide.
 {_HOUSE_STYLE} Trip context: {family_title}; {trip_date}; places remembered:
 {landmarks}. Age-complexity band: {age_complexity}.
 
-Illustrate the complete canonical family together in a warm watercolor-and-gouache storybook
-airport or travel-terminal scene, calmly preparing to return home with simple luggage. Convey a
-gentle, joyful end-of-adventure mood. Keep the family prominent in the middle half of the page,
-fully visible and uncropped. Use subtle travel motifs without adding new tourist landmarks.
+{scene}
 
 Keep the upper 26 percent and lower 25 percent pale, calm, and free from faces, bodies, luggage,
 signs, or important scene details. Trusted code will place the exact closing story and a lined

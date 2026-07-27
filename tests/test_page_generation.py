@@ -278,7 +278,9 @@ def test_openai_cover_uses_official_edit_contract_and_persists_png(tmp_path):
         assert image.format == "PNG"
 
 
-def test_openai_summary_uses_canonical_family_edit_contract(tmp_path):
+def test_summary_shows_the_route_and_never_the_family(tmp_path):
+    """O sumário é do roteiro; a família ocupava metade da página repetindo a capa."""
+
     calls = []
 
     def transport(method, url, **kwargs):
@@ -286,30 +288,24 @@ def test_openai_summary_uses_canonical_family_edit_contract(tmp_path):
         return _response(_png_bytes(color="#69b482"))
 
     output = tmp_path / "summary.png"
-    photo, cover = _family_references(tmp_path)
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
     generator.generate_summary_page(
-        family_photo=photo,
-        family_cover=cover,
         output_path=output,
         family_title="Família Moraes",
         trip_date="2026",
         landmark_names=["Torre Eiffel", "Coliseu"],
-        expected_visible_family_member_count=4,
     )
     _method, url, kwargs = calls[0]
-    assert url.endswith("/images/edits")
-    assert kwargs["data"]["output_format"] == "png"
-    assert [file_data[0] for _field, file_data in kwargs["files"]] == [
-        "family.png",
-        "cover-approved.png",
-    ]
-    prompt = kwargs["data"]["prompt"]
+    # Sem referência nenhuma, a chamada é de geração, não de edição de imagem.
+    assert url.endswith("/images/generations")
+    prompt = kwargs["json"]["prompt"]
     assert '"Coliseu"' in prompt
-    assert "Input image 1 is the original family photo" in prompt
-    assert "Input image 2 is the approved cover" in prompt
-    assert "Show exactly 4 family members together" in prompt
-    assert "never introduce another detailed person" in prompt
+    assert "PEOPLE-FREE CONTRACT" in prompt
+    assert "Do not depict a person" in prompt
+    # Nada de foto, capa aprovada ou contagem de gente.
+    assert "original family photo" not in prompt
+    assert "approved cover" not in prompt
+    assert "family members together" not in prompt
 
 
 def test_cover_revision_uses_original_photo_selected_cover_and_user_feedback(tmp_path):
@@ -362,12 +358,9 @@ def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_p
 
     reference = tmp_path / "summary-1.png"
     reference.write_bytes(_png_bytes())
-    photo, cover = _family_references(tmp_path)
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
 
     generator.generate_summary_page(
-        family_photo=photo,
-        family_cover=cover,
         output_path=tmp_path / "summary-2.png",
         reference_page=reference,
         family_title="Família Moraes",
@@ -377,12 +370,9 @@ def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_p
 
     _method, url, kwargs = calls[0]
     assert url.endswith("/images/edits")
-    assert [file_data[0] for _field, file_data in kwargs["files"]] == [
-        "family.png",
-        "cover-approved.png",
-        "summary-1.png",
-    ]
-    assert "Input image 3 is the selected current-page attempt" in kwargs["data"]["prompt"]
+    # A única referência é a tentativa anterior desta mesma página.
+    assert [file_data[0] for _field, file_data in kwargs["files"]] == ["summary-1.png"]
+    assert "selected current-page attempt" in kwargs["data"]["prompt"]
     assert "Create a visibly different alternative" in kwargs["data"]["prompt"]
     assert '2. "Coliseu"' in kwargs["data"]["prompt"]
 
@@ -509,11 +499,8 @@ def test_openai_page_generator_rejects_wrong_dimensions(tmp_path):
         return _response(_png_bytes(size=(512, 512)))
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
-    photo, cover = _family_references(tmp_path)
     with pytest.raises(PageGenerationError, match="dimensões"):
         generator.generate_summary_page(
-            family_photo=photo,
-            family_cover=cover,
             output_path=tmp_path / "bad.png",
             family_title="Família Moraes",
             trip_date="2026",
@@ -538,11 +525,8 @@ def test_openai_error_exposes_only_safe_diagnostic_identifiers(tmp_path):
         )
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
-    photo, cover = _family_references(tmp_path)
     with pytest.raises(PageGenerationError) as captured:
         generator.generate_summary_page(
-            family_photo=photo,
-            family_cover=cover,
             output_path=tmp_path / "bad.png",
             family_title="Família Moraes",
             trip_date="2026",

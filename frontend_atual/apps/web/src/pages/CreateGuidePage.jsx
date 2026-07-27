@@ -20,7 +20,7 @@ const STEP_NAMES = {
   3: 'Pontos turísticos',
   4: 'Quem vai viajar',
   5: 'Atividades',
-  6: 'Foto da capa',
+  6: 'Capa do guia',
   7: 'Revisão',
 };
 

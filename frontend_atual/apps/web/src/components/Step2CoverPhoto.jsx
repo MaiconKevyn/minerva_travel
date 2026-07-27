@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, UploadCloud, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, UploadCloud, CheckCircle2, Wand2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +23,8 @@ const Step2CoverPhoto = () => {
     updatePhotoProcessingConsent,
     childrenList,
     parentsList,
+    coverBrief,
+    setCoverBrief,
     nextStep
   } = useConversationalGuide();
   const [isDragging, setIsDragging] = useState(false);
@@ -69,8 +72,14 @@ const Step2CoverPhoto = () => {
     e.target.value = '';
   };
 
+  // A capa deixou de exigir foto: dá para descrever o que se quer, ou seguir
+  // sem nenhuma das duas e receber uma cena dos lugares da viagem.
+  const photoIsReady =
+    Boolean(coverPhoto) && confirmedFamilyMemberCount > 0 && photoProcessingConsent;
+  const canContinue = coverPhoto ? photoIsReady && !isValidatingPhoto : true;
+
   const handleConfirm = () => {
-    if (!coverPhoto || confirmedFamilyMemberCount <= 0 || !photoProcessingConsent) return;
+    if (!canContinue) return;
     setIsConfirmed(true);
   };
 
@@ -110,10 +119,11 @@ const Step2CoverPhoto = () => {
             className="w-full text-center space-y-8"
           >
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground leading-tight">
-              Seu roteiro está pronto. Escolha a foto de capa do PDF
+              Seu roteiro está pronto. Como você quer a capa?
             </h2>
             <p className="text-lg text-muted-foreground">
-              Essa imagem abre o livrinho da família antes das atividades, mapas e memórias da viagem.
+              Envie uma foto para virar ilustração, descreva a cena que imaginou, ou siga sem
+              nenhuma das duas — nesse caso a capa nasce dos lugares da viagem.
             </p>
 
             <div
@@ -220,19 +230,40 @@ const Step2CoverPhoto = () => {
               </label>
             </div>
 
+            {/* A descrição vale com ou sem foto: sem ela, é a capa inteira;
+                com ela, dirige só o cenário, nunca quem aparece. */}
+            <div className="rounded-[2rem] border-2 border-secondary/20 bg-secondary/5 p-6 text-left">
+              <label
+                htmlFor="cover-brief"
+                className="flex items-center gap-3 text-lg font-bold text-foreground"
+              >
+                <Wand2 className="h-6 w-6 text-secondary" aria-hidden="true" />
+                Como você imagina a capa?
+              </label>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
+                {coverPhoto
+                  ? 'Opcional. Com a foto enviada, isto guia só o cenário e o clima — quem aparece continua sendo a sua família.'
+                  : 'Opcional. Descreva a cena que quiser: um balão sobre os campos, um trem antigo, o mar ao amanhecer.'}
+              </p>
+              <Textarea
+                id="cover-brief"
+                value={coverBrief}
+                onChange={(event) => setCoverBrief(event.target.value.slice(0, 600))}
+                rows={3}
+                maxLength={600}
+                placeholder="Ex: um balão de ar quente sobrevoando os campos ao amanhecer"
+                className="mt-4 rounded-xl border-border bg-background text-base"
+              />
+            </div>
+
             <motion.div
               initial={{ opacity: 0 }}
-                animate={{ opacity: coverPhoto ? 1 : 0 }}
+              animate={{ opacity: 1 }}
               className="flex justify-center"
             >
               <Button
                 onClick={handleConfirm}
-                disabled={
-                  !coverPhoto ||
-                  confirmedFamilyMemberCount <= 0 ||
-                  !photoProcessingConsent ||
-                  isValidatingPhoto
-                }
+                disabled={!canContinue}
               className="w-full rounded-full bg-primary px-8 py-6 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-primary/90 sm:w-auto"
             >
                 Continuar para revisão <ArrowRight className="ml-2 w-5 h-5" />
@@ -247,7 +278,13 @@ const Step2CoverPhoto = () => {
             className="text-center space-y-6"
           >
             <div className="relative w-32 h-32 mx-auto">
-              <img src={coverPhotoUrl} alt="Capa confirmada" className="w-full h-full object-cover rounded-full shadow-xl" />
+              {coverPhotoUrl ? (
+                <img src={coverPhotoUrl} alt="Capa confirmada" className="w-full h-full object-cover rounded-full shadow-xl" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-secondary/10 shadow-xl">
+                  <Wand2 className="h-12 w-12 text-secondary" aria-hidden="true" />
+                </div>
+              )}
               <div className="absolute -bottom-2 -right-2 bg-background rounded-full p-1 shadow-sm">
                 <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>

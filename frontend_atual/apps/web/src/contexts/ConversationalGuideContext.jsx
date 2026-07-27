@@ -102,6 +102,8 @@ export const ConversationalGuideProvider = ({ children }) => {
   // Entra ligada: a página de palavras é o que a criança faz no avião, e
   // quem não quer desmarca — o contrário some com ela sem ninguém notar.
   const [flightVocabularyPages, setFlightVocabularyPages] = useState(true);
+  // A capa pode nascer de uma descrição escrita em vez da foto.
+  const [coverBrief, setCoverBrief] = useState('');
   const [itineraryPreferences, setItineraryPreferences] = useState({
     days: 3,
     interests: [],
@@ -145,6 +147,7 @@ export const ConversationalGuideProvider = ({ children }) => {
     recommended_itinerary: recommendedItinerary,
     restaurant_recommendations_extra: restaurantRecommendationsExtra,
     flight_vocabulary_pages: flightVocabularyPages,
+    cover_brief: coverBrief,
     itinerary_preferences: itineraryPreferences,
     has_searched_landmarks: hasSearchedLandmarks,
     expected_cover_family_member_count: expectedCoverFamilyMemberCount,
@@ -165,6 +168,7 @@ export const ConversationalGuideProvider = ({ children }) => {
     recommendedItinerary,
     restaurantRecommendationsExtra,
     flightVocabularyPages,
+    coverBrief,
     selectedLandmarks,
     year,
   ]);
@@ -302,6 +306,7 @@ export const ConversationalGuideProvider = ({ children }) => {
         setRestaurantRecommendationsExtra(Boolean(payload.restaurant_recommendations_extra));
         // Rascunho antigo não tem o campo; a página entra ligada, como num guia novo.
         setFlightVocabularyPages(payload.flight_vocabulary_pages !== false);
+        setCoverBrief(String(payload.cover_brief || ''));
         setItineraryPreferences(
           payload.itinerary_preferences && typeof payload.itinerary_preferences === 'object'
             ? payload.itinerary_preferences
@@ -456,6 +461,7 @@ export const ConversationalGuideProvider = ({ children }) => {
     setRecommendedItinerary(null);
     setRestaurantRecommendationsExtra(false);
     setFlightVocabularyPages(true);
+    setCoverBrief('');
     setItineraryPreferences({ days: 3, interests: [], pace: 'balanced' });
     setHasSearchedLandmarks(false);
     setDraftResetKey((value) => value + 1);
@@ -599,6 +605,8 @@ export const ConversationalGuideProvider = ({ children }) => {
         setRestaurantRecommendationsExtra,
         flightVocabularyPages,
         setFlightVocabularyPages,
+        coverBrief,
+        setCoverBrief,
         itineraryPreferences,
         setItineraryPreferences,
         isLoadingLandmarks,

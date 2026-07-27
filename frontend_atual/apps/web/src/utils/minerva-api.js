@@ -547,6 +547,9 @@ export const appendGuideMetadata = (formData, guideData = {}) => {
   if (guideData.flightVocabularyPages === false) {
     formData.append('flight_vocabulary_pages', 'false');
   }
+  if (String(guideData.coverBrief || '').trim()) {
+    formData.append('cover_brief', String(guideData.coverBrief).trim());
+  }
   if (guideData.itinerary) {
     formData.append('itinerary_json', JSON.stringify(guideData.itinerary));
   }

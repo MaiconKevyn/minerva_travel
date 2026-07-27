@@ -6,6 +6,7 @@ import {
   Landmark,
   ListChecks,
   Loader2,
+  Mail,
   MapPin,
   MessageSquareText,
   Plus,
@@ -334,6 +335,12 @@ const Step3Destination = () => {
         </h2>
         <p className="mx-auto max-w-2xl text-lg text-muted-foreground font-medium">
           Adicione cada destino separadamente para montarmos o guia na ordem da viagem.
+        </p>
+        {/* Dito logo na entrada: quem começa precisa saber onde o guia
+            termina, senão só descobre no fim que existe um e-mail. */}
+        <p className="mx-auto inline-flex max-w-2xl items-center gap-2 rounded-full bg-secondary/10 px-5 py-2 text-sm font-bold text-foreground">
+          <Mail className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
+          Ao final, montamos o guia e enviamos o PDF completo para o seu e-mail em alguns minutos.
         </p>
       </div>
 

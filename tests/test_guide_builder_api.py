@@ -184,9 +184,10 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
     assert "Torre Eiffel" in created["pages"][1]["required_copy"]
     assert "Coliseu" in created["pages"][1]["required_copy"]
 
-    early_summary = _generate(client, session_id, "summary", "summary-early")
-    assert early_summary.status_code == 409
-    assert early_summary.json()["detail"]["code"] == "page_dependency_missing"
+    # A página que ainda depende da capa é a de volta para casa, não o sumário.
+    early_homecoming = _generate(client, session_id, "homecoming", "homecoming-early")
+    assert early_homecoming.status_code == 409
+    assert early_homecoming.json()["detail"]["code"] == "page_dependency_missing"
     assert generator.calls == []
 
     first = _generate(client, session_id, "cover", "cover-request-1")
@@ -233,12 +234,14 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         assert generator.calls[-1] == kind
         request = generator.requests[-1]
         assert request["reference_page"] is None
-        if page_id in {"summary", "homecoming"} or page_id.startswith("landmark-"):
+        if page_id == "homecoming" or page_id.startswith("landmark-"):
             assert request["expected_visible_family_member_count"] == 2
         if page_id == "summary":
-            assert request["family_photo"].is_file()
-            assert request["family_cover"].name == "cover-1.png"
-            assert page["attempts"][-1]["include_family"] is True
+            # Página do roteiro: nada de família entra nela.
+            assert "family_photo" not in request
+            assert "family_cover" not in request
+            assert "expected_visible_family_member_count" not in request
+            assert page["attempts"][-1]["include_family"] is False
         elif page_id.startswith("landmark-"):
             assert request["family_photo"] is None
             assert request["family_cover"] is None
@@ -276,6 +279,9 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
         "download_url": f"/guide-builder/{session_id}/pdf",
         "filename": "familia-moraes-minerva-travel.pdf",
         "page_count": len(created["pages"]),
+        # Sem SMTP configurado nada é prometido: a tela só fala em e-mail
+        # quando o envio confirmou.
+        "emailed_to": None,
     }
     pdf_path = tmp_path / "generated" / "builder" / session_id / "approved-guide.pdf"
     first_bytes = pdf_path.read_bytes()
@@ -506,17 +512,24 @@ def test_regeneration_uses_selected_attempt_and_persists_bounded_feedback(tmp_pa
     assert generator.calls == ["cover", "cover", "cover"]
 
 
-def test_summary_regeneration_keeps_canonical_family_references(tmp_path, monkeypatch):
+def test_summary_is_about_the_route_and_never_receives_the_family(tmp_path, monkeypatch):
+    """O sumário deixou de ser uma página de família.
+
+    Antes ele exigia a capa aprovada e recebia foto e capa como referência, o
+    que fazia a família reaparecer ocupando metade da página. Agora sai antes
+    da capa, se o usuário quiser, e só regenera a partir de si mesmo.
+    """
+
     client, generator = _setup(monkeypatch, tmp_path)
     session_id = _create_session(client)["session_id"]
-    cover = _generate(client, session_id, "cover", "cover-first").json()
-    cover_attempt = cover["pages"][0]["selected_attempt_id"]
-    assert _approve(client, session_id, "cover", cover_attempt).status_code == 200
 
+    # Sem aprovar a capa antes: o sumário não depende mais dela.
     first = _generate(client, session_id, "summary", "summary-first")
     assert first.status_code == 200, first.text
     first_request = generator.requests[-1]
-    assert first_request["family_cover"].name == "cover-1.png"
+    assert "family_cover" not in first_request
+    assert "family_photo" not in first_request
+    assert "expected_visible_family_member_count" not in first_request
     assert first_request["reference_page"] is None
 
     revised = _generate(
@@ -528,10 +541,9 @@ def test_summary_regeneration_keeps_canonical_family_references(tmp_path, monkey
     )
     assert revised.status_code == 200, revised.text
     revised_request = generator.requests[-1]
-    assert revised_request["family_photo"].is_file()
-    assert revised_request["family_cover"].name == "cover-1.png"
+    assert "family_photo" not in revised_request
+    assert "family_cover" not in revised_request
     assert revised_request["reference_page"].name == "summary-1.png"
-    assert revised_request["expected_visible_family_member_count"] == 2
 
 
 def test_landmark_can_opt_in_to_family_and_idempotent_replay_keeps_choice(tmp_path, monkeypatch):
@@ -641,7 +653,14 @@ def test_landmark_without_family_does_not_require_cover_but_opt_in_does(tmp_path
     assert generator.calls.count("landmark") == 1
 
 
-def test_summary_fails_without_the_approved_cover_asset(tmp_path, monkeypatch):
+def test_a_family_page_fails_loudly_when_the_approved_cover_asset_vanishes(tmp_path, monkeypatch):
+    """O sumário deixou de depender da capa; a volta para casa não.
+
+    O invariante continua valendo para as páginas que realmente reusam a
+    família: sumir com o arquivo aprovado tem de virar erro explícito, não uma
+    página gerada sem a referência.
+    """
+
     client, generator = _setup(monkeypatch, tmp_path)
     session_id = _create_session(client)["session_id"]
     generated = _generate(client, session_id, "cover", "cover-first").json()
@@ -649,16 +668,16 @@ def test_summary_fails_without_the_approved_cover_asset(tmp_path, monkeypatch):
     assert _approve(client, session_id, "cover", cover_attempt).status_code == 200
     (tmp_path / "generated" / "builder" / session_id / "cover-1.png").unlink()
 
-    summary = _generate(client, session_id, "summary", "summary-missing-cover")
-    assert summary.status_code == 502
-    assert summary.json()["detail"]["message"] == (
+    homecoming = _generate(client, session_id, "homecoming", "homecoming-missing-cover")
+    assert homecoming.status_code == 502
+    assert homecoming.json()["detail"]["message"] == (
         "A capa aprovada da família não está mais disponível."
     )
     assert generator.calls == ["cover"]
     state = client.get(f"/api/guide-builder/{session_id}").json()
-    summary_page = next(page for page in state["pages"] if page["id"] == "summary")
-    assert summary_page["status"] == "error"
-    assert summary_page["attempts"] == []
+    page = next(item for item in state["pages"] if item["id"] == "homecoming")
+    assert page["status"] == "error"
+    assert page["attempts"] == []
 
 
 def test_builder_session_and_assets_are_owner_scoped(tmp_path, monkeypatch):

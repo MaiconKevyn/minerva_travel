@@ -137,6 +137,7 @@ from minerva_travel.custom_landmarks import (
     slugify,
 )
 from minerva_travel.destination_facts import lookup_destination_facts
+from minerva_travel.email_delivery import send_guide_ready_email
 from minerva_travel.flight_vocabulary import (
     country_flight_vocabulary_languages,
     flight_vocabulary_for,
@@ -611,6 +612,9 @@ class BuilderPdfResponse(BaseModel):
     download_url: str
     filename: str
     page_count: int = Field(ge=1)
+    # A tela precisa saber se o aviso saiu para não prometer um e-mail que
+    # nunca chegou — sem SMTP configurado o guia continua só no download.
+    emailed_to: str | None = None
 
 
 class GuideGenerationQueuedResponse(BaseModel):
@@ -1050,6 +1054,8 @@ class GuideGenerationFormRequest(StrictRequestModel):
     # Ausente significa ligado: a página de palavras entra por padrão, e um
     # cliente antigo que não conhece o campo não deve perdê-la em silêncio.
     flight_vocabulary_pages: bool = True
+    # A capa pode nascer de uma descrição em vez da foto da família.
+    cover_brief: str | None = Field(default=None, max_length=600)
     photo_processing_consent: bool = False
     privacy_consent_version: str | None = Field(default=None, max_length=100)
     privacy_consent_at: str | None = Field(default=None, max_length=100)
@@ -1571,6 +1577,7 @@ def parse_guide_generation_form(
     activity_selections_json: Annotated[str | None, Form()] = None,
     restaurant_recommendations_extra: Annotated[bool | None, Form()] = None,
     flight_vocabulary_pages: Annotated[bool | None, Form()] = None,
+    cover_brief: Annotated[str | None, Form()] = None,
     photo_processing_consent: Annotated[bool, Form()] = False,
     privacy_consent_version: Annotated[str | None, Form()] = None,
     privacy_consent_at: Annotated[str | None, Form()] = None,
@@ -1592,6 +1599,7 @@ def parse_guide_generation_form(
             flight_vocabulary_pages=(
                 True if flight_vocabulary_pages is None else flight_vocabulary_pages
             ),
+            cover_brief=cover_brief,
             photo_processing_consent=photo_processing_consent,
             privacy_consent_version=privacy_consent_version,
             privacy_consent_at=privacy_consent_at,
@@ -2699,14 +2707,34 @@ def _selected_builder_destinations(
     return contexts
 
 
+# Estas duas desenham a família a partir da foto. Sem foto elas sairiam com
+# uma família inventada, que não é a de ninguém.
+FAMILY_PHOTO_ACTIVITY_TYPES = frozenset({"family_coloring", "investigator"})
+
+
 def normalize_landmark_activity_selections(
     selections: list[LandmarkActivitySelection],
     *,
     selected_landmarks: list[LandmarkActivityContext],
     all_landmark_ids: set[str],
+    has_family_photo: bool = True,
 ) -> list[LandmarkActivitySelection]:
     """Validate associations and return deterministic itinerary/page order."""
 
+    if not has_family_photo:
+        blocked = sorted(
+            {
+                selection.activity_type
+                for selection in selections
+                if selection.activity_type in FAMILY_PHOTO_ACTIVITY_TYPES
+            }
+        )
+        if blocked:
+            raise ActivitySelectionInputError(
+                "activity_requires_family_photo",
+                "Estas atividades desenham a sua família e precisam da foto: "
+                f"{', '.join(_ACTIVITY_LABELS.get(item, item) for item in blocked)}.",
+            )
     if len(selections) > MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE:
         raise ActivitySelectionInputError(
             "activity_selection_guide_limit",
@@ -2957,6 +2985,7 @@ def _builder_page_plan(
         activity_selections,
         selected_landmarks=landmarks,
         all_landmark_ids=all_landmark_ids,
+        has_family_photo=bool(form.get("has_family_photo", True)),
     )
     investigator_children = (
         _builder_investigator_children(form)
@@ -3165,19 +3194,26 @@ def _builder_page_plan(
 @app.post("/api/guide-builder", response_model=BuilderSessionResponse, status_code=201)
 async def create_guide_builder(
     form: Annotated[GuideGenerationFormRequest, Depends(parse_guide_generation_form)],
-    family_photo: Annotated[UploadFile, File()],
     current_user: CurrentUser,
+    family_photo: Annotated[UploadFile | None, File()] = None,
 ) -> BuilderSessionResponse:
-    try:
-        privacy_consent = validate_photo_processing_consent(
-            granted=form.photo_processing_consent,
-            version=form.privacy_consent_version,
-            granted_at=form.privacy_consent_at,
-        )
-    except PrivacyConsentError as error:
-        raise HTTPException(status_code=422, detail=error.as_detail()) from error
+    # Sem foto não há processamento de imagem para consentir. Exigir o
+    # consentimento assim mesmo bloquearia quem escolheu descrever a capa.
+    privacy_consent = None
+    if family_photo is not None:
+        try:
+            privacy_consent = validate_photo_processing_consent(
+                granted=form.photo_processing_consent,
+                version=form.privacy_consent_version,
+                granted_at=form.privacy_consent_at,
+            )
+        except PrivacyConsentError as error:
+            raise HTTPException(status_code=422, detail=error.as_detail()) from error
 
     form_payload = form.model_dump(mode="json")
+    # O plano precisa saber se há foto para recusar as atividades que
+    # desenham a família antes de a sessão existir.
+    form_payload["has_family_photo"] = family_photo is not None
     catalog, _custom, selected = _builder_catalog_and_selected_from_form(form_payload)
     if not selected:
         raise HTTPException(
@@ -3195,7 +3231,7 @@ async def create_guide_builder(
     form_payload["activity_selections"] = [
         selection.model_dump(mode="json") for selection in normalized_activities
     ]
-    photo_path = await storage.save_upload(family_photo)
+    photo_path = await storage.save_upload(family_photo) if family_photo is not None else None
     session = create_builder_session(
         owner_id=current_user.id,
         form=form_payload,
@@ -3477,7 +3513,12 @@ def generate_builder_page_attempt(
                     "family_coloring",
                     "investigator",
                 }
-            elif page.kind in {"destination_intro", "flight_vocabulary", "best_memory"}:
+            elif page.kind in {
+                "destination_intro",
+                "flight_vocabulary",
+                "trip_summary",
+                "best_memory",
+            }:
                 include_family = False
             else:
                 include_family = True
@@ -3499,7 +3540,11 @@ def generate_builder_page_attempt(
                 "activity_type"
             ) in {"family_coloring", "investigator"}
             family_title = str(session.form.get("title") or "Guia da família")
-            photo_path = Path(session.photo_filename)
+            # Sessão sem foto guarda caminho vazio; `Path("")` vira `Path(".")`
+            # e passaria adiante como se fosse um arquivo.
+            photo_path = Path(session.photo_filename or "")
+            family_photo = photo_path if session.photo_filename and photo_path.is_file() else None
+            cover_brief = str(session.form.get("cover_brief") or "")
             expected_people = session.form.get("expected_visible_family_member_count")
             reference_attempt = page.selected_attempt()
             reference_page = (
@@ -3512,8 +3557,10 @@ def generate_builder_page_attempt(
                 else None
             )
             family_cover: Path | None = None
-            if page_kind in {"trip_summary", "homecoming"} or (
-                page_kind == "landmark" and include_family
+            # O sumário saiu daqui: é uma página só do roteiro, e esperar a
+            # capa aprovada travava uma página que não usa a família.
+            if family_photo is not None and (
+                page_kind == "homecoming" or (page_kind == "landmark" and include_family)
             ):
                 cover_page = session.page("cover")
                 cover_attempt = (
@@ -3567,36 +3614,35 @@ def generate_builder_page_attempt(
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
         generator = get_guide_page_generator()
         family_photo_required = (
-            page_kind in {"cover", "trip_summary", "homecoming"}
+            page_kind == "homecoming"
             or (page_kind == "landmark" and include_family)
             or family_reference_activity
         )
-        if family_photo_required and not photo_path.is_file():
+        if family_photo_required and family_photo is None:
             raise PageGenerationError("A foto da família não está mais disponível.")
         if page_kind == "cover":
             generator.generate_cover_page(
-                family_photo=photo_path,
+                family_photo=family_photo,
                 output_path=output,
                 family_title=family_title,
                 trip_date=str(metadata["trip_date"]),
                 landmark_names=list(metadata["landmark_names"]),
-                expected_visible_family_member_count=expected_people,
+                expected_visible_family_member_count=(
+                    expected_people if family_photo is not None else None
+                ),
+                cover_brief=cover_brief,
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )
         elif page_kind == "trip_summary":
-            if family_cover is None:
-                raise BuilderPageDependencyMissing(
-                    "A capa aprovada da família não está disponível."
-                )
+            # Não depende mais da capa aprovada: a página é só do roteiro, e
+            # exigir a capa antes travava o sumário por uma imagem que ele
+            # nem usa.
             generator.generate_summary_page(
-                family_photo=photo_path,
-                family_cover=family_cover,
                 output_path=output,
                 family_title=family_title,
                 trip_date=str(metadata["trip_date"]),
                 landmark_names=list(metadata["landmark_names"]),
-                expected_visible_family_member_count=expected_people,
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )
@@ -3628,7 +3674,7 @@ def generate_builder_page_attempt(
                     "A capa aprovada da família não está disponível."
                 )
             generator.generate_landmark_page(
-                family_photo=photo_path if include_family else None,
+                family_photo=family_photo if include_family else None,
                 family_cover=family_cover,
                 include_family=include_family,
                 output_path=output,
@@ -3667,22 +3713,24 @@ def generate_builder_page_attempt(
             }
             if activity_type == "coloring":
                 generator.generate_coloring_page(**common_activity_kwargs)
-            elif activity_type == "family_coloring":
-                generator.generate_family_coloring_page(
+            elif activity_type in FAMILY_PHOTO_ACTIVITY_TYPES:
+                # O plano já recusa estas sem foto; aqui é a última barreira
+                # para uma sessão antiga não gerar uma família inventada.
+                if family_photo is None:
+                    raise PageGenerationError(
+                        "Esta atividade desenha a sua família e precisa da foto."
+                    )
+                family_activity_kwargs = {
                     **common_activity_kwargs,
-                    family_photo=photo_path,
-                    family_cover=family_cover,
-                    family_title=family_title,
-                    expected_visible_family_member_count=expected_people,
-                )
-            elif activity_type == "investigator":
-                generator.generate_investigator_page(
-                    **common_activity_kwargs,
-                    family_photo=photo_path,
-                    family_cover=family_cover,
-                    family_title=family_title,
-                    expected_visible_family_member_count=expected_people,
-                )
+                    "family_photo": family_photo,
+                    "family_cover": family_cover,
+                    "family_title": family_title,
+                    "expected_visible_family_member_count": expected_people,
+                }
+                if activity_type == "family_coloring":
+                    generator.generate_family_coloring_page(**family_activity_kwargs)
+                else:
+                    generator.generate_investigator_page(**family_activity_kwargs)
             elif activity_type == "detail_hunt":
                 generator.generate_detail_hunt_page(**common_activity_kwargs)
             elif activity_type == "word_search":
@@ -3725,19 +3773,23 @@ def generate_builder_page_attempt(
                 reference_page=reference_page,
             )
         elif page_kind == "homecoming":
-            if family_cover is None:
+            # Sem foto, esta página fecha a viagem pelos objetos dela; a capa
+            # aprovada só é exigida quando há uma família para reencontrar.
+            if family_photo is not None and family_cover is None:
                 raise BuilderPageDependencyMissing(
                     "A capa aprovada da família não está disponível."
                 )
             generator.generate_homecoming_page(
-                family_photo=photo_path,
+                family_photo=family_photo,
                 family_cover=family_cover,
                 output_path=output,
                 family_title=family_title,
                 trip_date=str(metadata["trip_date"]),
                 landmark_names=list(metadata["landmark_names"]),
                 age_complexity=str(metadata["age_complexity"]),
-                expected_visible_family_member_count=expected_people,
+                expected_visible_family_member_count=(
+                    expected_people if family_photo is not None else None
+                ),
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )
@@ -3942,11 +3994,20 @@ def generate_guide_builder_pdf(
                     title=str(session.form.get("title") or "Guia Minerva Travel"),
                 )
             filename = _builder_pdf_download_filename(session)
+            # O envio acontece com o PDF já no disco: se o e-mail falhar, a
+            # família ainda baixa o guia pela tela.
+            emailed = send_guide_ready_email(
+                recipient=current_user.email or "",
+                family_title=str(session.form.get("title") or "sua família"),
+                session_id=session.id,
+                page_count=len(pages),
+            )
             response = BuilderPdfResponse(
                 session_id=session.id,
                 download_url=f"/guide-builder/{session.id}/pdf",
                 filename=filename,
                 page_count=len(pages),
+                emailed_to=current_user.email if emailed else None,
             )
         emit_event(
             "guide_builder_pdf_generated",

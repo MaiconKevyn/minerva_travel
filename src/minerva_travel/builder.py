@@ -250,7 +250,7 @@ def create_builder_session(
     *,
     owner_id: str,
     form: dict[str, Any],
-    photo_path: Path,
+    photo_path: Path | None,
     pages: list[BuilderPage],
     privacy_consent: dict[str, Any] | None,
 ) -> BuilderSession:
@@ -261,7 +261,7 @@ def create_builder_session(
         created_at=now.isoformat(),
         expires_at=(now + timedelta(days=guide_draft_retention_days())).isoformat(),
         form=form,
-        photo_filename=str(photo_path),
+        photo_filename=str(photo_path) if photo_path is not None else "",
         pages=pages,
         privacy_consent=privacy_consent,
     )

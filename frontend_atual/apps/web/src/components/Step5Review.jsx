@@ -12,6 +12,7 @@ import {
   BookHeart,
   AlertCircle,
   PenLine,
+  Mail,
   Plane,
   PlaneTakeoff,
   Puzzle,
@@ -63,6 +64,7 @@ const Step5Review = () => {
     recommendedItinerary,
     restaurantRecommendationsExtra,
     flightVocabularyPages,
+    coverBrief,
     setRestaurantRecommendationsExtra,
     year,
     builderSessionId,
@@ -156,6 +158,7 @@ const Step5Review = () => {
       itinerary,
       restaurantRecommendationsExtra,
       flightVocabularyPages,
+      coverBrief,
     };
   };
 
@@ -591,6 +594,23 @@ const Step5Review = () => {
             >
               Corrigir nomes
             </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* O mesmo aviso do começo, agora com o endereço que vai receber. */}
+      <div className="mt-8 rounded-3xl border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6">
+        <div className="flex items-start gap-4">
+          <Mail className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
+          <div>
+            <h3 className="text-xl font-serif font-bold text-foreground">
+              O guia chega no seu e-mail
+            </h3>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">
+              Você aprova as páginas uma a uma na próxima tela. Quando o PDF ficar pronto,
+              enviamos o link para o e-mail da sua conta em alguns minutos — e ele também fica
+              disponível para baixar aqui.
+            </p>
           </div>
         </div>
       </div>

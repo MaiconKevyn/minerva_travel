@@ -179,7 +179,10 @@ def test_every_page_of_the_guide_shares_the_house_style():
             **family, expected_visible_family_member_count=3
         ),
         "sumario": generation.summary_page_prompt(
-            **family, expected_visible_family_member_count=3
+            family_title="Família Lima",
+            trip_date="Julho de 2026",
+            landmark_names=["Coliseu"],
+            has_revision_reference=False,
         ),
         "destino": generation.destination_intro_page_prompt(
             title="Roma",

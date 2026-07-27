@@ -580,9 +580,24 @@ const GuideAssembly = ({ session: initialSession }) => {
         </div>
         <div className="mx-auto max-w-xl rounded-3xl border-2 border-secondary/30 bg-card p-6 shadow-sm">
           {pdfExport && (
-            <p className="mb-3 font-bold text-secondary" role="status">
-              PDF pronto com {pdfExport.page_count} páginas.
-            </p>
+            <div className="mb-3 space-y-1" role="status">
+              <p className="font-bold text-secondary">
+                PDF pronto com {pdfExport.page_count}{' '}
+                {pdfExport.page_count === 1 ? 'página' : 'páginas'}.
+              </p>
+              {/* Só prometemos o e-mail quando ele saiu de verdade: o backend
+                  devolve o endereço apenas depois do envio confirmado. */}
+              {pdfExport.emailed_to ? (
+                <p className="text-sm font-medium text-muted-foreground">
+                  Enviamos o link do guia para <strong>{pdfExport.emailed_to}</strong>. Ele chega
+                  em alguns minutos — confira também a caixa de spam.
+                </p>
+              ) : (
+                <p className="text-sm font-medium text-muted-foreground">
+                  Baixe o PDF por aqui. O guia também fica salvo na sua conta.
+                </p>
+              )}
+            </div>
           )}
           {actionError && (
             <p className="mb-3 font-bold text-destructive" role="alert">

@@ -170,6 +170,17 @@
             "title": "Children Names",
             "type": "string"
           },
+          "cover_brief": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Brief"
+          },
           "custom_landmarks": {
             "anyOf": [
               {
@@ -325,6 +336,17 @@
             "title": "Children Names",
             "type": "string"
           },
+          "cover_brief": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Brief"
+          },
           "custom_landmarks": {
             "anyOf": [
               {
@@ -348,9 +370,16 @@
             "title": "Expected Visible Family Member Count"
           },
           "family_photo": {
-            "contentMediaType": "application/octet-stream",
-            "title": "Family Photo",
-            "type": "string"
+            "anyOf": [
+              {
+                "contentMediaType": "application/octet-stream",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family Photo"
           },
           "flight_vocabulary_pages": {
             "anyOf": [
@@ -440,7 +469,6 @@
           }
         },
         "required": [
-          "family_photo",
           "title",
           "children_names",
           "parents_names",
@@ -1074,6 +1102,17 @@
           "download_url": {
             "title": "Download Url",
             "type": "string"
+          },
+          "emailed_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emailed To"
           },
           "filename": {
             "title": "Filename",
