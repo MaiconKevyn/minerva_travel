@@ -1,21 +1,17 @@
 """A foto da família deixou de ser obrigatória para existir um guia."""
 
+import json
 from io import BytesIO
 
-import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
 from minerva_travel import storage
 from minerva_travel.app import (
     FAMILY_PHOTO_ACTIVITY_TYPES,
-    ActivitySelectionInputError,
     app,
-    normalize_landmark_activity_selections,
 )
 from minerva_travel.auth import AuthenticatedUser, get_current_user
-from minerva_travel.catalog import load_catalog
-from minerva_travel.models import LandmarkActivitySelection
 from minerva_travel.page_generation import cover_page_prompt, homecoming_page_prompt
 
 
@@ -90,51 +86,91 @@ def test_the_photo_still_works_and_still_asks_for_consent(monkeypatch, tmp_path)
     assert with_consent.status_code == 201, with_consent.text
 
 
-def test_activities_that_draw_the_family_are_refused_without_a_photo():
-    catalog = load_catalog()
-    landmarks = [
-        item
-        for destination in catalog.destinations
-        for item in destination.landmarks
-        if item.id == "eiffel-tower"
-    ]
-    assert landmarks
+def test_activities_that_use_the_photo_are_still_planned_without_it(monkeypatch, tmp_path):
+    """Elas não somem do guia: são planejadas sem a família como inspiração.
 
-    from minerva_travel.app import _selected_builder_landmarks
+    Bloqueá-las tirava da criança páginas que funcionam sem foto nenhuma — o
+    investigador vive das missões, que vêm de nome e idade.
+    """
 
-    contexts = _selected_builder_landmarks(
-        catalog.destinations, ["paris:eiffel-tower"], [8]
-    )
     selections = [
-        LandmarkActivitySelection(
-            landmark_selection_id="paris:eiffel-tower",
-            activity_type="investigator",
-            order=1,
-        )
+        {
+            "landmark_selection_id": "paris:eiffel-tower",
+            "activity_type": activity_type,
+            "order": index,
+        }
+        for index, activity_type in enumerate(sorted(FAMILY_PHOTO_ACTIVITY_TYPES), start=1)
     ]
 
-    # Com foto passa; sem foto, recusa explicando qual atividade é o problema.
-    assert normalize_landmark_activity_selections(
-        selections,
-        selected_landmarks=contexts,
-        all_landmark_ids={"paris:eiffel-tower"},
-        has_family_photo=True,
-    )
-    with pytest.raises(ActivitySelectionInputError) as raised:
-        normalize_landmark_activity_selections(
-            selections,
-            selected_landmarks=contexts,
-            all_landmark_ids={"paris:eiffel-tower"},
-            has_family_photo=False,
+    try:
+        response = _client(monkeypatch, tmp_path).post(
+            "/api/guide-builder",
+            data=_form(activity_selections_json=json.dumps(selections)),
         )
-    assert raised.value.code == "activity_requires_family_photo"
-    assert "Investigador" in raised.value.message
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 201, response.text
+    planned = [page["metadata"].get("activity_type") for page in response.json()["pages"]]
+    for activity_type in FAMILY_PHOTO_ACTIVITY_TYPES:
+        assert activity_type in planned
 
 
-def test_every_family_photo_activity_is_actually_blocked():
-    # A lista existe para o plano e para a tela; se uma delas escapar, o guia
-    # sai com uma família inventada no lugar da real.
-    assert FAMILY_PHOTO_ACTIVITY_TYPES == frozenset({"family_coloring", "investigator"})
+def test_the_two_photo_activities_swap_the_family_for_a_generic_scene():
+    from minerva_travel.page_generation import (
+        family_coloring_artwork_prompt,
+        investigator_artwork_prompt,
+    )
+
+    common = {
+        "landmark_name": "Coliseu",
+        "city": "Roma",
+        "country": "Itália",
+        "age_complexity": "early_reader",
+        "expected_visible_family_member_count": None,
+        "has_family_cover": False,
+        "has_landmark_reference": False,
+        "has_landmark_page_reference": False,
+        "has_revision_reference": False,
+    }
+    coloring = family_coloring_artwork_prompt(**common, has_family_photo=False)
+    investigator = investigator_artwork_prompt(**common, child_count=2, has_family_photo=False)
+
+    # Colorir vira uma cena de férias qualquer, que a criança pinta e decide
+    # quem é; nenhum dos dois pode pedir semelhança com pessoa real.
+    assert "generic" in coloring
+    assert "no portrait likeness of any real person" in coloring
+    assert "original family photo" not in coloring
+    # O investigador some com as pessoas: as missões impressas já as nomeiam.
+    assert "PEOPLE-FREE CONTRACT" in investigator
+    assert "magnifying glass" in investigator
+    assert "original family photo" not in investigator
+
+
+def test_the_photo_still_drives_these_two_when_it_exists():
+    from minerva_travel.page_generation import (
+        family_coloring_artwork_prompt,
+        investigator_artwork_prompt,
+    )
+
+    common = {
+        "landmark_name": "Coliseu",
+        "city": "Roma",
+        "country": "Itália",
+        "age_complexity": "early_reader",
+        "expected_visible_family_member_count": 4,
+        "has_family_cover": True,
+        "has_landmark_reference": False,
+        "has_landmark_page_reference": False,
+        "has_revision_reference": False,
+    }
+    coloring = family_coloring_artwork_prompt(**common)
+    investigator = investigator_artwork_prompt(**common, child_count=2)
+
+    assert "original family photo" in coloring
+    assert "Depict exactly 4 family members" in coloring
+    assert "original family photo" in investigator
+    assert "Show exactly 4 recognizable family members" in investigator
 
 
 def test_the_cover_comes_from_the_written_brief_when_there_is_no_photo():

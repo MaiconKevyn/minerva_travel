@@ -194,7 +194,7 @@ class GuidePageGenerator(Protocol):
     def generate_family_coloring_page(
         self,
         *,
-        family_photo: Path,
+        family_photo: Path | None,
         family_cover: Path | None,
         output_path: Path,
         family_title: str,
@@ -210,7 +210,7 @@ class GuidePageGenerator(Protocol):
     def generate_investigator_page(
         self,
         *,
-        family_photo: Path,
+        family_photo: Path | None,
         family_cover: Path | None,
         output_path: Path,
         family_title: str,
@@ -669,7 +669,7 @@ class OpenAIGuidePageGenerator:
     def generate_family_coloring_page(
         self,
         *,
-        family_photo: Path,
+        family_photo: Path | None,
         family_cover: Path | None,
         output_path: Path,
         family_title: str,
@@ -692,6 +692,7 @@ class OpenAIGuidePageGenerator:
             has_landmark_reference=landmark_reference is not None,
             has_landmark_page_reference=landmark_page_reference is not None,
             has_revision_reference=reference_page is not None,
+            has_family_photo=family_photo is not None,
             revision_instruction=revision_instruction,
         )
         artwork = _provider_artwork_path(output_path)
@@ -722,7 +723,7 @@ class OpenAIGuidePageGenerator:
     def generate_investigator_page(
         self,
         *,
-        family_photo: Path,
+        family_photo: Path | None,
         family_cover: Path | None,
         output_path: Path,
         family_title: str,
@@ -775,6 +776,7 @@ class OpenAIGuidePageGenerator:
             has_landmark_reference=landmark_reference is not None,
             has_landmark_page_reference=landmark_page_reference is not None,
             has_revision_reference=reference_page is not None,
+            has_family_photo=family_photo is not None,
             revision_instruction=revision_instruction,
         )
         artwork = _provider_artwork_path(output_path)
@@ -2271,18 +2273,23 @@ def family_coloring_artwork_prompt(
     has_landmark_reference: bool,
     has_landmark_page_reference: bool,
     has_revision_reference: bool,
+    has_family_photo: bool = True,
     revision_instruction: str = "",
 ) -> str:
     """Build original family-reference line-art instructions without named-style imitation."""
 
-    reference_roles = [
-        (
+    # Sem foto a página continua existindo: ela vira uma cena de férias para
+    # colorir, com pessoas genéricas em vez das reais. Recusar a atividade
+    # tirava da criança uma página que ela pode colorir do mesmo jeito.
+    reference_roles = []
+    input_index = 1
+    if has_family_photo:
+        reference_roles.append(
             "Input image 1 is the sanitized original family photo and is authoritative for "
             "membership, approximate ages, facial structure, hair, glasses, body proportions, "
             "and major accessories."
         )
-    ]
-    input_index = 2
+        input_index = 2
     if has_family_cover:
         reference_roles.append(
             f"Input image {input_index} is the approved family cover and establishes the same "
@@ -2307,26 +2314,42 @@ def family_coloring_artwork_prompt(
             "revision/composition reference."
         )
 
-    family_count = (
-        f"Depict exactly {expected_visible_family_member_count} family members together."
-        if expected_visible_family_member_count
-        else "Depict every family member from input image 1 together without changing their count."
-    )
     location = ", ".join(part for part in (city, country) if part)
     revision = _family_coloring_revision_directive(
         revision_instruction,
         has_revision_reference,
     )
+    if has_family_photo:
+        family_count = (
+            f"Depict exactly {expected_visible_family_member_count} family members together."
+            if expected_visible_family_member_count
+            else "Depict every family member from input image 1 together without changing their "
+            "count."
+        )
+        subject = f"""Show the complete referenced family enjoying one warm, affectionate
+vacation moment together, with {landmark_name} clearly recognizable as the scene.
+{family_count} Preserve each member's
+recognizable hair silhouette, glasses, age relationship, body proportions and major accessories.
+Do not invent, omit, replace, merge, duplicate or change the apparent age or role of any member."""
+    else:
+        people = (
+            f"Draw {expected_visible_family_member_count} people"
+            if expected_visible_family_member_count
+            else "Draw a small group of two adults and two children"
+        )
+        subject = f"""{people} enjoying one warm vacation moment together, with
+{landmark_name} clearly recognizable as the scene. No family photo is supplied, so
+keep every face simple, generic and
+friendly: no portrait likeness of any real person, no photographic detail, no attempt to depict a
+specific family. The child will colour them in and decide who they are."""
+    references = " ".join(reference_roles) or "No reference image is supplied for this version."
     return f"""
 Create only the visual artwork layer for a premium vertical printable children's family travel
 coloring page set at {landmark_name} in {location}.
 {_HOUSE_STYLE_LINEART}
-{" ".join(reference_roles)}
+{references}
 
-Show the complete referenced family enjoying one warm, affectionate vacation moment together,
-with {landmark_name} clearly recognizable as the scene. {family_count} Preserve each member's
-recognizable hair silhouette, glasses, age relationship, body proportions and major accessories.
-Do not invent, omit, replace, merge, duplicate or change the apparent age or role of any member.
+{subject}
 
 Use an original cozy, cute and rounded children's coloring-book visual language: expressive but
 simple faces, friendly proportions, bold smooth black contours, large closed white shapes and a
@@ -2359,18 +2382,22 @@ def investigator_artwork_prompt(
     has_landmark_reference: bool,
     has_landmark_page_reference: bool,
     has_revision_reference: bool,
+    has_family_photo: bool = True,
     revision_instruction: str = "",
 ) -> str:
     """Build a text-free family detective scene for deterministic mission cards."""
 
-    reference_roles = [
-        (
+    # Sem foto o jogo continua: as missões são o que vale, e elas vêm dos
+    # nomes e idades, não da imagem. A cena então é só o ponto turístico.
+    reference_roles = []
+    input_index = 1
+    if has_family_photo:
+        reference_roles.append(
             "Input image 1 is the sanitized original family photo and is authoritative for "
             "family membership, approximate ages, facial structure, hair, glasses, body "
             "proportions and major accessories."
         )
-    ]
-    input_index = 2
+        input_index = 2
     if has_family_cover:
         reference_roles.append(
             f"Input image {input_index} is the approved family cover and establishes the same "
@@ -2395,26 +2422,40 @@ def investigator_artwork_prompt(
             "a revision/composition reference."
         )
 
-    family_count = (
-        f"Show exactly {expected_visible_family_member_count} recognizable family members."
-        if expected_visible_family_member_count
-        else "Show every visible family member from input image 1 exactly once."
-    )
     location = ", ".join(part for part in (city, country) if part)
     revision = _investigator_revision_directive(
         revision_instruction,
         has_revision_reference,
     )
+    if has_family_photo:
+        family_count = (
+            f"Show exactly {expected_visible_family_member_count} recognizable family members."
+            if expected_visible_family_member_count
+            else "Show every visible family member from input image 1 exactly once."
+        )
+        subject = f"""Preserve each family member's identity, age relationship, hair, glasses,
+body proportions and major accessories. {family_count}
+The family contains {child_count} registered children; make the children active
+investigators with simple magnifying glasses or notebooks while adults remain nearby
+as helpers. Do not invent, omit, replace, merge, duplicate or change the age or role
+of any person."""
+    else:
+        # Sem foto, ninguém na cena: as missões impressas já nomeiam cada
+        # criança, e desenhar gente genérica só competiria com elas.
+        subject = """PEOPLE-FREE CONTRACT — No family photo is supplied. Do not depict a
+person, family member, child, tourist, face, body, human silhouette, crowd, portrait
+or reflection anywhere. Instead,
+lay out the detective props themselves — a magnifying glass, an open notebook with a
+pencil, a compass and a few footprints — around the landmark, as if the investigators
+had just stepped away."""
+    references = " ".join(reference_roles) or "No reference image is supplied for this version."
     return f"""
 Create only the visual artwork layer for a premium vertical printable children's travel activity
 at {landmark_name} in {location}. The family is playing a warm, collaborative detective game.
 {_HOUSE_STYLE}
-{" ".join(reference_roles)}
+{references}
 
-Preserve each family member's identity, age relationship, hair, glasses, body proportions and major
-accessories. {family_count} The family contains {child_count} registered children; make the children
-active investigators with simple magnifying glasses or notebooks while adults remain nearby as
-helpers. Do not invent, omit, replace, merge, duplicate or change the age or role of any person.
+{subject}
 
 Use an original watercolor-and-gouache family travel-journal language with friendly expressions,
 warm paper tones and {landmark_name} clearly recognizable. Keep the upper 20 percent calm and free
@@ -2846,14 +2887,15 @@ def _activity_references(
 
 
 def _family_activity_references(
-    family_photo: Path,
+    family_photo: Path | None,
     family_cover: Path | None,
     landmark_reference: Path | None,
     landmark_page_reference: Path | None,
     reference_page: Path | None,
 ) -> list[Path]:
-    references = [family_photo]
+    references: list[Path] = []
     for candidate in (
+        family_photo,
         family_cover,
         landmark_reference,
         landmark_page_reference,

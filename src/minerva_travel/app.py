@@ -2707,8 +2707,10 @@ def _selected_builder_destinations(
     return contexts
 
 
-# Estas duas desenham a família a partir da foto. Sem foto elas sairiam com
-# uma família inventada, que não é a de ninguém.
+# Estas duas usam a foto da família quando ela existe. Sem foto elas saem
+# assim mesmo: colorir vira uma cena de férias com pessoas genéricas, e o
+# investigador vira o ponto turístico com as lupas e cadernos por perto — as
+# missões impressas já trazem o nome de cada criança.
 FAMILY_PHOTO_ACTIVITY_TYPES = frozenset({"family_coloring", "investigator"})
 
 
@@ -2717,24 +2719,9 @@ def normalize_landmark_activity_selections(
     *,
     selected_landmarks: list[LandmarkActivityContext],
     all_landmark_ids: set[str],
-    has_family_photo: bool = True,
 ) -> list[LandmarkActivitySelection]:
     """Validate associations and return deterministic itinerary/page order."""
 
-    if not has_family_photo:
-        blocked = sorted(
-            {
-                selection.activity_type
-                for selection in selections
-                if selection.activity_type in FAMILY_PHOTO_ACTIVITY_TYPES
-            }
-        )
-        if blocked:
-            raise ActivitySelectionInputError(
-                "activity_requires_family_photo",
-                "Estas atividades desenham a sua família e precisam da foto: "
-                f"{', '.join(_ACTIVITY_LABELS.get(item, item) for item in blocked)}.",
-            )
     if len(selections) > MAX_OPTIONAL_ACTIVITY_PAGES_PER_GUIDE:
         raise ActivitySelectionInputError(
             "activity_selection_guide_limit",
@@ -2985,7 +2972,6 @@ def _builder_page_plan(
         activity_selections,
         selected_landmarks=landmarks,
         all_landmark_ids=all_landmark_ids,
-        has_family_photo=bool(form.get("has_family_photo", True)),
     )
     investigator_children = (
         _builder_investigator_children(form)
@@ -3211,9 +3197,6 @@ async def create_guide_builder(
             raise HTTPException(status_code=422, detail=error.as_detail()) from error
 
     form_payload = form.model_dump(mode="json")
-    # O plano precisa saber se há foto para recusar as atividades que
-    # desenham a família antes de a sessão existir.
-    form_payload["has_family_photo"] = family_photo is not None
     catalog, _custom, selected = _builder_catalog_and_selected_from_form(form_payload)
     if not selected:
         raise HTTPException(
@@ -3613,10 +3596,8 @@ def generate_builder_page_attempt(
 
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
         generator = get_guide_page_generator()
-        family_photo_required = (
-            page_kind == "homecoming"
-            or (page_kind == "landmark" and include_family)
-            or family_reference_activity
+        family_photo_required = page_kind == "homecoming" or (
+            page_kind == "landmark" and include_family
         )
         if family_photo_required and family_photo is None:
             raise PageGenerationError("A foto da família não está mais disponível.")
@@ -3714,12 +3695,8 @@ def generate_builder_page_attempt(
             if activity_type == "coloring":
                 generator.generate_coloring_page(**common_activity_kwargs)
             elif activity_type in FAMILY_PHOTO_ACTIVITY_TYPES:
-                # O plano já recusa estas sem foto; aqui é a última barreira
-                # para uma sessão antiga não gerar uma família inventada.
-                if family_photo is None:
-                    raise PageGenerationError(
-                        "Esta atividade desenha a sua família e precisa da foto."
-                    )
+                # Sem foto elas continuam saindo; os prompts trocam a família
+                # real por uma cena genérica em vez de a página sumir.
                 family_activity_kwargs = {
                     **common_activity_kwargs,
                     "family_photo": family_photo,
