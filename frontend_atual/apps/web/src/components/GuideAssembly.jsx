@@ -7,6 +7,7 @@ import {
   Download,
   ImageIcon,
   Loader2,
+  Mail,
   RefreshCcw,
   Sparkles,
 } from 'lucide-react';
@@ -562,9 +563,21 @@ const GuideAssembly = ({ session: initialSession }) => {
         <div className="space-y-3">
           <h2 className="text-4xl font-serif font-bold text-foreground">Páginas aprovadas!</h2>
           <p className="mx-auto max-w-2xl text-lg font-medium text-muted-foreground">
-            Estas são as imagens finais escolhidas. Gere o PDF para reuni-las na mesma sequência,
-            com uma imagem ocupando cada página.
+            Estas são as imagens finais escolhidas, reunidas no PDF nesta mesma sequência —
+            uma imagem por página.
           </p>
+          {/* O e-mail já saiu ao concluir; dizer isso aqui evita a família
+              achar que precisa baixar para não perder o guia. */}
+          {completion.emailed_to ? (
+            <p className="mx-auto flex max-w-2xl items-center justify-center gap-2 rounded-full bg-secondary/10 px-5 py-2 text-sm font-bold text-foreground">
+              <Mail className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
+              Enviamos o link do guia para {completion.emailed_to}. Ele chega em alguns minutos.
+            </p>
+          ) : (
+            <p className="mx-auto max-w-2xl text-sm font-medium text-muted-foreground">
+              Baixe o PDF abaixo. O guia também continua salvo na sua conta.
+            </p>
+          )}
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {session.pages.map((page) => (

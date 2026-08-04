@@ -681,6 +681,17 @@
       },
       "BuilderCompletionResponse": {
         "properties": {
+          "emailed_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emailed To"
+          },
           "pages": {
             "items": {
               "$ref": "#/components/schemas/BuilderApprovedPageResponse"

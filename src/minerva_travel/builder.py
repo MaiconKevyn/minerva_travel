@@ -127,6 +127,9 @@ class BuilderSession:
     photo_filename: str
     pages: list[BuilderPage]
     privacy_consent: dict[str, Any] | None = None
+    # Marca que o aviso de guia pronto já saiu; sem isto, cada download
+    # mandaria outro e-mail para a mesma família.
+    emailed_at: str | None = None
     revision: int = 0
     layout_revision: int = 0
 
@@ -302,6 +305,7 @@ def _load_builder_session(session_id: str) -> BuilderSession:
             form=payload["form"],
             photo_filename=payload["photo_filename"],
             privacy_consent=payload.get("privacy_consent"),
+            emailed_at=payload.get("emailed_at"),
             revision=int(payload.get("revision", 0)),
             layout_revision=int(payload.get("layout_revision", 0)),
             pages=[

@@ -68,7 +68,7 @@ from minerva_travel.asset_policy import (
     assert_selected_asset_provenance,
     asset_provenance_required,
 )
-from minerva_travel.auth import CurrentUser
+from minerva_travel.auth import AuthenticatedUser, CurrentUser
 from minerva_travel.builder import (
     MAX_REVISION_INSTRUCTION_LENGTH,
     BuilderActivityAnchorInvalid,
@@ -98,6 +98,7 @@ from minerva_travel.builder import (
     remove_activity_page,
     reserve_page_attempt,
     rollback_page_attempt,
+    save_builder_session,
     select_page_attempt,
 )
 from minerva_travel.catalog import load_catalog
@@ -605,6 +606,7 @@ class BuilderApprovedPageResponse(BaseModel):
 class BuilderCompletionResponse(BaseModel):
     session_id: str
     pages: list[BuilderApprovedPageResponse]
+    emailed_to: str | None = None
 
 
 class BuilderPdfResponse(BaseModel):
@@ -3596,10 +3598,17 @@ def generate_builder_page_attempt(
 
         output = builder_asset_dir(session_id) / f"{attempt_id}.png"
         generator = get_guide_page_generator()
-        family_photo_required = page_kind == "homecoming" or (
-            page_kind == "landmark" and include_family
+        # Duas condições, não uma: a página usaria a foto E a sessão tinha uma
+        # que sumiu do disco. Exigir por tipo de página travava o guia sem foto
+        # na volta para casa — ela nunca gerava, o guia nunca ficava completo e
+        # o e-mail nunca saía. Exigir de todas quebrava as páginas que nem
+        # olham para a foto.
+        page_uses_family_photo = (
+            page_kind in {"cover", "homecoming"}
+            or (page_kind == "landmark" and include_family)
+            or family_reference_activity
         )
-        if family_photo_required and family_photo is None:
+        if page_uses_family_photo and session.photo_filename and family_photo is None:
             raise PageGenerationError("A foto da família não está mais disponível.")
         if page_kind == "cover":
             generator.generate_cover_page(
@@ -3915,20 +3924,98 @@ def approve_builder_page(
         ) from error
 
 
+def _write_builder_pdf(session: BuilderSession) -> tuple[Path, list[Path]]:
+    """Monta o PDF das páginas aprovadas, na ordem do guia.
+
+    A ordem vem de `approved_asset_filenames`, que percorre as páginas por
+    posição — não pela ordem em que a família resolveu gerá-las.
+    """
+
+    allowed_filenames = session.allowed_asset_filenames()
+    pages: list[Path] = []
+    for filename in session.approved_asset_filenames():
+        path = builder_asset_dir(session.id) / filename
+        if (
+            filename not in allowed_filenames
+            or path.name != filename
+            or path.suffix.lower() != ".png"
+            or not path.is_file()
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "builder_approved_asset_missing",
+                    "message": "Uma página aprovada não está mais disponível.",
+                },
+            )
+        pages.append(path)
+
+    output = builder_pdf_path(session.id)
+    if not _is_valid_cached_builder_pdf(output):
+        write_approved_page_images_pdf(
+            pages,
+            output,
+            title=str(session.form.get("title") or "Guia Minerva Travel"),
+        )
+    return output, pages
+
+
+def _notify_guide_ready(
+    session: BuilderSession,
+    current_user: AuthenticatedUser,
+    page_count: int,
+) -> str | None:
+    """Avisa a família uma vez só. Devolve o endereço quando o e-mail saiu.
+
+    O envio acontece com o PDF já no disco: se o servidor de e-mail estiver
+    fora, a família ainda baixa o guia pela tela.
+    """
+
+    if session.emailed_at:
+        return current_user.email
+    if not send_guide_ready_email(
+        recipient=current_user.email or "",
+        family_title=str(session.form.get("title") or "sua família"),
+        session_id=session.id,
+        page_count=page_count,
+    ):
+        return None
+    session.emailed_at = datetime.now(UTC).isoformat()
+    save_builder_session(session)
+    return current_user.email
+
+
 @app.post(
     "/api/guide-builder/{session_id}/complete",
     response_model=BuilderCompletionResponse,
 )
 def complete_guide_builder(session_id: str, current_user: CurrentUser) -> BuilderCompletionResponse:
-    session = _builder_session_or_404(session_id, current_user)
-    try:
-        pages = session.approved_manifest()
-    except BuilderIncomplete as error:
-        raise HTTPException(
-            status_code=409,
-            detail={"code": "builder_incomplete", "message": "Aprove todas as páginas primeiro."},
-        ) from error
-    return BuilderCompletionResponse.model_validate({"session_id": session.id, "pages": pages})
+    with builder_session_lock(session_id):
+        session = _builder_session_or_404(session_id, current_user)
+        try:
+            pages = session.approved_manifest()
+        except BuilderIncomplete as error:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "builder_incomplete",
+                    "message": "Aprove todas as páginas primeiro.",
+                },
+            ) from error
+        # Concluir já entrega: monta o PDF e avisa por e-mail. Antes isso só
+        # acontecia se a família clicasse em baixar, então quem aprovava tudo
+        # e fechava a aba nunca recebia nada.
+        emailed_to: str | None = None
+        try:
+            _write_builder_pdf(session)
+        except (ApprovedPagePdfError, HTTPException):
+            # O PDF sai no botão de download, que reporta o erro com detalhe.
+            emailed_to = None
+        else:
+            emailed_to = _notify_guide_ready(session, current_user, len(pages))
+    return BuilderCompletionResponse.model_validate(
+        {"session_id": session.id, "pages": pages, "emailed_to": emailed_to}
+    )
 
 
 @app.post(
@@ -3943,48 +4030,15 @@ def generate_guide_builder_pdf(
     try:
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
-            filenames = session.approved_asset_filenames()
-            allowed_filenames = session.allowed_asset_filenames()
-            pages: list[Path] = []
-            for filename in filenames:
-                path = builder_asset_dir(session.id) / filename
-                if (
-                    filename not in allowed_filenames
-                    or path.name != filename
-                    or path.suffix.lower() != ".png"
-                    or not path.is_file()
-                ):
-                    raise HTTPException(
-                        status_code=409,
-                        detail={
-                            "code": "builder_approved_asset_missing",
-                            "message": "Uma página aprovada não está mais disponível.",
-                        },
-                    )
-                pages.append(path)
-
-            output = builder_pdf_path(session.id)
-            if not _is_valid_cached_builder_pdf(output):
-                write_approved_page_images_pdf(
-                    pages,
-                    output,
-                    title=str(session.form.get("title") or "Guia Minerva Travel"),
-                )
+            output, pages = _write_builder_pdf(session)
             filename = _builder_pdf_download_filename(session)
-            # O envio acontece com o PDF já no disco: se o e-mail falhar, a
-            # família ainda baixa o guia pela tela.
-            emailed = send_guide_ready_email(
-                recipient=current_user.email or "",
-                family_title=str(session.form.get("title") or "sua família"),
-                session_id=session.id,
-                page_count=len(pages),
-            )
+            emailed_to = _notify_guide_ready(session, current_user, len(pages))
             response = BuilderPdfResponse(
                 session_id=session.id,
                 download_url=f"/guide-builder/{session.id}/pdf",
                 filename=filename,
                 page_count=len(pages),
-                emailed_to=current_user.email if emailed else None,
+                emailed_to=emailed_to,
             )
         emit_event(
             "guide_builder_pdf_generated",
