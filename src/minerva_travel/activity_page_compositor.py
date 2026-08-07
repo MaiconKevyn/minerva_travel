@@ -57,11 +57,16 @@ WORD_SEARCH_TITLE = "Caça-palavras"
 PAINTING_TITLE = "Minha pintura"
 INVESTIGATOR_TITLE = "Investigador"
 SPOT_DIFFERENCE_TITLE = "Ache os erros"
-# O painel é largo e a arte é alta: a cena precisa ser cortada antes de
-# validar, senão contaríamos diferenças que o corte esconde da criança.
-SPOT_PANEL_SIZE = (884, 470)
-SPOT_PANEL_GAP = 40
-SPOT_PANEL_TOP = 300
+# A cena dos erros é a única arte gerada deitada, em 3:2, e o painel impresso
+# tem exatamente a mesma proporção: nada é cortado. Antes a arte vinha em pé
+# (1024x1536) e o painel largo obrigava um corte central que jogava fora 65%
+# da altura — a Torre Eiffel saía sem pico e sem base, e quatro dos seis
+# objetos plantados para o jogo nem chegavam à página.
+SPOT_SCENE_SIZE = (1536, 1024)
+SPOT_PANEL_SIZE = (780, 520)
+SPOT_PANEL_GAP = 20
+SPOT_PANEL_TOP = 288
+SPOT_PANEL_LEFT = (PAGE_IMAGE_SIZE[0] - SPOT_PANEL_SIZE[0]) // 2
 LANGUAGE_TITLE = "Sobrevivência no idioma"
 # O idioma entra no título: "Primeiras palavras" sozinho não diz de qual país
 # é a página, e num guia com dois países há duas delas.
@@ -582,32 +587,40 @@ def compose_spot_the_difference_page(
     _puzzle_header(draw, SPOT_DIFFERENCE_TITLE, landmark_name, instruction)
 
     panel_width, panel_height = SPOT_PANEL_SIZE
+    left = SPOT_PANEL_LEFT
     for index, scene in enumerate((base, variant)):
         top = SPOT_PANEL_TOP + index * (panel_height + SPOT_PANEL_GAP)
-        image.paste(scene.resize(SPOT_PANEL_SIZE, Image.LANCZOS), (70, top))
-        draw.rectangle((70, top, 70 + panel_width, top + panel_height), outline=INK, width=4)
+        image.paste(scene.resize(SPOT_PANEL_SIZE, Image.LANCZOS), (left, top))
+        draw.rectangle((left, top, left + panel_width, top + panel_height), outline=INK, width=4)
         badge = "1" if index == 0 else "2"
-        draw.ellipse((80, top + 10, 128, top + 58), fill=ACCENT, outline=ACCENT)
+        draw.ellipse((left + 10, top + 10, left + 58, top + 58), fill=ACCENT, outline=ACCENT)
         _draw_centered_fit_box(
-            draw, badge, (84, top + 14, 124, top + 54), maximum_size=28, minimum_size=16, bold=True
+            draw,
+            badge,
+            (left + 14, top + 14, left + 54, top + 54),
+            maximum_size=28,
+            minimum_size=16,
+            bold=True,
         )
 
     checklist_top = SPOT_PANEL_TOP + 2 * (panel_height + SPOT_PANEL_GAP)
-    _panel(draw, (54, checklist_top, 970, 1490), radius=22)
+    _panel(draw, (54, checklist_top, 970, 1500), radius=22)
     draw.text(
-        (92, checklist_top + 24),
+        (92, checklist_top + 22),
         f"Marque cada diferença que encontrar ({len(regions)} no total):",
         font=_font(24, bold=True),
         fill=INK,
     )
+    # Uma linha só: com duas, a sétima caixa era desenhada abaixo da borda do
+    # painel e saía cortada na página impressa.
     box_size = 44
     for index in range(len(regions)):
-        x = 92 + (index % 6) * 142
-        y = checklist_top + 84 + (index // 6) * 70
+        x = 92 + index * 105
+        y = checklist_top + 68
         draw.rounded_rectangle(
             (x, y, x + box_size, y + box_size), radius=6, outline=INK, width=4, fill="white"
         )
-        draw.text((x + box_size + 12, y + 8), str(index + 1), font=_font(26, bold=True), fill=INK)
+        draw.text((x + box_size + 10, y + 8), str(index + 1), font=_font(26, bold=True), fill=INK)
     return _atomic_save(image, output_path)
 
 
@@ -628,16 +641,27 @@ def _load_panel_scene(path: Path) -> Image.Image:
 
 
 def crop_scene_for_panel(artwork_path: Path, output_path: Path) -> Path:
-    """Crop tall page artwork to the printed panel's aspect, before validation.
+    """Normalise the wide scene to the printed panel's aspect, before validation.
 
-    Validar a arte inteira contaria diferenças fora do recorte impresso, e a
-    criança procuraria por um erro que não está na página dela.
+    A cena é pedida em 3:2, a mesma proporção do painel, então na prática nada
+    é cortado. O corte continua aqui como rede: se o provedor devolver outra
+    proporção, é melhor perder uma faixa do que imprimir a cena esticada.
+    Validar antes de recortar contaria diferenças que a criança nunca veria.
     """
 
-    scene = _load_artwork(artwork_path)
+    try:
+        with Image.open(artwork_path) as opened:
+            if opened.format != "PNG" or opened.size != SPOT_SCENE_SIZE:
+                raise ActivityPageCompositionError(
+                    f"A cena dos erros não possui PNG {SPOT_SCENE_SIZE[0]}x{SPOT_SCENE_SIZE[1]}."
+                )
+            scene = opened.convert("RGB")
+    except (UnidentifiedImageError, OSError) as error:
+        raise ActivityPageCompositionError("A cena dos erros é inválida.") from error
+
     width, height = scene.size
     panel_width, panel_height = SPOT_PANEL_SIZE
-    crop_height = min(height, int(width * panel_height / panel_width))
+    crop_height = min(height, round(width * panel_height / panel_width))
     top = (height - crop_height) // 2
     scene.crop((0, top, width, top + crop_height)).save(output_path, "PNG")
     return output_path

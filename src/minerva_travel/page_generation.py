@@ -21,6 +21,7 @@ from PIL import Image, UnidentifiedImageError
 from minerva_travel.activity_page_compositor import (
     HERE_VS_HOME_TITLE,
     NEWSPAPER_HEADLINE_TITLE,
+    SPOT_SCENE_SIZE,
     TRAVEL_DIARY_TITLE,
     ActivityPageCompositionError,
     compose_anagram_page,
@@ -87,6 +88,9 @@ from minerva_travel.word_search import build_word_search_grid
 PAGE_IMAGE_SIZE = (1024, 1536)
 SPOT_DIFFERENCE_ATTEMPTS = 2
 PAGE_IMAGE_SIZE_PARAM = "1024x1536"
+# A cena dos erros é a única arte deitada: em pé, o painel largo cortava o
+# monumento ao meio e escondia dois terços dos objetos do jogo.
+SPOT_SCENE_SIZE_PARAM = f"{SPOT_SCENE_SIZE[0]}x{SPOT_SCENE_SIZE[1]}"
 MAX_PAGE_IMAGE_BYTES = 25 * 1024 * 1024
 
 
@@ -952,8 +956,10 @@ class OpenAIGuidePageGenerator:
                     _activity_references(
                         landmark_reference, landmark_page_reference, reference_page
                     ),
+                    size=SPOT_SCENE_SIZE_PARAM,
                 ),
                 base_artwork,
+                expected_size=SPOT_SCENE_SIZE,
             )
             crop_scene_for_panel(base_artwork, base_panel)
             regions = self._spot_the_difference_variant(
@@ -1001,8 +1007,10 @@ class OpenAIGuidePageGenerator:
                 self._edit_with_references(
                     spot_the_difference_variant_prompt(landmark_name=landmark_name),
                     [base_artwork],
+                    size=SPOT_SCENE_SIZE_PARAM,
                 ),
                 variant_artwork,
+                expected_size=SPOT_SCENE_SIZE,
             )
             crop_scene_for_panel(variant_artwork, variant_panel)
             try:
@@ -1597,13 +1605,15 @@ class OpenAIGuidePageGenerator:
         finally:
             artwork.unlink(missing_ok=True)
 
-    def _generate_from_prompt(self, prompt: str) -> httpx.Response:
+    def _generate_from_prompt(
+        self, prompt: str, *, size: str = PAGE_IMAGE_SIZE_PARAM
+    ) -> httpx.Response:
         return self._post(
             "/images/generations",
             json={
                 "model": self.model,
                 "prompt": prompt,
-                "size": PAGE_IMAGE_SIZE_PARAM,
+                "size": size,
                 "quality": self.quality,
                 "output_format": "png",
             },
@@ -1613,12 +1623,16 @@ class OpenAIGuidePageGenerator:
         self,
         prompt: str,
         references: list[Path],
+        *,
+        size: str = PAGE_IMAGE_SIZE_PARAM,
     ) -> httpx.Response:
         if references:
-            return self._edit_with_references(prompt, references)
-        return self._generate_from_prompt(prompt)
+            return self._edit_with_references(prompt, references, size=size)
+        return self._generate_from_prompt(prompt, size=size)
 
-    def _edit_with_references(self, prompt: str, references: list[Path]) -> httpx.Response:
+    def _edit_with_references(
+        self, prompt: str, references: list[Path], *, size: str = PAGE_IMAGE_SIZE_PARAM
+    ) -> httpx.Response:
         _validate_local_references(references)
         with ExitStack() as stack:
             files = []
@@ -1636,15 +1650,15 @@ class OpenAIGuidePageGenerator:
                 )
             return self._post(
                 "/images/edits",
-                data=self._edit_fields(prompt),
+                data=self._edit_fields(prompt, size=size),
                 files=files,
             )
 
-    def _edit_fields(self, prompt: str) -> dict[str, str]:
+    def _edit_fields(self, prompt: str, *, size: str = PAGE_IMAGE_SIZE_PARAM) -> dict[str, str]:
         fields = {
             "model": self.model,
             "prompt": prompt,
-            "size": PAGE_IMAGE_SIZE_PARAM,
+            "size": size,
             "quality": self.quality,
             "output_format": "png",
         }
@@ -2028,21 +2042,30 @@ WRITING_ACTIVITY_TITLES = {
 
 
 def spot_the_difference_variant_prompt(*, landmark_name: str) -> str:
-    """Ask for exactly the kind of change a child can spot side by side."""
+    """Ask for exactly the kind of change a child can spot side by side.
+
+    Toda mudança pedida aqui é uma mudança de COR, porque é isso que o
+    validador consegue medir. Este modelo redesenha a cena inteira a cada
+    edição, e o tremor do traço do monumento é indistinguível de uma diferença
+    de verdade quando se olha para o brilho — a página chegou a prometer sete
+    erros com dois achaveis, quatro deles em cima da própria torre.
+    """
 
     return f"""
-Return the same illustration of {landmark_name}, changed in exactly {MIN_DIFFERENCES + 1} places.
-Keep the framing, the palette, the style and the landmark itself pixel-for-pixel identical.
+Return the same illustration of {landmark_name}, changed in exactly {MIN_DIFFERENCES + 2} places.
+Keep the framing, the composition, the style and the landmark itself as identical as you can.
 
-Each of the {MIN_DIFFERENCES + 1} changes must be BOLD AND OBVIOUS at a glance, and must be a
-whole separate object, not a detail: delete an entire object so only background remains, add a
-whole new object where there was only background, or repaint one whole object in a strongly
-contrasting colour. Every changed object must be at least as large as one twelfth of the image
-width, and the changes must sit far apart from each other across the whole picture.
+Every one of the {MIN_DIFFERENCES + 2} changes must be a STRONG COLOUR CHANGE covering a whole
+separate object, never a detail and never the landmark: repaint one whole object in a clearly
+different, strongly contrasting colour, delete an entire object so only plain background remains,
+or add a whole new brightly coloured object where there was only background. The new colour must
+differ in hue, not only in shade — swapping green for red or blue for yellow, never green for a
+slightly darker green. Every changed object must be at least one tenth of the image width, must
+stay completely inside the frame, and the changes must sit far apart across the whole picture.
 
-Subtle edits, texture changes, shifted positions and edits smaller than that are failures.
-Do not redraw, restyle or recolour anything else. Do not add any letter, number, word, arrow,
-circle, marker or caption.
+Subtle edits, texture changes, shifted positions, changes of shade alone and edits smaller than
+that are failures. Never alter {landmark_name} itself. Do not add any letter, number, word,
+arrow, circle, marker or caption.
 """.strip()
 
 
@@ -2158,14 +2181,18 @@ def activity_artwork_prompt(
             "the large central 70 percent completely empty and pure white as a blank painting "
             "canvas. Do not paint, sketch, trace, shade, or place guide marks inside that canvas."
         ),
-        # As páginas de escrever recebem painéis opacos por cima: a arte só
-        # aparece como moldura, então detalhe no centro seria desperdiçado.
+        # A única cena pedida deitada (SPOT_SCENE_SIZE_PARAM): a página imprime
+        # dois painéis 3:2 empilhados, e a arte cabe neles sem corte nenhum.
         "spot_the_difference": (
-            "Create one wide, cheerful scene of the landmark carrying EXACTLY six large, "
-            "clearly separated stand-alone objects around it — for example a bird, a hot-air "
-            "balloon, a bench, a flag, a lone tree and a boat. Each object must be big, solid "
-            "and sit on empty background with nothing overlapping it, so it could be removed "
-            "without disturbing the rest. Keep everything else plain and uncluttered."
+            "Create one wide landscape scene, in a 3:2 frame, with the complete landmark "
+            "standing whole and unclipped in the middle — its top and its base must both be "
+            "inside the picture, with clear empty margin above and below it. Around it place "
+            "EXACTLY six large, clearly separated stand-alone objects — for example a bird, a "
+            "hot-air balloon, a bench, a flag, a lone tree and a boat. Every one of the six "
+            "must sit entirely inside the frame, never touching or crossing an edge, must be at "
+            "least one tenth of the picture width, must be painted in its own strong distinct "
+            "colour, and must sit on empty background with nothing overlapping it, so it could "
+            "be removed without disturbing the rest. Keep everything else plain and uncluttered."
         ),
         "language_survival": (
             "Create a decorative phrasebook background: a small recognizable watercolor landmark "
@@ -2971,7 +2998,12 @@ or character features; never introduce another detailed person.
 """.strip()
 
 
-def _persist_page_image(response: httpx.Response, output_path: Path) -> Path:
+def _persist_page_image(
+    response: httpx.Response,
+    output_path: Path,
+    *,
+    expected_size: tuple[int, int] = PAGE_IMAGE_SIZE,
+) -> Path:
     try:
         payload = response.json()
         encoded = payload["data"][0]["b64_json"]
@@ -2986,7 +3018,7 @@ def _persist_page_image(response: httpx.Response, output_path: Path) -> Path:
         with Image.open(BytesIO(image_bytes)) as image:
             image.verify()
         with Image.open(BytesIO(image_bytes)) as image:
-            if image.format != "PNG" or image.size != PAGE_IMAGE_SIZE:
+            if image.format != "PNG" or image.size != expected_size:
                 raise PageGenerationError(
                     "A página gerada não possui o formato ou as dimensões esperadas."
                 )

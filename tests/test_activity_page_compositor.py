@@ -21,6 +21,11 @@ from minerva_travel.activity_page_compositor import (
     LANDMARK_VISITED_LABEL,
     MEMORY_BLANK_REGION,
     PAINTING_TITLE,
+    SPOT_PANEL_GAP,
+    SPOT_PANEL_LEFT,
+    SPOT_PANEL_SIZE,
+    SPOT_PANEL_TOP,
+    SPOT_SCENE_SIZE,
     WORD_SEARCH_TITLE,
     ActivityPageCompositionError,
     coloring_instruction_for,
@@ -32,7 +37,9 @@ from minerva_travel.activity_page_compositor import (
     compose_homecoming_page,
     compose_investigator_page,
     compose_landmark_visited_checkbox,
+    compose_spot_the_difference_page,
     compose_word_search_page,
+    crop_scene_for_panel,
     family_coloring_instruction_for,
     validate_activity_page,
 )
@@ -40,6 +47,7 @@ from minerva_travel.investigator_activity import (
     InvestigatorMission,
     normalize_investigator_children,
 )
+from minerva_travel.spot_the_difference import MAX_DIFFERENCES, DifferenceRegion
 from minerva_travel.word_search import build_word_search_grid
 
 
@@ -350,3 +358,83 @@ def test_compositor_rejects_wrong_size_provider_artwork(tmp_path):
             landmark_name="Torre Eiffel",
             prompt="Desenhe.",
         )
+
+
+def _spot_scene(path: Path, *, tint: tuple[int, int, int]) -> Path:
+    """Cena larga com marcas coladas na borda de cima e na de baixo."""
+
+    image = Image.new("RGB", SPOT_SCENE_SIZE, "#f7f0de")
+    draw = ImageDraw.Draw(image)
+    width, height = SPOT_SCENE_SIZE
+    draw.rectangle((0, 0, width, 24), fill="#1f3a5f")
+    draw.rectangle((0, height - 24, width, height), fill="#1f3a5f")
+    draw.ellipse((300, 400, 700, 700), fill=tint)
+    image.save(path, "PNG")
+    return path
+
+
+def test_the_spot_scene_reaches_the_page_with_its_top_and_bottom_intact(tmp_path):
+    """A arte em pé era cortada ao meio: o monumento saía sem pico e sem base."""
+
+    base = _spot_scene(tmp_path / "base.png", tint=(90, 150, 110))
+    variant = _spot_scene(tmp_path / "variant.png", tint=(200, 90, 110))
+    base_panel = crop_scene_for_panel(base, tmp_path / "base-panel.png")
+    variant_panel = crop_scene_for_panel(variant, tmp_path / "variant-panel.png")
+
+    output = compose_spot_the_difference_page(
+        base_panel,
+        variant_panel,
+        tmp_path / "spot.png",
+        landmark_name="Torre Eiffel",
+        instruction="Compare os dois desenhos e ache as diferenças.",
+        regions=[DifferenceRegion(300, 400, 700, 700)],
+    )
+
+    with Image.open(output) as page:
+        pixels = page.convert("RGB").load()
+    left = SPOT_PANEL_LEFT + SPOT_PANEL_SIZE[0] // 2
+    for index in range(2):
+        top = SPOT_PANEL_TOP + index * (SPOT_PANEL_SIZE[1] + SPOT_PANEL_GAP)
+        bottom = top + SPOT_PANEL_SIZE[1] - 1
+        # A faixa escura da borda da cena tem de aparecer nas duas pontas.
+        assert sum(pixels[left, top + 2]) < 300, f"o topo da cena {index + 1} foi cortado"
+        assert sum(pixels[left, bottom - 2]) < 300, f"a base da cena {index + 1} foi cortada"
+
+
+def test_the_spot_checklist_stays_inside_its_panel_at_the_maximum_count(tmp_path):
+    """Com sete ou mais, a fila de baixo era desenhada fora do painel."""
+
+    base = _spot_scene(tmp_path / "base.png", tint=(90, 150, 110))
+    variant = _spot_scene(tmp_path / "variant.png", tint=(200, 90, 110))
+    output = compose_spot_the_difference_page(
+        crop_scene_for_panel(base, tmp_path / "base-panel.png"),
+        crop_scene_for_panel(variant, tmp_path / "variant-panel.png"),
+        tmp_path / "spot.png",
+        landmark_name="Torre Eiffel",
+        instruction="Compare os dois desenhos e ache as diferenças.",
+        regions=[
+            DifferenceRegion(index * 100, 400, index * 100 + 80, 480)
+            for index in range(MAX_DIFFERENCES)
+        ],
+    )
+
+    with Image.open(output) as page:
+        pixels = page.convert("RGB").load()
+    width, height = page.size
+    for y in range(1502, height):
+        for x in range(width):
+            assert sum(pixels[x, y]) > 600, f"há tinta desenhada abaixo do painel, em y={y}"
+
+
+def test_the_generated_scene_and_the_printed_panel_share_one_aspect():
+    """Enquanto forem iguais, `crop_scene_for_panel` não descarta nada.
+
+    Foi a divergência entre as duas — arte 2:3 e painel 1,88:1 — que cortava
+    65% da altura e decapitava o monumento. Mexer numa sem mexer na outra
+    traz o defeito de volta sem que nenhuma outra asserção perceba.
+    """
+
+    scene_width, scene_height = SPOT_SCENE_SIZE
+    panel_width, panel_height = SPOT_PANEL_SIZE
+
+    assert scene_width / scene_height == panel_width / panel_height
