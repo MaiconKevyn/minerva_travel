@@ -7,6 +7,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from minerva_travel.page_generation import (
+    SPOT_SCENE_SIZE,
     OpenAIGuidePageGenerator,
     PageGenerationConfigurationError,
     PageGenerationError,
@@ -1118,3 +1119,93 @@ def test_activity_generation_rejects_wrong_provider_output_without_partial_attem
     assert not output.exists()
     assert not (tmp_path / ".drawing.provider.png").exists()
     assert not (tmp_path / ".drawing.png.tmp").exists()
+
+
+def _spot_scene_bytes(recolored: bool) -> bytes:
+    """Cena deitada com seis objetos; na variante, quatro trocam de matiz."""
+
+    buffer = BytesIO()
+    image = Image.new("RGB", SPOT_SCENE_SIZE, "#f7f0de")
+    draw = ImageDraw.Draw(image)
+    palette = [
+        ("#6c94c4", "#c46c6c"),
+        ("#c48460", "#60c484"),
+        ("#b0606c", "#6c60b0"),
+        ("#789c6c", "#9c6c94"),
+        ("#c6a85c", "#5ca8c6"),
+        ("#6084a8", "#a88460"),
+    ]
+    for index, (x, y) in enumerate(
+        [(180, 180), (520, 200), (1180, 210), (200, 780), (640, 800), (1240, 790)]
+    ):
+        base_color, changed = palette[index]
+        fill = changed if recolored and index < 4 else base_color
+        draw.ellipse((x - 90, y - 90, x + 90, y + 90), fill=fill)
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_the_spot_the_difference_scene_is_requested_in_landscape(tmp_path):
+    """Em pé, o painel largo cortava 65% da arte e decapitava o monumento.
+
+    A proporção da cena e a do painel são iguais hoje; se alguém devolver o
+    pedido para retrato, o corte volta calado. Aqui ele não volta.
+    """
+
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return _response(_spot_scene_bytes(recolored=len(calls) > 1))
+
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    output = tmp_path / "spot.png"
+
+    assert (
+        generator.generate_spot_the_difference_page(
+            output_path=output,
+            landmark_reference=None,
+            landmark_page_reference=None,
+            landmark_context={
+                "name": "Torre Eiffel",
+                "city": "Paris",
+                "country": "França",
+                "age_complexity": "early_reader",
+            },
+            activity_spec={},
+        )
+        == output
+    )
+
+    scene, variant = calls[0], calls[1]
+    assert scene[1].endswith("/images/generations")
+    assert scene[2]["json"]["size"] == "1536x1024"
+    # A variante é uma edição da cena base e precisa do mesmo enquadramento.
+    assert variant[1].endswith("/images/edits")
+    assert variant[2]["data"]["size"] == "1536x1024"
+    # A página entregue continua retrato: é o PDF inteiro que depende disso.
+    with Image.open(output) as image:
+        assert image.size == (1024, 1536)
+
+
+def test_a_portrait_scene_from_the_provider_is_refused(tmp_path):
+    """Aceitar retrato aqui reabriria o corte central pela porta dos fundos."""
+
+    def transport(method, url, **kwargs):
+        return _response(_png_bytes())
+
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+
+    with pytest.raises(PageGenerationError):
+        generator.generate_spot_the_difference_page(
+            output_path=tmp_path / "spot.png",
+            landmark_reference=None,
+            landmark_page_reference=None,
+            landmark_context={
+                "name": "Torre Eiffel",
+                "city": "Paris",
+                "country": "França",
+                "age_complexity": "early_reader",
+            },
+            activity_spec={},
+        )
