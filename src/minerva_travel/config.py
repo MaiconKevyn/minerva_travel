@@ -3,6 +3,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+# O site em produção. Serve de padrão para o link do e-mail e para o CORS,
+# então uma variável de ambiente esquecida no deploy degrada para o endereço
+# certo em vez de para um domínio que não existe mais.
+PRODUCTION_SITE_URL = "https://guiadememorias.com.br"
+# A Hostinger atende o apex e o www; o CORS é comparado por igualdade exata,
+# então quem entrar pelo www ficaria sem API nenhuma.
+PRODUCTION_SITE_ORIGINS = (PRODUCTION_SITE_URL, "https://www.guiadememorias.com.br")
+
 
 def load_project_env() -> None:
     load_dotenv(Path(".env"))
@@ -15,11 +23,7 @@ def app_environment() -> str:
 
 def frontend_base_url() -> str:
     load_project_env()
-    default = (
-        "https://minerva-travel.hostingerapp.com"
-        if app_environment() == "production"
-        else "http://127.0.0.1:3000"
-    )
+    default = PRODUCTION_SITE_URL if app_environment() == "production" else "http://127.0.0.1:3000"
     value = os.getenv("FRONTEND_BASE_URL", default).rstrip("/")
     if app_environment() == "production" and not value.startswith("https://"):
         raise RuntimeError("FRONTEND_BASE_URL must use HTTPS in production.")
@@ -122,13 +126,11 @@ def cors_allowed_origins() -> list[str]:
     load_project_env()
     raw_origins = os.getenv("CORS_ALLOW_ORIGINS")
     if not raw_origins:
+        production = ",".join(PRODUCTION_SITE_ORIGINS)
         raw_origins = (
-            "https://minerva-travel.hostingerapp.com"
+            production
             if app_environment() == "production"
-            else (
-                "http://localhost:3000,http://127.0.0.1:3000,"
-                "https://minerva-travel.hostingerapp.com"
-            )
+            else f"http://localhost:3000,http://127.0.0.1:3000,{production}"
         )
     origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
     if app_environment() == "production":

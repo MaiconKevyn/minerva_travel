@@ -123,7 +123,7 @@ def test_landmarks_parse_allows_browser_preflight_from_frontend_origin():
     response = client.options(
         "/api/landmarks/parse",
         headers={
-            "Origin": "https://minerva-travel.hostingerapp.com",
+            "Origin": "https://guiadememorias.com.br",
             "Access-Control-Request-Method": "POST",
             "Access-Control-Request-Headers": "authorization,content-type",
         },
@@ -132,7 +132,7 @@ def test_landmarks_parse_allows_browser_preflight_from_frontend_origin():
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] in {
         "*",
-        "https://minerva-travel.hostingerapp.com",
+        "https://guiadememorias.com.br",
     }
     allowed_headers = response.headers["access-control-allow-headers"].lower()
     assert "authorization" in allowed_headers
