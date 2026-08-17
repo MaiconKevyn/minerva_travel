@@ -17,12 +17,21 @@ from minerva_travel.contract_limits import (
     DEFAULT_IMAGE_UPLOAD_MAX_WIDTH,
 )
 
-load_project_env()
-# Tudo que a família não pode perder mora aqui: o banco, as páginas geradas e
-# os PDFs. Num host de container o sistema de arquivos volta ao estado da
-# imagem a cada deploy, então isto precisa apontar para um disco montado —
-# senão o guia some no deploy seguinte e o link do e-mail dela quebra.
-RUNTIME_DIR = Path(os.getenv("MINERVA_RUNTIME_DIR", "runtime"))
+
+def runtime_dir_from_env() -> Path:
+    """Onde mora tudo que a família não pode perder.
+
+    O banco, as páginas geradas e os PDFs ficam sob este diretório. Num host de
+    container o sistema de arquivos volta ao estado da imagem a cada deploy,
+    então em produção isto precisa apontar para um disco montado — senão o guia
+    some no deploy seguinte e o link já enviado por e-mail quebra.
+    """
+
+    load_project_env()
+    return Path(os.getenv("MINERVA_RUNTIME_DIR", "runtime"))
+
+
+RUNTIME_DIR = runtime_dir_from_env()
 
 IMAGE_UPLOAD_CHUNK_BYTES = 64 * 1024
 

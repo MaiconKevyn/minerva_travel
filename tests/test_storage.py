@@ -332,12 +332,8 @@ def test_the_runtime_directory_follows_the_mounted_disk(monkeypatch):
     padrão precisa continuar sendo `runtime` para o desenvolvimento local.
     """
 
-    import importlib
-
     monkeypatch.setenv("MINERVA_RUNTIME_DIR", "/var/data")
-    montado = importlib.reload(storage)
-    assert montado.RUNTIME_DIR == Path("/var/data")
+    assert storage.runtime_dir_from_env() == Path("/var/data")
 
     monkeypatch.delenv("MINERVA_RUNTIME_DIR")
-    padrao = importlib.reload(storage)
-    assert padrao.RUNTIME_DIR == Path("runtime")
+    assert storage.runtime_dir_from_env() == Path("runtime")
