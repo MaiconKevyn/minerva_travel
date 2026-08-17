@@ -239,6 +239,26 @@ def test_approved_cover_queues_the_rest_and_worker_delivers_in_background(delive
     restored = client.get(f"/api/guide-builder/{session_id}").json()
     assert restored["generation_job_id"] == job_id
     assert restored["generation_requested_at"]
+    assert client.get("/api/guides").json()["guides"] == []
+    listed_job = client.get("/api/jobs").json()["jobs"][0]
+    assert listed_job["id"] == job_id
+    assert listed_job["guide_preview"] == {
+        "session_id": session_id,
+        "title": "Família Lima",
+        "cover_url": f"/jobs/{job_id}/cover",
+        "destinations": [
+            {
+                "id": "paris",
+                "place": "Paris, França",
+                "landmarks": ["Torre Eiffel"],
+            }
+        ],
+        "approved_page_count": 1,
+        "page_count": len(session["pages"]),
+    }
+    cover_preview = client.get(f"/jobs/{job_id}/cover")
+    assert cover_preview.status_code == 200
+    assert cover_preview.headers["content-type"] == "image/png"
     frozen = client.post(
         f"/api/guide-builder/{session_id}/pages/summary/attempts",
         headers={"Idempotency-Key": "late-manual-page"},
@@ -255,7 +275,16 @@ def test_approved_cover_queues_the_rest_and_worker_delivers_in_background(delive
     assert finished.json()["status"] == "succeeded"
     assert finished.json()["result"]["page_count"] == len(session["pages"])
     assert finished.json()["result"]["emailed_to"] == "familia@example.test"
+    assert finished.json()["result"]["download_url"].startswith("/download/")
     assert len(RecordingSmtp.sent) == 1
+
+    library = client.get("/api/guides").json()["guides"]
+    assert len(library) == 1
+    assert library[0]["id"] == job_id
+    assert library[0]["status"] == "succeeded"
+    assert library[0]["cover_url"] == f"/guides/{job_id}/cover"
+    assert library[0]["download_url"] == finished.json()["result"]["download_url"]
+    assert client.get(library[0]["cover_url"]).status_code == 200
 
     final_session = client.get(f"/api/guide-builder/{session_id}").json()
     assert final_session["is_complete"] is True
@@ -310,6 +339,28 @@ def test_background_builder_resumes_after_a_temporary_provider_limit(delivery):
     final_summary = next(page for page in final_session["pages"] if page["id"] == "summary")
     assert len(final_summary["attempts"]) == 1
     assert len(RecordingSmtp.sent) == 1
+
+
+def test_completed_pdf_reaches_profile_even_while_email_delivery_retries(delivery, monkeypatch):
+    client, _generator = delivery
+    monkeypatch.setenv("SMTP_HOST", "")
+    session = _create_without_photo(client)
+    session_id = session["session_id"]
+    _approve_every_page(client, session, ["cover"])
+    queued = client.post(
+        f"/api/guide-builder/{session_id}/generation-jobs",
+        headers={"Idempotency-Key": "finish-with-email-offline"},
+    ).json()
+
+    repository = GuideRepository(storage.RUNTIME_DIR / "minerva.sqlite3")
+    result = asyncio.run(GuideJobWorker(repository).run_once())
+
+    assert result.outcome == "retrying"
+    assert client.get(f"/api/jobs/{queued['job_id']}").json()["status"] == "queued"
+    library = client.get("/api/guides").json()["guides"]
+    assert len(library) == 1
+    assert library[0]["id"] == queued["job_id"]
+    assert client.get(library[0]["download_url"]).status_code == 200
 
 
 def test_failed_builder_job_can_be_requeued_with_a_new_idempotency_key(delivery):

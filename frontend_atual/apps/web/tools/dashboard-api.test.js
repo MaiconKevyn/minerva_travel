@@ -9,6 +9,7 @@ test('dashboard uses authenticated FastAPI guide records without PocketBase prof
 
   assert.doesNotMatch(dashboard, /pocketbaseClient|pb\.collection|handleUpdateProfile|updateProfile/);
   assert.match(dashboard, /listGuides/);
+  assert.match(dashboard, /listGuideJobs/);
   assert.match(dashboard, /getGuide/);
   assert.match(dashboard, /deleteGuide/);
   assert.match(dashboard, /downloadGuidePdf/);
@@ -28,14 +29,19 @@ test('dashboard exposes loading, error, retry, status, detail and owner actions'
   assert.match(dashboard, /Excluir definitivamente/);
   assert.match(dashboard, /Excluir guia/);
   assert.match(dashboard, /succeeded: \{ label: 'Pronto'/);
-  assert.match(dashboard, /running: \{ label: 'Em geração'/);
+  assert.match(dashboard, /running: \{ label: 'Em andamento'/);
   assert.match(dashboard, /failed: \{ label: 'Falhou'/);
+  assert.match(dashboard, /Guias em criação/);
+  assert.match(dashboard, /Preview aprovado/);
+  assert.match(dashboard, /approved_page_count/);
+  assert.match(dashboard, /setInterval\(\(\) => requestGuideList\(true\), 5000\)/);
 });
 
 test('guide API client targets list, owner detail and owner delete endpoints', () => {
   const api = readProjectFile('src/utils/minerva-api.js');
 
   assert.match(api, /export const listGuides/);
+  assert.match(api, /export const listGuideJobs/);
   assert.match(api, /export const getGuide/);
   assert.match(api, /export const deleteGuide/);
   assert.match(api, /\/api\/guides\/\$\{encodeURIComponent\(normalizedGuideId\)\}/);

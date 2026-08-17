@@ -22,13 +22,14 @@ import {
   deleteGuide,
   downloadGuidePdf,
   getGuide,
+  listGuideJobs,
   listGuides,
 } from '@/utils/minerva-api.js';
 import { toast } from 'sonner';
 
 const guideStatusConfig = {
   queued: { label: 'Na fila', className: 'bg-muted text-muted-foreground' },
-  running: { label: 'Em geração', className: 'bg-secondary/15 text-secondary' },
+  running: { label: 'Em andamento', className: 'bg-secondary/15 text-secondary' },
   succeeded: { label: 'Pronto', className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' },
   failed: { label: 'Falhou', className: 'bg-destructive/10 text-destructive' },
   cancelled: { label: 'Cancelado', className: 'bg-muted text-muted-foreground' },
@@ -38,6 +39,16 @@ const statusForGuide = (status) => guideStatusConfig[status] || {
   label: 'Status desconhecido',
   className: 'bg-muted text-muted-foreground',
 };
+
+const jobStageLabel = (stage) => ({
+  queued: 'Aguardando para começar',
+  validating: 'Conferindo o roteiro',
+  preparing_assets: 'Preparando as ilustrações',
+  generating_content: 'Criando as páginas do livro',
+  rendering_pdf: 'Montando o PDF',
+  persisting: 'Salvando na sua biblioteca',
+  finalizing: 'Finalizando a entrega',
+}[stage] || 'Criando o guia');
 
 const destinationNames = (destinations = []) => destinations
   .map((destination) => {
@@ -69,6 +80,7 @@ const saveBlob = (blob, filename) => {
 const DashboardPage = () => {
   const { user } = useAuth();
   const [guides, setGuides] = useState([]);
+  const [generationJobs, setGenerationJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [selectedGuideId, setSelectedGuideId] = useState(null);
@@ -81,26 +93,39 @@ const DashboardPage = () => {
   const listAbortController = useRef(null);
   const detailAbortController = useRef(null);
 
-  const loadGuideList = useCallback(async ({ signal } = {}) => {
-    setLoading(true);
-    setLoadError('');
+  const loadGuideList = useCallback(async ({ signal, background = false } = {}) => {
+    if (!background) {
+      setLoading(true);
+      setLoadError('');
+    }
     try {
-      const records = await listGuides({ signal });
-      if (!signal?.aborted) setGuides(records);
+      const [records, jobs] = await Promise.all([
+        listGuides({ signal }),
+        listGuideJobs({ signal }),
+      ]);
+      if (!signal?.aborted) {
+        const completedIds = new Set(records.map((record) => record.id));
+        setGuides(records);
+        setGenerationJobs(jobs.filter((job) => (
+          job.guide_preview
+          && !completedIds.has(job.id)
+          && ['queued', 'running', 'failed'].includes(job.status)
+        )));
+      }
     } catch (error) {
-      if (error.name !== 'AbortError' && !signal?.aborted) {
+      if (!background && error.name !== 'AbortError' && !signal?.aborted) {
         setLoadError(error.message || 'Não foi possível carregar seus guias.');
       }
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      if (!background && !signal?.aborted) setLoading(false);
     }
   }, []);
 
-  const requestGuideList = useCallback(() => {
+  const requestGuideList = useCallback((background = false) => {
     listAbortController.current?.abort();
     const controller = new AbortController();
     listAbortController.current = controller;
-    loadGuideList({ signal: controller.signal }).finally(() => {
+    loadGuideList({ signal: controller.signal, background }).finally(() => {
       if (listAbortController.current === controller) {
         listAbortController.current = null;
       }
@@ -111,6 +136,14 @@ const DashboardPage = () => {
     requestGuideList();
     return () => listAbortController.current?.abort();
   }, [requestGuideList]);
+
+  useEffect(() => {
+    if (!generationJobs.some((job) => ['queued', 'running'].includes(job.status))) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => requestGuideList(true), 5000);
+    return () => window.clearInterval(timer);
+  }, [generationJobs, requestGuideList]);
 
   useEffect(() => () => detailAbortController.current?.abort(), []);
 
@@ -248,6 +281,77 @@ const DashboardPage = () => {
                 </Button>
               </div>
 
+              {!loading && !loadError && generationJobs.length > 0 && (
+                <section className="mb-8" aria-labelledby="dashboard-generating-title">
+                  <div className="mb-4 flex items-end justify-between gap-4">
+                    <div>
+                      <h3 id="dashboard-generating-title" className="text-xl font-serif font-bold text-foreground">
+                        Guias em criação
+                      </h3>
+                      <p className="mt-1 text-sm font-medium text-muted-foreground">
+                        A criação continua mesmo se você fechar o site.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    {generationJobs.map((job) => {
+                      const preview = job.guide_preview;
+                      const status = statusForGuide(job.status);
+                      const destinations = destinationNames(preview.destinations);
+                      const progress = Math.min(100, Math.max(0, Number(job.progress) || 0));
+                      return (
+                        <article
+                          key={job.id}
+                          className="rounded-3xl border-2 border-secondary/25 bg-secondary/5 p-5 shadow-sm"
+                        >
+                          <div className="flex gap-4">
+                            <GuideCover coverUrl={preview.cover_url} title={preview.title} />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-xs font-black uppercase tracking-[0.14em] text-secondary">
+                                  Preview aprovado
+                                </p>
+                                <span className={`rounded-full px-3 py-1 text-xs font-bold ${status.className}`}>
+                                  {status.label}
+                                </span>
+                              </div>
+                              <h4 className="mt-2 font-serif text-lg font-bold text-foreground">
+                                {preview.title || 'Guia de viagem'}
+                              </h4>
+                              {destinations.length > 0 && (
+                                <p className="mt-1 line-clamp-2 text-sm font-medium text-muted-foreground">
+                                  {destinations.join(', ')}
+                                </p>
+                              )}
+                              <p className="mt-3 text-sm font-bold text-foreground" role="status" aria-live="polite">
+                                {jobStageLabel(job.stage)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-5 h-2 overflow-hidden rounded-full bg-background/80">
+                            <div
+                              className="h-full rounded-full bg-secondary transition-all duration-500"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-muted-foreground">
+                            <span>{progress}% concluído</span>
+                            <span>
+                              {preview.approved_page_count} de {preview.page_count} páginas prontas
+                            </span>
+                          </div>
+                          {job.status === 'failed' && (
+                            <p className="mt-4 rounded-2xl bg-destructive/10 p-3 text-sm font-bold text-destructive" role="alert">
+                              {job.error?.message || 'A criação foi interrompida. Abra o guia para tentar novamente.'}
+                            </p>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
               {loading ? (
                 <div
                   role="status"
@@ -267,7 +371,7 @@ const DashboardPage = () => {
                     <h3 className="text-xl font-bold font-serif text-foreground">Não foi possível abrir sua biblioteca</h3>
                     <p className="mt-2 text-muted-foreground font-medium">{loadError}</p>
                   </div>
-                  <Button type="button" variant="outline" onClick={requestGuideList} className="rounded-full">
+                  <Button type="button" variant="outline" onClick={() => requestGuideList()} className="rounded-full">
                     <RefreshCw className="w-4 h-4" aria-hidden="true" />
                     Tentar novamente
                   </Button>
@@ -279,7 +383,9 @@ const DashboardPage = () => {
                   </div>
                   <h3 className="text-xl font-bold font-serif text-foreground">O livro está em branco!</h3>
                   <p className="text-muted-foreground font-medium max-w-sm">
-                    Você ainda não criou nenhum guia. Que tal planejar a próxima aventura?
+                    {generationJobs.length > 0
+                      ? 'Seu primeiro livro ainda está sendo criado e aparecerá aqui quando estiver pronto.'
+                      : 'Você ainda não criou nenhum guia. Que tal planejar a próxima aventura?'}
                   </p>
                 </div>
               ) : (

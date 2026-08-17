@@ -2104,6 +2104,50 @@
         "title": "GuideJobListResponse",
         "type": "object"
       },
+      "GuideJobPreviewResponse": {
+        "properties": {
+          "approved_page_count": {
+            "minimum": 0.0,
+            "title": "Approved Page Count",
+            "type": "integer"
+          },
+          "cover_url": {
+            "title": "Cover Url",
+            "type": "string"
+          },
+          "destinations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Destinations",
+            "type": "array"
+          },
+          "page_count": {
+            "minimum": 1.0,
+            "title": "Page Count",
+            "type": "integer"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "title",
+          "cover_url",
+          "destinations",
+          "approved_page_count",
+          "page_count"
+        ],
+        "title": "GuideJobPreviewResponse",
+        "type": "object"
+      },
       "GuideJobResponse": {
         "properties": {
           "attempt_count": {
@@ -2134,6 +2178,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/GuideJobErrorResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "guide_preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GuideJobPreviewResponse"
               },
               {
                 "type": "null"

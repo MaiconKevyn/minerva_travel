@@ -980,7 +980,8 @@ const safeGuideCoverUrl = (coverUrl) => {
     `${browserOrigin.replace(/\/$/, '')}/`,
   );
   const resolvedUrl = new URL(String(coverUrl || ''), baseUrl);
-  const validPath = /^\/guides\/[A-Za-z0-9-]+\/cover$/.test(resolvedUrl.pathname);
+  const validPath = /^\/guides\/[A-Za-z0-9-]+\/cover$/.test(resolvedUrl.pathname)
+    || /^\/jobs\/[A-Za-z0-9]+\/cover$/.test(resolvedUrl.pathname);
   if (resolvedUrl.origin !== baseUrl.origin || !validPath) {
     throw new Error('Link de capa inválido.');
   }
@@ -991,7 +992,7 @@ const safeGuideCoverUrl = (coverUrl) => {
 // não dá para apontar um <img src> direto para a rota.
 export const fetchGuideCoverObjectUrl = async (coverUrl, { signal } = {}) => {
   const response = await authenticatedFetch(safeGuideCoverUrl(coverUrl), {
-    headers: { Accept: 'image/jpeg' },
+    headers: { Accept: 'image/jpeg, image/png' },
     signal,
   });
   if (!response.ok) {
@@ -1408,6 +1409,19 @@ export const getGuideJob = async (jobId, { signal } = {}) => {
     throw new Error(`Não foi possível consultar a geração (${response.status}).`);
   }
   return response.json();
+};
+
+export const listGuideJobs = async ({ signal } = {}) => {
+  const response = await authenticatedFetch(`${apiBaseUrl()}/api/jobs`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Não foi possível consultar as criações (${response.status}).`);
+  }
+  const payload = await response.json();
+  return Array.isArray(payload?.jobs) ? payload.jobs : [];
 };
 
 export const waitForGuideJob = async (

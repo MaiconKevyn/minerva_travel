@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import sqlite3
 import unicodedata
 from collections.abc import AsyncIterator, Callable
@@ -368,6 +369,15 @@ class GuideJobErrorResponse(BaseModel):
     message: str
 
 
+class GuideJobPreviewResponse(BaseModel):
+    session_id: str
+    title: str
+    cover_url: str
+    destinations: list[dict[str, Any]]
+    approved_page_count: int = Field(ge=0)
+    page_count: int = Field(ge=1)
+
+
 class GuideJobResponse(BaseModel):
     id: str
     status: str
@@ -382,6 +392,7 @@ class GuideJobResponse(BaseModel):
     completed_at: str | None = None
     error: GuideJobErrorResponse | None = None
     result: dict[str, Any] | None = None
+    guide_preview: GuideJobPreviewResponse | None = None
 
 
 class GuideJobListResponse(BaseModel):
@@ -2172,11 +2183,72 @@ def delete_family_profile(current_user: CurrentUser) -> DeletedResponse:
     return DeletedResponse(deleted=True)
 
 
+def _builder_library_destinations(session: BuilderSession) -> list[dict[str, object]]:
+    """Return the itinerary labels used by profile cards and account export."""
+
+    destinations: list[dict[str, object]] = []
+    for page in session.ordered_pages():
+        if page.kind != "destination_intro":
+            continue
+        metadata = page.metadata
+        destination_id = str(metadata.get("destination_id") or "").strip()
+        city = str(metadata.get("city") or "").strip()
+        country = str(metadata.get("country") or "").strip()
+        title = str(metadata.get("destination_title") or "").strip()
+        place = ", ".join(part for part in (city, country) if part) or title
+        raw_landmarks = metadata.get("landmark_names")
+        landmarks = (
+            [str(item).strip() for item in raw_landmarks if str(item).strip()]
+            if isinstance(raw_landmarks, list)
+            else []
+        )
+        if destination_id or place:
+            destinations.append(
+                {
+                    "id": destination_id or f"destination-{len(destinations) + 1}",
+                    "place": place,
+                    "landmarks": landmarks,
+                }
+            )
+    return destinations
+
+
+def _builder_job_preview(job: GuideJobRecord) -> dict[str, object] | None:
+    snapshot = job.request_snapshot
+    if snapshot.get("job_kind") != "builder_full_pdf":
+        return None
+    session_id = snapshot.get("builder_session_id")
+    if not isinstance(session_id, str):
+        return None
+    try:
+        session = load_builder_session(session_id, job.user_id)
+    except BuilderSessionNotFound:
+        return None
+    cover = session.page("cover")
+    attempt = cover.selected_attempt() if cover and cover.approved_at else None
+    if attempt is None:
+        return None
+    return {
+        "session_id": session.id,
+        "title": str(session.form.get("title") or "Guia de viagem"),
+        "cover_url": f"/jobs/{job.id}/cover",
+        "destinations": _builder_library_destinations(session),
+        "approved_page_count": sum(bool(page.approved_at) for page in session.pages),
+        "page_count": len(session.pages),
+    }
+
+
+def _guide_job_response_payload(job: GuideJobRecord) -> dict[str, object]:
+    payload = job.public_payload()
+    payload["guide_preview"] = _builder_job_preview(job)
+    return payload
+
+
 @app.get("/api/jobs", response_model=GuideJobListResponse)
 def list_jobs(current_user: CurrentUser) -> GuideJobListResponse:
     jobs = guide_repository().list_jobs_for_owner(current_user.id)
     return GuideJobListResponse(
-        jobs=[GuideJobResponse.model_validate(job.public_payload()) for job in jobs]
+        jobs=[GuideJobResponse.model_validate(_guide_job_response_payload(job)) for job in jobs]
     )
 
 
@@ -2185,7 +2257,33 @@ def job_details(job_id: str, current_user: CurrentUser) -> GuideJobResponse:
     job = guide_repository().get_job_for_owner(job_id, current_user.id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return GuideJobResponse.model_validate(job.public_payload())
+    return GuideJobResponse.model_validate(_guide_job_response_payload(job))
+
+
+@app.get("/jobs/{job_id}/cover", include_in_schema=False)
+def guide_job_cover(job_id: str, current_user: CurrentUser) -> FileResponse:
+    job = guide_repository().get_job_for_owner(job_id, current_user.id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Cover not found")
+    preview = _builder_job_preview(job)
+    if preview is None:
+        raise HTTPException(status_code=404, detail="Cover not found")
+    session = load_builder_session(str(preview["session_id"]), current_user.id)
+    cover = session.page("cover")
+    attempt = cover.selected_attempt() if cover and cover.approved_at else None
+    if attempt is None:
+        raise HTTPException(status_code=404, detail="Cover not found")
+    path = builder_asset_dir(session.id) / attempt.filename
+    if path.name != attempt.filename or not path.is_file():
+        raise HTTPException(status_code=404, detail="Cover not found")
+    return FileResponse(
+        path,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "private, max-age=60",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @app.delete("/api/jobs/{job_id}", response_model=GuideJobResponse)
@@ -2199,7 +2297,7 @@ def cancel_job(job_id: str, current_user: CurrentUser) -> GuideJobResponse:
     )
     if job.status == "cancelled" and not has_cross_owner_reference:
         delete_private_asset(job.photo_path)
-    return GuideJobResponse.model_validate(job.public_payload())
+    return GuideJobResponse.model_validate(_guide_job_response_payload(job))
 
 
 @app.get("/api/account/export", response_model=AccountExportResponse)
@@ -4228,11 +4326,69 @@ def _notify_guide_ready(
     return current_user.email
 
 
+def _persist_builder_guide_for_library(
+    session: BuilderSession,
+    *,
+    guide_id: str,
+    owner_id: str,
+    source_pdf: Path,
+    page_count: int,
+):
+    """Create the durable profile record once the full builder PDF exists."""
+
+    repository = guide_repository()
+    existing = repository.get_for_owner(guide_id, owner_id)
+    if existing is not None:
+        return existing
+
+    title = str(session.form.get("title") or "Guia de viagem")
+    title_slug = slugify(title)[:48] or "guia"
+    persisted_pdf = storage.pdf_path(f"{title_slug}-{guide_id[:16]}.pdf")
+    persisted_pdf.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_pdf, persisted_pdf)
+
+    cover = session.page("cover")
+    attempt = cover.selected_attempt() if cover and cover.approved_at else None
+    cover_thumbnail: Path | None = None
+    if attempt is not None:
+        cover_path = builder_asset_dir(session.id) / attempt.filename
+        if cover_path.is_file():
+            cover_thumbnail = write_cover_thumbnail(cover_path, guide_id)
+            if cover_thumbnail is not None:
+                store_cover_thumbnail(guide_id, cover_thumbnail)
+
+    assets: list[tuple[str, Path]] = [("generated_guide", persisted_pdf)]
+    if cover_thumbnail is not None:
+        assets.append(("cover_thumbnail", cover_thumbnail))
+    try:
+        return repository.save_succeeded_guide(
+            guide_id=guide_id,
+            user_id=owner_id,
+            title=title,
+            pdf_filename=persisted_pdf.name,
+            cover_fallback_used=False,
+            metadata={
+                "destinations": _builder_library_destinations(session),
+                "year": session.form.get("year"),
+                "privacy_consent": session.privacy_consent,
+                "cover_thumbnail": cover_thumbnail is not None,
+                "builder_session_id": session.id,
+                "page_count": page_count,
+            },
+            assets=assets,
+        )
+    except Exception:
+        for _kind, path in assets:
+            delete_private_asset(path)
+        raise
+
+
 def finalize_builder_guide_for_job(
     *,
     session_id: str,
     owner_id: str,
     recipient_email: str,
+    guide_id: str,
 ) -> dict[str, object]:
     """Assemble the canonical PDF and deliver its authenticated link."""
 
@@ -4241,11 +4397,19 @@ def finalize_builder_guide_for_job(
         session = load_builder_session(session_id, owner_id)
         manifest = session.approved_manifest()
         output, pages = _write_builder_pdf(session)
+        record = _persist_builder_guide_for_library(
+            session,
+            guide_id=guide_id,
+            owner_id=owner_id,
+            source_pdf=output,
+            page_count=len(pages),
+        )
         emailed_to = _notify_guide_ready(session, current_user, len(pages))
         return {
             "session_id": session.id,
-            "download_url": f"/guide-builder/{session.id}/pdf",
-            "filename": _builder_pdf_download_filename(session),
+            "guide_id": record.id,
+            "download_url": str(record.public_payload()["download_url"]),
+            "filename": record.pdf_filename or _builder_pdf_download_filename(session),
             "page_count": len(pages),
             "emailed_to": emailed_to,
             "pdf_bytes": output.stat().st_size,

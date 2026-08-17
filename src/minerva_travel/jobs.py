@@ -227,6 +227,7 @@ class GuideJobWorker:
             session_id=session_id,
             owner_id=job.user_id,
             recipient_email=recipient_email,
+            guide_id=job.id,
         )
         if not result_payload.get("emailed_to"):
             raise BuilderEmailDeliveryError("builder_email_delivery_failed")

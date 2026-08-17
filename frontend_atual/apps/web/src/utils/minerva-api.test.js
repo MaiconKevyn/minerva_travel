@@ -1053,6 +1053,43 @@ test('queueGuideBuilderGeneration returns immediately with an authenticated dura
   }
 });
 
+test('listGuideJobs returns authenticated builder previews for the profile', async () => {
+  const originalFetch = globalThis.fetch;
+  await authClient.signup('builder-library@example.com', 'Senha123', 'Família Biblioteca');
+  await authClient.login('builder-library@example.com', 'Senha123');
+  let seen;
+  const job = {
+    id: 'builderjob1',
+    status: 'running',
+    stage: 'generating_content',
+    progress: 42,
+    guide_preview: {
+      session_id: 'buildersession1',
+      title: 'Família Biblioteca',
+      cover_url: '/jobs/builderjob1/cover',
+      destinations: [{ id: 'paris', place: 'Paris, França' }],
+      approved_page_count: 4,
+      page_count: 10,
+    },
+  };
+  globalThis.fetch = async (url, options = {}) => {
+    seen = { url: String(url), options };
+    return new Response(JSON.stringify({ jobs: [job] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  try {
+    assert.deepEqual(await minervaApi.listGuideJobs(), [job]);
+    assert.equal(new URL(seen.url).pathname, '/api/jobs');
+    assert.equal(seen.options.headers.get('Authorization'), 'Bearer local-development-token');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});
+
 test('appendGuideMetadata sends restaurant extra entitlement only when selected', () => {
   const baseFormData = new FormData();
   appendGuideMetadata(baseFormData, {
