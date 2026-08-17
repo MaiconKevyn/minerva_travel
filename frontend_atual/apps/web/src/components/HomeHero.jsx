@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Baby, Palette, Printer, Sparkles } from 'lucide-react';
+import { ArrowRight, Baby, Palette, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OPTIONAL_LANDMARK_ACTIVITY_TYPES } from '@/utils/landmark-activities.js';
 
@@ -43,8 +43,7 @@ const HomeHero = () => (
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="space-y-7 text-center lg:text-left"
       >
-        <p className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-4 py-1.5 text-sm font-bold text-secondary shadow-sm">
-          <Sparkles className="h-4 w-4" aria-hidden="true" />
+        <p className="inline-flex items-center rounded-full border border-border/60 bg-card px-4 py-1.5 text-sm font-bold text-secondary shadow-sm">
           Feito sob medida para o roteiro de vocês
         </p>
 
