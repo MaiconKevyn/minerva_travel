@@ -150,7 +150,9 @@ const StepActivities = () => {
               </h3>
               <span className="text-xs font-medium text-muted-foreground">{category.hint}</span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {/* Três colunas, não quatro: a página impressa é o argumento de
+                venda da atividade e precisa caber legível no card. */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {category.options.map((activity) => {
                 const chosenIds = landmarksWithActivity(landmarkActivitySelections, activity.type);
                 const chosen = chosenIds.length > 0;
@@ -164,12 +166,17 @@ const StepActivities = () => {
                         : 'border-border/70 hover:border-primary/45 hover:shadow-md'
                     }`}
                   >
-                    <div className="relative aspect-[3/2] overflow-hidden bg-muted">
+                    {/* A moldura tem a proporção da folha impressa e a arte
+                        entra inteira. Numa janela 3:2 cortada pelo topo só
+                        sobravam 44% da página: a cruzadinha aparecia sem as
+                        dicas, o labirinto sem a saída e o cartão-postal sem o
+                        espaço de escrever — justamente o que explica cada uma. */}
+                    <div className="relative aspect-[2/3] overflow-hidden bg-muted">
                       <img
                         src={activity.preview}
                         alt={`Exemplo visual de ${activity.label}`}
                         loading="lazy"
-                        className="h-full w-full object-cover object-top transition duration-300 group-hover:scale-[1.03]"
+                        className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]"
                       />
                       <button
                         type="button"
@@ -186,13 +193,13 @@ const StepActivities = () => {
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-1 flex-col gap-1.5 p-3">
-                      <h4 className="text-sm font-bold leading-snug text-foreground">
+                    <div className="flex flex-1 flex-col gap-2 p-4">
+                      <h4 className="text-base font-bold leading-snug text-foreground">
                         {activity.label}
                       </h4>
                       <p
                         id={`${inputId}-description`}
-                        className="line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground"
+                        className="text-[13px] font-medium leading-relaxed text-muted-foreground"
                       >
                         {activity.description}
                       </p>

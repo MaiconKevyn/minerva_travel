@@ -60,7 +60,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
       'A criança olha para a ilustração do lugar e marca cada detalhe da lista conforme encontra. Feita para ser resolvida em pé, durante a visita, sem precisar de mesa.',
     category: 'onsite',
     label: 'Caça aos detalhes',
-    description: 'Observe a ilustração e marque detalhes especiais do lugar.',
+    description:
+      'Faz a criança olhar de verdade para o lugar em vez de passar batido. Cada detalhe achado vira uma lembrança que ela conta depois.',
     ageLabel: '5+',
     durationLabel: '5–10 min',
     materialLabel: 'Lápis',
@@ -73,7 +74,7 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     category: 'onsite',
     label: 'Investigador',
     description:
-      'Cada criança recebe uma pista e uma missão diferente, adaptada à idade e ao ponto turístico.',
+      'Cada criança recebe uma pista e uma missão só dela, adaptada à idade e ao ponto turístico. Observar de perto é o que faz o lugar grudar na memória.',
     ageLabel: 'Todas',
     durationLabel: '10–20 min',
     materialLabel: 'Lápis',
@@ -89,7 +90,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     ],
     category: 'puzzle',
     label: 'Caça-palavras',
-    description: 'Encontre palavras ligadas ao ponto turístico e à cidade.',
+    description:
+      'Os nomes do lugar, da cidade e do país escondidos na grade. Procurando letra por letra, a criança aprende a escrever os nomes sem perceber.',
     ageLabel: '6+',
     durationLabel: '10–15 min',
     materialLabel: 'Lápis',
@@ -105,7 +107,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     ],
     category: 'puzzle',
     label: 'Labirinto',
-    description: 'Leva a família pelo labirinto até o ponto turístico. A grade cresce com a idade.',
+    description:
+      'Um caminho só até o ponto turístico, e é ela quem tem de achar. Preenche o tempo da fila e ainda treina paciência.',
     ageLabel: '4+',
     durationLabel: '5–10 min',
     materialLabel: 'Lápis',
@@ -121,7 +124,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     ],
     category: 'puzzle',
     label: 'Ligue os pontos',
-    description: 'Liga os números e a silhueta do ponto turístico aparece. Menos pontos para os menores.',
+    description:
+      'A silhueta do lugar aparece aos poucos, número a número. No fim ela reconhece o monumento que viu de verdade — e a ficha cai.',
     ageLabel: '4+',
     durationLabel: '5–10 min',
     materialLabel: 'Lápis',
@@ -133,7 +137,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
       'Os nomes do lugar, da cidade e do país aparecem embaralhados, com uma caixinha por letra e a primeira já preenchida, que é onde a palavra mais longa costuma travar.',
     category: 'puzzle',
     label: 'Palavras embaralhadas',
-    description: 'Desembaralha os nomes do lugar, da cidade e do país, com a primeira letra de dica.',
+    description:
+      'Os nomes da viagem embaralhados, com a primeira letra de dica. Desembaralhar fixa o nome do lugar de um jeito que só ler não fixa.',
     ageLabel: '7+',
     durationLabel: '5–10 min',
     materialLabel: 'Lápis',
@@ -149,7 +154,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     ],
     category: 'puzzle',
     label: 'Cruzadinha da viagem',
-    description: 'Palavras cruzadas com dicas sobre a cidade, o país e o ponto turístico.',
+    description:
+      'As dicas falam da cidade, do país e do ponto turístico. Para completar, a criança precisa lembrar do que viu: vira revisão sem parecer lição.',
     ageLabel: '9+',
     durationLabel: '15–20 min',
     materialLabel: 'Lápis',
@@ -161,7 +167,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
       'Uma frase verdadeira sobre o lugar aparece cifrada em números. Três letras vêm reveladas para começar, e no fim há espaço para escrever a frase inteira.',
     category: 'puzzle',
     label: 'Código secreto',
-    description: 'Decifra com a chave numérica uma frase verdadeira sobre o ponto turístico.',
+    description:
+      'Uma frase verdadeira sobre o lugar escondida atrás de uma chave numérica. Decifrar dá a sensação de descobrir um segredo do monumento.',
     ageLabel: '9+',
     durationLabel: '15–20 min',
     materialLabel: 'Lápis',
@@ -190,7 +197,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
       'Dois desenhos do mesmo lugar com pequenas diferenças. Elas são conferidas uma a uma antes da impressão, e a página só diz o número que realmente existe.',
     category: 'puzzle',
     label: 'Ache os erros',
-    description: 'Dois desenhos do lugar; a página conta as diferenças conferidas antes de imprimir.',
+    description:
+      'Dois desenhos quase iguais do mesmo lugar. Comparar treina o olhar para os detalhes da arquitetura que ela acabou de ver de perto.',
     ageLabel: '6+',
     durationLabel: '10–15 min',
     materialLabel: 'Lápis',
@@ -199,11 +207,11 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
   {
     type: 'coloring',
     about:
-      'O ponto turístico em traço limpo, com formas grandes e sem detalhes miúdos, do jeito que uma criança consegue pintar sem sair da linha.',
+      'O ponto turístico em traço limpo, com formas grandes e sem detalhes miúdos, do jeito que uma criança consegue pintar sem sair da linha. Embaixo do desenho sai uma frase escrita para aquela família e aquela parada, para ela colorir também.',
     category: 'art',
     label: 'Página para colorir',
     description:
-      'Um desenho do ponto turístico com traços limpos, formas grandes e uma frase personalizada para colorir.',
+      'O monumento em traços limpos, formas grandes e uma frase personalizada impressa junto. Pintar devagar é o que transforma o passeio em lembrança dela.',
     ageLabel: '4+',
     durationLabel: '15–25 min',
     materialLabel: 'Lápis de cor',
@@ -212,11 +220,11 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
   {
     type: 'family_coloring',
     about:
-      'A foto que vocês enviaram vira um desenho da família de férias no ponto turístico, pronto para colorir. A foto original nunca é impressa.',
+      'A família vira um desenho de férias no ponto turístico, pronto para colorir. Quando vocês enviam a foto, ela serve só de referência para o traço e nunca é impressa; sem foto, a cena sai do mesmo jeito, sem semelhança com ninguém real.',
     category: 'art',
     label: 'Família de férias para colorir',
     description:
-      'Usa a foto enviada como referência para transformar a família em um desenho fofo de férias no ponto turístico.',
+      'A família vira um desenho de férias no ponto turístico — a foto enviada como referência nunca é impressa. A criança se vê dentro da viagem.',
     ageLabel: '4+',
     durationLabel: '15–25 min',
     materialLabel: 'Lápis de cor',
@@ -228,7 +236,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
       'Uma moldura com o lugar em miniatura e uma tela grande em branco no meio, para a criança pintar do jeito dela. Tem espaço para dar título e data à pintura.',
     category: 'art',
     label: 'Minha pintura',
-    description: 'Use o espaço em branco para criar uma pintura do lugar do seu jeito.',
+    description:
+      'Uma folha em branco para a criança criar uma pintura do lugar do jeito dela. Sem gabarito: o que sai é a versão que ela viu.',
     ageLabel: '4+',
     durationLabel: '10–20 min',
     materialLabel: 'Tinta ou lápis',
@@ -240,7 +249,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
       'Cinco frases do idioma do país — cumprimentar, agradecer, pedir um sorvete, achar o banheiro e se apresentar — com a pronúncia escrita do jeito que se lê em português.',
     category: 'writing',
     label: 'Sobrevivência no idioma',
-    description: 'Cinco frases do país para a criança pedir sozinha, com a pronúncia escrita.',
+    description:
+      'Cinco frases para a criança pedir sozinha, com a pronúncia escrita do jeito que se fala. Falar a primeira palavra em outra língua é um momento que não se esquece.',
     ageLabel: '6+',
     durationLabel: '5–10 min',
     materialLabel: 'Só a boca',
@@ -252,7 +262,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
       'A frente traz a arte do ponto turístico e o verso vem formatado como cartão de verdade: mensagem, remetente, caixa de selo e linhas de endereço, com linha de corte para postar.',
     category: 'writing',
     label: 'Cartão-postal',
-    description: 'Frente com a arte do lugar e verso para escrever, recortar e postar de verdade.',
+    description:
+      'Frente ilustrada e verso para escrever de verdade. Escrever para alguém obriga a resumir a viagem — e o cartão chega em casa antes da família.',
     ageLabel: '7+',
     durationLabel: '10–15 min',
     materialLabel: 'Caneta e tesoura',
@@ -264,7 +275,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
       'Uma página por país, com o nome da criança, a data de chegada e uma moldura tracejada do tamanho de um bilhete de entrada para colar.',
     category: 'writing',
     label: 'Passaporte de viagem',
-    description: 'Uma página por país, com moldura para colar o bilhete ou o carimbo real.',
+    description:
+      'Uma página por país para colar o bilhete, o carimbo, o que sobrou do bolso. Vira o álbum da viagem montado pela própria criança.',
     ageLabel: 'Todas',
     durationLabel: '5 min',
     materialLabel: 'Cola e caneta',
@@ -277,7 +289,7 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
     category: 'writing',
     label: 'Diário do dia',
     description:
-      'Melhor momento, a surpresa do dia, uma palavra nova aprendida e a nota da criança.',
+      'Melhor momento, a surpresa do dia, uma palavra nova. Escrever obriga a criança a escolher o que valeu mais — e a dizer o que ela quer repetir na próxima viagem.',
     ageLabel: '8+',
     durationLabel: '10–15 min',
     materialLabel: 'Caneta',
@@ -286,10 +298,11 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
   {
     type: 'newspaper_headline',
     about:
-      'A criança vira repórter daquele ponto turístico: escreve a manchete, conta o que aconteceu na visita e quem estava junto.',
+      'A criança vira repórter daquele ponto turístico: escreve a manchete, assina a reportagem, conta o que aconteceu na visita, quem estava junto e o que mais chamou a atenção — com espaço para desenhar a foto que ilustraria a notícia.',
     category: 'writing',
     label: 'Manchete do jornal',
-    description: 'A criança vira repórter do ponto turístico e escreve a manchete da visita.',
+    description:
+      'A criança vira repórter e escreve a manchete da visita. Contar como notícia faz ela reparar no que era mesmo digno de nota.',
     ageLabel: '9+',
     durationLabel: '10–15 min',
     materialLabel: 'Caneta',
@@ -301,7 +314,8 @@ export const LANDMARK_ACTIVITY_OPTIONS = [
       'Uma comparação entre as ruas e as casas do destino e a rua onde a criança mora, mais uma coisa que existe lá e não existe aqui.',
     category: 'writing',
     label: 'Aqui e na minha rua',
-    description: 'Compara as ruas e as casas do destino com a rua onde a criança mora.',
+    description:
+      'Compara a rua do destino com a rua de casa. É o exercício que mostra para a criança que existe mais de um jeito de viver.',
     ageLabel: '8+',
     durationLabel: '10–15 min',
     materialLabel: 'Caneta',
