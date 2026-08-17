@@ -321,3 +321,23 @@ def test_save_upload_removes_partial_file_when_request_is_cancelled(tmp_path, mo
         asyncio.run(storage.save_upload(upload, chunk_bytes=7))
 
     assert list((tmp_path / "uploads").iterdir()) == []
+
+
+def test_the_runtime_directory_follows_the_mounted_disk(monkeypatch):
+    """Sem isto, o deploy apaga o guia da família.
+
+    Num host de container o sistema de arquivos volta ao estado da imagem a
+    cada deploy. O banco, as páginas geradas e os PDFs vivem todos sob este
+    diretório, então ele precisa poder apontar para um disco montado — e o
+    padrão precisa continuar sendo `runtime` para o desenvolvimento local.
+    """
+
+    import importlib
+
+    monkeypatch.setenv("MINERVA_RUNTIME_DIR", "/var/data")
+    montado = importlib.reload(storage)
+    assert montado.RUNTIME_DIR == Path("/var/data")
+
+    monkeypatch.delenv("MINERVA_RUNTIME_DIR")
+    padrao = importlib.reload(storage)
+    assert padrao.RUNTIME_DIR == Path("runtime")
