@@ -130,6 +130,8 @@ class BuilderSession:
     # Marca que o aviso de guia pronto já saiu; sem isto, cada download
     # mandaria outro e-mail para a mesma família.
     emailed_at: str | None = None
+    generation_job_id: str | None = None
+    generation_requested_at: str | None = None
     revision: int = 0
     layout_revision: int = 0
 
@@ -164,6 +166,8 @@ class BuilderSession:
             "layout_revision": self.layout_revision,
             "active_page_id": active_page.id if active_page else None,
             "is_complete": self.is_complete,
+            "generation_job_id": self.generation_job_id,
+            "generation_requested_at": self.generation_requested_at,
             "pages": [self._page_payload(page) for page in self.ordered_pages()],
         }
 
@@ -306,6 +310,8 @@ def _load_builder_session(session_id: str) -> BuilderSession:
             photo_filename=payload["photo_filename"],
             privacy_consent=payload.get("privacy_consent"),
             emailed_at=payload.get("emailed_at"),
+            generation_job_id=payload.get("generation_job_id"),
+            generation_requested_at=payload.get("generation_requested_at"),
             revision=int(payload.get("revision", 0)),
             layout_revision=int(payload.get("layout_revision", 0)),
             pages=[

@@ -128,14 +128,19 @@ produção está em `docs/ENVIRONMENT_MATRIX.md`.
 
 ### Worker de geração
 
-Em produção, `ASYNC_GUIDE_JOBS_ENABLED=true` faz o `POST /api/generate` retornar `202`
-com `job_id`. Execute um processo worker separado com as mesmas variáveis de ambiente:
+Em produção, `ASYNC_GUIDE_JOBS_ENABLED=true` faz as gerações retornarem `202`
+com `job_id`. Quando API, fila SQLite e imagens usam o mesmo disco persistente (como no
+serviço web do Render), mantenha `IN_PROCESS_GUIDE_WORKER_ENABLED=true`: o processo da API
+inicia um worker em segundo plano e a família pode fechar a página. Em uma infraestrutura com
+storage compartilhado, o worker também pode ser executado separadamente:
 
 ```bash
 uv run python scripts/run_guide_worker.py
 ```
 
 O worker aplica lease, retry exponencial para falhas transitórias e limite de tentativas.
+No construtor final, ele retoma as páginas ainda não aprovadas, monta o PDF na ordem canônica e
+só conclui o job depois de enviar por e-mail o link autenticado para download.
 Eventos JSON sem PII incluem `request_id`, `job_id`, estágio, duração e um hash do usuário.
 
 O CI audita dependências, executa SAST e procura vulnerabilidades, segredos e

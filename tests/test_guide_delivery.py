@@ -1,5 +1,6 @@
 """O que a família recebe depois de aprovar tudo: o PDF certo, uma vez só."""
 
+import asyncio
 import smtplib
 from io import BytesIO
 from pathlib import Path
@@ -13,6 +14,9 @@ from minerva_travel import app as app_module
 from minerva_travel import storage
 from minerva_travel.app import app
 from minerva_travel.auth import AuthenticatedUser, get_current_user
+from minerva_travel.jobs import GuideJobWorker
+from minerva_travel.page_generation import PageGenerationRetryableError
+from minerva_travel.persistence import GuideRepository
 
 PAGE_COLORS = [
     "#4f86b7",
@@ -216,3 +220,134 @@ def test_an_incomplete_guide_is_refused_and_nothing_is_emailed(delivery):
     assert completed.status_code == 409
     assert completed.json()["detail"]["code"] == "builder_incomplete"
     assert RecordingSmtp.sent == []
+
+
+def test_approved_cover_queues_the_rest_and_worker_delivers_in_background(delivery):
+    client, _generator = delivery
+    session = _create_without_photo(client)
+    session_id = session["session_id"]
+    _approve_every_page(client, session, ["cover"])
+
+    queued = client.post(
+        f"/api/guide-builder/{session_id}/generation-jobs",
+        headers={"Idempotency-Key": "finish-guide-1"},
+    )
+
+    assert queued.status_code == 202, queued.text
+    assert queued.json()["status"] == "queued"
+    job_id = queued.json()["job_id"]
+    restored = client.get(f"/api/guide-builder/{session_id}").json()
+    assert restored["generation_job_id"] == job_id
+    assert restored["generation_requested_at"]
+    frozen = client.post(
+        f"/api/guide-builder/{session_id}/pages/summary/attempts",
+        headers={"Idempotency-Key": "late-manual-page"},
+    )
+    assert frozen.status_code == 409
+    assert frozen.json()["detail"]["code"] == "builder_generation_already_requested"
+
+    repository = GuideRepository(storage.RUNTIME_DIR / "minerva.sqlite3")
+    result = asyncio.run(GuideJobWorker(repository).run_once())
+
+    assert result == result.__class__(job_id=job_id, outcome="succeeded")
+    finished = client.get(f"/api/jobs/{job_id}")
+    assert finished.status_code == 200
+    assert finished.json()["status"] == "succeeded"
+    assert finished.json()["result"]["page_count"] == len(session["pages"])
+    assert finished.json()["result"]["emailed_to"] == "familia@example.test"
+    assert len(RecordingSmtp.sent) == 1
+
+    final_session = client.get(f"/api/guide-builder/{session_id}").json()
+    assert final_session["is_complete"] is True
+    assert all(page["status"] == "approved" for page in final_session["pages"])
+    assert client.get(finished.json()["result"]["download_url"]).status_code == 200
+
+
+def test_background_builder_resumes_after_a_temporary_provider_limit(delivery):
+    client, generator = delivery
+    session = _create_without_photo(client)
+    session_id = session["session_id"]
+    _approve_every_page(client, session, ["cover"])
+
+    original_write = generator._write
+    background_calls = 0
+
+    def flaky_write(output_path: Path) -> Path:
+        nonlocal background_calls
+        background_calls += 1
+        if background_calls == 2:
+            raise PageGenerationRetryableError(
+                "A OpenAI está temporariamente ocupada.",
+                retry_after_seconds=5,
+            )
+        return original_write(output_path)
+
+    generator._write = flaky_write
+    queued = client.post(
+        f"/api/guide-builder/{session_id}/generation-jobs",
+        headers={"Idempotency-Key": "finish-guide-with-retry"},
+    ).json()
+    repository = GuideRepository(storage.RUNTIME_DIR / "minerva.sqlite3")
+
+    first = asyncio.run(GuideJobWorker(repository).run_once())
+    after_first = client.get(f"/api/guide-builder/{session_id}").json()
+    summary = next(page for page in after_first["pages"] if page["id"] == "summary")
+
+    assert first.outcome == "retrying"
+    assert summary["status"] == "approved"
+    assert len(summary["attempts"]) == 1
+    with repository._connection() as connection:
+        connection.execute(
+            "UPDATE guide_jobs SET next_attempt_at = ? WHERE id = ?",
+            ("2000-01-01T00:00:00+00:00", queued["job_id"]),
+        )
+
+    second = asyncio.run(GuideJobWorker(repository).run_once())
+    final_session = client.get(f"/api/guide-builder/{session_id}").json()
+
+    assert second.outcome == "succeeded"
+    assert final_session["is_complete"] is True
+    final_summary = next(page for page in final_session["pages"] if page["id"] == "summary")
+    assert len(final_summary["attempts"]) == 1
+    assert len(RecordingSmtp.sent) == 1
+
+
+def test_failed_builder_job_can_be_requeued_with_a_new_idempotency_key(delivery):
+    client, _generator = delivery
+    session = _create_without_photo(client)
+    session_id = session["session_id"]
+    _approve_every_page(client, session, ["cover"])
+
+    first = client.post(
+        f"/api/guide-builder/{session_id}/generation-jobs",
+        headers={"Idempotency-Key": "first-submission"},
+    )
+    assert first.status_code == 202
+    first_job_id = first.json()["job_id"]
+
+    repository = GuideRepository(storage.RUNTIME_DIR / "minerva.sqlite3")
+    claimed = repository.claim_next_job()
+    assert claimed is not None and claimed.id == first_job_id
+    assert repository.fail_job(
+        first_job_id,
+        error_code="generation_failed",
+        error_message_safe="Não foi possível gerar o guia.",
+    )
+
+    replay = client.post(
+        f"/api/guide-builder/{session_id}/generation-jobs",
+        headers={"Idempotency-Key": "first-submission"},
+    )
+    assert replay.status_code == 202
+    assert replay.json()["job_id"] == first_job_id
+
+    retry = client.post(
+        f"/api/guide-builder/{session_id}/generation-jobs",
+        headers={"Idempotency-Key": "deliberate-retry"},
+    )
+    assert retry.status_code == 202
+    assert retry.json()["status"] == "queued"
+    assert retry.json()["job_id"] != first_job_id
+
+    restored = client.get(f"/api/guide-builder/{session_id}").json()
+    assert restored["generation_job_id"] == retry.json()["job_id"]

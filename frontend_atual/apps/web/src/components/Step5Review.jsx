@@ -607,9 +607,9 @@ const Step5Review = () => {
               O guia chega no seu e-mail
             </h3>
             <p className="mt-1 text-sm font-medium text-muted-foreground">
-              Você aprova as páginas uma a uma na próxima tela. Quando o PDF ficar pronto,
-              enviamos o link para o e-mail da sua conta em alguns minutos — e ele também fica
-              disponível para baixar aqui.
+              Na próxima tela você revisa apenas a capa. Depois de aprová-la, um único clique
+              inicia o guia completo; você pode sair do site e receberá o link do PDF no e-mail
+              da sua conta quando tudo estiver pronto.
             </p>
           </div>
         </div>
@@ -625,7 +625,7 @@ const Step5Review = () => {
           {isGenerating ? (
             <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Preparando as páginas...</>
           ) : (
-            <><Sparkles className="w-6 h-6 mr-3 inline-block" /> Começar pelas páginas</>
+            <><Sparkles className="w-6 h-6 mr-3 inline-block" /> Criar e revisar a capa</>
           )}
         </Button>
       </div>
@@ -636,7 +636,7 @@ const Step5Review = () => {
       )}
       {isGenerating && (
         <p className="mt-4 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
-          Preparando a ordem das páginas. Nenhuma imagem será gerada sem sua confirmação.
+          Preparando a capa e a ordem definitiva do guia. Nenhuma imagem será gerada sem sua confirmação.
         </p>
       )}
     </div>

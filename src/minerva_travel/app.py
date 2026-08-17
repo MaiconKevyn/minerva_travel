@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import logging
@@ -7,8 +8,10 @@ import sqlite3
 import unicodedata
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Event, Thread
 from time import perf_counter
 from typing import Annotated, Any, Literal
 from urllib.parse import urlparse
@@ -111,8 +114,10 @@ from minerva_travel.config import (
     frontend_base_url,
     google_maps_api_key,
     guide_job_max_attempts,
+    guide_worker_poll_seconds,
     image_generation_concurrency,
     image_provider,
+    in_process_guide_worker_enabled,
     landmark_art_generation_enabled,
     landmark_stylized_art_enabled,
     pilot_restaurant_recommendations_enabled,
@@ -559,6 +564,8 @@ class BuilderSessionResponse(BaseModel):
     layout_revision: int = Field(default=0, ge=0)
     active_page_id: str | None = None
     is_complete: bool
+    generation_job_id: str | None = None
+    generation_requested_at: str | None = None
     pages: list[BuilderPageResponse]
 
 
@@ -650,6 +657,42 @@ API_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
 }
 
 
+def _run_embedded_guide_worker(stop_event: Event) -> None:
+    """Poll the durable queue without occupying the API event loop."""
+
+    from minerva_travel.jobs import run_once
+
+    repository = guide_repository()
+    while not stop_event.is_set():
+        try:
+            result = run_once(repository)
+        except Exception:  # pragma: no cover - last-resort process resilience
+            logger.exception("embedded guide worker iteration failed")
+            result = None
+        if result is None or result.outcome == "idle":
+            stop_event.wait(guide_worker_poll_seconds())
+
+
+@asynccontextmanager
+async def _app_lifespan(_app: FastAPI):
+    stop_event = Event()
+    worker: Thread | None = None
+    if in_process_guide_worker_enabled():
+        worker = Thread(
+            target=_run_embedded_guide_worker,
+            args=(stop_event,),
+            name="minerva-guide-worker",
+            daemon=True,
+        )
+        worker.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        if worker is not None:
+            await asyncio.to_thread(worker.join, 1.0)
+
+
 class MinervaFastAPI(FastAPI):
     def openapi(self) -> dict[str, Any]:
         schema = super().openapi()
@@ -665,7 +708,12 @@ class MinervaFastAPI(FastAPI):
         return schema
 
 
-app = MinervaFastAPI(title="Minerva Travel MVP", version="1.0.0", responses=API_ERROR_RESPONSES)
+app = MinervaFastAPI(
+    title="Minerva Travel MVP",
+    version="1.0.0",
+    responses=API_ERROR_RESPONSES,
+    lifespan=_app_lifespan,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allowed_origins(),
@@ -3233,6 +3281,126 @@ def get_guide_builder(session_id: str, current_user: CurrentUser) -> BuilderSess
     return BuilderSessionResponse.model_validate(session.public_payload())
 
 
+def _ensure_builder_still_editable(session: BuilderSession) -> None:
+    if session.generation_requested_at:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "builder_generation_already_requested",
+                "message": "O guia completo já foi enviado para criação e não pode mais mudar.",
+            },
+        )
+
+
+@app.post(
+    "/api/guide-builder/{session_id}/generation-jobs",
+    response_model=GuideGenerationQueuedResponse,
+    status_code=202,
+)
+def queue_guide_builder_generation(
+    session_id: str,
+    request: Request,
+    response: Response,
+    current_user: CurrentUser,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> GuideGenerationQueuedResponse:
+    """Queue every page after the approved cover and return immediately."""
+
+    key = (idempotency_key or "").strip()
+    if not key:
+        raise IdempotencyKeyRequiredError()
+    if len(key) > 200:
+        raise HTTPException(status_code=422, detail="Idempotency-Key inválida.")
+    if not (current_user.email or "").strip():
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "builder_email_required",
+                "message": "Entre com uma conta que tenha e-mail para receber o guia pronto.",
+            },
+        )
+
+    repository = guide_repository()
+    with builder_session_lock(session_id):
+        session = _builder_session_or_404(session_id, current_user)
+        cover = session.page("cover")
+        if cover is None or not cover.approved_at or cover.selected_attempt() is None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "builder_cover_not_approved",
+                    "message": "Gere e aprove a capa antes de criar o guia completo.",
+                },
+            )
+        if any(page.pending_attempt_id for page in session.pages):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "builder_page_generation_in_progress",
+                    "message": "Aguarde a geração atual terminar antes de criar o guia completo.",
+                },
+            )
+
+        existing_job = (
+            repository.get_job_for_owner(session.generation_job_id, current_user.id)
+            if session.generation_job_id
+            else None
+        )
+        if existing_job is not None and existing_job.status in {
+            "queued",
+            "running",
+            "succeeded",
+        }:
+            response.headers["Idempotency-Replayed"] = "true"
+            return GuideGenerationQueuedResponse.model_validate(queued_job_payload(existing_job))
+
+        job_id = uuid4().hex
+        jobs_dir = storage.RUNTIME_DIR / "jobs"
+        jobs_dir.mkdir(parents=True, exist_ok=True)
+        marker = jobs_dir / f"{job_id}.marker"
+        marker.write_text(session_id, encoding="utf-8")
+        # The caller key distinguishes a network replay from a deliberate retry
+        # after a terminal failure. Active/succeeded jobs are still replayed
+        # above for the whole session, so two tabs cannot queue duplicate work.
+        key_digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:32]
+        database_key = f"builder:{session_id}:{key_digest}"
+        try:
+            job = repository.create_job(
+                job_id=job_id,
+                user_id=current_user.id,
+                idempotency_key=database_key,
+                request_snapshot={
+                    "job_kind": "builder_full_pdf",
+                    "builder_session_id": session.id,
+                    "recipient_email": current_user.email,
+                },
+                photo_path=marker,
+                max_attempts=guide_job_max_attempts(),
+            )
+        except sqlite3.IntegrityError:
+            marker.unlink(missing_ok=True)
+            replay = repository.get_job_for_idempotency(current_user.id, database_key)
+            if replay is None:  # pragma: no cover - database invariant
+                raise
+            job = replay
+            response.headers["Idempotency-Replayed"] = "true"
+        else:
+            response.headers["Idempotency-Replayed"] = "false"
+        session.generation_job_id = job.id
+        session.generation_requested_at = datetime.now(UTC).isoformat()
+        save_builder_session(session)
+
+    emit_event(
+        "guide_builder_job_accepted",
+        request_id=getattr(request.state, "request_id", None),
+        job_id=job.id,
+        user_id=current_user.id,
+        stage=job.stage,
+        outcome="accepted",
+    )
+    return GuideGenerationQueuedResponse.model_validate(queued_job_payload(job))
+
+
 def _builder_activity_input_error(code: str, message: str) -> HTTPException:
     return HTTPException(status_code=422, detail={"code": code, "message": message})
 
@@ -3322,6 +3490,7 @@ def add_builder_activity(
     try:
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
+            _ensure_builder_still_editable(session)
             page = _new_session_activity_page(
                 session,
                 payload.landmark_selection_id,
@@ -3370,6 +3539,7 @@ def move_builder_activity(
     try:
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
+            _ensure_builder_still_editable(session)
             move_activity_page(
                 session,
                 page_id,
@@ -3411,6 +3581,7 @@ def delete_builder_activity(
     try:
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
+            _ensure_builder_still_editable(session)
             remove_activity_page(
                 session,
                 page_id,
@@ -3450,18 +3621,16 @@ def delete_builder_activity(
         ) from error
 
 
-@app.post(
-    "/api/guide-builder/{session_id}/pages/{page_id}/attempts",
-    response_model=BuilderSessionResponse,
-)
-def generate_builder_page_attempt(
+def _generate_builder_page_attempt_impl(
     session_id: str,
     page_id: str,
-    request: Request,
+    request: Request | None,
     response: Response,
-    current_user: CurrentUser,
+    current_user: AuthenticatedUser,
     payload: BuilderPageGenerationRequest | None = None,
-    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    idempotency_key: str | None = None,
+    *,
+    admit_request: bool,
 ) -> BuilderSessionResponse:
     key = (idempotency_key or "").strip()
     if not key:
@@ -3473,19 +3642,24 @@ def generate_builder_page_attempt(
     output: Path | None = None
     attempt_id = ""
     try:
-        lease = admit_expensive_request(
-            request=request,
-            user_id=current_user.id,
-            scope="guide_page_generate",
-            provider="openai",
-            default_user_limit=DEFAULT_BUILDER_PAGE_GENERATION_RATE_LIMIT,
-            default_ip_limit=DEFAULT_BUILDER_PAGE_GENERATION_RATE_LIMIT * 3,
-            default_window_seconds=10 * 60,
-            default_user_concurrency=DEFAULT_BUILDER_PAGE_GENERATION_CONCURRENCY,
-            default_user_quota=DEFAULT_BUILDER_PAGE_GENERATION_QUOTA,
-        )
+        if admit_request:
+            if request is None:  # pragma: no cover - internal programming error
+                raise RuntimeError("request is required for an admitted generation")
+            lease = admit_expensive_request(
+                request=request,
+                user_id=current_user.id,
+                scope="guide_page_generate",
+                provider="openai",
+                default_user_limit=DEFAULT_BUILDER_PAGE_GENERATION_RATE_LIMIT,
+                default_ip_limit=DEFAULT_BUILDER_PAGE_GENERATION_RATE_LIMIT * 3,
+                default_window_seconds=10 * 60,
+                default_user_concurrency=DEFAULT_BUILDER_PAGE_GENERATION_CONCURRENCY,
+                default_user_quota=DEFAULT_BUILDER_PAGE_GENERATION_QUOTA,
+            )
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
+            if admit_request:
+                _ensure_builder_still_editable(session)
             page = session.page(page_id)
             if page is None:
                 raise BuilderPageOutOfOrder(page_id)
@@ -3788,7 +3962,7 @@ def generate_builder_page_attempt(
             response.headers["Idempotency-Replayed"] = "false"
             emit_event(
                 "guide_page_generated",
-                request_id=getattr(request.state, "request_id", None),
+                request_id=(getattr(request.state, "request_id", None) if request else None),
                 user_id=current_user.id,
                 stage=page_kind,
                 outcome="succeeded",
@@ -3871,6 +4045,73 @@ def generate_builder_page_attempt(
             lease.release()
 
 
+@app.post(
+    "/api/guide-builder/{session_id}/pages/{page_id}/attempts",
+    response_model=BuilderSessionResponse,
+)
+def generate_builder_page_attempt(
+    session_id: str,
+    page_id: str,
+    request: Request,
+    response: Response,
+    current_user: CurrentUser,
+    payload: BuilderPageGenerationRequest | None = None,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> BuilderSessionResponse:
+    return _generate_builder_page_attempt_impl(
+        session_id,
+        page_id,
+        request,
+        response,
+        current_user,
+        payload,
+        idempotency_key,
+        admit_request=True,
+    )
+
+
+def generate_and_approve_builder_page_for_job(
+    *,
+    session_id: str,
+    owner_id: str,
+    recipient_email: str,
+    page_id: str,
+    job_id: str,
+) -> None:
+    """Generate one planned page idempotently for the durable worker."""
+
+    current_user = AuthenticatedUser(id=owner_id, email=recipient_email)
+    with builder_session_lock(session_id):
+        session = load_builder_session(session_id, owner_id)
+        page = session.page(page_id)
+        if page is None:
+            raise BuilderPageOutOfOrder(page_id)
+        if page.approved_at:
+            return
+        if page.kind == "cover":
+            raise BuilderPageDependencyMissing("A capa precisa ser aprovada antes do envio.")
+
+    _generate_builder_page_attempt_impl(
+        session_id,
+        page_id,
+        None,
+        Response(),
+        current_user,
+        BuilderPageGenerationRequest(),
+        f"job:{job_id}:{page_id}",
+        admit_request=False,
+    )
+    with builder_session_lock(session_id):
+        session = load_builder_session(session_id, owner_id)
+        page = session.page(page_id)
+        if page is None:
+            raise BuilderPageOutOfOrder(page_id)
+        if page.approved_at:
+            return
+        selected = page.selected_attempt()
+        approve_page_attempt(session, page_id, selected.id if selected else None)
+
+
 @app.patch(
     "/api/guide-builder/{session_id}/pages/{page_id}/selection",
     response_model=BuilderSessionResponse,
@@ -3884,6 +4125,7 @@ def select_builder_page_attempt(
     try:
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
+            _ensure_builder_still_editable(session)
             select_page_attempt(session, page_id, payload.attempt_id)
             return BuilderSessionResponse.model_validate(session.public_payload())
     except BuilderAttemptNotFound as error:
@@ -3905,6 +4147,7 @@ def approve_builder_page(
     try:
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
+            _ensure_builder_still_editable(session)
             approve_page_attempt(session, page_id, payload.attempt_id)
             return BuilderSessionResponse.model_validate(session.public_payload())
     except BuilderAttemptNotFound as error:
@@ -3983,6 +4226,31 @@ def _notify_guide_ready(
     session.emailed_at = datetime.now(UTC).isoformat()
     save_builder_session(session)
     return current_user.email
+
+
+def finalize_builder_guide_for_job(
+    *,
+    session_id: str,
+    owner_id: str,
+    recipient_email: str,
+) -> dict[str, object]:
+    """Assemble the canonical PDF and deliver its authenticated link."""
+
+    current_user = AuthenticatedUser(id=owner_id, email=recipient_email)
+    with builder_session_lock(session_id):
+        session = load_builder_session(session_id, owner_id)
+        manifest = session.approved_manifest()
+        output, pages = _write_builder_pdf(session)
+        emailed_to = _notify_guide_ready(session, current_user, len(pages))
+        return {
+            "session_id": session.id,
+            "download_url": f"/guide-builder/{session.id}/pdf",
+            "filename": _builder_pdf_download_filename(session),
+            "page_count": len(pages),
+            "emailed_to": emailed_to,
+            "pdf_bytes": output.stat().st_size,
+            "pages": len(manifest),
+        }
 
 
 @app.post(

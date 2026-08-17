@@ -159,76 +159,53 @@ test('review step offers restaurant recommendations under the explicit pilot con
 test('review starts a page session without triggering legacy PDF generation', () => {
   const review = readProjectFile('src/components/Step5Review.jsx');
 
-  assert.match(review, /Começar pelas páginas/);
+  assert.match(review, /Criar e revisar a capa/);
   assert.match(review, /Nenhuma imagem será gerada sem sua confirmação/);
   assert.match(review, /createGuideBuilder/);
   assert.match(review, /<GuideAssembly session=\{builderSession\}/);
   assert.doesNotMatch(review, /generatePDF|downloadGuidePdf|fetchGuidePreviewHtml|legacyGenerate/);
 });
 
-test('progressive assembly generates, versions, approves and completes page images', () => {
+test('final assembly reviews only the cover and queues the complete guide', () => {
   const api = readProjectFile('src/utils/minerva-api.js');
   const review = readProjectFile('src/components/Step5Review.jsx');
   const assembly = readProjectFile('src/components/GuideAssembly.jsx');
 
   assert.match(api, /createGuideBuilder/);
   assert.match(api, /generateBuilderPageAttempt/);
-  assert.match(api, /selectBuilderPageAttempt/);
   assert.match(api, /approveBuilderPage/);
-  assert.match(api, /completeGuideBuilder/);
-  assert.match(api, /generateBuilderPdf/);
+  assert.match(api, /queueGuideBuilderGeneration/);
+  assert.match(api, /generation-jobs/);
+  assert.match(api, /getGuideJob/);
   assert.match(api, /downloadGuidePdf/);
   assert.match(api, /fetchBuilderAssetObjectUrl/);
   assert.match(api, /fetchGuideBuilderSession/);
   assert.match(api, /Idempotency-Key/);
   assert.match(review, /GuideAssembly/);
   assert.doesNotMatch(review, /legacyGenerate/);
-  assert.match(assembly, /Gerar página/);
-  assert.match(assembly, /Gerar outra versão/);
-  assert.match(assembly, /O que você quer mudar nesta versão\?/);
-  assert.match(assembly, /homecoming: 'Encerramento obrigatório'/);
-  assert.match(assembly, /Gerar versão com ajustes/);
-  assert.match(assembly, /alternativa visivelmente diferente/);
+  assert.match(assembly, /Gerar preview da capa/);
+  assert.match(assembly, /Gerar nova versão/);
+  assert.match(assembly, /Quer mudar alguma coisa\?/);
   assert.match(api, /revision_instruction: revisionInstruction\.trim\(\)/);
-  assert.match(api, /include_family: includeFamily/);
-  assert.match(assembly, /Incluir família/);
-  assert.match(assembly, /activePage\.kind === 'landmark'/);
-  assert.match(assembly, /selectedPageId/);
-  assert.match(assembly, /setSelectedPageId\(page\.id\)/);
-  assert.match(assembly, /aria-current=\{isSelected \? 'page'/);
-  assert.match(assembly, /pageBusyActions/);
-  assert.match(assembly, /MAX_GENERATION_ATTEMPTS/);
-  assert.match(assembly, /Nova tentativa automática/);
+  assert.match(assembly, /MAX_COVER_ATTEMPTS/);
+  assert.match(assembly, /Nova tentativa automática em/);
   assert.match(assembly, /builderGenerationRetryDelaySeconds/);
   assert.match(assembly, /isRetryableBuilderGenerationError/);
-  assert.match(assembly, /revisionInstructions/);
-  assert.match(assembly, /includeFamilyByPage/);
-  assert.match(assembly, /nextSession\.revision/);
-  assert.match(assembly, /Você pode abrir outra página e iniciar uma nova geração/);
-  assert.match(assembly, /attempt\.include_family \? 'Com família' : 'Sem família'/);
-  assert.match(assembly, /Aprovar página/);
-  assert.match(assembly, /Ver páginas aprovadas/);
-  assert.match(assembly, /Gerar PDF e baixar/);
-  assert.match(assembly, /Baixar PDF novamente/);
-  assert.match(assembly, /PDF pronto com/);
-  assert.match(assembly, /required_copy/);
-  assert.match(assembly, /destination_intro: 'Destino e curiosidades'/);
-  assert.match(assembly, /País: \{activePage\.metadata\.country\}/);
-  assert.match(assembly, /activePage\.metadata\?\.activity_label/);
-  assert.match(assembly, /Ligada a/);
-  assert.match(assembly, /hydratedAssetUrlsRef/);
+  assert.match(assembly, /Aprovar esta capa/);
+  assert.match(assembly, /Criar guia completo/);
+  assert.match(assembly, /Você pode fechar esta página com segurança/);
+  assert.match(assembly, /Não é preciso aguardar no site/);
+  assert.match(assembly, /Guia pronto e enviado/);
+  assert.doesNotMatch(assembly, /GuideActivityPanel|selectedPageId|Gerar página/);
 });
 
-test('final builder offers a real-example activity panel and persistent page placement', () => {
+test('activity examples and placement APIs remain available before final cover review', () => {
   const api = readProjectFile('src/utils/minerva-api.js');
   const assembly = readProjectFile('src/components/GuideAssembly.jsx');
   const panel = readProjectFile('src/components/GuideActivityPanel.jsx');
   const activities = readProjectFile('src/utils/landmark-activities.js');
 
-  assert.match(assembly, /GuideActivityPanel/);
-  assert.match(assembly, /handleAddActivity/);
-  assert.match(assembly, /handleMoveActivity/);
-  assert.match(assembly, /handleRemoveActivity/);
+  assert.doesNotMatch(assembly, /GuideActivityPanel|handleAddActivity|handleMoveActivity/);
   assert.match(api, /addBuilderActivity/);
   assert.match(api, /moveBuilderActivity/);
   assert.match(api, /removeBuilderActivity/);
@@ -298,10 +275,9 @@ test('home explains the flow and shows real product pages from our own domain', 
   assert.match(home, /HomeHero/);
   assert.match(home, /HowItWorks/);
   assert.match(home, /PageGallery/);
-  // O diferencial (aprovar página por página) precisa aparecer antes do cadastro.
-  assert.match(howItWorks, /Veja cada página nascer/);
+  assert.match(howItWorks, /Aprove a sua capa/);
   assert.match(howItWorks, /Conte a viagem/);
-  assert.match(howItWorks, /Leve o livro na mala/);
+  assert.match(howItWorks, /Receba o livro por e-mail/);
   assert.match(gallery, /activity-examples\/cover-sample\.webp/);
   assert.match(gallery, /activity-examples\/route-sample\.webp/);
   // O herói mostra o livro, não uma capa solta: quem chega precisa ver que há

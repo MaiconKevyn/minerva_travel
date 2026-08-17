@@ -2,7 +2,7 @@
 
 The production database schema has the same job states. This SQLite adapter is
 intentionally small but preserves the important operational contract: the API
-persists a request and returns quickly; a separately started worker claims,
+persists a request and returns quickly; a separate or embedded worker claims,
 leases, resumes and finalizes the work.
 """
 
@@ -24,6 +24,10 @@ from minerva_travel.privacy import PrivacyConsentError, validate_photo_processin
 class JobRunResult:
     job_id: str | None
     outcome: str
+
+
+class BuilderEmailDeliveryError(RuntimeError):
+    """The PDF exists, but its required delivery email did not leave."""
 
 
 class GuideJobWorker:
@@ -59,6 +63,8 @@ class GuideJobWorker:
             )
             return JobRunResult(job_id=job.id, outcome="cancelled")
         try:
+            if job.request_snapshot.get("job_kind") == "builder_full_pdf":
+                return self._run_builder_job(job, started_at=started_at)
             payload = _validated_snapshot(job.request_snapshot)
             consent = validate_photo_processing_consent(
                 granted=bool(payload["photo_processing_consent"]),
@@ -170,6 +176,81 @@ class GuideJobWorker:
             )
             return JobRunResult(job_id=job.id, outcome=outcome)
 
+    def _run_builder_job(self, job: GuideJobRecord, *, started_at: float) -> JobRunResult:
+        snapshot = _validated_builder_snapshot(job.request_snapshot)
+        session_id = snapshot["builder_session_id"]
+        recipient_email = snapshot["recipient_email"]
+
+        from minerva_travel.app import (
+            finalize_builder_guide_for_job,
+            generate_and_approve_builder_page_for_job,
+        )
+        from minerva_travel.builder import load_builder_session
+
+        session = load_builder_session(session_id, job.user_id)
+        pending_pages = [
+            page
+            for page in session.ordered_pages()
+            if page.kind != "cover" and not page.approved_at
+        ]
+        total = max(len(pending_pages), 1)
+        for index, page in enumerate(pending_pages):
+            progress = 10 + round((index / total) * 75)
+            if not self.repository.update_job_progress(
+                job.id,
+                stage="generating_content",
+                progress=progress,
+                lease_seconds=self.lease_seconds,
+            ):
+                self.repository.retry_or_fail_job(
+                    job.id,
+                    error_code="generation_cancelled",
+                    error_message_safe="A geração foi cancelada.",
+                )
+                delete_private_asset(job.photo_path)
+                return JobRunResult(job_id=job.id, outcome="cancelled")
+            generate_and_approve_builder_page_for_job(
+                session_id=session_id,
+                owner_id=job.user_id,
+                recipient_email=recipient_email,
+                page_id=page.id,
+                job_id=job.id,
+            )
+
+        self.repository.update_job_progress(
+            job.id,
+            stage="rendering_pdf",
+            progress=90,
+            lease_seconds=self.lease_seconds,
+        )
+        result_payload = finalize_builder_guide_for_job(
+            session_id=session_id,
+            owner_id=job.user_id,
+            recipient_email=recipient_email,
+        )
+        if not result_payload.get("emailed_to"):
+            raise BuilderEmailDeliveryError("builder_email_delivery_failed")
+        self.repository.update_job_progress(
+            job.id,
+            stage="finalizing",
+            progress=98,
+            lease_seconds=self.lease_seconds,
+        )
+        if self.repository.finish_job(job.id, result_payload=result_payload):
+            delete_private_asset(job.photo_path)
+            emit_event(
+                "guide_job_finished",
+                job_id=job.id,
+                user_id=job.user_id,
+                stage="complete",
+                outcome="succeeded",
+                duration_ms=round((perf_counter() - started_at) * 1000),
+                attempt_count=job.attempt_count,
+            )
+            return JobRunResult(job_id=job.id, outcome="succeeded")
+        delete_private_asset(job.photo_path)
+        return JobRunResult(job_id=job.id, outcome="cancelled")
+
 
 def run_once(repository: GuideRepository | None = None) -> JobRunResult:
     """Synchronous worker entrypoint used by the process script and tests."""
@@ -213,11 +294,33 @@ def _validated_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _validated_builder_snapshot(snapshot: dict[str, Any]) -> dict[str, str]:
+    session_id = snapshot.get("builder_session_id")
+    recipient_email = snapshot.get("recipient_email")
+    if not isinstance(session_id, str) or not session_id.isalnum():
+        raise ValueError("job_snapshot_invalid_builder_session_id")
+    if (
+        not isinstance(recipient_email, str)
+        or "@" not in recipient_email
+        or len(recipient_email) > 320
+    ):
+        raise ValueError("job_snapshot_invalid_recipient_email")
+    return {
+        "builder_session_id": session_id,
+        "recipient_email": recipient_email,
+    }
+
+
 def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) else None
 
 
 def _safe_job_error(error: Exception) -> tuple[str, str]:
+    if isinstance(error, BuilderEmailDeliveryError):
+        return (
+            "builder_email_delivery_failed",
+            "O PDF ficou pronto, mas o e-mail não pôde ser enviado. Tente novamente.",
+        )
     if isinstance(error, PrivacyConsentError):
         return error.code, error.message
     if isinstance(error, HTTPException):

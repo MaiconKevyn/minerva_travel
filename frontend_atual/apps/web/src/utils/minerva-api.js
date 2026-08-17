@@ -1344,6 +1344,23 @@ export const approveBuilderPage = async (sessionId, pageId, attemptId) =>
     },
   );
 
+export const queueGuideBuilderGeneration = async (
+  sessionId,
+  idempotencyKey = createIdempotencyKey(),
+) => {
+  const response = await authenticatedFetch(
+    `${apiBaseUrl()}/api/guide-builder/${encodeURIComponent(sessionId)}/generation-jobs`,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+    },
+  );
+  if (!response.ok) {
+    throw await responseApiError(response, 'Não foi possível iniciar a criação do guia');
+  }
+  return response.json();
+};
+
 export const completeGuideBuilder = async (sessionId) =>
   builderRequest(`/api/guide-builder/${encodeURIComponent(sessionId)}/complete`, {
     method: 'POST',

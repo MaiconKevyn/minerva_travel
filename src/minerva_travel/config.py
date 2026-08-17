@@ -227,6 +227,32 @@ def async_guide_jobs_enabled() -> bool:
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def in_process_guide_worker_enabled() -> bool:
+    """Run the durable queue beside the API when both share one mounted disk.
+
+    Render disks are attached to a single service. Until the queue and builder
+    assets move to shared object storage/database infrastructure, keeping the
+    worker in the web service is what lets queued jobs survive deploys *and*
+    see the same private files.
+    """
+
+    load_project_env()
+    raw_value = os.getenv(
+        "IN_PROCESS_GUIDE_WORKER_ENABLED",
+        "true" if app_environment() == "production" else "false",
+    )
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def guide_worker_poll_seconds() -> float:
+    load_project_env()
+    try:
+        value = float(os.getenv("GUIDE_WORKER_POLL_SECONDS", "1"))
+    except ValueError:
+        return 1.0
+    return min(max(value, 0.25), 30.0)
+
+
 def guide_job_max_attempts() -> int:
     load_project_env()
     raw_value = os.getenv("GUIDE_JOB_MAX_ATTEMPTS", "3")

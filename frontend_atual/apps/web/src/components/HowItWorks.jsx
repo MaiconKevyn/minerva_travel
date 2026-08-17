@@ -2,10 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { BookHeart, MapPin, Wand2 } from 'lucide-react';
 
-/**
- * O diferencial do produto é a família aprovar página por página — quem chega
- * pela home não descobria isso em lugar nenhum antes de criar uma conta.
- */
 const STEPS = [
   {
     icon: MapPin,
@@ -15,15 +11,15 @@ const STEPS = [
   },
   {
     icon: Wand2,
-    title: 'Veja cada página nascer',
+    title: 'Aprove a sua capa',
     description:
-      'As páginas são ilustradas uma a uma. Você acompanha na tela, pede ajustes ou gera outra versão até gostar do resultado.',
+      'Veja a capa ilustrada, peça mudanças de estilo e aprove quando ela representar bem a família e a viagem.',
   },
   {
     icon: BookHeart,
-    title: 'Leve o livro na mala',
+    title: 'Receba o livro por e-mail',
     description:
-      'Ao aprovar tudo, o guia vira um PDF A4 pronto para imprimir e encadernar — para a criança colorir, escrever e guardar.',
+      'Com um clique, criamos todas as páginas em segundo plano e enviamos o PDF A4 pronto para imprimir e encadernar.',
   },
 ];
 

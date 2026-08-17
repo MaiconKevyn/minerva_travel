@@ -1,8 +1,29 @@
+from threading import Event
+
 from fastapi.testclient import TestClient
 
+from minerva_travel import app as app_module
 from minerva_travel import storage
 from minerva_travel.app import app
 from minerva_travel.config import cors_allowed_origins
+
+
+def test_lifespan_supervises_the_embedded_durable_worker(monkeypatch):
+    started = Event()
+    stopped = Event()
+
+    def fake_worker(stop_event):
+        started.set()
+        stop_event.wait(timeout=2)
+        stopped.set()
+
+    monkeypatch.setattr(app_module, "in_process_guide_worker_enabled", lambda: True)
+    monkeypatch.setattr(app_module, "_run_embedded_guide_worker", fake_worker)
+
+    with TestClient(app):
+        assert started.wait(timeout=1)
+
+    assert stopped.wait(timeout=1)
 
 
 def test_health_endpoints_are_public_and_readiness_checks_local_dependencies(

@@ -1018,6 +1018,41 @@ test('waitForGuideJob polls an owner-scoped job until its durable result is read
   }
 });
 
+test('queueGuideBuilderGeneration returns immediately with an authenticated durable job', async () => {
+  const originalFetch = globalThis.fetch;
+  await authClient.signup('builder-queue@example.com', 'Senha123', 'Família Fila');
+  await authClient.login('builder-queue@example.com', 'Senha123');
+  let seen;
+  globalThis.fetch = async (url, options = {}) => {
+    seen = { url: String(url), options };
+    return new Response(JSON.stringify({
+      job_id: 'builder-job-1',
+      status: 'queued',
+      stage: 'queued',
+      progress: 0,
+      poll_url: '/api/jobs/builder-job-1',
+    }), {
+      status: 202,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  try {
+    const queued = await minervaApi.queueGuideBuilderGeneration(
+      'builder-1',
+      'finish-builder-1',
+    );
+    assert.equal(queued.job_id, 'builder-job-1');
+    assert.equal(new URL(seen.url).pathname, '/api/guide-builder/builder-1/generation-jobs');
+    assert.equal(seen.options.method, 'POST');
+    assert.equal(seen.options.headers.get('Authorization'), 'Bearer local-development-token');
+    assert.equal(seen.options.headers.get('Idempotency-Key'), 'finish-builder-1');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});
+
 test('appendGuideMetadata sends restaurant extra entitlement only when selected', () => {
   const baseFormData = new FormData();
   appendGuideMetadata(baseFormData, {

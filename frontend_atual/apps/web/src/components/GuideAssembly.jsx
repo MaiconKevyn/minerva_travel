@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 import {
-  AlertCircle,
   Check,
   CircleCheck,
   Download,
@@ -11,48 +9,25 @@ import {
   RefreshCcw,
   Sparkles,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import GuideActivityPanel from '@/components/GuideActivityPanel.jsx';
 import {
-  addBuilderActivity,
   approveBuilderPage,
-  completeGuideBuilder,
+  builderGenerationRetryDelaySeconds,
   createIdempotencyKey,
   downloadGuidePdf,
   fetchBuilderAssetObjectUrl,
   fetchGuideBuilderSession,
-  builderGenerationRetryDelaySeconds,
-  generateBuilderPdf,
   generateBuilderPageAttempt,
+  getGuideJob,
   isRetryableBuilderGenerationError,
-  moveBuilderActivity,
-  removeBuilderActivity,
-  selectBuilderPageAttempt,
+  queueGuideBuilderGeneration,
 } from '@/utils/minerva-api.js';
-import { toast } from 'sonner';
 
-const STATUS_LABELS = {
-  ready: 'Pronta para gerar',
-  generating: 'Gerando',
-  awaiting_approval: 'Aguardando sua aprovação',
-  approved: 'Aprovada',
-  error: 'Precisa tentar novamente',
-};
-
-const MAX_REVISION_INSTRUCTION_LENGTH = 600;
-const MAX_GENERATION_ATTEMPTS = 4;
-
-const PAGE_KIND_LABELS = {
-  cover: 'Capa',
-  trip_summary: 'Resumo do roteiro',
-  destination_intro: 'Destino e curiosidades',
-  landmark: 'Ponto turístico',
-  landmark_activity: 'Atividade',
-  best_memory: 'Página obrigatória',
-  homecoming: 'Encerramento obrigatório',
-};
+const MAX_COVER_ATTEMPTS = 4;
+const MAX_REVISION_LENGTH = 600;
+const sleep = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
 const saveBlob = (blob, filename) => {
   const objectUrl = URL.createObjectURL(blob);
@@ -65,953 +40,310 @@ const saveBlob = (blob, filename) => {
   URL.revokeObjectURL(objectUrl);
 };
 
-const formatRetryDelay = (seconds) => {
-  if (seconds < 60) return `${seconds} segundo${seconds === 1 ? '' : 's'}`;
-  const minutes = Math.ceil(seconds / 60);
-  return `${minutes} minuto${minutes === 1 ? '' : 's'}`;
-};
-
-const waitForRetry = (delayMs, signal) => new Promise((resolve, reject) => {
-  const abort = () => {
-    window.clearTimeout(timer);
-    const error = new Error('Geração cancelada.');
-    error.name = 'AbortError';
-    reject(error);
-  };
-  const timer = window.setTimeout(() => {
-    signal.removeEventListener('abort', abort);
-    resolve();
-  }, delayMs);
-  signal.addEventListener('abort', abort, { once: true });
-  if (signal.aborted) abort();
-});
-
-const withOptimisticPageMove = (current, pageId, afterPageId) => {
-  const movedPage = current.pages.find((page) => page.id === pageId);
-  if (!movedPage) return current;
-  const remaining = current.pages.filter((page) => page.id !== pageId);
-  const anchorIndex = remaining.findIndex((page) => page.id === afterPageId);
-  if (anchorIndex < 0) return current;
-  const pages = [...remaining];
-  pages.splice(anchorIndex + 1, 0, movedPage);
-  return {
-    ...current,
-    pages: pages.map((page, index) => ({ ...page, position: index + 1 })),
-  };
-};
-
-// Gerar uma página leva de 15 a 40 segundos. Um spinner mudo nesse tempo
-// parece travamento, então narramos o que está acontecendo. As etapas são
-// ilustrativas do processo real (ilustração + textos na mesma passada).
-const GENERATION_STAGES = [
-  'Preparando o cenário da página…',
-  'Desenhando a família na aquarela…',
-  'Pintando os detalhes do lugar…',
-  'Escrevendo os textos da página…',
-  'Dando os retoques finais…',
-];
-
-const STAGE_DURATION_MS = 7000;
-
-const GeneratingPagePlaceholder = () => {
-  const [stageIndex, setStageIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      // Segura na última etapa: a geração real pode passar do tempo estimado.
-      setStageIndex((current) => Math.min(current + 1, GENERATION_STAGES.length - 1));
-    }, STAGE_DURATION_MS);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  return (
-    <>
-      <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden="true" />
-      <div className="w-full max-w-xs space-y-3">
-        <p className="font-bold text-foreground" role="status" aria-live="polite">
-          {GENERATION_STAGES[stageIndex]}
-        </p>
-        <div
-          className="flex justify-center gap-1.5"
-          role="progressbar"
-          aria-valuemin={1}
-          aria-valuemax={GENERATION_STAGES.length}
-          aria-valuenow={stageIndex + 1}
-          aria-label="Progresso da geração da página"
-        >
-          {GENERATION_STAGES.map((stage, index) => (
-            <span
-              key={stage}
-              className={`h-1.5 rounded-full transition-all duration-500 ${
-                index <= stageIndex ? 'w-8 bg-primary' : 'w-4 bg-border'
-              }`}
-            />
-          ))}
-        </div>
-        <p className="text-sm">A ilustração e os textos são produzidos juntos pela IA.</p>
-      </div>
-    </>
-  );
-};
+const jobStageLabel = (stage) => ({
+  queued: 'Na fila de criação',
+  validating: 'Conferindo o roteiro',
+  preparing_assets: 'Preparando as ilustrações',
+  generating_cover: 'Preparando a capa',
+  generating_content: 'Ilustrando as páginas do guia',
+  rendering_pdf: 'Montando o PDF',
+  persisting: 'Salvando o guia',
+  finalizing: 'Enviando o e-mail',
+  complete: 'Concluído',
+}[stage] || 'Criando o guia');
 
 const GuideAssembly = ({ session: initialSession }) => {
   const [session, setSession] = useState(initialSession);
-  const [selectedPageId, setSelectedPageId] = useState(
-    initialSession.active_page_id || initialSession.pages[0]?.id || '',
-  );
-  const [assetUrls, setAssetUrls] = useState({});
-  const [assetLoadErrors, setAssetLoadErrors] = useState({});
-  const [pageBusyActions, setPageBusyActions] = useState({});
-  const [pageErrors, setPageErrors] = useState({});
-  const [pageRetryNotices, setPageRetryNotices] = useState({});
-  const [revisionInstructions, setRevisionInstructions] = useState({});
-  const [includeFamilyByPage, setIncludeFamilyByPage] = useState({});
-  const [busyAction, setBusyAction] = useState('');
-  const [actionError, setActionError] = useState('');
-  const [completion, setCompletion] = useState(null);
-  const [pdfExport, setPdfExport] = useState(null);
-  const [layoutBusyAction, setLayoutBusyAction] = useState('');
-  const [layoutError, setLayoutError] = useState('');
-  const objectUrlsRef = useRef(new Set());
-  const hydratedAssetUrlsRef = useRef(new Set());
-  const generationKeysRef = useRef({});
-  const generationAbortControllersRef = useRef(new Map());
+  const [coverUrl, setCoverUrl] = useState('');
+  const [revisionInstruction, setRevisionInstruction] = useState('');
+  const [coverBusy, setCoverBusy] = useState('');
+  const [coverError, setCoverError] = useState('');
+  const [retryNotice, setRetryNotice] = useState('');
+  const [job, setJob] = useState(null);
+  const [jobBusy, setJobBusy] = useState(false);
+  const [jobError, setJobError] = useState('');
+  const generationKeyRef = useRef('');
+  const queueKeyRef = useRef('');
 
-  const hydrateAssets = useCallback(async (nextSession) => {
-    const urls = [...new Set(
-      nextSession.pages.flatMap((page) => page.attempts.map((attempt) => attempt.asset_url)),
-    )].filter((url) => !hydratedAssetUrlsRef.current.has(url));
-    urls.forEach((url) => hydratedAssetUrlsRef.current.add(url));
-    const failures = [];
-    const loaded = await Promise.all(
-      urls.map(async (url) => {
-        try {
-          const objectUrl = await fetchBuilderAssetObjectUrl(url);
-          objectUrlsRef.current.add(objectUrl);
-          return [url, objectUrl];
-        } catch (error) {
-          console.error('Erro ao carregar página gerada:', error);
-          hydratedAssetUrlsRef.current.delete(url);
-          failures.push(url);
-          return null;
-        }
-      }),
-    );
-    setAssetUrls((current) => {
-      const next = { ...current };
-      loaded.filter(Boolean).forEach(([url, objectUrl]) => {
-        if (next[url]) {
-          URL.revokeObjectURL(objectUrl);
-          objectUrlsRef.current.delete(objectUrl);
-        } else {
-          next[url] = objectUrl;
-        }
-      });
-      return next;
-    });
-    setAssetLoadErrors((current) => {
-      const next = { ...current };
-      loaded.filter(Boolean).forEach(([url]) => delete next[url]);
-      failures.forEach((url) => {
-        next[url] = 'Não foi possível carregar esta imagem. Tente gerar novamente.';
-      });
-      return next;
-    });
+  const cover = useMemo(
+    () => session.pages.find((page) => page.kind === 'cover') || null,
+    [session.pages],
+  );
+  const selectedAttempt = cover?.attempts.find(
+    (attempt) => attempt.id === cover.selected_attempt_id,
+  ) || cover?.attempts.at(-1) || null;
+  const generatedPageCount = Math.max(session.pages.length - 1, 0);
+
+  const loadCover = useCallback(async (attempt) => {
+    if (!attempt?.asset_url) {
+      setCoverUrl('');
+      return;
+    }
+    try {
+      const nextUrl = await fetchBuilderAssetObjectUrl(attempt.asset_url);
+      setCoverUrl(nextUrl);
+    } catch (error) {
+      setCoverError(error.message || 'Não foi possível carregar a capa.');
+    }
   }, []);
 
   useEffect(() => {
-    const objectUrls = objectUrlsRef.current;
-    const hydratedAssetUrls = hydratedAssetUrlsRef.current;
-    const generationAbortControllers = generationAbortControllersRef.current;
-    hydrateAssets(initialSession);
-    return () => {
-      objectUrls.forEach((url) => URL.revokeObjectURL(url));
-      objectUrls.clear();
-      hydratedAssetUrls.clear();
-      generationAbortControllers.forEach((controller) => controller.abort());
-      generationAbortControllers.clear();
-    };
-  }, [hydrateAssets, initialSession]);
+    loadCover(selectedAttempt);
+  }, [loadCover, selectedAttempt?.asset_url]);
 
-  const activePage = useMemo(
-    () => session.pages.find((page) => page.id === selectedPageId)
-      || session.pages.find((page) => page.id === session.active_page_id)
-      || session.pages[0]
-      || null,
-    [selectedPageId, session],
-  );
-  const activePageBusyAction = activePage ? pageBusyActions[activePage.id] || '' : '';
-  const activePageError = activePage ? pageErrors[activePage.id] || '' : '';
-  const activePageRetryNotice = activePage ? pageRetryNotices[activePage.id] || '' : '';
-  const revisionInstruction = activePage ? revisionInstructions[activePage.id] || '' : '';
-  const includeFamily = activePage ? includeFamilyByPage[activePage.id] || false : false;
-  const selectedAttempt = activePage?.attempts.find(
-    (attempt) => attempt.id === activePage.selected_attempt_id,
-  );
-  const selectedImageUrl = selectedAttempt ? assetUrls[selectedAttempt.asset_url] : '';
-  const selectedAssetError = selectedAttempt
-    ? assetLoadErrors[selectedAttempt.asset_url]
-    : '';
+  useEffect(() => () => {
+    if (coverUrl) URL.revokeObjectURL(coverUrl);
+  }, [coverUrl]);
+
+  const refreshSession = useCallback(async () => {
+    const latest = await fetchGuideBuilderSession(session.session_id);
+    setSession(latest);
+    return latest;
+  }, [session.session_id]);
 
   useEffect(() => {
-    if (!session.pages.some((page) => page.id === selectedPageId)) {
-      setSelectedPageId(session.active_page_id || session.pages[0]?.id || '');
-    }
-  }, [selectedPageId, session.active_page_id, session.pages]);
-
-  const applySession = useCallback(async (nextSession) => {
-    setSession((current) => (
-      Number(nextSession.revision || 0) > Number(current.revision || 0)
-        ? nextSession
-        : current
-    ));
-    await hydrateAssets(nextSession);
-    return nextSession;
-  }, [hydrateAssets]);
-
-  const updateSession = async (operation) => {
-    const nextSession = await operation();
-    return applySession(nextSession);
-  };
-
-  useEffect(() => {
-    if (!session.pages.some((page) => page.status === 'generating')) return undefined;
+    const jobId = session.generation_job_id;
+    if (!jobId) return undefined;
     let cancelled = false;
-    const refresh = async () => {
+    let timer;
+    const refreshJob = async () => {
       try {
-        const latest = await fetchGuideBuilderSession(session.session_id);
-        if (!cancelled) await applySession(latest);
+        const latest = await getGuideJob(jobId);
+        if (cancelled) return;
+        setJob(latest);
+        if (!['succeeded', 'failed', 'cancelled'].includes(latest.status)) {
+          timer = window.setTimeout(refreshJob, 5000);
+        }
       } catch (error) {
-        console.error('Erro ao atualizar páginas em geração:', error);
+        if (!cancelled) setJobError(error.message || 'Não foi possível consultar a criação.');
       }
     };
-    const timer = window.setInterval(refresh, 2500);
+    refreshJob();
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      if (timer) window.clearTimeout(timer);
     };
-  }, [applySession, session.pages, session.session_id]);
+  }, [session.generation_job_id]);
 
-  const setPageBusy = (pageId, action) => {
-    setPageBusyActions((current) => {
-      const next = { ...current };
-      if (action) next[pageId] = action;
-      else delete next[pageId];
-      return next;
-    });
-  };
-
-  const setPageError = (pageId, message) => {
-    setPageErrors((current) => ({ ...current, [pageId]: message }));
-  };
-
-  const setPageRetryNotice = (pageId, message) => {
-    setPageRetryNotices((current) => {
-      const next = { ...current };
-      if (message) next[pageId] = message;
-      else delete next[pageId];
-      return next;
-    });
-  };
-
-  const handleGenerate = async () => {
-    if (
-      !activePage
-      || pageBusyActions[activePage.id]
-      || activePage.status === 'generating'
-      || activePage.approved_at
-    ) return;
-    const page = activePage;
-    setPageBusy(page.id, 'generate');
-    setPageError(page.id, '');
-    const key = generationKeysRef.current[page.id] || createIdempotencyKey();
-    generationKeysRef.current[page.id] = key;
-    const requestedRevision = (revisionInstructions[page.id] || '').trim();
-    const controller = new AbortController();
-    generationAbortControllersRef.current.set(page.id, controller);
+  const handleGenerateCover = async () => {
+    if (!cover || coverBusy || cover.approved_at) return;
+    setCoverBusy('generate');
+    setCoverError('');
+    const key = generationKeyRef.current || createIdempotencyKey();
+    generationKeyRef.current = key;
     try {
-      let failedAttempts = 0;
-      while (failedAttempts < MAX_GENERATION_ATTEMPTS) {
+      for (let attempt = 1; attempt <= MAX_COVER_ATTEMPTS; attempt += 1) {
         try {
-          await updateSession(() =>
-            generateBuilderPageAttempt(
-              session.session_id,
-              page.id,
-              key,
-              requestedRevision,
-              page.kind === 'landmark' && Boolean(includeFamilyByPage[page.id]),
-              { signal: controller.signal },
-            ),
+          const latest = await generateBuilderPageAttempt(
+            session.session_id,
+            cover.id,
+            key,
+            revisionInstruction,
           );
-          break;
+          setSession(latest);
+          generationKeyRef.current = '';
+          setRevisionInstruction('');
+          setRetryNotice('');
+          toast.success('Preview da capa pronto para revisar.');
+          return;
         } catch (error) {
-          failedAttempts += 1;
-          if (
-            controller.signal.aborted
-            || failedAttempts >= MAX_GENERATION_ATTEMPTS
-            || !isRetryableBuilderGenerationError(error)
-          ) throw error;
-          const delaySeconds = builderGenerationRetryDelaySeconds(error, failedAttempts);
-          setPageRetryNotice(
-            page.id,
-            `Limite temporário. Nova tentativa automática em ${formatRetryDelay(delaySeconds)} `
-              + `(${failedAttempts + 1} de ${MAX_GENERATION_ATTEMPTS}).`,
-          );
-          await waitForRetry(delaySeconds * 1000, controller.signal);
-          setPageRetryNotice(page.id, 'Tentando gerar esta página novamente...');
+          if (attempt === MAX_COVER_ATTEMPTS || !isRetryableBuilderGenerationError(error)) throw error;
+          const delay = builderGenerationRetryDelaySeconds(error, attempt);
+          setRetryNotice(`A OpenAI está ocupada. Nova tentativa automática em ${delay}s.`);
+          await sleep(delay * 1000);
         }
       }
-      delete generationKeysRef.current[page.id];
-      setRevisionInstructions((current) => ({ ...current, [page.id]: '' }));
-      toast.success(`${page.title} gerada. Confira todos os textos antes de aprovar.`);
     } catch (error) {
-      if (error.name !== 'AbortError') {
-        setPageError(page.id, error.message || 'Não foi possível gerar esta página.');
-      }
+      setCoverError(error.message || 'Não foi possível gerar o preview da capa.');
     } finally {
-      if (generationAbortControllersRef.current.get(page.id) === controller) {
-        generationAbortControllersRef.current.delete(page.id);
-      }
-      setPageRetryNotice(page.id, '');
-      setPageBusy(page.id, '');
+      setCoverBusy('');
+      setRetryNotice('');
     }
   };
 
-  const handleSelect = async (attemptId) => {
-    if (
-      !activePage
-      || pageBusyActions[activePage.id]
-      || activePage.status === 'generating'
-      || activePage.approved_at
-    ) return;
-    const page = activePage;
-    setPageBusy(page.id, 'select');
-    setPageError(page.id, '');
+  const handleApproveCover = async () => {
+    if (!cover?.selected_attempt_id || coverBusy || cover.approved_at) return;
+    setCoverBusy('approve');
+    setCoverError('');
     try {
-      await updateSession(() =>
-        selectBuilderPageAttempt(session.session_id, page.id, attemptId),
+      const latest = await approveBuilderPage(
+        session.session_id,
+        cover.id,
+        cover.selected_attempt_id,
       );
+      setSession(latest);
+      toast.success('Capa aprovada. Agora podemos criar o guia completo.');
     } catch (error) {
-      setPageError(page.id, error.message || 'Não foi possível escolher esta versão.');
+      setCoverError(error.message || 'Não foi possível aprovar a capa.');
     } finally {
-      setPageBusy(page.id, '');
+      setCoverBusy('');
     }
   };
 
-  const handleApprove = async () => {
-    if (
-      !activePage?.selected_attempt_id
-      || pageBusyActions[activePage.id]
-      || activePage.status === 'generating'
-      || activePage.approved_at
-    ) return;
-    const page = activePage;
-    setPageBusy(page.id, 'approve');
-    setPageError(page.id, '');
+  const handleQueueGuide = async () => {
+    if (!cover?.approved_at || jobBusy) return;
+    setJobBusy(true);
+    setJobError('');
+    const key = queueKeyRef.current || createIdempotencyKey();
+    queueKeyRef.current = key;
     try {
-      const nextSession = await updateSession(() =>
-        approveBuilderPage(
-          session.session_id,
-          page.id,
-          page.selected_attempt_id,
-        ),
-      );
-      setSelectedPageId(nextSession.active_page_id || page.id);
-      toast.success(`${page.title} aprovada.`);
+      const queued = await queueGuideBuilderGeneration(session.session_id, key);
+      setJob({ id: queued.job_id, ...queued });
+      await refreshSession();
+      queueKeyRef.current = '';
+      toast.success('Criação iniciada. Você já pode fechar esta página.');
     } catch (error) {
-      setPageError(page.id, error.message || 'Não foi possível aprovar esta página.');
+      setJobError(error.message || 'Não foi possível iniciar a criação do guia.');
     } finally {
-      setPageBusy(page.id, '');
+      setJobBusy(false);
     }
   };
 
-  const handleComplete = async () => {
-    setBusyAction('complete');
-    setActionError('');
+  const handleDownload = async () => {
     try {
-      setCompletion(await completeGuideBuilder(session.session_id));
+      const ready = await downloadGuidePdf(job.result.download_url);
+      saveBlob(ready.blob, job.result.filename || ready.filename);
     } catch (error) {
-      setActionError(error.message || 'Não foi possível concluir a revisão.');
-    } finally {
-      setBusyAction('');
+      setJobError(error.message || 'Não foi possível baixar o PDF.');
     }
   };
 
-  const handlePdfExport = async () => {
-    setBusyAction('pdf');
-    setActionError('');
-    try {
-      const readyPdf = await generateBuilderPdf(session.session_id);
-      setPdfExport(readyPdf);
-      const { blob, filename } = await downloadGuidePdf(readyPdf.download_url);
-      saveBlob(blob, readyPdf.filename || filename);
-      toast.success('PDF gerado. O download foi iniciado.');
-    } catch (error) {
-      setActionError(error.message || 'Não foi possível gerar e baixar o PDF.');
-    } finally {
-      setBusyAction('');
-    }
-  };
-
-  const handleLayoutFailure = async (error, fallbackMessage) => {
-    setLayoutError(error.message || fallbackMessage);
-    if (error.code === 'builder_layout_conflict') {
-      try {
-        await applySession(await fetchGuideBuilderSession(session.session_id));
-      } catch (refreshError) {
-        console.error('Erro ao atualizar a ordem do guia:', refreshError);
-      }
-    }
-  };
-
-  const handleAddActivity = async (landmarkSelectionId, activityType) => {
-    const action = `add:${activityType}`;
-    setLayoutBusyAction(action);
-    setLayoutError('');
-    try {
-      const nextSession = await updateSession(() => addBuilderActivity(session.session_id, {
-        landmarkSelectionId,
-        activityType,
-        layoutRevision: session.layout_revision || 0,
-      }));
-      const addedPage = nextSession.pages.find((page) => (
-        page.kind === 'landmark_activity'
-        && page.metadata?.landmark_selection_id === landmarkSelectionId
-        && page.metadata?.activity_type === activityType
-      ));
-      setPdfExport(null);
-      if (addedPage) setSelectedPageId(addedPage.id);
-      toast.success('Atividade adicionada. Você pode posicioná-la ou gerar quando quiser.');
-    } catch (error) {
-      await handleLayoutFailure(error, 'Não foi possível adicionar a atividade.');
-    } finally {
-      setLayoutBusyAction('');
-    }
-  };
-
-  const handleMoveActivity = async (pageId, afterPageId) => {
-    const action = `move:${pageId}`;
-    const previousSession = session;
-    setLayoutBusyAction(action);
-    setLayoutError('');
-    setSession((current) => withOptimisticPageMove(current, pageId, afterPageId));
-    try {
-      await updateSession(() => moveBuilderActivity(session.session_id, pageId, {
-        afterPageId,
-        layoutRevision: session.layout_revision || 0,
-      }));
-      setPdfExport(null);
-      toast.success('Nova posição salva para o guia e para o PDF.');
-    } catch (error) {
-      setSession((current) => (
-        current.revision > previousSession.revision ? current : previousSession
-      ));
-      await handleLayoutFailure(error, 'Não foi possível mover esta atividade.');
-    } finally {
-      setLayoutBusyAction('');
-    }
-  };
-
-  const handleRemoveActivity = async (page) => {
-    const hasGeneratedVersions = page.attempts.length > 0;
-    if (
-      hasGeneratedVersions
-      && !window.confirm(
-        `Remover “${page.title}” e apagar todas as versões já geradas desta atividade?`,
-      )
-    ) return;
-    const action = `remove:${page.id}`;
-    const previousSession = session;
-    setLayoutBusyAction(action);
-    setLayoutError('');
-    setSession((current) => ({
-      ...current,
-      pages: current.pages
-        .filter((item) => item.id !== page.id)
-        .map((item, index) => ({ ...item, position: index + 1 })),
-    }));
-    try {
-      await updateSession(() => removeBuilderActivity(session.session_id, page.id, {
-        layoutRevision: session.layout_revision || 0,
-        confirmGenerated: hasGeneratedVersions,
-      }));
-      setPdfExport(null);
-      toast.success('Atividade removida do guia.');
-    } catch (error) {
-      setSession((current) => (
-        current.revision > previousSession.revision ? current : previousSession
-      ));
-      await handleLayoutFailure(error, 'Não foi possível remover esta atividade.');
-    } finally {
-      setLayoutBusyAction('');
-    }
-  };
-
-  const pageAssetUrl = (page) => {
-    const attempt = page.attempts.find((item) => item.id === page.selected_attempt_id);
-    return attempt ? assetUrls[attempt.asset_url] : '';
-  };
-
-  if (completion) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mx-auto w-full max-w-6xl space-y-8 py-10 text-center"
-      >
-        <CircleCheck className="mx-auto h-16 w-16 text-secondary" />
-        <div className="space-y-3">
-          <h2 className="text-4xl font-serif font-bold text-foreground">Páginas aprovadas!</h2>
-          <p className="mx-auto max-w-2xl text-lg font-medium text-muted-foreground">
-            Estas são as imagens finais escolhidas, reunidas no PDF nesta mesma sequência —
-            uma imagem por página.
-          </p>
-          {/* O e-mail já saiu ao concluir; dizer isso aqui evita a família
-              achar que precisa baixar para não perder o guia. */}
-          {completion.emailed_to ? (
-            <p className="mx-auto flex max-w-2xl items-center justify-center gap-2 rounded-full bg-secondary/10 px-5 py-2 text-sm font-bold text-foreground">
-              <Mail className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
-              Enviamos o link do guia para {completion.emailed_to}. Ele chega em alguns minutos.
-            </p>
-          ) : (
-            <p className="mx-auto max-w-2xl text-sm font-medium text-muted-foreground">
-              Baixe o PDF abaixo. O guia também continua salvo na sua conta.
-            </p>
-          )}
-        </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {session.pages.map((page) => (
-            <figure key={page.id} className="rounded-3xl border bg-card p-3 shadow-sm">
-              <img
-                src={pageAssetUrl(page)}
-                alt={page.title}
-                className="aspect-[2/3] w-full rounded-2xl bg-muted object-contain"
-              />
-              <figcaption className="px-2 py-3 font-bold text-foreground">{page.title}</figcaption>
-            </figure>
-          ))}
-        </div>
-        <div className="mx-auto max-w-xl rounded-3xl border-2 border-secondary/30 bg-card p-6 shadow-sm">
-          {pdfExport && (
-            <div className="mb-3 space-y-1" role="status">
-              <p className="font-bold text-secondary">
-                PDF pronto com {pdfExport.page_count}{' '}
-                {pdfExport.page_count === 1 ? 'página' : 'páginas'}.
-              </p>
-              {/* Só prometemos o e-mail quando ele saiu de verdade: o backend
-                  devolve o endereço apenas depois do envio confirmado. */}
-              {pdfExport.emailed_to ? (
-                <p className="text-sm font-medium text-muted-foreground">
-                  Enviamos o link do guia para <strong>{pdfExport.emailed_to}</strong>. Ele chega
-                  em alguns minutos — confira também a caixa de spam.
-                </p>
-              ) : (
-                <p className="text-sm font-medium text-muted-foreground">
-                  Baixe o PDF por aqui. O guia também fica salvo na sua conta.
-                </p>
-              )}
-            </div>
-          )}
-          {actionError && (
-            <p className="mb-3 font-bold text-destructive" role="alert">
-              {actionError}
-            </p>
-          )}
-          <Button
-            type="button"
-            onClick={handlePdfExport}
-            disabled={busyAction === 'pdf'}
-            className="w-full rounded-full py-6 text-base font-bold"
-          >
-            {busyAction === 'pdf' ? (
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-5 w-5" />
-            )}
-            {busyAction === 'pdf'
-              ? 'Gerando PDF...'
-              : pdfExport
-                ? 'Baixar PDF novamente'
-                : 'Gerar PDF e baixar'}
-          </Button>
-        </div>
-      </motion.div>
-    );
-  }
+  const jobActive = job && ['queued', 'running'].includes(job.status);
+  const jobSucceeded = job?.status === 'succeeded';
+  const jobFailed = job && ['failed', 'cancelled'].includes(job.status);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mx-auto grid w-full max-w-6xl gap-6 py-10 lg:grid-cols-[280px_minmax(0,1fr)]"
-    >
-      {/* No celular a área de trabalho vem primeiro: a lista de páginas é
-          navegação e empurrava o conteúdo quase duas telas para baixo. */}
-      <aside className="order-2 h-fit rounded-[2rem] border-2 border-border/70 bg-card p-5 shadow-sm lg:sticky lg:top-6 lg:order-1">
-        <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
-          Páginas do guia
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <div className="mb-8 text-center">
+        <p className="text-sm font-black uppercase tracking-[0.18em] text-primary">Última etapa</p>
+        <h1 className="mt-2 font-serif text-4xl font-bold text-foreground sm:text-5xl">
+          Aprove a capa do seu guia
+        </h1>
+        <p className="mx-auto mt-3 max-w-2xl font-medium text-muted-foreground">
+          Esta é a única página que você precisa revisar. Depois da aprovação, criamos as outras
+          {` ${generatedPageCount} páginas`} e enviamos o link do PDF por e-mail.
         </p>
-        <GuideActivityPanel
-          session={session}
-          busyAction={layoutBusyAction}
-          errorMessage={layoutError}
-          onAdd={handleAddActivity}
-          onMove={handleMoveActivity}
-          onRemove={handleRemoveActivity}
-        />
-        <ol className="space-y-3">
-          {session.pages.map((page) => {
-            const isSelected = page.id === activePage?.id;
-            const isRecommended = page.id === session.active_page_id;
-            const pageBusyAction = pageBusyActions[page.id];
-            return (
-              <li key={page.id}>
-                <button
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+        <section className="overflow-hidden rounded-[2rem] border-2 border-primary/15 bg-card shadow-sm">
+          <div className="flex min-h-[560px] items-center justify-center bg-muted/35 p-4 sm:p-8">
+            {coverUrl ? (
+              <img src={coverUrl} alt="Preview da capa do guia" className="max-h-[720px] w-auto rounded-xl object-contain shadow-xl" />
+            ) : coverBusy === 'generate' ? (
+              <div className="max-w-sm text-center" role="status" aria-live="polite">
+                <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" aria-hidden="true" />
+                <p className="mt-5 text-xl font-bold text-foreground">Criando o preview da capa…</p>
+                <p className="mt-2 text-sm text-muted-foreground">A ilustração, o nome da família e a data são produzidos juntos.</p>
+              </div>
+            ) : (
+              <div className="max-w-sm text-center text-muted-foreground">
+                <ImageIcon className="mx-auto h-16 w-16" aria-hidden="true" />
+                <p className="mt-4 text-lg font-bold text-foreground">Sua capa aparecerá aqui</p>
+                <p className="mt-2 text-sm">Gere o primeiro preview para conferir antes do guia completo.</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <aside className="space-y-5">
+          {!cover?.approved_at && (
+            <div className="rounded-[2rem] border-2 border-border bg-card p-6 shadow-sm">
+              <h2 className="font-serif text-2xl font-bold text-foreground">{selectedAttempt ? 'Quer mudar alguma coisa?' : 'Gerar a capa'}</h2>
+              <p className="mt-2 text-sm font-medium text-muted-foreground">
+                {selectedAttempt
+                  ? 'Descreva o que deve mudar, inclusive o estilo. Se estiver boa, basta aprovar.'
+                  : 'O primeiro preview usa a foto ou a descrição da família e os dados da viagem.'}
+              </p>
+              {selectedAttempt && (
+                <Textarea
+                  value={revisionInstruction}
+                  onChange={(event) => setRevisionInstruction(event.target.value.slice(0, MAX_REVISION_LENGTH))}
+                  placeholder="Ex.: use um estilo de livro infantil, deixe o fundo mais claro e mantenha as mesmas pessoas."
+                  className="mt-4 min-h-28 resize-y rounded-2xl"
+                  disabled={Boolean(coverBusy)}
+                />
+              )}
+              {retryNotice && <p className="mt-3 text-sm font-bold text-amber-700">{retryNotice}</p>}
+              {coverError && <p className="mt-3 text-sm font-bold text-destructive" role="alert">{coverError}</p>}
+              <div className="mt-5 grid gap-3">
+                <Button
                   type="button"
-                  onClick={() => setSelectedPageId(page.id)}
-                  aria-current={isSelected ? 'page' : undefined}
-                  className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
-                    isSelected
-                      ? 'border-primary bg-primary/5 shadow-sm'
-                      : 'border-border/60 hover:border-primary/40 hover:bg-muted/40'
-                  }`}
+                  onClick={handleGenerateCover}
+                  disabled={Boolean(coverBusy) || (selectedAttempt && !revisionInstruction.trim())}
+                  className="rounded-full py-6 font-bold"
                 >
-                  <div className="flex items-start gap-3">
-                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                      page.status === 'approved' ? 'bg-secondary text-white' : 'bg-muted text-foreground'
-                    }`}>
-                      {page.status === 'approved' ? (
-                        <Check className="h-4 w-4" />
-                      ) : pageBusyAction === 'generate' || page.status === 'generating' ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      ) : (
-                        page.position
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-foreground">{page.title}</p>
-                      <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-primary">
-                        {page.kind === 'landmark_activity' && page.metadata?.activity_label
-                          ? page.metadata.activity_label
-                          : PAGE_KIND_LABELS[page.kind]}
-                      </p>
-                      <p className="mt-1 text-xs font-medium text-muted-foreground">
-                        {pageBusyAction === 'generate'
-                          ? STATUS_LABELS.generating
-                          : STATUS_LABELS[page.status]}
-                      </p>
-                      {isRecommended && page.status !== 'approved' && (
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-secondary">
-                          Próxima pendente
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </aside>
-
-      <section className="order-1 space-y-6 lg:order-2">
-        <div className="space-y-2 text-center sm:space-y-3 lg:text-left">
-          <h2 className="text-2xl font-serif font-bold text-foreground sm:text-3xl md:text-4xl">
-            O livro da {session.title || 'sua família'}, página por página
-          </h2>
-          {/* No celular o texto de apoio empurraria a página gerada para fora
-              da primeira tela; o essencial já está nos botões de ação. */}
-          <p className="hidden text-lg font-medium text-muted-foreground sm:block">
-            Gere cada página, veja o resultado e aprove quando gostar. Dá para pedir ajustes
-            ou gerar outra versão quantas vezes precisar.
-          </p>
-        </div>
-
-        {session.is_complete ? (
-          <section className="rounded-[2rem] border-2 border-secondary/40 bg-card p-8 text-center shadow-sm">
-            <CircleCheck className="mx-auto mb-4 h-12 w-12 text-secondary" />
-            <h3 className="text-2xl font-serif font-bold text-foreground">Todas as páginas estão aprovadas</h3>
-            <p className="mx-auto mt-2 max-w-xl text-muted-foreground">
-              Continue para revisar a sequência final e gerar o PDF para download.
-            </p>
-            {actionError && <p className="mt-4 font-bold text-destructive">{actionError}</p>}
-            <Button
-              type="button"
-              onClick={handleComplete}
-              disabled={busyAction === 'complete'}
-              className="mt-6 rounded-full px-10 py-6 text-base font-bold"
-            >
-              {busyAction === 'complete' ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
-              Ver páginas aprovadas
-            </Button>
-          </section>
-        ) : activePage ? (
-          <section className="rounded-[2rem] border-2 border-border/70 bg-card p-4 shadow-sm sm:p-6">
-            <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-                  Página {activePage.position} de {session.pages.length}
-                </p>
-                <h3 className="mt-1 text-2xl font-serif font-bold text-foreground">{activePage.title}</h3>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold">
-                  <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
-                    {activePage.kind === 'landmark_activity' && activePage.metadata?.activity_label
-                      ? activePage.metadata.activity_label
-                      : PAGE_KIND_LABELS[activePage.kind]}
-                  </span>
-                  {activePage.kind === 'landmark_activity' && activePage.metadata?.landmark_name && (
-                    <span className="rounded-full bg-muted px-3 py-1 text-muted-foreground">
-                      Ligada a {activePage.metadata.landmark_name}
-                    </span>
+                  {coverBusy === 'generate' ? (
+                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Gerando preview…</>
+                  ) : (
+                    <><RefreshCcw className="mr-2 h-5 w-5" /> {selectedAttempt ? 'Gerar nova versão' : 'Gerar preview da capa'}</>
                   )}
-                  {activePage.kind === 'destination_intro' && activePage.metadata?.country && (
-                    <span className="rounded-full bg-muted px-3 py-1 text-muted-foreground">
-                      País: {activePage.metadata.country}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <span className="rounded-full bg-muted px-4 py-2 text-xs font-bold text-muted-foreground">
-                {activePage.attempts_left} versões disponíveis
-              </span>
-            </div>
-
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="overflow-hidden rounded-3xl border border-border/70 bg-muted/50">
-                {selectedAttempt && selectedImageUrl ? (
-                  <img
-                    src={selectedImageUrl}
-                    alt={`Versão escolhida de ${activePage.title}`}
-                    className="mx-auto aspect-[2/3] max-h-[72vh] w-full bg-white object-contain"
-                  />
-                ) : (
-                  // Mesma proporção da página final: o espaço já fica reservado
-                  // e a imagem entra sem empurrar o resto do layout.
-                  <div className="mx-auto flex aspect-[2/3] max-h-[72vh] w-full flex-col items-center justify-center gap-4 px-6 text-center text-muted-foreground">
-                    {activePageBusyAction === 'generate' || activePage.status === 'generating' ? (
-                      <GeneratingPagePlaceholder />
+                </Button>
+                {selectedAttempt && (
+                  <Button type="button" variant="outline" onClick={handleApproveCover} disabled={Boolean(coverBusy)} className="rounded-full border-2 py-6 font-bold">
+                    {coverBusy === 'approve' ? (
+                      <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Aprovando…</>
                     ) : (
-                      <>
-                        <ImageIcon className="h-12 w-12" />
-                        <p className="font-bold text-foreground">Nenhuma imagem gerada ainda</p>
-                        <p className="max-w-sm text-sm">Clique em “Gerar página” quando estiver pronto.</p>
-                      </>
+                      <><Check className="mr-2 h-5 w-5" /> Aprovar esta capa</>
                     )}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-5 text-left">
-                <div className="rounded-2xl bg-muted/60 p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                    Confira na imagem
-                  </p>
-                  <ul className="mt-3 space-y-2">
-                    {activePage.required_copy.map((copy) => (
-                      <li key={copy} className="flex gap-2 text-sm font-medium text-foreground">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
-                        <span>{copy}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {activePage.attempts.length > 0 && (
-                  <div>
-                    <p className="mb-3 text-sm font-bold text-foreground">Versões geradas</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {activePage.attempts.map((attempt, index) => {
-                        const selected = attempt.id === activePage.selected_attempt_id;
-                        return (
-                          <button
-                            key={attempt.id}
-                            type="button"
-                            disabled={
-                              Boolean(activePageBusyAction)
-                              || activePage.status === 'generating'
-                              || Boolean(activePage.approved_at)
-                            }
-                            onClick={() => handleSelect(attempt.id)}
-                            className={`relative overflow-hidden rounded-2xl border-4 ${
-                              selected ? 'border-primary' : 'border-transparent hover:border-primary/40'
-                            }`}
-                          >
-                            {assetUrls[attempt.asset_url] ? (
-                              <img
-                                src={assetUrls[attempt.asset_url]}
-                                alt={`Versão ${index + 1}`}
-                                className="aspect-[2/3] w-full bg-white object-cover"
-                              />
-                            ) : (
-                              <span className="flex aspect-[2/3] items-center justify-center bg-muted text-muted-foreground">
-                                <Loader2 className="h-5 w-5 animate-spin" aria-label="Carregando imagem" />
-                              </span>
-                            )}
-                            <span className="absolute bottom-1 left-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold text-white">
-                              Versão {index + 1}
-                            </span>
-                            {activePage.kind === 'landmark' && (
-                              <span className="absolute bottom-1 right-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold text-white">
-                                {attempt.include_family ? 'Com família' : 'Sem família'}
-                              </span>
-                            )}
-                            {selected && (
-                              <span className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white">
-                                <Check className="h-4 w-4" />
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {selectedAttempt && !activePage.approved_at && (
-                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                    <label
-                      htmlFor={`revision-${activePage.id}`}
-                      className="text-sm font-bold text-foreground"
-                    >
-                      O que você quer mudar nesta versão?
-                    </label>
-                    <Textarea
-                      id={`revision-${activePage.id}`}
-                      value={revisionInstruction}
-                      onChange={(event) => setRevisionInstructions((current) => ({
-                        ...current,
-                        [activePage.id]: event.target.value,
-                      }))}
-                      maxLength={MAX_REVISION_INSTRUCTION_LENGTH}
-                      disabled={
-                        Boolean(activePageBusyAction) || activePage.status === 'generating'
-                      }
-                      placeholder="Ex.: mude para um estilo 3D, use tons azuis e deixe o título menor."
-                      className="mt-2 min-h-28 resize-y bg-background"
-                    />
-                    <div className="mt-2 flex items-start justify-between gap-3 text-xs text-muted-foreground">
-                      <p>
-                        Se deixar vazio, criaremos uma alternativa visivelmente diferente.
-                      </p>
-                      <span className="shrink-0" aria-live="polite">
-                        {revisionInstruction.length}/{MAX_REVISION_INSTRUCTION_LENGTH}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {activePage.kind === 'landmark' && !activePage.approved_at && (
-                  <div className="rounded-2xl border border-secondary/25 bg-secondary/5 p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <label
-                          htmlFor={`include-family-${activePage.id}`}
-                          className="text-sm font-bold text-foreground"
-                        >
-                          Incluir família
-                        </label>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Desativado por padrão. Ative para usar a foto e a capa aprovada como referência.
-                        </p>
-                      </div>
-                      <Switch
-                        id={`include-family-${activePage.id}`}
-                        checked={includeFamily}
-                        onCheckedChange={(checked) => setIncludeFamilyByPage((current) => ({
-                          ...current,
-                          [activePage.id]: checked,
-                        }))}
-                        disabled={
-                          Boolean(activePageBusyAction) || activePage.status === 'generating'
-                        }
-                        aria-label="Incluir família"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {activePageRetryNotice && (
-                  <div
-                    className="flex gap-3 rounded-2xl bg-amber-500/10 p-4 text-sm font-bold text-amber-800 dark:text-amber-200"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
-                    <p>{activePageRetryNotice}</p>
-                  </div>
-                )}
-
-                {(activePageError || activePage.error || selectedAssetError) && (
-                  <div className="flex gap-3 rounded-2xl bg-destructive/10 p-4 text-sm font-bold text-destructive">
-                    <AlertCircle className="h-5 w-5 shrink-0" />
-                    <p>{activePageError || activePage.error || selectedAssetError}</p>
-                  </div>
-                )}
-
-                {activePage.approved_at ? (
-                  <div className="rounded-2xl bg-secondary/10 p-4 text-sm font-bold text-secondary">
-                    <CircleCheck className="mr-2 inline h-5 w-5" />
-                    Página aprovada. Você pode abrir qualquer outra página na lista.
-                  </div>
-                ) : (
-                  // Ações sempre alcançáveis: a página gerada é alta e, sem
-                  // isto, aprovar exigia rolar duas telas a cada página.
-                  <div className="sticky bottom-2 z-20 space-y-3 rounded-3xl border-2 border-border/70 bg-card/95 p-3 shadow-xl backdrop-blur xl:static xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none xl:backdrop-blur-none">
-                    <Button
-                      type="button"
-                      variant={selectedAttempt ? 'outline' : 'default'}
-                      disabled={
-                        Boolean(activePageBusyAction)
-                        || activePage.status === 'generating'
-                        || activePage.attempts_left <= 0
-                      }
-                      onClick={handleGenerate}
-                      className="w-full rounded-full py-6 font-bold"
-                    >
-                      {activePageBusyAction === 'generate' ? (
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      ) : selectedAttempt ? (
-                        <RefreshCcw className="mr-2 h-5 w-5" />
-                      ) : (
-                        <Sparkles className="mr-2 h-5 w-5" />
-                      )}
-                      {activePageBusyAction === 'generate'
-                        ? activePageRetryNotice
-                          ? 'Aguardando nova tentativa...'
-                          : 'Gerando esta página...'
-                        : selectedAttempt && revisionInstruction.trim()
-                          ? 'Gerar versão com ajustes'
-                          : selectedAttempt
-                            ? 'Gerar outra versão'
-                            : 'Gerar página'}
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={
-                        !selectedAttempt
-                        || !selectedImageUrl
-                        || Boolean(activePageBusyAction)
-                        || activePage.status === 'generating'
-                      }
-                      onClick={handleApprove}
-                      className="w-full rounded-full bg-secondary py-6 font-bold text-white hover:bg-secondary/90"
-                    >
-                      {activePageBusyAction === 'approve' ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Check className="mr-2 h-5 w-5" />}
-                      Aprovar página
-                    </Button>
-                    {(activePageBusyAction === 'generate' || activePage.status === 'generating') && (
-                      <p className="text-center text-xs font-medium text-muted-foreground" role="status">
-                        Você pode abrir outra página e iniciar uma nova geração enquanto aguarda.
-                      </p>
-                    )}
-                  </div>
+                  </Button>
                 )}
               </div>
             </div>
-          </section>
-        ) : null}
-      </section>
-    </motion.div>
+          )}
+
+          {cover?.approved_at && !jobSucceeded && (
+            <div className="rounded-[2rem] border-2 border-secondary/25 bg-secondary/5 p-6 shadow-sm">
+              <CircleCheck className="h-10 w-10 text-secondary" aria-hidden="true" />
+              <h2 className="mt-4 font-serif text-2xl font-bold text-foreground">Capa aprovada</h2>
+              <p className="mt-2 text-sm font-medium text-muted-foreground">
+                Com um clique, criaremos as páginas restantes na ordem certa, montaremos o PDF e enviaremos o link para o e-mail da sua conta.
+              </p>
+              {jobActive ? (
+                <div className="mt-5 rounded-2xl bg-card p-4" role="status" aria-live="polite">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
+                    <div>
+                      <p className="font-bold text-foreground">{jobStageLabel(job.stage)}</p>
+                      <p className="text-xs text-muted-foreground">Você pode fechar esta página com segurança.</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${job.progress || 0}%` }} />
+                  </div>
+                </div>
+              ) : (
+                <Button type="button" onClick={handleQueueGuide} disabled={jobBusy} className="mt-5 w-full rounded-full py-7 text-base font-bold">
+                  {jobBusy ? (
+                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Iniciando…</>
+                  ) : (
+                    <><Sparkles className="mr-2 h-5 w-5" /> {jobFailed ? 'Tentar criar novamente' : 'Criar guia completo'}</>
+                  )}
+                </Button>
+              )}
+              <div className="mt-4 flex items-start gap-3 rounded-2xl border border-secondary/20 bg-card p-4">
+                <Mail className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
+                <p className="text-sm font-medium text-muted-foreground">Não é preciso aguardar no site. O processamento continua mesmo que você saia.</p>
+              </div>
+              {jobFailed && <p className="mt-4 text-sm font-bold text-destructive" role="alert">{job.error?.message || 'A criação foi interrompida. Você pode tentar novamente.'}</p>}
+              {jobError && <p className="mt-4 text-sm font-bold text-destructive" role="alert">{jobError}</p>}
+            </div>
+          )}
+
+          {jobSucceeded && (
+            <div className="rounded-[2rem] border-2 border-emerald-300 bg-emerald-50 p-6 shadow-sm">
+              <CircleCheck className="h-11 w-11 text-emerald-700" aria-hidden="true" />
+              <h2 className="mt-4 font-serif text-2xl font-bold text-emerald-950">Guia pronto e enviado</h2>
+              <p className="mt-2 text-sm font-medium text-emerald-900">Enviamos por e-mail o link do PDF com {job.result?.page_count || session.pages.length} páginas.</p>
+              <Button type="button" onClick={handleDownload} className="mt-5 w-full rounded-full py-6 font-bold">
+                <Download className="mr-2 h-5 w-5" /> Baixar PDF agora
+              </Button>
+              {jobError && <p className="mt-3 text-sm font-bold text-destructive" role="alert">{jobError}</p>}
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
   );
 };
 
