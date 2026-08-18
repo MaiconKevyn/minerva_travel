@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   ArrowRight,
@@ -109,13 +109,55 @@ const BookPage = ({ pageIndex, side, canTurn, onTurn, priority = false }) => {
   );
 };
 
-const BookViewport = ({ activePage, direction, isMobile, onNext, onPrevious, expanded = false }) => {
-  const indexes = useMemo(
-    () => visiblePageIndexes(activePage, isMobile),
-    [activePage, isMobile],
-  );
+const BookViewport = ({
+  activePage,
+  turn,
+  isMobile,
+  onNext,
+  onPrevious,
+  onTurnEnd,
+  expanded = false,
+}) => {
   const touchStartX = useRef(null);
   const swiped = useRef(false);
+  // A folha continua existindo para quem pediu menos movimento — sem ela o
+  // spread ficaria meio origem, meio destino durante a troca. Ela so assenta
+  // na hora, em vez de girar.
+  const turnSeconds = useMemo(
+    () =>
+      typeof window !== 'undefined'
+        && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        ? 0
+        : 0.72,
+    [],
+  );
+
+  // Durante a virada, a metade que a folha ainda nao cobriu continua mostrando
+  // a pagina de ORIGEM, e a metade que ela acabou de liberar ja mostra o
+  // DESTINO. E o que faz a folha parecer descolar de uma pilha em vez de
+  // trocar o livro inteiro.
+  const { baseIndexes, leaf } = useMemo(() => {
+    if (!turn) {
+      return { baseIndexes: visiblePageIndexes(activePage, isMobile), leaf: null };
+    }
+    const from = visiblePageIndexes(turn.from, isMobile);
+    const to = visiblePageIndexes(turn.to, isMobile);
+    if (isMobile) {
+      return {
+        baseIndexes: to,
+        leaf: { side: turn.direction > 0 ? 'right' : 'left', front: from[0], back: to[0] },
+      };
+    }
+    return turn.direction > 0
+      ? {
+          baseIndexes: [from[0], to[1]],
+          leaf: { side: 'right', front: from[1], back: to[0] },
+        }
+      : {
+          baseIndexes: [to[0], from[1]],
+          leaf: { side: 'left', front: from[0], back: to[1] },
+        };
+  }, [activePage, isMobile, turn]);
 
   const handleTouchStart = (event) => {
     touchStartX.current = event.changedTouches[0]?.clientX ?? null;
@@ -147,48 +189,62 @@ const BookViewport = ({ activePage, direction, isMobile, onNext, onPrevious, exp
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <AnimatePresence initial={false} mode="wait" custom={direction}>
-        <motion.div
-          key={`${isMobile ? 'page' : 'spread'}-${activePage}`}
-          custom={direction}
-          variants={{
-            enter: (turnDirection) => ({
-              opacity: 0,
-              rotateY: turnDirection > 0 ? 12 : -12,
-              x: turnDirection > 0 ? 28 : -28,
-            }),
-            center: { opacity: 1, rotateY: 0, x: 0 },
-            exit: (turnDirection) => ({
-              opacity: 0,
-              rotateY: turnDirection > 0 ? -12 : 12,
-              x: turnDirection > 0 ? -22 : 22,
-            }),
-          }}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-          className={isMobile ? 'sample-guide-single' : 'sample-guide-spread'}
-        >
-          {indexes.map((pageIndex, position) => {
+      <div className={isMobile ? 'sample-guide-book sample-guide-book--single' : 'sample-guide-book'}>
+        <div className={isMobile ? 'sample-guide-single' : 'sample-guide-spread'}>
+          {baseIndexes.map((pageIndex, position) => {
             const side = isMobile ? 'right' : position === 0 ? 'left' : 'right';
-            const canTurn = side === 'left'
-              ? activePage > 0
-              : pageIndex !== null && pageIndex < LAST_PAGE_INDEX;
-            const turn = side === 'left' ? onPrevious : onNext;
+            const canTurn = turn
+              ? false
+              : side === 'left'
+                ? activePage > 0
+                : pageIndex !== null && pageIndex < LAST_PAGE_INDEX;
+            const goTo = side === 'left' ? onPrevious : onNext;
             return (
               <BookPage
                 key={`${side}-${pageIndex ?? 'blank'}`}
                 pageIndex={pageIndex}
                 side={side}
                 canTurn={canTurn}
-                onTurn={() => handlePageTurn(turn)}
+                onTurn={() => handlePageTurn(goTo)}
                 priority={pageIndex === 0}
               />
             );
           })}
-        </motion.div>
-      </AnimatePresence>
+        </div>
+
+        {leaf ? (
+          <motion.div
+            className={`sample-guide-leaf sample-guide-leaf--${leaf.side}`}
+            initial={{ rotateY: 0 }}
+            animate={{ rotateY: leaf.side === 'right' ? -180 : 180 }}
+            // Papel tem peso: sai devagar, ganha velocidade e assenta sem
+            // repique. Duracao alta o bastante para o olho ler o giro.
+            transition={{ duration: turnSeconds, ease: [0.36, 0, 0.16, 1] }}
+            onAnimationComplete={onTurnEnd}
+          >
+            <div className="sample-guide-leaf-face sample-guide-leaf-face--front">
+              <BookPage pageIndex={leaf.front} side={leaf.side} canTurn={false} onTurn={() => {}} />
+            </div>
+            <div className="sample-guide-leaf-face sample-guide-leaf-face--back">
+              <BookPage
+                pageIndex={leaf.back}
+                side={leaf.side === 'right' ? 'left' : 'right'}
+                canTurn={false}
+                onTurn={() => {}}
+              />
+            </div>
+            {/* A sombra some nas pontas e enche no meio do giro: e ela que da
+                a impressao de volume, porque a folha em si e plana. */}
+            <motion.div
+              className="sample-guide-leaf-shade"
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.38, 0] }}
+              transition={{ duration: turnSeconds, times: [0, 0.5, 1], ease: 'easeInOut' }}
+            />
+          </motion.div>
+        ) : null}
+      </div>
     </div>
   );
 };
@@ -196,7 +252,9 @@ const BookViewport = ({ activePage, direction, isMobile, onNext, onPrevious, exp
 const SampleGuideReader = () => {
   const isMobile = useIsMobile();
   const [activePage, setActivePage] = useState(0);
-  const [direction, setDirection] = useState(1);
+  // A pagina so muda quando a folha termina de girar. Trocar antes era o que
+  // fazia o livro piscar no meio da virada.
+  const [turn, setTurn] = useState(null);
   const visibleIndexes = useMemo(
     () => visiblePageIndexes(activePage, isMobile),
     [activePage, isMobile],
@@ -205,9 +263,18 @@ const SampleGuideReader = () => {
   const canGoNext = lastVisiblePage < LAST_PAGE_INDEX;
 
   const goToPage = (pageIndex) => {
-    const nextPage = Math.min(LAST_PAGE_INDEX, Math.max(0, pageIndex));
-    setDirection(nextPage >= activePage ? 1 : -1);
-    setActivePage(isMobile ? nextPage : spreadStartForPage(nextPage));
+    if (turn) return;
+    const bounded = Math.min(LAST_PAGE_INDEX, Math.max(0, pageIndex));
+    const nextPage = isMobile ? bounded : spreadStartForPage(bounded);
+    if (nextPage === activePage) return;
+    setTurn({ from: activePage, to: nextPage, direction: nextPage > activePage ? 1 : -1 });
+  };
+
+  const finishTurn = () => {
+    setTurn((current) => {
+      if (current) setActivePage(current.to);
+      return null;
+    });
   };
 
   const goNext = () => {
@@ -353,10 +420,11 @@ const SampleGuideReader = () => {
                 </DialogHeader>
                 <BookViewport
                   activePage={activePage}
-                  direction={direction}
+                  turn={turn}
                   isMobile={isMobile}
                   onNext={goNext}
                   onPrevious={goPrevious}
+                  onTurnEnd={finishTurn}
                   expanded
                 />
                 {controls}
@@ -366,10 +434,11 @@ const SampleGuideReader = () => {
 
           <BookViewport
             activePage={activePage}
-            direction={direction}
+            turn={turn}
             isMobile={isMobile}
             onNext={goNext}
             onPrevious={goPrevious}
+            onTurnEnd={finishTurn}
           />
 
           <div className="mt-6">{controls}</div>
