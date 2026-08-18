@@ -69,6 +69,22 @@ const pageRangeLabel = (indexes) => {
   return `Páginas ${pageNumbers[0]} e ${pageNumbers[1]} de 19`;
 };
 
+// O Tailwind so emite as regras de `@layer components` cujas classes ele
+// encontra ESCRITAS POR INTEIRO no codigo. Montar o nome com template
+// (`--${side}`) fazia o scanner nao achar nada, e as regras sumiam do CSS
+// compilado: a folha ficava sem `left` e sem `transform-origin`, girava pelo
+// proprio centro e por cima da metade errada do livro. Por isso os nomes
+// completos moram aqui.
+const PAGE_SIDE_CLASS = {
+  left: 'sample-guide-page--left',
+  right: 'sample-guide-page--right',
+};
+
+const LEAF_SIDE_CLASS = {
+  left: 'sample-guide-leaf--left',
+  right: 'sample-guide-leaf--right',
+};
+
 const BookPage = ({ pageIndex, side, canTurn, onTurn, priority = false }) => {
   if (pageIndex === null) {
     return (
@@ -94,14 +110,14 @@ const BookPage = ({ pageIndex, side, canTurn, onTurn, priority = false }) => {
   );
 
   if (!canTurn) {
-    return <div className={`sample-guide-page sample-guide-page--${side}`}>{image}</div>;
+    return <div className={`sample-guide-page ${PAGE_SIDE_CLASS[side]}`}>{image}</div>;
   }
 
   return (
     <button
       type="button"
       onClick={onTurn}
-      className={`sample-guide-page sample-guide-page--${side} sample-guide-page--turnable`}
+      className={`sample-guide-page ${PAGE_SIDE_CLASS[side]} sample-guide-page--turnable`}
       aria-label={side === 'left' ? 'Folhear para as páginas anteriores' : 'Folhear para as próximas páginas'}
     >
       {image}
@@ -214,9 +230,13 @@ const BookViewport = ({
 
         {leaf ? (
           <motion.div
-            className={`sample-guide-leaf sample-guide-leaf--${leaf.side}`}
-            initial={{ rotateY: 0 }}
-            animate={{ rotateY: leaf.side === 'right' ? -180 : 180 }}
+            className={`sample-guide-leaf ${LEAF_SIDE_CLASS[leaf.side]}`}
+            // O `z` nao e enfeite. Num contexto preserve-3d o z-index NAO
+            // ordena: quem ordena e a posicao em Z. Folha e base estavam ambas
+            // em Z=0, coplanares, e o navegador pintava metade da folha atras
+            // da pagina de baixo — era a metade que "sumia" ao girar.
+            initial={{ rotateY: 0, z: 2 }}
+            animate={{ rotateY: leaf.side === 'right' ? -180 : 180, z: 2 }}
             // Papel tem peso: sai devagar, ganha velocidade e assenta sem
             // repique. Duracao alta o bastante para o olho ler o giro.
             transition={{ duration: turnSeconds, ease: [0.36, 0, 0.16, 1] }}

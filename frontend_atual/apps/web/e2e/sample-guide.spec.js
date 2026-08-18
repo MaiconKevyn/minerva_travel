@@ -86,6 +86,26 @@ test('a virada gira uma folha só, sem o livro sumir nem pular', async ({ page }
   expect(Math.abs(during.deslocamento - before.deslocamento)).toBeLessThan(2);
   expect(Math.abs(during.altura - before.altura)).toBeLessThan(2);
 
+  // A folha tem de nascer na lombada e girar em torno dela. Montar o nome da
+  // classe com template fazia o Tailwind purgar `--right`/`--left` do CSS: a
+  // folha ficava sem `left` e sem `transform-origin`, girava pelo proprio
+  // centro e invadia a pagina da esquerda. Purge nao aparece em revisao de
+  // codigo, so aqui.
+  const geometria = await leaf.evaluate((el) => {
+    const livro = el.closest('.sample-guide-book').getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    return {
+      esquerdaRelativa: el.getBoundingClientRect().left - livro.left,
+      lombada: livro.width / 2,
+      origemX: Number.parseFloat(cs.transformOrigin.split(' ')[0]),
+    };
+  });
+  // No spread a folha nasce na lombada; no celular, que e pagina unica, ela
+  // ocupa a largura toda e gira pela borda esquerda.
+  const inicioEsperado = testInfo.project.name.includes('mobile') ? 0 : geometria.lombada;
+  expect(Math.abs(geometria.esquerdaRelativa - inicioEsperado)).toBeLessThan(2);
+  expect(geometria.origemX).toBeLessThan(2);
+
   // Uma pagina em rotacao se projeta MAIOR que sua altura parada. Como o
   // palco tem `overflow: hidden`, sem folga vertical ela era fatiada no topo
   // e na base — medido, 32px para cada lado no auge do giro.

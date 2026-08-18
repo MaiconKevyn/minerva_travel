@@ -248,11 +248,15 @@
     overflow: hidden;
     border-radius: 1.5rem;
     /* Folga vertical para a folha girar. Uma pagina em rotacao se projeta
-       MAIOR que sua altura parada — medido, ate 32px para cada lado no auge
-       do giro. Com o padding de 1rem que havia antes, o `overflow: hidden`
-       fatiava o topo e a base da folha justamente no quadro mais visivel. */
-    padding: 3.25rem 1rem;
-    perspective: 1800px;
+       MAIOR que sua altura parada — medido, 55px para cada lado no auge do
+       giro com a perspectiva atual. Com o padding de 1rem que havia antes, o
+       `overflow: hidden` fatiava o topo e a base da folha justamente no
+       quadro mais visivel da virada. */
+    padding: 3.75rem 1rem;
+    /* 1800px exigia 112px de folga vertical: a folha, girando na
+       lombada, avanca para a camera e sua projecao cresce 33%. Com
+       3200px ela cresce 16% — segue tridimensional e cabe no palco. */
+    perspective: 3200px;
     touch-action: pan-y;
     background:
       radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.92), transparent 48%),
@@ -384,6 +388,12 @@
     backface-visibility: hidden;
   }
 
+  /* Fracao de pixel a frente do verso. Faces exatamente coplanares brigam
+     pela profundidade e o verso aparece atraves da frente. */
+  .sample-guide-leaf-face--front {
+    transform: translate3d(0, 0, 0.02px);
+  }
+
   .sample-guide-leaf-face--back {
     transform: rotateY(180deg);
   }
@@ -511,7 +521,7 @@
 @media (max-width: 767px) {
   .sample-guide-stage {
     min-height: 31rem;
-    padding: 2.5rem 0.75rem;
+    padding: 3rem 0.75rem;
   }
 
   .sample-guide-stage--expanded {
