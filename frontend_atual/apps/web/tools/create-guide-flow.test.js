@@ -270,16 +270,17 @@ test('home explains the flow and shows real product pages from our own domain', 
   const home = readProjectFile('src/pages/HomePage.jsx');
   const hero = readProjectFile('src/components/HomeHero.jsx');
   const howItWorks = readProjectFile('src/components/HowItWorks.jsx');
-  const gallery = readProjectFile('src/components/PageGallery.jsx');
+  const sampleGuide = readProjectFile('src/components/SampleGuideReader.jsx');
 
   assert.match(home, /HomeHero/);
   assert.match(home, /HowItWorks/);
-  assert.match(home, /PageGallery/);
+  assert.match(home, /SampleGuideReader/);
   assert.match(howItWorks, /Aprove a sua capa/);
   assert.match(howItWorks, /Conte a viagem/);
   assert.match(howItWorks, /Receba o livro por e-mail/);
-  assert.match(gallery, /activity-examples\/cover-sample\.webp/);
-  assert.match(gallery, /activity-examples\/route-sample\.webp/);
+  assert.match(sampleGuide, /sample-guide\/page-/);
+  assert.match(sampleGuide, /19 páginas reais/);
+  assert.match(sampleGuide, /Ir para a página/);
   // O herói mostra o livro, não uma capa solta: quem chega precisa ver que há
   // atividades dentro antes de decidir criar uma conta.
   assert.match(hero, /activity-examples\/cover-sample\.webp/);
@@ -287,7 +288,7 @@ test('home explains the flow and shows real product pages from our own domain', 
   assert.match(hero, /activity-examples\/word-search-real\.webp/);
 
   // Nenhuma imagem da vitrine pode depender de CDN de terceiros.
-  for (const source of [home, hero, gallery]) {
+  for (const source of [home, hero, sampleGuide]) {
     assert.doesNotMatch(source, /horizons-cdn|https?:\/\/[^"']+\.(png|jpe?g|webp)/);
   }
 });

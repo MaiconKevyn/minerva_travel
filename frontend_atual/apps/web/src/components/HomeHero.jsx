@@ -83,10 +83,10 @@ const HomeHero = () => (
             </Link>
           </Button>
           <a
-            href="#paginas"
+            href="#guia-exemplo"
             className="whitespace-nowrap rounded-full px-6 py-3 text-base font-bold text-foreground underline underline-offset-4 transition-colors hover:text-primary"
           >
-            Ver as páginas por dentro
+            Folhear um guia completo
           </a>
         </div>
 

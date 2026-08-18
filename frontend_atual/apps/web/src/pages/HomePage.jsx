@@ -6,9 +6,9 @@ import { ArrowRight, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import HomeHero from '@/components/HomeHero.jsx';
+import SampleGuideReader from '@/components/SampleGuideReader.jsx';
 import BookAnatomy from '@/components/BookAnatomy.jsx';
 import HowItWorks from '@/components/HowItWorks.jsx';
-import PageGallery from '@/components/PageGallery.jsx';
 import ActivityShowcase from '@/components/ActivityShowcase.jsx';
 import HomeFaq from '@/components/HomeFaq.jsx';
 
@@ -27,9 +27,9 @@ const HomePage = () => (
 
       <main id="main-content" tabIndex={-1} className="flex-1">
         <HomeHero />
+        <SampleGuideReader />
         <BookAnatomy />
         <HowItWorks />
-        <PageGallery />
         <ActivityShowcase />
         <HomeFaq />
 

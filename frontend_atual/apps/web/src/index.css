@@ -236,6 +236,214 @@
     writing-mode: vertical-rl;
     text-orientation: mixed;
   }
+
+  /* Leitor do guia demonstrativo. A dobra reage ao hover para sugerir a
+     interação, mas a página só vira com clique, teclado ou gesto. */
+  .sample-guide-stage {
+    position: relative;
+    display: flex;
+    min-height: 34rem;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    padding: 1rem;
+    perspective: 1800px;
+    touch-action: pan-y;
+    background:
+      radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.92), transparent 48%),
+      linear-gradient(145deg, rgba(201, 169, 97, 0.16), rgba(122, 145, 160, 0.11));
+  }
+
+  .dark .sample-guide-stage {
+    background:
+      radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.05), transparent 48%),
+      linear-gradient(145deg, rgba(201, 169, 97, 0.09), rgba(122, 145, 160, 0.08));
+  }
+
+  .sample-guide-stage--expanded {
+    min-height: min(72vh, 50rem);
+  }
+
+  .sample-guide-spread,
+  .sample-guide-single {
+    position: relative;
+    display: grid;
+    width: min(100%, 56rem);
+    transform-style: preserve-3d;
+    filter: drop-shadow(0 24px 24px rgba(74, 55, 30, 0.2));
+  }
+
+  .sample-guide-spread {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sample-guide-single {
+    width: min(100%, 24rem);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sample-guide-spread::after {
+    content: '';
+    position: absolute;
+    z-index: 4;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 24px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(61, 43, 24, 0.18), transparent);
+  }
+
+  .sample-guide-page {
+    position: relative;
+    display: flex;
+    aspect-ratio: 2 / 3;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid #c9a961;
+    background: #f8f1df;
+    color: #705d35;
+    box-shadow: inset 0 0 24px rgba(111, 82, 43, 0.08);
+    transition: transform 280ms ease, filter 280ms ease;
+    backface-visibility: hidden;
+  }
+
+  .sample-guide-page--left {
+    transform-origin: right center;
+    border-radius: 0.8rem 0 0 0.8rem;
+  }
+
+  .sample-guide-page--right {
+    transform-origin: left center;
+    border-radius: 0 0.8rem 0.8rem 0;
+  }
+
+  .sample-guide-single .sample-guide-page--right {
+    border-radius: 0.8rem;
+  }
+
+  .sample-guide-page--turnable {
+    cursor: pointer;
+  }
+
+  .sample-guide-page--turnable::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 3.5rem;
+    height: 3.5rem;
+    pointer-events: none;
+    opacity: 0;
+    clip-path: polygon(100% 0, 0 100%, 100% 100%);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(116, 84, 44, 0.3));
+    transition: opacity 220ms ease, transform 220ms ease;
+  }
+
+  .sample-guide-page--left.sample-guide-page--turnable::after {
+    right: auto;
+    left: 0;
+    transform: scaleX(-1);
+  }
+
+  .sample-guide-page--turnable:hover::after,
+  .sample-guide-page--turnable:focus-visible::after {
+    opacity: 1;
+  }
+
+  .sample-guide-page--right.sample-guide-page--turnable:hover {
+    transform: rotateY(-2.5deg) translateX(2px);
+  }
+
+  .sample-guide-page--left.sample-guide-page--turnable:hover {
+    transform: rotateY(2.5deg) translateX(-2px);
+  }
+
+  .sample-guide-page--turnable:focus-visible {
+    z-index: 6;
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 3px;
+  }
+
+  .sample-guide-page--blank {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 2rem;
+    text-align: center;
+    font-family: "Fraunces", serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    background:
+      radial-gradient(circle at 24% 28%, rgba(201, 169, 97, 0.24), transparent 35%),
+      #f8f1df;
+  }
+
+  .sample-guide-thumbnails {
+    display: flex;
+    gap: 0.65rem;
+    overflow-x: auto;
+    padding: 0.25rem 0.25rem 0.75rem;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .sample-guide-thumbnail {
+    position: relative;
+    width: 3.25rem;
+    flex: 0 0 3.25rem;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    border: 2px solid transparent;
+    border-radius: 0.5rem;
+    background: hsl(var(--muted));
+    opacity: 0.68;
+    transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease;
+  }
+
+  .sample-guide-thumbnail:hover,
+  .sample-guide-thumbnail:focus-visible,
+  .sample-guide-thumbnail[aria-current='page'] {
+    opacity: 1;
+    transform: translateY(-2px);
+    border-color: hsl(var(--primary));
+  }
+
+  .sample-guide-thumbnail:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  .sample-guide-thumbnail span {
+    position: absolute;
+    right: 0.2rem;
+    bottom: 0.2rem;
+    display: flex;
+    min-width: 1.15rem;
+    height: 1.15rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #3e3325;
+    font-size: 0.65rem;
+    font-weight: 800;
+  }
+}
+
+@media (max-width: 767px) {
+  .sample-guide-stage {
+    min-height: 31rem;
+    padding: 0.75rem;
+  }
+
+  .sample-guide-stage--expanded {
+    min-height: min(68vh, 42rem);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
