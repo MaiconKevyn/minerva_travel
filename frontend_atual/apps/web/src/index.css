@@ -247,7 +247,11 @@
     justify-content: center;
     overflow: hidden;
     border-radius: 1.5rem;
-    padding: 1rem;
+    /* Folga vertical para a folha girar. Uma pagina em rotacao se projeta
+       MAIOR que sua altura parada — medido, ate 32px para cada lado no auge
+       do giro. Com o padding de 1rem que havia antes, o `overflow: hidden`
+       fatiava o topo e a base da folha justamente no quadro mais visivel. */
+    padding: 3.25rem 1rem;
     perspective: 1800px;
     touch-action: pan-y;
     background:
@@ -507,7 +511,7 @@
 @media (max-width: 767px) {
   .sample-guide-stage {
     min-height: 31rem;
-    padding: 0.75rem;
+    padding: 2.5rem 0.75rem;
   }
 
   .sample-guide-stage--expanded {

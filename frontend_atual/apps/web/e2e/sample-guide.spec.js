@@ -86,6 +86,23 @@ test('a virada gira uma folha só, sem o livro sumir nem pular', async ({ page }
   expect(Math.abs(during.deslocamento - before.deslocamento)).toBeLessThan(2);
   expect(Math.abs(during.altura - before.altura)).toBeLessThan(2);
 
+  // Uma pagina em rotacao se projeta MAIOR que sua altura parada. Como o
+  // palco tem `overflow: hidden`, sem folga vertical ela era fatiada no topo
+  // e na base — medido, 32px para cada lado no auge do giro.
+  const vazamento = await leaf.evaluate((el) => {
+    const palco = el.closest('.sample-guide-stage').getBoundingClientRect();
+    let pior = -Infinity;
+    const original = el.style.transform;
+    for (let g = -5; g >= -175; g -= 10) {
+      el.style.setProperty('transform', `rotateY(${g}deg)`, 'important');
+      const f = el.getBoundingClientRect();
+      pior = Math.max(pior, palco.top - f.top, f.bottom - palco.bottom);
+    }
+    el.style.transform = original;
+    return pior;
+  });
+  expect(vazamento).toBeLessThanOrEqual(0);
+
   // Quando a folha assenta ela some e o rotulo avanca.
   await expect(leaf).toHaveCount(0, { timeout: 4000 });
   const expectedLabel = testInfo.project.name.includes('mobile')
