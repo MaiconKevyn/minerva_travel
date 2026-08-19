@@ -59,7 +59,7 @@ const HomePage = () => (
             <Button
               asChild
               size="lg"
-              className="group mt-8 rounded-full bg-primary px-8 py-6 text-base font-bold text-white shadow-[0_8px_30px_rgb(160,72,45,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary/90 sm:text-lg"
+              className="group mt-8 rounded-full bg-primary px-8 py-6 text-base font-bold text-white shadow-[0_8px_30px_hsl(var(--primary)/0.30)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary/90 sm:text-lg"
             >
               <Link to="/create">
                 Criar o guia da minha família

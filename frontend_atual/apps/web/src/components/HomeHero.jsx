@@ -43,7 +43,9 @@ const HomeHero = () => (
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="space-y-7 text-center lg:text-left"
       >
-        <p className="inline-flex items-center rounded-full border border-border/60 bg-card px-4 py-1.5 text-sm font-bold text-secondary shadow-sm">
+        {/* Caixa alta com entreletra larga: a voz tipográfica da identidade,
+            que vem das pranchas de referência. */}
+        <p className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-muted-foreground">
           Feito sob medida para o roteiro de vocês
         </p>
 
@@ -75,7 +77,7 @@ const HomeHero = () => (
           <Button
             asChild
             size="lg"
-            className="group w-full rounded-full bg-primary px-8 py-6 text-base font-bold text-white shadow-[0_8px_30px_rgb(160,72,45,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary/90 sm:w-auto sm:text-lg"
+            className="group w-full rounded-full bg-primary px-8 py-6 text-base font-bold text-white shadow-[0_8px_30px_hsl(var(--primary)/0.30)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary/90 sm:w-auto sm:text-lg"
           >
             <Link to="/create">
               Criar o guia da minha família
