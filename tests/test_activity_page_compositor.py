@@ -15,12 +15,14 @@ from minerva_travel.activity_page_compositor import (
     FAMILY_COLORING_TITLE,
     HOMECOMING_REQUIRED_COPY,
     HOMECOMING_WRITING_BLANK_REGIONS,
+    INK,
     INVESTIGATOR_INSTRUCTION,
     INVESTIGATOR_TITLE,
     LANDMARK_VISITED_CHECKBOX,
     LANDMARK_VISITED_LABEL,
     MEMORY_BLANK_REGION,
     PAINTING_TITLE,
+    PAPER,
     SPOT_PANEL_GAP,
     SPOT_PANEL_LEFT,
     SPOT_PANEL_SIZE,
@@ -49,6 +51,11 @@ from minerva_travel.investigator_activity import (
 )
 from minerva_travel.spot_the_difference import MAX_DIFFERENCES, DifferenceRegion
 from minerva_travel.word_search import build_word_search_grid
+
+# Do token, nao de um literal: trocar a identidade nao pode exigir reescrever
+# coordenada de pixel em teste.
+PAPEL_RGB = tuple(int(PAPER[i : i + 2], 16) for i in (1, 3, 5))
+TINTA_RGB = tuple(int(INK[i : i + 2], 16) for i in (1, 3, 5))
 
 
 def _artwork(path: Path, color: str = "#d9eaf2") -> Path:
@@ -144,11 +151,11 @@ def test_landmark_compositor_adds_one_empty_printable_visited_checkbox(tmp_path)
     with Image.open(output) as image:
         rgb = image.convert("RGB")
         assert rgb.getpixel(((left + right) // 2, (top + bottom) // 2)) == (255, 255, 255)
-        assert rgb.getpixel((left, (top + bottom) // 2)) == (21, 52, 81)
+        assert rgb.getpixel((left, (top + bottom) // 2)) == TINTA_RGB
         label_crop = rgb.crop((438, 1418, 650, 1480))
         colors = label_crop.getcolors(maxcolors=label_crop.width * label_crop.height)
         assert colors is not None
-        assert any(color == (21, 52, 81) for _count, color in colors)
+        assert any(color == TINTA_RGB for _count, color in colors)
 
 
 def test_coloring_compositor_outputs_binary_printable_page(tmp_path):
@@ -289,7 +296,7 @@ def test_word_search_composites_only_a_solvable_seeded_grid(tmp_path):
     validate_activity_page(output)
     with Image.open(output) as image:
         # The code-owned grid panel is opaque and independent from model artwork.
-        assert image.convert("RGB").getpixel((170, 258)) == (255, 253, 248)
+        assert image.convert("RGB").getpixel((170, 258)) == PAPEL_RGB
 
 
 def test_word_search_rejects_a_word_missing_from_the_grid(tmp_path):
@@ -326,9 +333,9 @@ def test_drawing_and_memory_preserve_measurable_blank_response_areas(tmp_path):
     assert _white_fraction(drawing, DRAWING_BLANK_REGION) == 1
     assert _white_fraction(memory, MEMORY_BLANK_REGION) == 1
     with Image.open(drawing) as drawing_image:
-        assert drawing_image.convert("RGB").getpixel((80, 1320)) == (255, 253, 248)
+        assert drawing_image.convert("RGB").getpixel((80, 1320)) == PAPEL_RGB
     with Image.open(memory) as memory_image:
-        assert memory_image.convert("RGB").getpixel((65, 1265)) == (255, 253, 248)
+        assert memory_image.convert("RGB").getpixel((65, 1265)) == PAPEL_RGB
     validate_activity_page(drawing, blank_regions=[DRAWING_BLANK_REGION])
     validate_activity_page(memory, blank_regions=[MEMORY_BLANK_REGION])
 
@@ -341,10 +348,10 @@ def test_homecoming_compositor_adds_exact_closing_copy_and_blank_writing_lines(t
     with Image.open(output) as image:
         rgb = image.convert("RGB")
         assert rgb.size == (1024, 1536)
-        assert rgb.getpixel((80, 1200)) == (255, 253, 248)
-        assert rgb.getpixel((200, 1340)) == (21, 52, 81)
+        assert rgb.getpixel((80, 1200)) == PAPEL_RGB
+        assert rgb.getpixel((200, 1340)) == TINTA_RGB
         for left, top, right, bottom in HOMECOMING_WRITING_BLANK_REGIONS:
-            assert rgb.getpixel(((left + right) // 2, (top + bottom) // 2)) == (255, 253, 248)
+            assert rgb.getpixel(((left + right) // 2, (top + bottom) // 2)) == PAPEL_RGB
 
 
 def test_compositor_rejects_wrong_size_provider_artwork(tmp_path):

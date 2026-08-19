@@ -7,6 +7,8 @@ from unicodedata import normalize
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, UnidentifiedImageError
 
+from minerva_travel.visual_identity import ILLUSTRATION_STYLE
+
 
 @dataclass(frozen=True)
 class CoverValidationResult:
@@ -78,7 +80,7 @@ class ImageGenerator(Protocol):
         landmark_name: str,
         city: str,
     ) -> Path:
-        """Transform a real landmark photo into storybook watercolor art."""
+        """Redraw a real landmark photo in the flat crayon-textured house style."""
 
 
 class PlaceholderImageGenerator:
@@ -646,13 +648,15 @@ def cover_prompt(
             "Do not turn a group photo into a portrait of only one adult or child. "
         )
     return (
-        "Transform the reference photo into a polished children's book watercolor "
-        "illustration for a personalized family travel guide cover. Preserve the "
+        f"{ILLUSTRATION_STYLE}\n\n"
+        "Redraw the family from the reference photo in that style, for the cover of a "
+        "personalized family travel guide. Preserve the "
         "family group's recognizable composition, friendly smiles, approximate hair "
         "colors, glasses, ages, and poses, but render them as soft illustrated "
         f"characters, not a photorealistic copy. {family_count_guidance}"
-        "Use warm natural light, soft pastel colors, "
-        "and a subtle background inspired by these confirmed tourist landmarks: "
+        "Draw them as flat chunky crayon-textured shapes, never photographic. "
+        "Behind them keep the pale flat ground and a few simple motifs inspired by "
+        "these confirmed tourist landmarks: "
         f"{landmarks}. "
         "Vertical cover composition, generous clean space for title text added later. "
         f"Do not include any readable text, logos, watermark, or the title '{title}' "
@@ -665,9 +669,9 @@ def landmark_stylize_prompt(landmark_name: str, city: str) -> str:
     # real garante a arquitetura fiel; o prompt so troca o acabamento visual.
     location = f"{landmark_name} in {city}" if city else landmark_name
     return (
-        "Transform this photo into a warm children's storybook watercolor "
-        "illustration in vintage travel journal style: cream aged paper tones, "
-        "soft golden light, gentle painterly brushstrokes, charming and inviting. "
+        f"{ILLUSTRATION_STYLE}\n\n"
+        "Redraw the landmark in this photo in that style: flat chunky shapes with a dry "
+        "crayon texture, no outline stroke, on a pale flat ground. "
         f"Preserve the real architecture, proportions and recognizable details of "
         f"{location} faithfully. No text, no watermark, no border, no people added."
     )
@@ -676,10 +680,9 @@ def landmark_stylize_prompt(landmark_name: str, city: str) -> str:
 def landmark_prompt(landmark_name: str, city: str, country: str) -> str:
     return (
         f"Representative exterior view of {landmark_name} in {city}, {country}. "
-        "Polished children's book watercolor illustration matching a premium family "
-        "travel guide cover, soft pastel colors, warm natural light, gentle paper "
-        "texture, soft illustrated edges, clean vertical-friendly editorial composition, "
-        "charming but accurate landmark exterior, calm open sky, subtle travel-book mood, "
+        f"{ILLUSTRATION_STYLE} "
+        "Clean vertical-friendly composition, the landmark exterior simplified into flat "
+        "shapes but still accurate and recognizable, calm empty sky, "
         "no readable text, no labels, no watermark, no logo, no signature."
     )
 
@@ -689,8 +692,8 @@ def trip_summary_prompt(title: str, destination_names: list[str]) -> str:
     return (
         "Create a vertical text-free children's book travel illustration for the "
         "left map panel of a printed itinerary page. It should feel like the scenic "
-        "illustration side of a premium family travel planner, with lush watercolor "
-        "and gouache detail, playful city scenery, recognizable landmark silhouettes, "
+        "illustration side of a premium family travel planner, drawn as flat crayon-textured "
+        "shapes, playful city scenery, recognizable landmark silhouettes, "
         "parks, streets, river, small boats, carousels or family-friendly details, "
         f"and warm daylight. The trip title is '{title}' and the scenery is inspired "
         f"by these confirmed places: {landmarks}. Draw only the scenery. The app will "

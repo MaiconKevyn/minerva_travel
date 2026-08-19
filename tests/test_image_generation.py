@@ -436,7 +436,8 @@ def test_landmark_stylize_prompt_demands_faithful_architecture():
 
     prompt = landmark_stylize_prompt(landmark_name="Tower Bridge", city="Londres")
 
-    assert "watercolor" in prompt
+    # A arte do ponto turistico segue a mesma identidade das paginas.
+    assert "crayon and chalk brush" in prompt
     assert "Preserve the real architecture" in prompt
     assert "Tower Bridge in Londres" in prompt
     assert "No text" in prompt

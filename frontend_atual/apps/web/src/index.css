@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,9 +6,9 @@
 
 @layer base {
   :root {
-    /* Warm Cream Background */
-    --background: 48 33% 97%;
-    --foreground: 24 15% 20%;
+    /* Papel da identidade Destinations — o mesmo tom das páginas impressas. */
+    --background: 42 56% 96%;
+    --foreground: 30 27% 13%;
 
     /* Soft white for cards, slightly tinted */
     --card: 0 0% 100%;
@@ -17,21 +17,21 @@
     --popover: 0 0% 100%;
     --popover-foreground: 24 15% 20%;
 
-    /* Warm Orange, dark enough for AA contrast with white text. */
-    --primary: 15 65% 40%;
+    /* Terracota: o acento da referência. */
+    --primary: 10 59% 45%;
     --primary-foreground: 0 0% 100%;
 
-    /* Storybook blue, dark enough for AA contrast with white text. */
-    --secondary: 202 55% 36%;
+    /* Petróleo: a cor da tipografia nas páginas. */
+    --secondary: 176 51% 25%;
     --secondary-foreground: 0 0% 100%;
 
-    /* Gentle Green */
-    --accent: 142 30% 65%;
-    --accent-foreground: 24 15% 20%;
+    /* Sálvia */
+    --accent: 100 18% 52%;
+    --accent-foreground: 30 27% 13%;
 
-    /* Soft Pink/Coral for highlights */
-    --muted: 15 30% 95%;
-    --muted-foreground: 24 12% 36%;
+    /* Creme e a sombra quente da paleta */
+    --muted: 41 42% 93%;
+    --muted-foreground: 37 16% 46%;
 
     --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
@@ -99,7 +99,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: "Fraunces", serif;
+    font-family: "Zilla Slab", Georgia, serif;
     text-wrap: balance;
     font-weight: 600;
   }
@@ -458,7 +458,7 @@
     gap: 1rem;
     padding: 2rem;
     text-align: center;
-    font-family: "Fraunces", serif;
+    font-family: "Zilla Slab", Georgia, serif;
     font-size: 1.2rem;
     font-weight: 700;
     background:

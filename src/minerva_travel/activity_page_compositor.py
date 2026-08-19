@@ -13,6 +13,7 @@ from typing import cast
 
 from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 
+from minerva_travel import visual_identity as identidade
 from minerva_travel.child_phrasebook import PHRASES_PER_PAGE, ChildPhrasebook
 from minerva_travel.crossword import Crossword
 from minerva_travel.dot_to_dot import DotToDot
@@ -32,16 +33,20 @@ from minerva_travel.spot_the_difference import DifferenceRegion
 from minerva_travel.word_search import locate_words
 
 PAGE_IMAGE_SIZE = (1024, 1536)
-INK = "#153451"
-MUTED_INK = "#42617a"
-ACCENT = "#db8b45"
-PAPER = "#fffdf8"
+# As cores vem de `visual_identity`, que e a fonte unica da identidade.
+INK = identidade.PETROLEO
+MUTED_INK = identidade.SOMBRA
+ACCENT = identidade.TERRACOTA
+PAPER = identidade.PAPEL
 # Ocre suave em vez do azul-acinzentado: as réguas e molduras passam a ser as
 # mesmas do guia impresso que serve de referência do produto.
-PANEL_OUTLINE = "#c9ad78"
+PANEL_OUTLINE = identidade.CREME
+_PAPEL_RGB = tuple(int(PAPER[i : i + 2], 16) for i in (1, 3, 5))
+# Folga so para o antisserrilhado da tipografia, nao para deixar arte passar.
+_TOLERANCIA_PAPEL = 4
 # Vermelho do gabarito: nunca aparece na página que a criança recebe, só na
 # versão resolvida que mostramos como exemplo no seletor.
-SOLUTION_INK = "#c0392b"
+SOLUTION_INK = identidade.TERRACOTA
 SOLUTION_WIDTH = 7
 # Faixa translúcida em vez de risco cheio: riscar por cima apagava as letras
 # justamente na hora de conferir se a palavra está certa.
@@ -1555,16 +1560,22 @@ def _validate_blank_region(image: Image.Image, region: tuple[int, int, int, int]
         list[tuple[int, tuple[int, int, int]]] | None,
         crop.getcolors(maxcolors=total),
     )
-    white = (
+    # "Limpo" e a cor do PAPEL desta identidade, nao branco puro. Fixar 248 em
+    # cada canal amarrava a checagem ao creme antigo (#fffdf8) e reprovava
+    # qualquer paleta mais quente — o que importa e que nada foi desenhado
+    # aqui, e nao qual e o tom do papel.
+    limpo = (
         sum(
             count
             for count, (red, green, blue) in colors
-            if red >= 248 and green >= 248 and blue >= 248
+            if red >= _PAPEL_RGB[0] - _TOLERANCIA_PAPEL
+            and green >= _PAPEL_RGB[1] - _TOLERANCIA_PAPEL
+            and blue >= _PAPEL_RGB[2] - _TOLERANCIA_PAPEL
         )
         if colors is not None
         else 0
     )
-    if not total or white / total < 0.98:
+    if not total or limpo / total < 0.98:
         raise ActivityPageCompositionError("A página não preservou espaço branco suficiente.")
 
 
@@ -1805,6 +1816,18 @@ def _wrap_text(
 
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Zilla Slab, versionada no repositorio.
+
+    Antes isto caia na DejaVu do sistema: sem relacao com a identidade e
+    diferente de maquina para maquina, o que fazia a mesma pagina sair com
+    metrica distinta em cada ambiente.
+    """
+
+    caminho = identidade.FONTE_SEMIBOLD if bold else identidade.FONTE_REGULAR
+    try:
+        return ImageFont.truetype(str(caminho), size)
+    except OSError:
+        pass
     names = ["DejaVuSans-Bold.ttf", "Arial Bold.ttf"] if bold else ["DejaVuSans.ttf", "Arial.ttf"]
     for name in names:
         try:

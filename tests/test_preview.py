@@ -10,6 +10,7 @@ from PIL import Image
 from minerva_travel.app import app
 from minerva_travel.catalog import load_catalog
 from minerva_travel.guide_builder import build_guide_context
+from minerva_travel.landmark_art_cache import STYLE_VERSION
 from minerva_travel.models import GuideRequest
 from minerva_travel.pdf import (
     PdfResourceAccessError,
@@ -160,7 +161,7 @@ def test_preview_render_never_serializes_model_path_outside_approved_roots(tmp_p
 
 def test_default_pdf_asset_roots_include_shared_stylized_art_cache(tmp_path, monkeypatch):
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
-    stylized = tmp_path / "landmark-art" / "stylized" / "v1" / "torre-eiffel-paris.png"
+    stylized = tmp_path / "landmark-art" / "stylized" / STYLE_VERSION / "torre-eiffel-paris.png"
     stylized.parent.mkdir(parents=True)
     Image.new("RGB", (60, 40), "#4f86b7").save(stylized)
 

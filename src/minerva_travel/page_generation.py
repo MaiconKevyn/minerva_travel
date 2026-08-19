@@ -83,6 +83,11 @@ from minerva_travel.spot_the_difference import (
     SpotTheDifferenceError,
     find_difference_regions,
 )
+from minerva_travel.visual_identity import (
+    COMPOSITION_RULE,
+    ILLUSTRATION_STYLE,
+    LINEART_STYLE,
+)
 from minerva_travel.word_search import build_word_search_grid
 
 PAGE_IMAGE_SIZE = (1024, 1536)
@@ -1725,38 +1730,14 @@ def get_guide_page_generator() -> GuidePageGenerator:
 # Identidade visual única do caderno, tirada do guia impresso que serve de
 # referência do produto. Sem isto cada atividade saía com um fundo próprio e o
 # caderno parecia uma colagem de fontes diferentes.
-_HOUSE_STYLE = (
-    "HOUSE STYLE — every page of this book shares one look. Warm aged cream "
-    "parchment background with a subtle paper grain, edges slightly darker than the centre. "
-    "An ornate double-rule border frame in soft golden ochre runs just inside the page edge, "
-    "with small decorative scrollwork at each corner. Near the top edge place a faint circular "
-    "vintage travel postmark, a small navy-blue airplane and a fine dashed flight-path curve. "
-    "Any illustration is vintage children's storybook watercolour with fine ink linework, warm "
-    "and soft, softly blended into the parchment with no hard photographic edges and no white "
-    "box around it. Palette: aged cream, golden ochre, muted navy blue, soft sage and dusty "
-    "rose. No neon, no flat vector shapes, no modern UI look, no drop shadows."
-)
+# A identidade mora em `visual_identity`. Estes apelidos existem so para nao
+# reescrever as 16 interpolacoes espalhadas pelos prompts.
+_HOUSE_STYLE = f"{ILLUSTRATION_STYLE}\n\n{COMPOSITION_RULE}"
+_HOUSE_STYLE_PLAIN = ILLUSTRATION_STYLE
+_HOUSE_STYLE_LINEART = LINEART_STYLE
 
-# O "ache os erros" recorta a arte em dois painéis, então a moldura é jogada
-# fora de qualquer jeito — e o excesso de ornamento fazia o editor devolver a
-# cena quase intacta, sem diferenças achaveis. Mesma paleta e mesmo traço,
-# sem moldura.
-_HOUSE_STYLE_PLAIN = (
-    "HOUSE STYLE — vintage children's storybook watercolour with fine ink linework, warm and "
-    "soft, on a calm pale sky-and-parchment background. Palette: aged cream, golden ochre, "
-    "muted navy blue, soft sage and dusty rose. No border frame, no postmark, no ornament, no "
-    "paper grain overlay. No neon, no flat vector shapes, no modern UI look, no drop shadows."
-)
-
-# Páginas em traço puro. A moldura do estilo padrão vira borda preta torta
-# depois da conversão monocromática, e no "ligue os pontos" o traçador de
-# silhueta segue a moldura em vez do monumento — o enigma sai um retângulo.
-_HOUSE_STYLE_LINEART = (
-    "HOUSE STYLE — pure black line art on plain white, in the same vintage children's storybook "
-    "hand as the rest of the book: confident ink outlines, generous closed shapes, no shading. "
-    "Absolutely no border frame, no corner ornament, no postmark, no parchment texture, no "
-    "background wash and no colour — the sheet outside the drawing must stay pure white."
-)
+# Traco puro: a crianca precisa de contorno fechado para pintar dentro.
+_LINEART_ACTIVITIES = frozenset({"coloring", "family_coloring", "dot_to_dot"})
 
 
 def cover_page_prompt(
@@ -1837,7 +1818,7 @@ Output the finished flat cover artwork, not a book photographed in a scene.
 Create a complete vertical cover for a premium children's illustrated family travel book.
 {_HOUSE_STYLE}
 {inputs}
-Transform the supplied family photo into a warm hand-painted watercolor storybook illustration.
+Redraw the supplied family photo as flat chunky crayon-textured shapes in the house style.
 Preserve the family's recognizable composition, approximate ages, hair, glasses, expressions
 and poses.
 {people}
@@ -1883,7 +1864,7 @@ def summary_page_prompt(
     return f"""
 Create page 2 of a premium vertical children's illustrated family travel guide.
 {_HOUSE_STYLE}
-Design a joyful watercolor-and-gouache itinerary infographic with one distinct recognizable
+Design a joyful flat crayon-textured itinerary infographic with one distinct recognizable
 illustrated vignette for every confirmed stop below, connected in order by a playful dotted route.
 {reference}
 
@@ -1942,7 +1923,7 @@ family travel guide about {location}.
 
 Use an original child-friendly travel-journal hierarchy inspired by classic exploration books:
 a large destination title, two short learning notes with small decorative star icons, one
-recognizable watercolor-and-gouache destination scene, and a distinct curiosity card. Keep every
+recognizable flat crayon-textured destination scene, and a distinct curiosity card. Keep every
 text block short, high-contrast, correctly accented, and readable on a phone. Do not copy any
 reference-book characters, border, wording, page number, or layout.
 
@@ -2009,7 +1990,7 @@ def landmark_page_prompt(
     return f"""
 Create a complete vertical page for a premium children's illustrated family travel guide.
 {_HOUSE_STYLE}
-Show a recognizable, accurate watercolor-and-gouache storybook illustration of {landmark_name}
+Show a recognizable, accurate flat crayon-textured illustration of {landmark_name}
 in {location}, {subject}.
 
 Use an original travel-journal hierarchy: a large landmark title, location subtitle, one concise
@@ -2071,14 +2052,13 @@ arrow, circle, marker or caption.
 
 _WRITING_ARTWORK_CONTRACT = (
     "Create a decorative border-only illustration for a writing page: {motif}, arranged around "
-    "the outer edges as a calm watercolor frame. Keep the entire central 80 percent pale, plain "
+    "the outer edges as a calm flat-shape frame. Keep the entire central 80 percent pale, plain "
     "and free of detail — trusted code paints opaque ruled panels over it. Do not draw lines, "
     "rules, boxes, paper sheets or writing areas anywhere."
 )
 
 
 # Traço puro: a arte vira silhueta ou desenho de colorir e não pode ter moldura.
-_LINEART_ACTIVITIES = frozenset({"coloring", "family_coloring", "dot_to_dot"})
 
 
 def _house_style_for(activity_type: str) -> str:
@@ -2106,9 +2086,9 @@ def flight_vocabulary_artwork_prompt(
 
     places = ", ".join(name for name in landmark_names if name)
     scenery = (
-        f"Around the perimeter add small watercolor vignettes of these confirmed places: {places}."
+        f"Around the perimeter add small flat vignettes of these confirmed places: {places}."
         if places
-        else "Around the perimeter add small watercolor clouds and a paper airplane."
+        else "Around the perimeter add small flat clouds and a paper airplane."
     )
     revision = _activity_revision_directive(revision_instruction, has_revision_reference)
     reference = (
@@ -2123,7 +2103,7 @@ Page: first words in {language} to practise on the flight to {country}.
 {reference}
 
 Compose an airplane-window travel scene: a rounded cabin window in one corner opening onto soft
-watercolor clouds, and a fine dashed flight path curving toward the horizon. {scenery}
+flat clouds, and a fine dashed flight path curving toward the horizon. {scenery}
 
 Keep the entire centre of the page pale, calm and free of detail: a deterministic list of word
 cards will be composited over it by trusted code, and any illustration there would show through.
@@ -2171,12 +2151,12 @@ def activity_artwork_prompt(
             "area. Keep the lower 45 percent calm and low-detail for a deterministic checklist."
         ),
         "word_search": (
-            "Create a subtle decorative travel background with a small recognizable watercolor "
+            "Create a subtle decorative travel background with a small recognizable flat "
             "landmark vignette near the bottom edge. Keep the center pale and low-detail for a "
             "puzzle."
         ),
         "drawing": (
-            "Create a child-friendly painting-workshop frame with a small watercolor landmark "
+            "Create a child-friendly painting-workshop frame with a small flat landmark "
             "vignette near the perimeter plus a simple paint palette and two clean brushes. Keep "
             "the large central 70 percent completely empty and pure white as a blank painting "
             "canvas. Do not paint, sketch, trace, shade, or place guide marks inside that canvas."
@@ -2195,18 +2175,18 @@ def activity_artwork_prompt(
             "be removed without disturbing the rest. Keep everything else plain and uncluttered."
         ),
         "language_survival": (
-            "Create a decorative phrasebook background: a small recognizable watercolor landmark "
+            "Create a decorative phrasebook background: a small recognizable flat landmark "
             "vignette near the bottom edge and speech-bubble motifs around the perimeter. Keep "
             "the whole centre pale and plain for code-owned phrase cards."
         ),
         "postcard": (
-            "Create a classic postcard front: one large recognizable watercolor view of the "
+            "Create a classic postcard front: one large recognizable flat view of the "
             "landmark filling the upper 38 percent of the page edge to edge, with a soft white "
             "border. Keep everything below that band plain and pale for the code-owned card back."
         ),
         "passport_stamp": (
             "Create a decorative passport-page background: aged paper texture, faint travel stamp "
-            "rings and a small watercolor landmark vignette near the perimeter. Keep the whole "
+            "rings and a small flat landmark vignette near the perimeter. Keep the whole "
             "centre pale and plain so glued tickets and printed frames stay readable."
         ),
         "dot_to_dot": (
@@ -2216,25 +2196,25 @@ def activity_artwork_prompt(
             "percent completely white and empty."
         ),
         "crossword": (
-            "Create a subtle decorative travel background with a small recognizable watercolor "
+            "Create a subtle decorative travel background with a small recognizable flat "
             "landmark vignette near the bottom edge and a pencil and eraser near the perimeter. "
             "Keep the whole centre pale and completely free of detail so a printed grid stays "
             "readable."
         ),
         "maze": (
-            "Create a subtle decorative travel background with a small recognizable watercolor "
+            "Create a subtle decorative travel background with a small recognizable flat "
             "landmark vignette near the bottom edge and a winding dotted travel trail motif near "
             "the perimeter. Keep the whole centre pale and completely free of detail so a large "
             "printed maze grid stays readable."
         ),
         "anagram": (
-            "Create a subtle decorative travel background with a small recognizable watercolor "
+            "Create a subtle decorative travel background with a small recognizable flat "
             "landmark vignette near the bottom edge and a few scattered alphabet-block motifs "
             "around the perimeter. Keep the whole centre pale and free of detail for the puzzle."
         ),
         "cryptogram": (
             "Create a subtle decorative spy-notebook background with a small recognizable "
-            "watercolor landmark vignette near the bottom edge, a magnifying glass and a wax "
+            "flat landmark vignette near the bottom edge, a magnifying glass and a wax "
             "seal near the perimeter. Keep the whole centre pale and free of detail."
         ),
         "newspaper_headline": _WRITING_ARTWORK_CONTRACT.format(
@@ -2484,7 +2464,7 @@ at {landmark_name} in {location}. The family is playing a warm, collaborative de
 
 {subject}
 
-Use an original watercolor-and-gouache family travel-journal language with friendly expressions,
+Use an original flat crayon-textured family travel-journal language with friendly expressions,
 warm paper tones and {landmark_name} clearly recognizable. Keep the upper 20 percent calm and free
 from people or important details for the code-owned title. Keep the lower 50 percent pale,
 low-detail and free from people or important objects for code-owned child mission cards. Confine
@@ -2545,7 +2525,7 @@ Create only the decorative visual layer for a premium vertical children's travel
 Trip context: {family_title}; {trip_date}; confirmed places: {landmarks}.
 Age-complexity band: {age_complexity}. {reference}
 
-Use a warm watercolor-and-gouache storybook style with small travel motifs and subtle recognizable
+Use a warm flat crayon-textured storybook style with small travel motifs and subtle recognizable
 architectural hints from only the confirmed places. Keep the central and lower areas pale,
 uncluttered, and suitable for large handwriting and drawing fields.
 
@@ -2578,7 +2558,7 @@ def homecoming_page_prompt(
             expected_visible_family_member_count, has_revision_reference
         )
         scene = """Illustrate the complete canonical family together in a warm
-watercolor-and-gouache storybook airport or travel-terminal scene, calmly preparing to
+flat crayon-textured storybook airport or travel-terminal scene, calmly preparing to
 return home with simple luggage. Convey a gentle, joyful end-of-adventure mood. Keep the
 family prominent in the middle half of the page, fully visible and uncropped. Use subtle
 travel motifs without adding new tourist landmarks."""
@@ -2589,7 +2569,7 @@ travel motifs without adding new tourist landmarks."""
             "PEOPLE-FREE CONTRACT — Do not depict a person, family member, child, tourist, face, "
             "body, human silhouette, crowd, portrait, or reflection anywhere."
         )
-        scene = """Illustrate a warm watercolor-and-gouache storybook airport or
+        scene = """Illustrate a warm flat crayon-textured storybook airport or
 travel-terminal corner at the end of a trip: a packed suitcase with travel stickers, a hat,
 a teddy bear peeking out, a boarding pass and a window onto the runway at golden hour.
 Convey a gentle, joyful end-of-adventure mood with no people in the scene. Use subtle
@@ -2945,7 +2925,7 @@ def _revision_directive(instruction: str, has_revision_reference: bool) -> str:
         requested_change = (
             "Apply this quoted user design feedback: "
             f"{json.dumps(normalized, ensure_ascii=False)}. A requested visual style replaces the "
-            "default watercolor-and-gouache treatment."
+            "default flat crayon-textured treatment."
         )
     else:
         requested_change = (

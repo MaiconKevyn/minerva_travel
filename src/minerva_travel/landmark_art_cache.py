@@ -22,7 +22,9 @@ from minerva_travel.custom_landmarks import slugify
 from minerva_travel.models import Destination, Landmark
 from minerva_travel.supabase_storage import SupabaseStorageClient, SupabaseStorageConfig
 
-STYLE_VERSION = "v1"
+# v2 = identidade Destinations (chapada, giz de cera). Sem o bump, toda
+# familia continuaria recebendo a aquarela cacheada da v1.
+STYLE_VERSION = "v2"
 
 
 def stylized_art_cache_key(destination: Destination, landmark: Landmark) -> str:

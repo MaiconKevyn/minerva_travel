@@ -15,6 +15,7 @@ from minerva_travel.app import (
     fetch_custom_wikimedia_assets,
     generate_selected_landmark_art,
 )
+from minerva_travel.landmark_art_cache import STYLE_VERSION
 from minerva_travel.models import RestaurantRecommendation
 from minerva_travel.persistence import guide_repository
 from minerva_travel.wikimedia_assets import WikimediaAsset
@@ -1481,7 +1482,7 @@ def test_api_generate_stylizes_custom_landmark_photo_with_global_cache(tmp_path,
     assert len(stylize_calls) == 1
     assert stylize_calls[0][0] == downloaded_image
     expected_cache = (
-        tmp_path / "landmark-art" / "stylized" / "v1" / "chijlu7jzclu5kcr4pcooo6p3i0.png"
+        tmp_path / "landmark-art" / "stylized" / STYLE_VERSION / "chijlu7jzclu5kcr4pcooo6p3i0.png"
     )
     assert captured_images == [expected_cache]
     assert expected_cache.read_bytes() == b"stylized-art"

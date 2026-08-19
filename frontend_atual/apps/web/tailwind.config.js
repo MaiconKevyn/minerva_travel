@@ -16,6 +16,13 @@ module.exports = {
       },
     },
     extend: {
+      // Sem isto as utilitarias `font-serif`/`font-sans` do Tailwind caem na
+      // pilha padrao e a identidade nao chega aos titulos, por mais que o CSS
+      // base declare a familia.
+      fontFamily: {
+        serif: ['"Zilla Slab"', 'Georgia', 'serif'],
+        sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

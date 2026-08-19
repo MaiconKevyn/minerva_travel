@@ -6,9 +6,16 @@ from PIL import Image
 from minerva_travel.activity_page_compositor import (
     NEWSPAPER_HEADLINE_TITLE,
     PAGE_IMAGE_SIZE,
+    PAPER,
     ActivityPageCompositionError,
     compose_writing_page,
 )
+from minerva_travel.visual_identity import PALETA_PROSA
+
+# A frase que so existe na identidade vigente. O teste protege que TODAS as
+# paginas pecam o MESMO estilo — nao qual estilo e.
+MARCA_DO_ESTILO = "crayon and chalk brush"
+PAPEL_RGB = tuple(int(PAPER[i : i + 2], 16) for i in (1, 3, 5))
 
 
 def _artwork(tmp_path: Path, color: tuple[int, int, int] = (255, 255, 255)) -> Path:
@@ -80,7 +87,8 @@ def test_writing_page_keeps_white_paper_even_over_dark_artwork(tmp_path: Path):
 
     with Image.open(output) as page:
         band = page.convert("RGB").crop((120, 400, 900, 420))
-    assert all(minimum >= 248 for minimum, _maximum in band.getextrema())
+    piso = min(PAPEL_RGB) - 4
+    assert all(minimum >= piso for minimum, _maximum in band.getextrema())
 
 
 def test_every_activity_artwork_asks_for_the_same_house_style():
@@ -108,18 +116,18 @@ def test_every_activity_artwork_asks_for_the_same_house_style():
             has_revision_reference=False,
         )
         assert "HOUSE STYLE" in prompt, activity_type
-        assert "vintage children's storybook" in prompt, activity_type
         assert "text-free" in prompt.lower(), activity_type
 
         if activity_type in lineart:
-            # Traço puro: qualquer moldura reaparece como borda preta e, no
-            # ligue os pontos, vira a própria resposta do enigma.
+            # Traço puro: sem contorno fechado a criança não tem onde pintar,
+            # e no ligue os pontos o traçador seguiria a textura em vez do
+            # monumento.
             assert "pure black line art" in prompt, activity_type
             assert "no border frame" in prompt.lower(), activity_type
+            assert MARCA_DO_ESTILO not in prompt, activity_type
         else:
-            assert "aged cream, golden ochre, muted navy blue" in prompt, activity_type
-            framed = "ornate double-rule border frame" in prompt
-            assert framed is (activity_type != "spot_the_difference"), activity_type
+            assert MARCA_DO_ESTILO in prompt, activity_type
+            assert PALETA_PROSA in prompt, activity_type
 
 
 def test_the_two_family_activities_share_the_house_style_too():
@@ -155,7 +163,7 @@ def test_the_two_family_activities_share_the_house_style_too():
         has_landmark_page_reference=False,
         has_revision_reference=False,
     )
-    assert "ornate double-rule border frame" in investigator
+    assert MARCA_DO_ESTILO in investigator
 
 
 def test_every_page_of_the_guide_shares_the_house_style():
@@ -216,5 +224,5 @@ def test_every_page_of_the_guide_shares_the_house_style():
     }
     for page, prompt in pages.items():
         assert "HOUSE STYLE" in prompt, page
-        assert "ornate double-rule border frame" in prompt, page
-        assert "aged cream, golden ochre, muted navy blue" in prompt, page
+        assert MARCA_DO_ESTILO in prompt, page
+        assert PALETA_PROSA in prompt, page
