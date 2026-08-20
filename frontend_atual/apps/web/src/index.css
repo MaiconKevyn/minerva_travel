@@ -41,6 +41,10 @@
     --ring: 15 65% 40%;
 
     --radius: 1.5rem;
+
+    /* A estrela mostarda e o rosa do cartão "Você sabia?" das páginas. */
+    --star: 40 75% 53%;
+    --rosa: 347 61% 72%;
   }
 
   .dark {
@@ -74,6 +78,9 @@
     --border: 30 12% 22%;
     --input: 30 12% 22%;
     --ring: 10 62% 62%;
+
+    --star: 44 78% 60%;
+    --rosa: 347 34% 42%;
   }
 
   * {
@@ -111,6 +118,40 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* O cartão rosa de "Você sabia?" das páginas ilustradas: um tom lavado do
+     rosa da paleta, cantos generosos, sem borda. */
+  .guide-card-rosa {
+    background-color: hsl(var(--rosa) / 0.30);
+    border-radius: 1.875rem;
+  }
+
+  /* A bolinha numerada terracota do roteiro, com o número em Zilla Slab na
+     cor do papel. */
+  .guide-bullet {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-family: "Zilla Slab", Georgia, serif;
+    font-weight: 700;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  /* A rota pontilhada que liga as paradas. border dotted desenha exatamente
+     os círculos espaçados da página do roteiro. */
+  .guide-route-h {
+    border-top: 4px dotted hsl(var(--secondary) / 0.55);
+  }
+
+  .guide-route-v {
+    border-left: 4px dotted hsl(var(--secondary) / 0.55);
   }
 
   /* A moldura de filete duplo em ocre é a assinatura das páginas impressas.

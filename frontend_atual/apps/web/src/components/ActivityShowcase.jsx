@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Clock3 } from 'lucide-react';
+import { GuideLockup } from '@/components/GuideLockup.jsx';
 import { activityOptionsByCategory } from '@/utils/landmark-activities.js';
 
 /**
@@ -18,17 +19,13 @@ const ActivityShowcase = () => (
     aria-labelledby="atividades-title"
   >
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <GuideLockup
+        id="atividades-title"
+        overline="O que a criança faz"
+        title={`${CATEGORIES.reduce((total, category) => total + category.options.length, 0)} atividades diferentes`}
+        arched="Escolhidas por vocês"
+      />
       <div className="mx-auto max-w-2xl text-center">
-        <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
-          O que a criança faz
-        </p>
-        <h2
-          id="atividades-title"
-          className="mt-3 text-3xl font-serif font-bold text-foreground sm:text-4xl"
-        >
-          {CATEGORIES.reduce((total, category) => total + category.options.length, 0)} atividades,
-          e vocês escolhem quais entram
-        </h2>
         <p className="mt-4 text-lg font-medium text-muted-foreground">
           Cada uma nasce do ponto turístico da vez — o caça-palavras usa o nome do lugar, o
           labirinto leva até ele, o guia de frases é do idioma do país.
@@ -43,7 +40,7 @@ const ActivityShowcase = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-60px' }}
             transition={{ duration: 0.5, delay: (index % 2) * 0.08 }}
-            className="rounded-[2rem] border-2 border-border/60 bg-card p-6 shadow-sm sm:p-7"
+            className="rounded-[2rem] border border-border/50 bg-card p-6 sm:p-7"
             aria-labelledby={`categoria-${category.id}`}
           >
             <h3

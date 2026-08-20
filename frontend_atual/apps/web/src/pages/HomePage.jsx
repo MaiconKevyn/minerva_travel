@@ -2,7 +2,8 @@ import React from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Heart } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { ArchedText, GuideStar } from '@/components/GuideLockup.jsx';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import HomeHero from '@/components/HomeHero.jsx';
@@ -46,9 +47,14 @@ const HomePage = () => (
             transition={{ duration: 0.5 }}
             className="mx-auto max-w-2xl px-4 text-center sm:px-6 lg:px-8"
           >
+            {/* O fechamento fala como a capa: o nome do produto em arco por
+                cima do título. */}
+            <div className="mx-auto max-w-sm text-secondary">
+              <ArchedText direction="up">Guia de Memórias</ArchedText>
+            </div>
             <h2
               id="comecar-title"
-              className="text-3xl font-serif font-bold text-foreground sm:text-4xl"
+              className="!mt-1 text-3xl font-serif font-bold text-foreground sm:text-4xl"
             >
               A viagem já está marcada. Falta o livro.
             </h2>
@@ -73,10 +79,8 @@ const HomePage = () => (
       <footer className="mt-auto border-t border-border bg-muted py-12 transition-colors duration-200">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-            <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-card shadow-sm">
-                <Heart className="h-5 w-5 text-primary" aria-hidden="true" />
-              </div>
+            <div className="flex items-center gap-2.5">
+              <GuideStar className="h-6 w-6" />
               <span className="font-serif text-xl font-bold text-foreground">Minerva Travel</span>
             </div>
             <div className="flex gap-8 text-sm font-medium">

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
+import { GuideLockup } from '@/components/GuideLockup.jsx';
 import { PHRASEBOOK_COUNTRIES } from '@/utils/landmark-activities.js';
 
 /**
@@ -67,20 +68,13 @@ const QUESTIONS = [
 const HomeFaq = () => (
   <section className="border-t border-border/50 py-20 sm:py-24" aria-labelledby="faq-title">
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-      <div className="text-center">
-        <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
-          Antes de começar
-        </p>
-        <h2 id="faq-title" className="mt-3 text-3xl font-serif font-bold text-foreground sm:text-4xl">
-          Perguntas que todo pai faz
-        </h2>
-      </div>
+      <GuideLockup id="faq-title" overline="Antes de começar" title="Perguntas que todo pai faz" />
 
       <div className="mt-10 space-y-3">
         {QUESTIONS.map((item) => (
           <details
             key={item.question}
-            className="group rounded-2xl border-2 border-border/60 bg-card px-5 py-1 transition-colors open:border-primary/35"
+            className="group rounded-3xl border border-border/50 bg-card px-6 py-1 transition-colors open:border-primary/40"
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-serif text-lg font-bold text-foreground marker:content-none">
               {item.question}

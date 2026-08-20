@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Baby, Palette, Printer } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ArchedText, GuideStar } from '@/components/GuideLockup.jsx';
 import { OPTIONAL_LANDMARK_ACTIVITY_TYPES } from '@/utils/landmark-activities.js';
 import { formatPrice, getGuideProduct } from '@/utils/minerva-api.js';
 
@@ -29,10 +30,12 @@ const PAGES = [
   },
 ];
 
+// As provas na voz do livro: notas com a estrelinha mostarda, como as notas
+// de leitura da página de destino — não chips de landing page.
 const PROOF = [
-  { icon: Palette, label: `${OPTIONAL_LANDMARK_ACTIVITY_TYPES.length} atividades diferentes` },
-  { icon: Baby, label: 'No nível de cada idade' },
-  { icon: Printer, label: 'PDF A4 para imprimir' },
+  `${OPTIONAL_LANDMARK_ACTIVITY_TYPES.length} atividades diferentes`,
+  'No nível de cada idade',
+  'PDF A4 para imprimir',
 ];
 
 const HomeHero = () => {
@@ -57,13 +60,13 @@ const HomeHero = () => {
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="space-y-7 text-center lg:text-left"
       >
-        {/* Caixa alta com entreletra larga: a voz tipográfica da identidade,
-            que vem das pranchas de referência. */}
-        <p className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-muted-foreground">
-          Feito sob medida para o roteiro de vocês
-        </p>
+        {/* O brasão da capa: o nome do produto corre em arco por cima do
+            título, exatamente como "GUIA DE MEMÓRIAS" na capa do livro. */}
+        <div className="mx-auto max-w-md text-secondary lg:mx-0">
+          <ArchedText direction="up">Guia de Memórias</ArchedText>
+        </div>
 
-        <h1 className="text-4xl font-serif font-bold leading-[1.1] text-foreground sm:text-5xl">
+        <h1 className="!mt-1 text-4xl font-serif font-bold leading-[1.1] text-foreground sm:text-5xl">
           O livro de atividades da viagem que a sua família já marcou
         </h1>
 
@@ -72,19 +75,13 @@ const HomeHero = () => {
           brincadeiras no nível de cada criança — para a fila do museu, o avião e a noite no hotel.
         </p>
 
-        <ul className="flex flex-wrap justify-center gap-2 lg:justify-start">
-          {PROOF.map((item) => {
-            const Icon = item.icon;
-            return (
-              <li
-                key={item.label}
-                className="inline-flex items-center gap-2 rounded-full bg-muted px-3.5 py-1.5 text-sm font-bold text-foreground"
-              >
-                <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
-                {item.label}
-              </li>
-            );
-          })}
+        <ul className="flex flex-col items-center gap-2.5 lg:items-start">
+          {PROOF.map((item) => (
+            <li key={item} className="flex items-center gap-2.5 font-bold text-secondary">
+              <GuideStar className="h-5 w-5" />
+              {item}
+            </li>
+          ))}
         </ul>
 
         <div className="flex flex-col items-center gap-3 pt-1 sm:flex-row lg:justify-start">

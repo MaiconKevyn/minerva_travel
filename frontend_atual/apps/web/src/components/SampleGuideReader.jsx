@@ -1,3 +1,4 @@
+import { GuideLockup } from '@/components/GuideLockup.jsx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -379,15 +380,12 @@ const SampleGuideReader = () => {
           transition={{ duration: 0.5 }}
           className="mx-auto max-w-3xl text-center"
         >
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
-            Um guia completo de verdade
-          </p>
-          <h2
+          <GuideLockup
             id="guia-exemplo-title"
-            className="mt-3 text-3xl font-serif font-bold text-foreground sm:text-4xl lg:text-5xl"
-          >
-            Folheie a aventura antes de criar a sua
-          </h2>
+            overline="Um guia completo de verdade"
+            title="Folheie a aventura antes de criar a sua"
+            arched="Família Knopp em Paris"
+          />
           <p className="mt-4 text-lg font-medium leading-relaxed text-muted-foreground">
             São 19 páginas reais, da capa à volta para casa. Clique nas folhas, use as setas ou
             deslize no celular para conhecer o livro inteiro.

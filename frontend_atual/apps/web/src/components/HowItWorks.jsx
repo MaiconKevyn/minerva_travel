@@ -1,22 +1,24 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { BookHeart, MapPin, Wand2 } from 'lucide-react';
+import { GuideLockup } from '@/components/GuideLockup.jsx';
 
+/**
+ * Os três passos na gramática da página "Nosso roteiro": bolinha numerada
+ * terracota, nome ao lado, rota pontilhada ligando as paradas. Os cards com
+ * ícone e borda eram linguagem de landing page — o livro nunca teve caixa.
+ */
 const STEPS = [
   {
-    icon: MapPin,
     title: 'Conte a viagem',
     description:
       'Diga os destinos, os pontos turísticos que já estão no roteiro e quem vai viajar. As idades das crianças ajustam as atividades.',
   },
   {
-    icon: Wand2,
     title: 'Aprove a sua capa',
     description:
       'Veja a capa ilustrada, peça mudanças de estilo e aprove quando ela representar bem a família e a viagem.',
   },
   {
-    icon: BookHeart,
     title: 'Receba o livro por e-mail',
     description:
       'Com um clique, criamos todas as páginas em segundo plano e enviamos o PDF A4 pronto para imprimir e encadernar.',
@@ -29,44 +31,51 @@ const HowItWorks = () => (
     aria-labelledby="como-funciona-title"
   >
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-2xl text-center">
-        <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
-          Como funciona
-        </p>
-        <h2
-          id="como-funciona-title"
-          className="mt-3 text-3xl font-serif font-bold text-foreground sm:text-4xl"
-        >
-          Três passos até o livro da sua família
-        </h2>
-      </div>
+      <GuideLockup
+        id="como-funciona-title"
+        overline="Como funciona"
+        title="Três passos até o livro da sua família"
+        arched="Do roteiro ao PDF"
+      />
 
-      <ol className="mt-14 grid gap-8 md:grid-cols-3">
-        {STEPS.map((step, index) => {
-          const Icon = step.icon;
-          return (
+      <ol className="mx-auto mt-14 flex max-w-md flex-col gap-0 md:max-w-none md:flex-row md:items-start md:gap-0">
+        {STEPS.map((step, index) => (
+          <React.Fragment key={step.title}>
+            {index > 0 ? (
+              <>
+                {/* A rota pontilhada entre as paradas, como na página do
+                    roteiro: deitada no desktop, de pé no celular. */}
+                {/* Largura garantida: como item flexível, o conector era a
+                    primeira coisa a colapsar a zero e a rota sumia. */}
+                <li aria-hidden="true" className="hidden shrink-0 md:block md:w-10 md:pt-5 lg:w-20">
+                  <div className="guide-route-h" />
+                </li>
+                <li aria-hidden="true" className="md:hidden">
+                  <div className="guide-route-v ml-[1.35rem] h-8" />
+                </li>
+              </>
+            ) : null}
             <motion.li
-              key={step.title}
               initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-80px' }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="relative rounded-[2rem] border-2 border-border/60 bg-card p-7 shadow-sm"
+              className="flex gap-4 md:flex-1"
             >
-              <span
-                className="absolute -top-4 left-7 flex h-9 w-9 items-center justify-center rounded-full bg-primary font-serif text-lg font-bold text-white shadow-md"
-                aria-hidden="true"
-              >
+              <span className="guide-bullet" aria-hidden="true">
                 {index + 1}
               </span>
-              <Icon className="mb-4 mt-2 h-8 w-8 text-secondary" aria-hidden="true" />
-              <h3 className="mb-2 text-xl font-serif font-bold text-foreground">{step.title}</h3>
-              <p className="font-medium leading-relaxed text-muted-foreground">
-                {step.description}
-              </p>
+              <div>
+                <h3 className="pt-1.5 text-xl font-serif font-bold text-foreground">
+                  {step.title}
+                </h3>
+                <p className="mt-2 font-medium leading-relaxed text-muted-foreground">
+                  {step.description}
+                </p>
+              </div>
             </motion.li>
-          );
-        })}
+          </React.Fragment>
+        ))}
       </ol>
     </div>
   </section>
