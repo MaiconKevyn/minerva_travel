@@ -1,15 +1,16 @@
 import React from 'react';
-import { Check, PlaneTakeoff } from 'lucide-react';
+import { Check, MessageCircleHeart } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { countryHasFlightVocabulary, guideFlightVocabularyCountries } from '@/utils/landmark-activities.js';
 
 /**
- * A página que a criança faz no avião, antes de pousar em cada país.
+ * "O primeiro olá": a página que abre o capítulo de cada país ensinando a
+ * criança a conversar — olá, tudo bem?, por favor, obrigado e tchau, com a
+ * pronúncia como ela lê e uma curiosidade do idioma.
  *
- * Vem ligada, ao contrário do resto do catálogo: é a única atividade que
- * acontece antes da viagem começar, e quem não conhece o produto não iria
- * procurá-la. Desligar é um clique; descobrir que ela existia, não.
+ * Vem ligada, ao contrário do resto do catálogo: quem não conhece o produto
+ * não iria procurá-la. Desligar é um clique; descobrir que ela existia, não.
  */
 const FlightVocabularyCard = ({ landmarks, enabled, onChange }) => {
   const covered = guideFlightVocabularyCountries(landmarks);
@@ -28,14 +29,14 @@ const FlightVocabularyCard = ({ landmarks, enabled, onChange }) => {
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-start gap-4">
-          <PlaneTakeoff className="mt-1 h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
+          <MessageCircleHeart className="mt-1 h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
           <div>
             <h3 id="flight-vocabulary-title" className="text-xl font-serif font-bold text-foreground">
-              Primeiras palavras, para treinar no avião
+              O primeiro olá, no idioma de cada país
             </h3>
             <p className="mt-1 font-medium text-muted-foreground">
-              Uma página antes de cada país, com palavras do dia a dia e palavras dos lugares que
-              vocês vão visitar — como se escreve, como se fala e o que quer dizer.
+              Uma página abrindo cada país: olá, tudo bem?, por favor, obrigado e tchau — como se
+              escreve, como se fala — e uma curiosidade do idioma.
             </p>
           </div>
         </div>

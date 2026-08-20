@@ -60,7 +60,7 @@ class FakePageGenerator:
     def generate_summary_page(self, *, output_path, **kwargs):
         return self._write("summary", output_path, kwargs)
 
-    def generate_flight_vocabulary_page(self, *, output_path, **kwargs):
+    def generate_language_welcome_page(self, *, output_path, **kwargs):
         return self._write("flight_vocabulary", output_path, kwargs)
 
     def generate_destination_intro_page(self, *, output_path, **kwargs):
@@ -171,11 +171,11 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
     assert [page["kind"] for page in created["pages"]] == [
         "cover",
         "trip_summary",
-        "flight_vocabulary",
         "destination_intro",
+        "flight_vocabulary",
         "landmark",
-        "flight_vocabulary",
         "destination_intro",
+        "flight_vocabulary",
         "landmark",
         "best_memory",
         "homecoming",
@@ -218,11 +218,11 @@ def test_page_builder_generates_approves_completes_and_exports_pdf(tmp_path, mon
 
     for page_id, kind in (
         ("summary", "summary"),
-        ("flight-vocabulary-franca", "flight_vocabulary"),
         ("destination-1", "destination"),
+        ("language-welcome-franca", "flight_vocabulary"),
         ("landmark-1", "landmark"),
-        ("flight-vocabulary-italia", "flight_vocabulary"),
         ("destination-2", "destination"),
+        ("language-welcome-italia", "flight_vocabulary"),
         ("landmark-2", "landmark"),
         ("best-memory", "memory"),
         ("homecoming", "homecoming"),

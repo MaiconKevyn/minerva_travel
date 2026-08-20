@@ -96,7 +96,7 @@ class RecordingPageGenerator:
     def generate_summary_page(self, *, output_path, **kwargs):
         return self._write("summary", output_path, kwargs)
 
-    def generate_flight_vocabulary_page(self, *, output_path, **kwargs):
+    def generate_language_welcome_page(self, *, output_path, **kwargs):
         return self._write("flight_vocabulary", output_path, kwargs)
 
     def generate_destination_intro_page(self, *, output_path, **kwargs):
@@ -410,8 +410,8 @@ def test_page_plan_interleaves_activities_and_appends_one_memory_page(tmp_path, 
     assert [page["id"] for page in payload["pages"]] == [
         "cover",
         "summary",
-        "flight-vocabulary-franca",
         "destination-1",
+        "language-welcome-franca",
         "landmark-1",
         "activity-1-word-search",
         "activity-1-coloring",
@@ -533,17 +533,17 @@ def test_page_plan_adds_one_learning_page_before_each_selected_destination():
     )
 
     assert activities == []
-    # A página de palavras abre cada país, antes do destino: é o que a criança
-    # faz no avião, então precisa vir antes de qualquer coisa daquele país.
+    # "O primeiro olá" abre o capítulo do país logo DEPOIS da página que o
+    # apresenta: conheça Paris, aprenda a dizer Bonjour, Torre Eiffel.
     assert [(page.id, page.kind) for page in pages] == [
         ("cover", "cover"),
         ("summary", "trip_summary"),
-        ("flight-vocabulary-franca", "flight_vocabulary"),
         ("destination-1", "destination_intro"),
+        ("language-welcome-franca", "flight_vocabulary"),
         ("landmark-1", "landmark"),
         ("landmark-2", "landmark"),
-        ("flight-vocabulary-inglaterra", "flight_vocabulary"),
         ("destination-2", "destination_intro"),
+        ("language-welcome-inglaterra", "flight_vocabulary"),
         ("landmark-3", "landmark"),
         ("best-memory", "best_memory"),
         ("homecoming", "homecoming"),

@@ -65,7 +65,6 @@ from minerva_travel.activity_page_compositor import (
     WORD_SEARCH_TITLE,
     coloring_instruction_for,
     family_coloring_instruction_for,
-    flight_vocabulary_title,
 )
 from minerva_travel.asset_policy import (
     AssetProvenanceError,
@@ -158,7 +157,7 @@ from minerva_travel.destination_facts import lookup_destination_facts
 from minerva_travel.email_delivery import send_guide_ready_email
 from minerva_travel.flight_vocabulary import (
     country_flight_vocabulary_languages,
-    flight_vocabulary_for,
+    language_welcome_for,
 )
 from minerva_travel.guide_builder import build_guide_context
 from minerva_travel.guide_cover import (
@@ -3426,7 +3425,6 @@ def _builder_activity_page(
     )
 
 
-FLIGHT_VOCABULARY_INSTRUCTION = "Treine no avião e marque cada palavra que você conseguir falar."
 
 
 def _country_key(country: str) -> str:
@@ -3512,8 +3510,6 @@ def _builder_page_plan(
     ]
     next_position = 3
     introduced_destination_ids: set[str] = set()
-    # Uma página de palavras por país, não por destino: Paris e Lyon são a
-    # mesma França, e ensinar francês duas vezes seria papel jogado fora.
     introduced_countries: set[str] = set()
     include_flight_vocabulary = bool(form.get("flight_vocabulary_pages", True))
     landmarks_by_country: dict[str, list[str]] = {}
@@ -3522,37 +3518,6 @@ def _builder_page_plan(
 
     for landmark in landmarks:
         country_key = _country_key(landmark.country)
-        if include_flight_vocabulary and country_key and country_key not in introduced_countries:
-            introduced_countries.add(country_key)
-            vocabulary = flight_vocabulary_for(
-                landmark.country, landmarks_by_country.get(country_key, [])
-            )
-            if vocabulary is not None:
-                instruction = FLIGHT_VOCABULARY_INSTRUCTION
-                pages.append(
-                    BuilderPage(
-                        id=f"flight-vocabulary-{country_key}",
-                        kind="flight_vocabulary",
-                        title=f"Primeiras palavras em {vocabulary.language}",
-                        position=next_position,
-                        required_copy=[
-                            flight_vocabulary_title(vocabulary.language),
-                            vocabulary.country,
-                            instruction,
-                            *(word.word for word in vocabulary.words),
-                            *(word.meaning for word in vocabulary.words),
-                        ],
-                        metadata={
-                            "country": landmark.country,
-                            "language": vocabulary.language,
-                            "landmark_names": landmarks_by_country.get(country_key, []),
-                            "instruction": instruction,
-                            "trip_date": trip_date,
-                        },
-                    )
-                )
-                next_position += 1
-
         if landmark.destination_id not in introduced_destination_ids:
             destination_context = destination_context_by_id[landmark.destination_id]
             destination_private_context = destination_context.model_dump(mode="json")
@@ -3597,6 +3562,39 @@ def _builder_page_plan(
             )
             next_position += 1
             introduced_destination_ids.add(landmark.destination_id)
+
+        # "O primeiro olá" abre o capítulo do país, logo depois da página que
+        # o apresenta: conheça Paris, aprenda a dizer Bonjour, Torre Eiffel.
+        # Uma por país, não por destino: Paris e Lyon são a mesma França.
+        if include_flight_vocabulary and country_key and country_key not in introduced_countries:
+            introduced_countries.add(country_key)
+            welcome = language_welcome_for(landmark.country)
+            if welcome is not None:
+                pages.append(
+                    BuilderPage(
+                        id=f"language-welcome-{country_key}",
+                        kind="flight_vocabulary",
+                        title=f"O primeiro olá em {welcome.language}",
+                        position=next_position,
+                        required_copy=[
+                            "O primeiro olá",
+                            welcome.greeting,
+                            f"Olá, em {welcome.language}",
+                            *(word.word for word in welcome.words),
+                            *(word.meaning for word in welcome.words),
+                            welcome.curiosity,
+                        ],
+                        metadata={
+                            "country": landmark.country,
+                            "language": welcome.language,
+                            # A âncora visual da arte: o primeiro ponto
+                            # confirmado do país, como na abertura de destino.
+                            "landmark_name": landmarks_by_country.get(country_key, [""])[0],
+                            "trip_date": trip_date,
+                        },
+                    )
+                )
+                next_position += 1
 
         location = ", ".join(part for part in (landmark.city, landmark.country) if part)
         private_context = landmark.model_dump(mode="json")
@@ -4273,11 +4271,16 @@ def _generate_builder_page_attempt_impl(
                 reference_page=reference_page,
             )
         elif page_kind == "flight_vocabulary":
-            generator.generate_flight_vocabulary_page(
+            # Sessões criadas antes da troca guardam landmark_names (lista);
+            # as novas guardam landmark_name. As duas regeneram na página nova.
+            landmark_anchor = str(
+                metadata.get("landmark_name")
+                or next(iter(metadata.get("landmark_names") or []), "")
+            )
+            generator.generate_language_welcome_page(
                 output_path=output,
                 country=str(metadata["country"]),
-                landmark_names=list(metadata["landmark_names"]),
-                instruction=str(metadata["instruction"]),
+                landmark_name=landmark_anchor,
                 revision_instruction=revision_instruction,
                 reference_page=reference_page,
             )

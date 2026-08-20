@@ -7,6 +7,8 @@ from minerva_travel.activity_page_compositor import (
     ActivityPageCompositionError,
     compose_language_welcome_page,
 )
+from minerva_travel.app import _builder_page_plan
+from minerva_travel.catalog import load_catalog
 from minerva_travel.flight_vocabulary import (
     EVERYDAY_WORDS,
     GOODBYE_WORDS,
@@ -134,3 +136,84 @@ def test_the_generator_composes_a_full_page(tmp_path):
         landmark_name="Portão de Brandemburgo",
     )
     assert saida.is_file()
+
+
+# ---------------------------------------------------------------------------
+# O plano de montagem: onde "O primeiro olá" entra no livro.
+# ---------------------------------------------------------------------------
+
+
+def _plan(selected, **form_extra):
+    catalog = load_catalog()
+    pages, _ = _builder_page_plan(
+        {
+            "title": "Família Lima",
+            "year": 2026,
+            "children_ages": [8],
+            "activity_selections": [],
+            **form_extra,
+        },
+        catalog.destinations,
+        selected,
+    )
+    return pages
+
+
+def test_one_welcome_per_country_right_after_the_country_is_introduced():
+    """Conheça Paris, aprenda a dizer Bonjour, Torre Eiffel — nessa ordem.
+
+    Uma página por país, não por destino: Paris e o Louvre são a mesma França.
+    E ela vem DEPOIS da abertura do destino, porque primeiro se apresenta o
+    lugar, depois se aprende a falar com ele.
+    """
+
+    pages = _plan(["paris:eiffel-tower", "paris:louvre", "london:tower-bridge"])
+    kinds = [page.kind for page in pages]
+
+    welcome_positions = [i for i, kind in enumerate(kinds) if kind == "flight_vocabulary"]
+    assert len(welcome_positions) == 2
+    for index in welcome_positions:
+        assert kinds[index - 1] == "destination_intro"
+        assert kinds[index + 1] == "landmark"
+
+    welcome_pages = [page for page in pages if page.kind == "flight_vocabulary"]
+    assert [page.metadata["country"] for page in welcome_pages] == ["França", "Inglaterra"]
+    # A âncora visual é o primeiro ponto confirmado do país.
+    assert welcome_pages[0].metadata["landmark_name"] == "Torre Eiffel"
+    assert welcome_pages[0].title == "O primeiro olá em francês"
+
+
+def test_the_welcome_is_on_by_default_and_can_be_switched_off():
+    """Cliente antigo que não conhece o campo não perde a página em silêncio."""
+
+    assert any(page.kind == "flight_vocabulary" for page in _plan(["paris:eiffel-tower"]))
+    assert not any(
+        page.kind == "flight_vocabulary"
+        for page in _plan(["paris:eiffel-tower"], flight_vocabulary_pages=False)
+    )
+
+
+def test_the_printed_contract_lists_the_whole_conversation():
+    page = next(
+        page for page in _plan(["paris:eiffel-tower"]) if page.kind == "flight_vocabulary"
+    )
+    welcome = language_welcome_for("França")
+
+    assert welcome is not None
+    assert "O primeiro olá" in page.required_copy
+    assert welcome.greeting in page.required_copy
+    assert welcome.curiosity in page.required_copy
+    for word in welcome.words:
+        assert word.word in page.required_copy
+        assert word.meaning in page.required_copy
+
+
+def test_a_country_without_curated_language_gets_no_welcome_in_the_plan():
+    """Sem curadoria, o capítulo abre direto no ponto turístico — sem chute."""
+
+    catalog = load_catalog()
+    rio = [d for d in catalog.destinations if "rio" in d.id.lower()]
+    if not rio:
+        pytest.skip("catálogo sem destino de país sem curadoria")
+    selecao = [f"{rio[0].id}:{rio[0].landmarks[0].id}"]
+    assert not any(page.kind == "flight_vocabulary" for page in _plan(selecao))
