@@ -6,7 +6,13 @@ import httpx
 import pytest
 from PIL import Image, ImageDraw
 
-from minerva_travel.activity_page_compositor import BAND, SCENE_ARTWORK_SIZE
+from minerva_travel.activity_page_compositor import (
+    BAND,
+    SCENE_ARTWORK_SIZE,
+    SUMMARY_ROUTE_INSET,
+    compose_summary_page,
+    summary_band,
+)
 from minerva_travel.page_generation import (
     SPOT_SCENE_SIZE,
     OpenAIGuidePageGenerator,
@@ -183,7 +189,15 @@ def test_summary_prompt_lists_every_stop_without_writing_it_on_the_art():
     assert "2. Museu do Louvre" in prompt
     assert "TEXT-FREE CONTRACT" in prompt
     assert "Nosso roteiro" not in prompt
-    assert "do not invent, merge or omit any" in prompt
+    assert "Do not invent, merge or omit stops" in prompt
+    # Cada parada ganha a sua faixa e o seu lado, e o lado oposto fica vazio
+    # porque e la que o codigo escreve o nome. Sem esse contrato o nome caia
+    # em cima da vinheta — nao ha como o codigo adivinhar onde ela foi parar.
+    assert "in the RIGHT half" in prompt
+    assert "in the LEFT half" in prompt
+    assert "MUST STAY EMPTY" in prompt
+    # E a rota e do codigo: duas rotas na mesma pagina seria o defeito obvio.
+    assert "application draws the route itself" in prompt
 
 
 def test_destination_intro_prompt_stays_text_free_and_forbids_people():
@@ -303,7 +317,7 @@ def test_summary_shows_the_route_and_never_the_family(tmp_path):
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#69b482"))
+        return _response(_png_bytes(color="#69b482"))
 
     output = tmp_path / "summary.png"
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
@@ -377,7 +391,7 @@ def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_p
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#cc825f"))
+        return _response(_png_bytes(color="#cc825f"))
 
     reference = tmp_path / "summary-1.png"
     reference.write_bytes(_png_bytes())
@@ -1236,3 +1250,67 @@ def test_a_portrait_scene_from_the_provider_is_refused(tmp_path):
             },
             activity_spec={},
         )
+
+
+def test_the_route_prompt_and_the_printed_names_agree_on_which_half_is_empty(tmp_path):
+    """O prompt reserva uma metade por parada; o nome tem que cair nela.
+
+    Enquanto o modelo escrevia os nomes, o código não tinha como saber onde a
+    vinheta caiu. Agora ele dita as faixas — e é a divergência entre o que se
+    pede e o que se desenha que já cortou o monumento pelos pés na página do
+    ponto turístico. Aqui os dois lados vêm de `summary_band`, e este teste é
+    o que impede que um mude sem o outro.
+    """
+
+    paradas = ["Torre Eiffel", "Museu do Louvre", "Catedral de Notre-Dame"]
+    prompt = summary_page_prompt(
+        family_title="Família Moraes", trip_date="Setembro de 2026", landmark_names=paradas
+    )
+
+    arte = tmp_path / "roteiro-art.png"
+    Image.new("RGB", (1024, 1536), "#dfe8dc").save(arte, "PNG")
+    saida = tmp_path / "roteiro.png"
+    compose_summary_page(
+        arte,
+        saida,
+        family_title="Família Moraes",
+        trip_date="Setembro de 2026",
+        landmark_names=paradas,
+    )
+
+    metade = 1024 // 2
+    with Image.open(saida) as imagem:
+        pagina = imagem.convert("RGB")
+        for indice, parada in enumerate(paradas):
+            topo, base, vinheta_a_direita = summary_band(indice, len(paradas))
+            # O prompt precisa declarar exatamente este lado para esta parada.
+            lado_da_vinheta = "RIGHT" if vinheta_a_direita else "LEFT"
+            assert f"{indice + 1}. {parada} — between" in prompt
+            assert f"in the {lado_da_vinheta} half" in prompt
+
+            # A rota cruza as duas metades por construção, então a medição
+            # olha só para fora do corredor por onde ela passa.
+            corredor = SUMMARY_ROUTE_INSET + 40
+            fora_a_esquerda = (0, topo, metade - corredor, base)
+            fora_a_direita = (metade + corredor, topo, 1024, base)
+            do_nome = fora_a_esquerda if vinheta_a_direita else fora_a_direita
+            da_vinheta = fora_a_direita if vinheta_a_direita else fora_a_esquerda
+
+            assert _tem_tinta_escura(pagina, do_nome), f"o nome sumiu da faixa {indice + 1}"
+            assert not _tem_tinta_escura(
+                pagina, da_vinheta
+            ), f"o nome invadiu a vinheta {indice + 1}"
+
+
+def _tem_tinta_escura(pagina: Image.Image, caixa: tuple[int, int, int, int]) -> bool:
+    """Procura tinta de texto, ignorando a rota pontilhada e o fundo."""
+
+    recorte = pagina.crop(caixa)
+    cores = recorte.getcolors(maxcolors=recorte.width * recorte.height) or []
+    escuros = sum(
+        quantidade
+        for quantidade, (r, g, b) in cores
+        if r < 120 and g < 140 and b < 140
+    )
+    # Longe do corredor da rota, tinta escura só pode ser texto.
+    return escuros > 200

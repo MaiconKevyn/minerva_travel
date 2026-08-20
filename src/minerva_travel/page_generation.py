@@ -21,8 +21,10 @@ from PIL import Image, UnidentifiedImageError
 from minerva_travel.activity_page_compositor import (
     HERE_VS_HOME_TITLE,
     NEWSPAPER_HEADLINE_TITLE,
+    PAGE_TOP_BAND,
     SCENE_ARTWORK_SIZE,
     SPOT_SCENE_SIZE,
+    SUMMARY_MAX_STOPS,
     TRAVEL_DIARY_TITLE,
     ActivityPageCompositionError,
     compose_anagram_page,
@@ -49,6 +51,7 @@ from minerva_travel.activity_page_compositor import (
     compose_word_search_page,
     compose_writing_page,
     crop_scene_for_panel,
+    summary_band,
 )
 from minerva_travel.child_phrasebook import phrasebook_for_country
 from minerva_travel.config import (
@@ -518,12 +521,10 @@ class OpenAIGuidePageGenerator:
         # Sem foto e sem capa como referência: a página é só do roteiro, e
         # passar a família como entrada é o que a fazia reaparecer.
         references = [reference_page] if reference_page is not None else []
-        response = self._generate_activity_artwork(
-            prompt, references, size=SCENE_ARTWORK_SIZE_PARAM
-        )
+        response = self._generate_activity_artwork(prompt, references)
         artwork = _provider_artwork_path(output_path)
         try:
-            _persist_page_image(response, artwork, expected_size=SCENE_ARTWORK_SIZE)
+            _persist_page_image(response, artwork)
             return compose_summary_page(
                 artwork,
                 output_path,
@@ -1922,7 +1923,22 @@ def summary_page_prompt(
     — e é a parada que a criança procura quando abre o sumário.
     """
 
-    numbered = "\n".join(f"{index}. {name}" for index, name in enumerate(landmark_names, 1))
+    # A geometria vem do compositor, nao de numeros redigitados aqui: foi a
+    # divergencia entre o que se pede e o que se desenha que cortou o monumento
+    # pelos pes na pagina do ponto turistico.
+    altura_pagina = PAGE_IMAGE_SIZE[1]
+    total = min(len(landmark_names), SUMMARY_MAX_STOPS)
+    faixas_linhas = []
+    for indice, name in enumerate(landmark_names[:total]):
+        topo, base, a_direita = summary_band(indice, total)
+        faixas_linhas.append(
+            f"{indice + 1}. {name} — between {round(topo / altura_pagina * 100)} and "
+            f"{round(base / altura_pagina * 100)} percent of the page height, "
+            f"in the {'RIGHT' if a_direita else 'LEFT'} half; keep the "
+            f"{'LEFT' if a_direita else 'RIGHT'} half of this band empty."
+        )
+    faixas = "\n".join(faixas_linhas)
+    topo_pct = round(PAGE_TOP_BAND[3] / altura_pagina * 100)
     revision = _revision_directive(revision_instruction, has_revision_reference)
     reference = (
         "The supplied input image is the selected current-page attempt and is only a "
@@ -1931,12 +1947,11 @@ def summary_page_prompt(
         else "No reference image is supplied for this first version."
     )
     return f"""
-Create the wide horizontal itinerary illustration for page 2 of a premium children's illustrated
-family travel guide.
+Create the vertical itinerary illustration for page 2 of a premium children's illustrated family
+travel guide.
 {_HOUSE_STYLE}
 Design a joyful flat crayon-textured itinerary with one distinct recognizable illustrated vignette
-for every confirmed stop below, laid out left to right in the order given and connected by a
-playful dotted route.
+for every confirmed stop below.
 {reference}
 
 PEOPLE-FREE CONTRACT — This page is about the places, not the travellers. Do not depict a person,
@@ -1948,12 +1963,20 @@ signpost, page number, watermark or signature anywhere in this artwork. Trusted 
 numbered list of stops underneath, in the book's own typeface. A vignette must be recognizable on
 its own, without a name written next to it.
 
-STOPS — draw one vignette for each, in this order, and do not invent, merge or omit any:
-{numbered}
+LAYOUT — the application prints a title panel over the top {topo_pct} percent of the page and
+writes each stop's name itself, so this artwork must leave room for both. Divide the rest of the
+page into one horizontal band per stop and place each vignette inside its own band, on the side
+named below. THE OTHER SIDE OF EACH BAND MUST STAY EMPTY — plain, calm background with no motif,
+no scenery and no decoration — because the stop's name is printed there.
 
-This artwork is printed whole, edge to edge, with nothing cropped away, so compose for the wide
-landscape frame you were given. Do not imply precise geographic scale. No logos, prices, mockup
-border or UI. Output the finished flat illustration.
+{faixas}
+
+Do not draw a route, a path, a dotted line, an arrow, a number or a marker between the stops: the
+application draws the route itself. Keep the vignettes clearly separate, each whole and
+recognizable, sitting on the same flat pale background across the whole page.
+
+Do not invent, merge or omit stops. Do not imply precise geographic scale. No logos, prices,
+mockup border or UI. Output the finished flat illustration.
 {revision}
 """.strip()
 

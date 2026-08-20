@@ -2408,13 +2408,60 @@ def compose_destination_intro_page(
 
 
 SUMMARY_TITLE = "Nosso roteiro"
-SUMMARY_LIST_TOP = 1058
-SUMMARY_LIST_BOTTOM = 1486
-SUMMARY_MAX_STOPS = 8
-SUMMARY_COLUMN_GAP = 40
-SUMMARY_ROW_MAX_HEIGHT = 118
+SUMMARY_MAX_STOPS = 6
 SUMMARY_BULLET_RADIUS = 22
 SUMMARY_BULLET_GAP = 20
+# A pagina do roteiro e uma serpentina: uma faixa por parada, a vinheta
+# alternando de lado, e o nome na metade vazia da mesma faixa. O modelo so
+# desenha as vinhetas; a rota pontilhada e os nomes sao do codigo, que assim
+# sabe exatamente onde cada parada esta.
+SUMMARY_ROUTE_TOP = 372
+SUMMARY_ROUTE_BOTTOM = 1470
+SUMMARY_HALF = PAGE_IMAGE_SIZE[0] // 2
+SUMMARY_ROUTE_DOT = 7
+SUMMARY_ROUTE_STEP = 34
+# Quanto da curva fica de fora em cada ponta, para nao invadir a vinheta.
+SUMMARY_ROUTE_MARGIN = 0.10
+# Quao longe do eixo da pagina a rota se afasta, de cada lado.
+SUMMARY_ROUTE_INSET = 96
+
+
+def summary_band(index: int, total: int) -> tuple[int, int, bool]:
+    """Faixa da parada: topo, base e se a vinheta fica a direita.
+
+    O codigo e o prompt derivam a geometria daqui, os dois. Foi a divergencia
+    entre o que se pedia e o que se desenhava que cortou o monumento pelos pes
+    na pagina do ponto turistico.
+    """
+
+    altura = (SUMMARY_ROUTE_BOTTOM - SUMMARY_ROUTE_TOP) // max(1, total)
+    topo = SUMMARY_ROUTE_TOP + index * altura
+    return topo, topo + altura, index % 2 == 0
+
+
+def _draw_dotted_route(draw: ImageDraw.ImageDraw, pontos: Sequence[tuple[float, float]]) -> None:
+    """Liga as paradas com a rota pontilhada, em curva e nao em reta."""
+
+    ultimo = len(pontos) - 2
+    for trecho, ((x0, y0), (x1, y1)) in enumerate(zip(pontos, pontos[1:], strict=False)):
+        # Tangentes verticais nas duas pontas: a rota desce de uma parada, faz
+        # a barriga e sobe na proxima. Com os controles na diagonal ela saia
+        # reta, e reta nao parece caminho — parece regua.
+        c0 = (x0, y0 + (y1 - y0) * 0.55)
+        c1 = (x1, y1 - (y1 - y0) * 0.55)
+        comprimento = abs(y1 - y0) + abs(x1 - x0)
+        passos = max(4, int(comprimento / SUMMARY_ROUTE_STEP))
+        # So as duas pontas do caminho inteiro ficam de fora — as internas nao,
+        # senao a rota vira tracos soltos em vez de um caminho continuo.
+        inicio = SUMMARY_ROUTE_MARGIN if trecho == 0 else 0.0
+        fim = 1 - SUMMARY_ROUTE_MARGIN if trecho == ultimo else 1.0
+        for passo in range(passos + 1):
+            s = inicio + (passo / passos) * (fim - inicio)
+            u = 1 - s
+            x = u**3 * x0 + 3 * u**2 * s * c0[0] + 3 * u * s**2 * c1[0] + s**3 * x1
+            y = u**3 * y0 + 3 * u**2 * s * c0[1] + 3 * u * s**2 * c1[1] + s**3 * y1
+            raio = SUMMARY_ROUTE_DOT / 2
+            draw.ellipse((x - raio, y - raio, x + raio, y + raio), fill=INK)
 
 
 def compose_summary_page(
@@ -2425,12 +2472,12 @@ def compose_summary_page(
     trip_date: str,
     landmark_names: Sequence[str],
 ) -> Path:
-    """Escreve o roteiro sobre a cena das paradas, na fonte do caderno.
+    """Monta o roteiro: vinhetas do modelo, rota e nomes do codigo.
 
-    O modelo desenhava o nome de cada parada ao lado da sua vinheta, e nao ha
-    como o codigo adivinhar onde a vinheta caiu. Entao a lista numerada desce
-    para a faixa de baixo, onde o codigo manda: a cena mostra as paradas, a
-    lista as nomeia — as duas na mesma voz do resto do livro.
+    A lista numerada no rodape mostrava os nomes mas nao amarrava nenhum deles
+    ao seu desenho — quem abria a pagina via as paradas de um lado e a lista do
+    outro. Aqui cada nome fica na mesma faixa da sua vinheta, e a rota
+    pontilhada passa por elas na ordem, sem que a IA precise escrever nada.
     """
 
     paradas = [" ".join(nome.split()) for nome in landmark_names if nome.strip()]
@@ -2438,9 +2485,9 @@ def compose_summary_page(
         raise ActivityPageCompositionError("O roteiro não tem paradas.")
     paradas = paradas[:SUMMARY_MAX_STOPS]
 
-    image = Image.new("RGB", PAGE_IMAGE_SIZE, BAND)
-    image.paste(_fitted_scene(artwork_path), (PAGE_SCENE_BOX[0], PAGE_SCENE_BOX[1]))
+    image = _load_artwork(artwork_path)
     draw = ImageDraw.Draw(image)
+    draw.rectangle(PAGE_TOP_BAND, fill=BAND)
     _draw_scene_page_header(
         image,
         draw,
@@ -2449,50 +2496,40 @@ def compose_summary_page(
         arched=_bounded(trip_date, "trip_date", 60) if trip_date.strip() else "",
     )
 
-    # Uma coluna ate quatro paradas; acima disso, duas, senao as linhas ficam
-    # tao apertadas que o nome encolhe abaixo do legivel.
-    colunas = 1 if len(paradas) <= 4 else 2
-    linhas = -(-len(paradas) // colunas)
-    largura_coluna = (PAGE_TEXT_RIGHT - PAGE_TEXT_LEFT - (colunas - 1) * SUMMARY_COLUMN_GAP) // (
-        colunas
-    )
-    # A altura da linha tem teto: com tres paradas, dividir a faixa inteira
-    # espalhava a lista pela pagina como se faltasse conteudo.
-    altura_linha = min(
-        SUMMARY_ROW_MAX_HEIGHT, (SUMMARY_LIST_BOTTOM - SUMMARY_LIST_TOP) // linhas
-    )
-    topo_lista = SUMMARY_LIST_TOP + (
-        (SUMMARY_LIST_BOTTOM - SUMMARY_LIST_TOP) - altura_linha * linhas
-    ) // 2
-
-    # Um corpo so para a lista inteira. Deixar cada nome escolher o seu fazia a
-    # parada de nome longo aparecer menor que a vizinha, dentro da mesma lista.
-    largura_texto = largura_coluna - 2 * SUMMARY_BULLET_RADIUS - SUMMARY_BULLET_GAP
+    # Um corpo so para todas as paradas: deixar cada nome escolher o seu fazia
+    # a parada de nome longo aparecer menor que a vizinha na mesma pagina.
+    largura_do_nome = SUMMARY_HALF - PAGE_TEXT_LEFT - 2 * SUMMARY_BULLET_RADIUS - SUMMARY_BULLET_GAP
     corpo = _shared_fit_size(
-        draw, paradas, maximum_size=32, minimum_size=18, maximum_width=largura_texto
+        draw, paradas, maximum_size=34, minimum_size=17, maximum_width=largura_do_nome
     )
     fonte = _font(corpo, bold=True)
-    recuo = (
-        (PAGE_IMAGE_SIZE[0] - (2 * SUMMARY_BULLET_RADIUS + SUMMARY_BULLET_GAP + max(
-            draw.textlength(parada, font=fonte) for parada in paradas
-        ))) / 2
-        if colunas == 1
-        else PAGE_TEXT_LEFT
-    )
 
+    ancoras = []
     for indice, parada in enumerate(paradas):
-        coluna, linha = divmod(indice, linhas) if colunas == 2 else (0, indice)
-        esquerda = recuo + coluna * (largura_coluna + SUMMARY_COLUMN_GAP)
-        centro_y = topo_lista + linha * altura_linha + altura_linha // 2
-        _draw_numbered_bullet(draw, str(indice + 1), (esquerda, centro_y))
+        topo, base, vinheta_a_direita = summary_band(indice, len(paradas))
+        meio = (topo + base) // 2
+        # A rota corre pelo corredor central, nao pelo meio da vinheta: ancorada
+        # no centro do desenho, os primeiros pontos caiam em cima do monumento.
+        ancoras.append(
+            (
+                SUMMARY_HALF + (SUMMARY_ROUTE_INSET if vinheta_a_direita else -SUMMARY_ROUTE_INSET),
+                meio,
+            )
+        )
+
+        # O nome ocupa a metade que a vinheta deixou vazia.
+        esquerda = PAGE_TEXT_LEFT if vinheta_a_direita else SUMMARY_HALF + 20
+        _draw_numbered_bullet(draw, str(indice + 1), (esquerda, meio))
         caixa = draw.textbbox((0, 0), parada, font=fonte)
         draw.text(
             (
                 esquerda + 2 * SUMMARY_BULLET_RADIUS + SUMMARY_BULLET_GAP,
-                centro_y - (caixa[3] - caixa[1]) / 2 - caixa[1],
+                meio - (caixa[3] - caixa[1]) / 2 - caixa[1],
             ),
             parada,
             font=fonte,
             fill=INK,
         )
+
+    _draw_dotted_route(draw, ancoras)
     return _atomic_save(image, output_path)
