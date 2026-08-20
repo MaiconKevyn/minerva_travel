@@ -20,8 +20,8 @@ from PIL import Image, UnidentifiedImageError
 
 from minerva_travel.activity_page_compositor import (
     HERE_VS_HOME_TITLE,
-    LANDMARK_SCENE_SIZE,
     NEWSPAPER_HEADLINE_TITLE,
+    SCENE_ARTWORK_SIZE,
     SPOT_SCENE_SIZE,
     TRAVEL_DIARY_TITLE,
     ActivityPageCompositionError,
@@ -31,6 +31,7 @@ from minerva_travel.activity_page_compositor import (
     compose_cover_page,
     compose_crossword_page,
     compose_cryptogram_page,
+    compose_destination_intro_page,
     compose_detail_hunt_page,
     compose_dot_to_dot_page,
     compose_drawing_page,
@@ -44,6 +45,7 @@ from minerva_travel.activity_page_compositor import (
     compose_passport_page,
     compose_postcard_page,
     compose_spot_the_difference_page,
+    compose_summary_page,
     compose_word_search_page,
     compose_writing_page,
     crop_scene_for_panel,
@@ -98,7 +100,7 @@ PAGE_IMAGE_SIZE_PARAM = "1024x1536"
 # A cena dos erros é a única arte deitada: em pé, o painel largo cortava o
 # monumento ao meio e escondia dois terços dos objetos do jogo.
 SPOT_SCENE_SIZE_PARAM = f"{SPOT_SCENE_SIZE[0]}x{SPOT_SCENE_SIZE[1]}"
-LANDMARK_SCENE_SIZE_PARAM = f"{LANDMARK_SCENE_SIZE[0]}x{LANDMARK_SCENE_SIZE[1]}"
+SCENE_ARTWORK_SIZE_PARAM = f"{SCENE_ARTWORK_SIZE[0]}x{SCENE_ARTWORK_SIZE[1]}"
 MAX_PAGE_IMAGE_BYTES = 25 * 1024 * 1024
 
 
@@ -516,8 +518,23 @@ class OpenAIGuidePageGenerator:
         # Sem foto e sem capa como referência: a página é só do roteiro, e
         # passar a família como entrada é o que a fazia reaparecer.
         references = [reference_page] if reference_page is not None else []
-        response = self._generate_activity_artwork(prompt, references)
-        return _persist_page_image(response, output_path)
+        response = self._generate_activity_artwork(
+            prompt, references, size=SCENE_ARTWORK_SIZE_PARAM
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            _persist_page_image(response, artwork, expected_size=SCENE_ARTWORK_SIZE)
+            return compose_summary_page(
+                artwork,
+                output_path,
+                family_title=family_title,
+                trip_date=trip_date,
+                landmark_names=landmark_names,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar o roteiro.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
 
     def generate_destination_intro_page(
         self,
@@ -545,11 +562,28 @@ class OpenAIGuidePageGenerator:
             has_revision_reference=reference_page is not None,
         )
         response = (
-            self._edit_with_references(prompt, [reference_page])
+            self._edit_with_references(prompt, [reference_page], size=SCENE_ARTWORK_SIZE_PARAM)
             if reference_page is not None
-            else self._generate_from_prompt(prompt)
+            else self._generate_from_prompt(prompt, size=SCENE_ARTWORK_SIZE_PARAM)
         )
-        return _persist_page_image(response, output_path)
+        artwork = _provider_artwork_path(output_path)
+        try:
+            _persist_page_image(response, artwork, expected_size=SCENE_ARTWORK_SIZE)
+            return compose_destination_intro_page(
+                artwork,
+                output_path,
+                title=title,
+                subtitle=country if country.strip().casefold() != title.strip().casefold() else "",
+                learning_points=learning_points,
+                curiosity=curiosity,
+                curiosity_label=curiosity_label,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError(
+                "Não foi possível finalizar a abertura do destino."
+            ) from error
+        finally:
+            artwork.unlink(missing_ok=True)
 
     def generate_landmark_page(
         self,
@@ -591,17 +625,17 @@ class OpenAIGuidePageGenerator:
             if reference_page is not None:
                 references.append(reference_page)
             response = self._edit_with_references(
-                prompt, references, size=LANDMARK_SCENE_SIZE_PARAM
+                prompt, references, size=SCENE_ARTWORK_SIZE_PARAM
             )
         elif reference_page is not None:
             response = self._edit_with_references(
-                prompt, [reference_page], size=LANDMARK_SCENE_SIZE_PARAM
+                prompt, [reference_page], size=SCENE_ARTWORK_SIZE_PARAM
             )
         else:
-            response = self._generate_from_prompt(prompt, size=LANDMARK_SCENE_SIZE_PARAM)
+            response = self._generate_from_prompt(prompt, size=SCENE_ARTWORK_SIZE_PARAM)
         artwork = _provider_artwork_path(output_path)
         try:
-            _persist_page_image(response, artwork, expected_size=LANDMARK_SCENE_SIZE)
+            _persist_page_image(response, artwork, expected_size=SCENE_ARTWORK_SIZE)
             return compose_landmark_page(
                 artwork,
                 output_path,
@@ -1887,7 +1921,7 @@ def summary_page_prompt(
     — e é a parada que a criança procura quando abre o sumário.
     """
 
-    numbered = "\n".join(f'{index}. "{name}"' for index, name in enumerate(landmark_names, 1))
+    numbered = "\n".join(f"{index}. {name}" for index, name in enumerate(landmark_names, 1))
     revision = _revision_directive(revision_instruction, has_revision_reference)
     reference = (
         "The supplied input image is the selected current-page attempt and is only a "
@@ -1896,27 +1930,29 @@ def summary_page_prompt(
         else "No reference image is supplied for this first version."
     )
     return f"""
-Create page 2 of a premium vertical children's illustrated family travel guide.
+Create the wide horizontal itinerary illustration for page 2 of a premium children's illustrated
+family travel guide.
 {_HOUSE_STYLE}
-Design a joyful flat crayon-textured itinerary infographic with one distinct recognizable
-illustrated vignette for every confirmed stop below, connected in order by a playful dotted route.
+Design a joyful flat crayon-textured itinerary with one distinct recognizable illustrated vignette
+for every confirmed stop below, laid out left to right in the order given and connected by a
+playful dotted route.
 {reference}
 
 PEOPLE-FREE CONTRACT — This page is about the places, not the travellers. Do not depict a person,
 family member, child, tourist, face, body, human silhouette, crowd or portrait anywhere. Give the
-whole page to the stops and the route between them.
+whole artwork to the stops and the route between them.
 
-TEXT CONTRACT — render every quoted string verbatim, exactly once, with no spelling changes:
-"Nosso roteiro"
-"{family_title}"
-"{trip_date}"
+TEXT-FREE CONTRACT — do not render any letter, word, number, title, caption, label, sign,
+signpost, page number, watermark or signature anywhere in this artwork. Trusted code prints the
+numbered list of stops underneath, in the book's own typeface. A vignette must be recognizable on
+its own, without a name written next to it.
+
+STOPS — draw one vignette for each, in this order, and do not invent, merge or omit any:
 {numbered}
 
-Each stop name must sit beside its own illustration and remain large enough to read on a phone.
-Use correct Portuguese accents, clean editorial hierarchy, generous spacing and strong contrast.
-Do not invent, merge or omit stops. Do not imply precise geographic scale.
-No other readable text, logos, prices, watermark, signature, mockup border or UI.
-Output the finished flat guide page.
+This artwork is printed whole, edge to edge, with nothing cropped away, so compose for the wide
+landscape frame you were given. Do not imply precise geographic scale. No logos, prices, mockup
+border or UI. Output the finished flat illustration.
 {revision}
 """.strip()
 
@@ -1933,44 +1969,28 @@ def destination_intro_page_prompt(
     revision_instruction: str = "",
     has_revision_reference: bool = False,
 ) -> str:
-    normalized_points = [" ".join(point.split()) for point in learning_points if point.strip()]
-    normalized_curiosity = " ".join(curiosity.split())
-    normalized_label = " ".join(curiosity_label.split())
-    subtitle = country if country.strip().casefold() != title.strip().casefold() else ""
-    exact_copy = [
-        title,
-        subtitle,
-        "Descubra este destino",
-        *normalized_points,
-        normalized_label,
-        normalized_curiosity,
-    ]
-    quoted_copy = "\n".join(json.dumps(value, ensure_ascii=False) for value in exact_copy if value)
     visual_anchors = ", ".join(landmark_names)
     location = ", ".join(part for part in (city, country) if part)
     revision = _revision_directive(revision_instruction, has_revision_reference)
     people_contract = _destination_without_people_directive(has_revision_reference)
     return f"""
-Create a complete vertical destination-introduction page for a premium children's illustrated
-family travel guide about {location}.
+Create the wide horizontal illustration that opens the chapter about {location} in a premium
+children's illustrated family travel guide.
 {_HOUSE_STYLE}
 
-Use an original child-friendly travel-journal hierarchy inspired by classic exploration books:
-a large destination title, two short learning notes with small decorative star icons, one
-recognizable flat crayon-textured destination scene, and a distinct curiosity card. Keep every
-text block short, high-contrast, correctly accented, and readable on a phone. Do not copy any
-reference-book characters, border, wording, page number, or layout.
+TEXT-FREE CONTRACT — do not render any letter, word, number, title, subtitle, caption, sign,
+label, page number, monogram, watermark or signature anywhere in this artwork. Trusted code prints
+the destination name, the country, the learning notes and the curiosity around it, in the book's
+own typeface.
 
-Use these confirmed places only as visual anchors for the destination scene: {visual_anchors}.
-Do not render their names unless they already appear in the exact text contract below.
+This artwork is printed whole, edge to edge, with nothing cropped away, so compose for the wide
+landscape frame you were given. Use these confirmed places only as visual anchors for the scene:
+{visual_anchors}. Show them whole, with their base or waterline included, and let the scenery run
+out to the left and right edges instead of floating in the middle of an empty field. Do not copy
+any reference-book characters, border, wording, page number, or layout.
+
 Do not add or infer any fact, date, number, historical claim, superlative, recommendation, or
-activity.
-
-TEXT CONTRACT — render every quoted string verbatim, exactly once, with no spelling changes:
-{quoted_copy}
-
-No other readable text, logos, prices, watermark, signature, mockup border or UI. Output the
-finished flat guide page.
+activity. No logos, prices, mockup border or UI. Output the finished flat illustration.
 {revision}
 {people_contract}
 """.strip()

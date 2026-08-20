@@ -41,8 +41,9 @@ PAPER = identidade.PAPEL
 # Ocre suave em vez do azul-acinzentado: as réguas e molduras passam a ser as
 # mesmas do guia impresso que serve de referência do produto.
 PANEL_OUTLINE = identidade.CREME
-# A faixa chapada onde o tipo assenta, na pagina do ponto turistico.
+# A faixa chapada onde o tipo assenta, nas paginas ilustradas.
 BAND = identidade.CREME
+HIGHLIGHT = identidade.MOSTARDA
 _PAPEL_RGB = tuple(int(PAPER[i : i + 2], 16) for i in (1, 3, 5))
 # Folga so para o antisserrilhado da tipografia, nao para deixar arte passar.
 _TOLERANCIA_PAPEL = 4
@@ -139,17 +140,18 @@ HOMECOMING_REQUIRED_COPY = (
 # A pagina do ponto turistico e composta como a capa: a arte chega sem letra
 # nenhuma e o codigo escreve por cima, em duas faixas chapadas que sangram ate
 # a borda — o gesto da referencia, onde o tipo assenta sobre blocos de cor.
-# A cena chega deitada, no formato exato da janela. Pedir a arte no formato da
+# A grade das paginas ilustradas: a cena chega deitada, no formato exato da
+# janela entre as duas faixas chapadas onde o codigo escreve. Pedir a arte no formato da
 # pagina e depois tapar dois tercos dela era o que cortava o monumento pelos pes:
 # o modelo compunha para o quadro inteiro que recebia, e a faixa caia por cima.
-LANDMARK_SCENE_SIZE = (1536, 1024)
-LANDMARK_TOP_BAND = (0, 0, PAGE_IMAGE_SIZE[0], 340)
-LANDMARK_SCENE_BOX = (0, 340, PAGE_IMAGE_SIZE[0], 1023)
-LANDMARK_BOTTOM_BAND = (0, 1023, PAGE_IMAGE_SIZE[0], PAGE_IMAGE_SIZE[1])
-LANDMARK_TEXT_LEFT = 76
-LANDMARK_TEXT_RIGHT = PAGE_IMAGE_SIZE[0] - 76
-LANDMARK_BLOCKS_TOP = 1076
-LANDMARK_BLOCKS_BOTTOM = 1372
+SCENE_ARTWORK_SIZE = (1536, 1024)
+PAGE_TOP_BAND = (0, 0, PAGE_IMAGE_SIZE[0], 340)
+PAGE_SCENE_BOX = (0, 340, PAGE_IMAGE_SIZE[0], 1023)
+PAGE_BOTTOM_BAND = (0, 1023, PAGE_IMAGE_SIZE[0], PAGE_IMAGE_SIZE[1])
+PAGE_TEXT_LEFT = 76
+PAGE_TEXT_RIGHT = PAGE_IMAGE_SIZE[0] - 76
+PAGE_BLOCKS_TOP = 1076
+PAGE_BLOCKS_BOTTOM = 1372
 LANDMARK_VISITED_LABEL = "Já visitei"
 LANDMARK_VISITED_PANEL = (326, 1392, 698, 1500)
 LANDMARK_VISITED_CHECKBOX = (366, 1423, 414, 1471)
@@ -1740,6 +1742,44 @@ def _draw_centered_fit(
     raise ActivityPageCompositionError("O nome do ponto turístico não cabe no título.")
 
 
+def _shared_fit_size(
+    draw: ImageDraw.ImageDraw,
+    textos: Sequence[str],
+    *,
+    maximum_size: int,
+    minimum_size: int,
+    maximum_width: int,
+) -> int:
+    """O maior corpo em que TODOS os textos cabem, para a lista falar igual."""
+
+    for size in range(maximum_size, minimum_size - 1, -1):
+        font = _font(size, bold=True)
+        if all(draw.textlength(texto, font=font) <= maximum_width for texto in textos):
+            return size
+    raise ActivityPageCompositionError("O nome da parada não cabe no roteiro.")
+
+
+def _draw_numbered_bullet(
+    draw: ImageDraw.ImageDraw,
+    numero: str,
+    anchor: tuple[float, float],
+) -> None:
+    left, middle = anchor
+    raio = SUMMARY_BULLET_RADIUS
+    draw.ellipse((left, middle - raio, left + 2 * raio, middle + raio), fill=ACCENT)
+    fonte = _font(24, bold=True)
+    caixa = draw.textbbox((0, 0), numero, font=fonte)
+    draw.text(
+        (
+            left + raio - (caixa[2] - caixa[0]) / 2 - caixa[0],
+            middle - (caixa[3] - caixa[1]) / 2 - caixa[1],
+        ),
+        numero,
+        font=fonte,
+        fill=PAPER,
+    )
+
+
 def _draw_centered_fit_box(
     draw: ImageDraw.ImageDraw,
     text: str,
@@ -2014,7 +2054,7 @@ def _fitted_scene(path: Path) -> Image.Image:
     except (UnidentifiedImageError, OSError) as error:
         raise ActivityPageCompositionError("A cena do ponto turístico é inválida.") from error
 
-    esquerda, topo, direita, base = LANDMARK_SCENE_BOX
+    esquerda, topo, direita, base = PAGE_SCENE_BOX
     largura, altura = direita - esquerda, base - topo
     escala = max(largura / cena.width, altura / cena.height)
     redimensionada = cena.resize(
@@ -2024,6 +2064,89 @@ def _fitted_scene(path: Path) -> Image.Image:
     corte_x = (redimensionada.width - largura) // 2
     corte_y = (redimensionada.height - altura) // 2
     return redimensionada.crop((corte_x, corte_y, corte_x + largura, corte_y + altura))
+
+
+def _draw_star(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    radius: float,
+    fill: str,
+) -> None:
+    """A estrelinha que marca as notas de aprendizado, como nas pranchas."""
+
+    cx, cy = center
+    pontas = []
+    for indice in range(10):
+        raio = radius if indice % 2 == 0 else radius * 0.42
+        angulo = -math.pi / 2 + indice * math.pi / 5
+        pontas.append((cx + raio * math.cos(angulo), cy + raio * math.sin(angulo)))
+    draw.polygon(pontas, fill=fill)
+
+
+def _draw_band_blocks(
+    draw: ImageDraw.ImageDraw,
+    blocos: Sequence[tuple[str, str]],
+    *,
+    bottom: int = PAGE_BLOCKS_BOTTOM,
+) -> None:
+    """Distribui os blocos rotulados pela faixa de baixo, separados por um fio."""
+
+    presentes = [
+        (rotulo, " ".join(texto.split())) for rotulo, texto in blocos if " ".join(texto.split())
+    ]
+    if not presentes:
+        return
+    vao = 26
+    altura = (bottom - PAGE_BLOCKS_TOP - vao * (len(presentes) - 1)) // len(presentes)
+    topo = PAGE_BLOCKS_TOP
+    for indice, (rotulo, texto) in enumerate(presentes):
+        if indice:
+            meio = topo - vao // 2
+            draw.line((PAGE_TEXT_LEFT, meio, PAGE_TEXT_RIGHT, meio), fill=MUTED_INK, width=2)
+        _draw_tracked(
+            draw,
+            _bounded(rotulo, "rótulo do bloco", 60).upper(),
+            topo,
+            size=21,
+            fill=ACCENT,
+            left=PAGE_TEXT_LEFT,
+        )
+        _draw_wrapped_fit(
+            draw,
+            texto,
+            (PAGE_TEXT_LEFT, topo + 40, PAGE_TEXT_RIGHT, topo + altura),
+            maximum_size=26,
+            minimum_size=17,
+            fill=INK,
+        )
+        topo += altura + vao
+
+
+def _draw_scene_page_header(
+    image: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    *,
+    overline: str,
+    title: str,
+    arched: str,
+) -> None:
+    """A cabeceira das paginas ilustradas: sobrelinha, titulo e a linha em arco."""
+
+    if overline:
+        _draw_tracked(draw, overline.upper(), 44, size=21, fill=MUTED_INK)
+    _draw_centered_fit(draw, title, 100, 78, 34, 880, bold=True)
+    if arched:
+        # Arco lido em 286, entao o centro da circunferencia fica um raio acima.
+        RAIO = 430
+        _arc_text(
+            image,
+            arched.upper(),
+            center=(PAGE_IMAGE_SIZE[0] // 2, 286 - RAIO),
+            radius=RAIO,
+            size=25,
+            fill=ACCENT,
+            below=True,
+        )
 
 
 def compose_landmark_page(
@@ -2056,70 +2179,185 @@ def compose_landmark_page(
     )
 
     image = Image.new("RGB", PAGE_IMAGE_SIZE, BAND)
-    image.paste(_fitted_scene(artwork_path), (LANDMARK_SCENE_BOX[0], LANDMARK_SCENE_BOX[1]))
+    image.paste(_fitted_scene(artwork_path), (PAGE_SCENE_BOX[0], PAGE_SCENE_BOX[1]))
     draw = ImageDraw.Draw(image)
 
-    if assinatura:
-        _draw_tracked(
-            draw,
-            _bounded(assinatura, "assinatura", 120).upper(),
-            44,
-            size=21,
-            fill=MUTED_INK,
-        )
-    _draw_centered_fit(draw, nome, 100, 78, 34, 880, bold=True)
-    if lugar:
-        # Arco lido em 286, entao o centro da circunferencia fica um raio acima.
-        RAIO_DO_LUGAR = 430
-        _arc_text(
-            image,
-            _bounded(lugar, "location", 80).upper(),
-            center=(PAGE_IMAGE_SIZE[0] // 2, 286 - RAIO_DO_LUGAR),
-            radius=RAIO_DO_LUGAR,
-            size=25,
-            fill=ACCENT,
-            below=True,
-        )
+    _draw_scene_page_header(
+        image,
+        draw,
+        overline=_bounded(assinatura, "assinatura", 120) if assinatura else "",
+        title=nome,
+        arched=_bounded(lugar, "location", 80) if lugar else "",
+    )
 
-    blocos = [
-        (rotulo, " ".join(texto.split()))
-        for rotulo, texto in (
+    _draw_band_blocks(
+        draw,
+        [
             ("Conheça o lugar", description),
             (curiosity_label or "Você sabia?", curiosity),
-        )
-        if " ".join(texto.split())
-    ]
-    if blocos:
-        vao = 26
-        altura = (LANDMARK_BLOCKS_BOTTOM - LANDMARK_BLOCKS_TOP - vao * (len(blocos) - 1)) // len(
-            blocos
-        )
-        topo = LANDMARK_BLOCKS_TOP
-        for indice, (rotulo, texto) in enumerate(blocos):
-            if indice:
-                meio = topo - vao // 2
-                draw.line(
-                    (LANDMARK_TEXT_LEFT, meio, LANDMARK_TEXT_RIGHT, meio),
-                    fill=MUTED_INK,
-                    width=2,
-                )
-            _draw_tracked(
-                draw,
-                _bounded(rotulo, "curiosity_label", 60).upper(),
-                topo,
-                size=21,
-                fill=ACCENT,
-                left=LANDMARK_TEXT_LEFT,
-            )
-            _draw_wrapped_fit(
-                draw,
-                texto,
-                (LANDMARK_TEXT_LEFT, topo + 40, LANDMARK_TEXT_RIGHT, topo + altura),
-                maximum_size=26,
-                minimum_size=17,
-                fill=INK,
-            )
-            topo += altura + vao
-
+        ],
+    )
     _draw_visited_marker(draw)
+    return _atomic_save(image, output_path)
+
+
+DESTINATION_OVERLINE = "Descubra este destino"
+DESTINATION_NOTES_TOP = 1050
+DESTINATION_NOTE_HEIGHT = 88
+DESTINATION_TEXT_BOTTOM = 1470
+
+
+def compose_destination_intro_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    title: str,
+    subtitle: str = "",
+    learning_points: Sequence[str] = (),
+    curiosity: str = "",
+    curiosity_label: str = "Você sabia?",
+) -> Path:
+    """Monta a abertura do destino na mesma grade da pagina do ponto turistico.
+
+    As duas paginas abrem o mesmo capitulo e precisam abrir igual: cabeceira em
+    cima, cena deitada no meio, texto na faixa de baixo. Enquanto o modelo
+    escrevia, cada abertura chegava com um desenho de titulo proprio.
+    """
+
+    destino = _bounded(title, "title", 80)
+    image = Image.new("RGB", PAGE_IMAGE_SIZE, BAND)
+    image.paste(_fitted_scene(artwork_path), (PAGE_SCENE_BOX[0], PAGE_SCENE_BOX[1]))
+    draw = ImageDraw.Draw(image)
+    _draw_scene_page_header(
+        image,
+        draw,
+        overline=DESTINATION_OVERLINE,
+        title=destino,
+        arched=_bounded(subtitle, "subtitle", 80) if subtitle.strip() else "",
+    )
+
+    topo = DESTINATION_NOTES_TOP
+    for nota in [" ".join(ponto.split()) for ponto in learning_points if ponto.strip()][:2]:
+        _draw_star(draw, (PAGE_TEXT_LEFT + 16, topo + 22), 16, HIGHLIGHT)
+        _draw_wrapped_fit(
+            draw,
+            nota,
+            (PAGE_TEXT_LEFT + 52, topo, PAGE_TEXT_RIGHT, topo + DESTINATION_NOTE_HEIGHT),
+            maximum_size=26,
+            minimum_size=17,
+            fill=INK,
+        )
+        topo += DESTINATION_NOTE_HEIGHT + 12
+
+    if curiosity.strip():
+        meio = topo + 12
+        draw.line((PAGE_TEXT_LEFT, meio, PAGE_TEXT_RIGHT, meio), fill=MUTED_INK, width=2)
+        rotulo = meio + 24
+        _draw_tracked(
+            draw,
+            _bounded(curiosity_label or "Você sabia?", "curiosity_label", 60).upper(),
+            rotulo,
+            size=21,
+            fill=ACCENT,
+            left=PAGE_TEXT_LEFT,
+        )
+        _draw_wrapped_fit(
+            draw,
+            " ".join(curiosity.split()),
+            (PAGE_TEXT_LEFT, rotulo + 40, PAGE_TEXT_RIGHT, DESTINATION_TEXT_BOTTOM),
+            maximum_size=26,
+            minimum_size=17,
+            fill=INK,
+        )
+    return _atomic_save(image, output_path)
+
+
+SUMMARY_TITLE = "Nosso roteiro"
+SUMMARY_LIST_TOP = 1058
+SUMMARY_LIST_BOTTOM = 1486
+SUMMARY_MAX_STOPS = 8
+SUMMARY_COLUMN_GAP = 40
+SUMMARY_ROW_MAX_HEIGHT = 118
+SUMMARY_BULLET_RADIUS = 22
+SUMMARY_BULLET_GAP = 20
+
+
+def compose_summary_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    family_title: str,
+    trip_date: str,
+    landmark_names: Sequence[str],
+) -> Path:
+    """Escreve o roteiro sobre a cena das paradas, na fonte do caderno.
+
+    O modelo desenhava o nome de cada parada ao lado da sua vinheta, e nao ha
+    como o codigo adivinhar onde a vinheta caiu. Entao a lista numerada desce
+    para a faixa de baixo, onde o codigo manda: a cena mostra as paradas, a
+    lista as nomeia — as duas na mesma voz do resto do livro.
+    """
+
+    paradas = [" ".join(nome.split()) for nome in landmark_names if nome.strip()]
+    if not paradas:
+        raise ActivityPageCompositionError("O roteiro não tem paradas.")
+    paradas = paradas[:SUMMARY_MAX_STOPS]
+
+    image = Image.new("RGB", PAGE_IMAGE_SIZE, BAND)
+    image.paste(_fitted_scene(artwork_path), (PAGE_SCENE_BOX[0], PAGE_SCENE_BOX[1]))
+    draw = ImageDraw.Draw(image)
+    _draw_scene_page_header(
+        image,
+        draw,
+        overline=_bounded(family_title, "family_title", 60),
+        title=SUMMARY_TITLE,
+        arched=_bounded(trip_date, "trip_date", 60) if trip_date.strip() else "",
+    )
+
+    # Uma coluna ate quatro paradas; acima disso, duas, senao as linhas ficam
+    # tao apertadas que o nome encolhe abaixo do legivel.
+    colunas = 1 if len(paradas) <= 4 else 2
+    linhas = -(-len(paradas) // colunas)
+    largura_coluna = (PAGE_TEXT_RIGHT - PAGE_TEXT_LEFT - (colunas - 1) * SUMMARY_COLUMN_GAP) // (
+        colunas
+    )
+    # A altura da linha tem teto: com tres paradas, dividir a faixa inteira
+    # espalhava a lista pela pagina como se faltasse conteudo.
+    altura_linha = min(
+        SUMMARY_ROW_MAX_HEIGHT, (SUMMARY_LIST_BOTTOM - SUMMARY_LIST_TOP) // linhas
+    )
+    topo_lista = SUMMARY_LIST_TOP + (
+        (SUMMARY_LIST_BOTTOM - SUMMARY_LIST_TOP) - altura_linha * linhas
+    ) // 2
+
+    # Um corpo so para a lista inteira. Deixar cada nome escolher o seu fazia a
+    # parada de nome longo aparecer menor que a vizinha, dentro da mesma lista.
+    largura_texto = largura_coluna - 2 * SUMMARY_BULLET_RADIUS - SUMMARY_BULLET_GAP
+    corpo = _shared_fit_size(
+        draw, paradas, maximum_size=32, minimum_size=18, maximum_width=largura_texto
+    )
+    fonte = _font(corpo, bold=True)
+    recuo = (
+        (PAGE_IMAGE_SIZE[0] - (2 * SUMMARY_BULLET_RADIUS + SUMMARY_BULLET_GAP + max(
+            draw.textlength(parada, font=fonte) for parada in paradas
+        ))) / 2
+        if colunas == 1
+        else PAGE_TEXT_LEFT
+    )
+
+    for indice, parada in enumerate(paradas):
+        coluna, linha = divmod(indice, linhas) if colunas == 2 else (0, indice)
+        esquerda = recuo + coluna * (largura_coluna + SUMMARY_COLUMN_GAP)
+        centro_y = topo_lista + linha * altura_linha + altura_linha // 2
+        _draw_numbered_bullet(draw, str(indice + 1), (esquerda, centro_y))
+        caixa = draw.textbbox((0, 0), parada, font=fonte)
+        draw.text(
+            (
+                esquerda + 2 * SUMMARY_BULLET_RADIUS + SUMMARY_BULLET_GAP,
+                centro_y - (caixa[3] - caixa[1]) / 2 - caixa[1],
+            ),
+            parada,
+            font=fonte,
+            fill=INK,
+        )
     return _atomic_save(image, output_path)

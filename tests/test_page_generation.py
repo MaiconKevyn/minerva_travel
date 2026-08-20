@@ -6,7 +6,7 @@ import httpx
 import pytest
 from PIL import Image, ImageDraw
 
-from minerva_travel.activity_page_compositor import BAND, LANDMARK_SCENE_SIZE
+from minerva_travel.activity_page_compositor import BAND, SCENE_ARTWORK_SIZE
 from minerva_travel.page_generation import (
     SPOT_SCENE_SIZE,
     OpenAIGuidePageGenerator,
@@ -83,7 +83,13 @@ def _family_references(tmp_path):
 
 
 def test_openai_rate_limit_retries_with_bounded_exponential_backoff(tmp_path):
-    responses = iter([_error_response(429), _error_response(429), _response(_png_bytes())])
+    responses = iter(
+        [
+            _error_response(429),
+            _error_response(429),
+            _response(_png_bytes(size=SCENE_ARTWORK_SIZE)),
+        ]
+    )
     sleeps = []
     calls = 0
 
@@ -159,20 +165,23 @@ def test_cover_prompt_requires_exact_family_copy_and_visible_people():
     assert "Do not include any other readable text" in prompt
 
 
-def test_summary_prompt_lists_every_stop_as_exact_copy():
+def test_summary_prompt_lists_every_stop_without_writing_it_on_the_art():
     prompt = summary_page_prompt(
         family_title="Família Moraes",
         trip_date="2026",
         landmark_names=["Torre Eiffel", "Museu do Louvre"],
     )
 
-    assert '1. "Torre Eiffel"' in prompt
-    assert '2. "Museu do Louvre"' in prompt
-    assert '"Nosso roteiro"' in prompt
-    assert "Do not invent, merge or omit stops" in prompt
+    # As paradas continuam ditando as vinhetas, mas nao viram letra: o codigo
+    # escreve a lista numerada embaixo, na fonte do caderno.
+    assert "1. Torre Eiffel" in prompt
+    assert "2. Museu do Louvre" in prompt
+    assert "TEXT-FREE CONTRACT" in prompt
+    assert "Nosso roteiro" not in prompt
+    assert "do not invent, merge or omit any" in prompt
 
 
-def test_destination_intro_prompt_keeps_exact_learning_copy_and_forbids_people():
+def test_destination_intro_prompt_stays_text_free_and_forbids_people():
     prompt = destination_intro_page_prompt(
         title="Londres",
         city="Londres",
@@ -186,19 +195,19 @@ def test_destination_intro_prompt_keeps_exact_learning_copy_and_forbids_people()
         landmark_names=["Tower Bridge", "Big Ben"],
     )
 
-    for exact_copy in (
-        '"Londres"',
-        '"Inglaterra"',
-        '"Descubra este destino"',
-        '"Londres é uma cidade cheia de história."',
-        '"O Rio Tâmisa passa por lugares importantes da cidade."',
-        '"Você sabia?"',
-        '"O Big Ben é o nome do sino que fica dentro da torre."',
+    # O texto saiu do prompt: o compositor escreve o destino, as notas e a
+    # curiosidade em volta da cena, na fonte do caderno.
+    assert "TEXT-FREE CONTRACT" in prompt
+    for copia in (
+        "Descubra este destino",
+        "Londres é uma cidade cheia de história.",
+        "O Big Ben é o nome do sino que fica dentro da torre.",
     ):
-        assert exact_copy in prompt
+        assert copia not in prompt
+    # A arte e a janela, nao a pagina.
+    assert "printed whole, edge to edge, with nothing cropped away" in prompt
     assert "Do not add or infer any fact" in prompt
     assert "Do not depict any person" in prompt
-    assert "Do not render their names" in prompt
 
 
 def test_destination_intro_uses_generation_then_only_selected_page_for_revision(tmp_path):
@@ -206,7 +215,7 @@ def test_destination_intro_uses_generation_then_only_selected_page_for_revision(
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(color="#6f9fb8"))
+        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#6f9fb8"))
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
     first = tmp_path / "destination-1.png"
@@ -289,7 +298,7 @@ def test_summary_shows_the_route_and_never_the_family(tmp_path):
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(color="#69b482"))
+        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#69b482"))
 
     output = tmp_path / "summary.png"
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
@@ -303,7 +312,7 @@ def test_summary_shows_the_route_and_never_the_family(tmp_path):
     # Sem referência nenhuma, a chamada é de geração, não de edição de imagem.
     assert url.endswith("/images/generations")
     prompt = kwargs["json"]["prompt"]
-    assert '"Coliseu"' in prompt
+    assert "2. Coliseu" in prompt
     assert "PEOPLE-FREE CONTRACT" in prompt
     assert "Do not depict a person" in prompt
     # Nada de foto, capa aprovada ou contagem de gente.
@@ -358,7 +367,7 @@ def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_p
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(color="#cc825f"))
+        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#cc825f"))
 
     reference = tmp_path / "summary-1.png"
     reference.write_bytes(_png_bytes())
@@ -378,7 +387,7 @@ def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_p
     assert [file_data[0] for _field, file_data in kwargs["files"]] == ["summary-1.png"]
     assert "selected current-page attempt" in kwargs["data"]["prompt"]
     assert "Create a visibly different alternative" in kwargs["data"]["prompt"]
-    assert '2. "Coliseu"' in kwargs["data"]["prompt"]
+    assert "2. Coliseu" in kwargs["data"]["prompt"]
 
 
 def test_landmark_page_defaults_to_generation_without_people_or_family_inputs(tmp_path):
@@ -386,7 +395,7 @@ def test_landmark_page_defaults_to_generation_without_people_or_family_inputs(tm
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(size=LANDMARK_SCENE_SIZE, color="#d09a55"))
+        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#d09a55"))
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
     output = tmp_path / "landmark.png"
@@ -432,7 +441,7 @@ def test_landmark_page_can_include_same_family_with_canonical_references(tmp_pat
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(size=LANDMARK_SCENE_SIZE, color="#d09a55"))
+        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#d09a55"))
 
     photo, cover = _family_references(tmp_path)
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
@@ -468,7 +477,7 @@ def test_landmark_revision_without_family_uses_only_selected_page_and_removes_pe
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(size=LANDMARK_SCENE_SIZE, color="#6faec9"))
+        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#6faec9"))
 
     reference = tmp_path / "landmark-with-family.png"
     reference.write_bytes(_png_bytes())
