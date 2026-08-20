@@ -37,6 +37,7 @@ variável não documentada. Valores reais nunca devem ser versionados.
 | Jobs | `ASYNC_GUIDE_JOBS_ENABLED`, `IN_PROCESS_GUIDE_WORKER_ENABLED`, `GUIDE_WORKER_POLL_SECONDS`, `GUIDE_JOB_MAX_ATTEMPTS` | ✓ | ✓ |
 | Entrega | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS` | ✓ | ✓ |
 | Retenção | `GUIDE_RETENTION_DAYS`, `GUIDE_DRAFT_RETENTION_DAYS` | ✓ | ✓ |
+| Pagamentos | `PAYMENTS_ENABLED`, `MERCADO_PAGO_ENVIRONMENT`, `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET`, `MERCADO_PAGO_WEBHOOK_URL`, `MERCADO_PAGO_API_BASE_URL`, `GUIDE_PRODUCT_*` | ✓ | — |
 | Controles | `REQUEST_CONTROL_*`, `RATE_LIMIT_*`, `QUOTA_*`, `CONCURRENCY_*`, `IDEMPOTENCY_*` | ✓ | — |
 | Privacidade | `PHOTO_PROCESSING_CONSENT_REQUIRED`, `OBSERVABILITY_HASH_SALT` | ✓ | ✓ |
 
@@ -47,6 +48,9 @@ variável não documentada. Valores reais nunca devem ser versionados.
   secrets do servidor; não recebem prefixo `VITE_`.
 - Produção não inicia com auth local, consentimento desativado, controles
   desativados ou geração síncrona.
+- O checkout fica com `PAYMENTS_ENABLED=false` durante deploy e migração. Em
+  produção, só pode ser ligado depois de configurar credenciais de produção,
+  segredo e URL HTTPS do webhook, preço aprovado e teste de compra/reembolso.
 - Toda alteração de variável exige atualização do `.env.example`, desta matriz,
   do ambiente de deploy e do rollback correspondente.
 - Antes da promoção: executar `uv sync --frozen --extra dev`, `npm ci`, o CI

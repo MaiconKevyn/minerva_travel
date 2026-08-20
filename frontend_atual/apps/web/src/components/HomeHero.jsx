@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Baby, Palette, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OPTIONAL_LANDMARK_ACTIVITY_TYPES } from '@/utils/landmark-activities.js';
+import { formatPrice, getGuideProduct } from '@/utils/minerva-api.js';
 
 /**
  * O produto é um livro inteiro, não uma capa bonita.
@@ -34,8 +35,21 @@ const PROOF = [
   { icon: Printer, label: 'PDF A4 para imprimir' },
 ];
 
-const HomeHero = () => (
-  <section className="relative overflow-hidden parchment-wash pt-10 pb-20 lg:pt-16 lg:pb-28">
+const HomeHero = () => {
+  const [guideProduct, setGuideProduct] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getGuideProduct({ signal: controller.signal })
+      .then(setGuideProduct)
+      .catch((error) => {
+        if (error.name !== 'AbortError') setGuideProduct(null);
+      });
+    return () => controller.abort();
+  }, []);
+
+  return (
+    <section className="relative overflow-hidden parchment-wash pt-10 pb-20 lg:pt-16 lg:pb-28">
     <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 items-center gap-14 px-4 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:px-8">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -93,7 +107,9 @@ const HomeHero = () => (
         </div>
 
         <p className="text-sm font-medium text-muted-foreground">
-          Piloto aberto e sem cobrança enquanto validamos o produto.
+          {guideProduct?.enabled
+            ? `Compra única de ${formatPrice(guideProduct.amount_minor, guideProduct.currency)} com checkout Mercado Pago.`
+            : 'Piloto aberto e sem cobrança enquanto validamos o produto.'}
         </p>
       </motion.div>
 
@@ -131,7 +147,8 @@ const HomeHero = () => (
         </div>
       </motion.div>
     </div>
-  </section>
-);
+    </section>
+  );
+};
 
 export default HomeHero;

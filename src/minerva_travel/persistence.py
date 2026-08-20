@@ -27,6 +27,14 @@ JOB_STAGES = {
     "complete",
 }
 JOB_STATUSES = {"queued", "running", "succeeded", "failed", "cancelled"}
+PAYMENT_STATUSES = {
+    "pending",
+    "authorized",
+    "paid",
+    "failed",
+    "refunded",
+    "cancelled",
+}
 
 
 @dataclass(frozen=True)
@@ -257,6 +265,52 @@ class GuideJobRecord:
         return payload
 
 
+@dataclass(frozen=True)
+class PaymentRecord:
+    id: str
+    user_id: str
+    builder_session_id: str
+    provider: str
+    provider_preference_id: str | None
+    provider_payment_id: str | None
+    idempotency_key: str
+    status: str
+    amount_minor: int
+    currency: str
+    product_code: str
+    checkout_url: str | None
+    created_at: str
+    updated_at: str
+    paid_at: str | None
+
+    def public_payload(self) -> dict[str, object]:
+        return {
+            "payment_id": self.id,
+            "builder_session_id": self.builder_session_id,
+            "status": self.status,
+            "amount_minor": self.amount_minor,
+            "currency": self.currency,
+            "product_code": self.product_code,
+            "checkout_url": self.checkout_url,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "paid_at": self.paid_at,
+        }
+
+
+@dataclass(frozen=True)
+class EntitlementRecord:
+    id: str
+    user_id: str
+    builder_session_id: str
+    source_payment_id: str
+    status: str
+    product_code: str
+    created_at: str
+    consumed_at: str | None
+    revoked_at: str | None
+
+
 class GuideRepository:
     """Small durable repository used by the API and local worker.
 
@@ -371,6 +425,52 @@ class GuideRepository:
                     ON guide_jobs(user_id, created_at DESC);
                 CREATE INDEX IF NOT EXISTS guide_jobs_queue_idx
                     ON guide_jobs(status, next_attempt_at, lease_expires_at, created_at);
+                CREATE TABLE IF NOT EXISTS payments (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    builder_session_id TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    provider_preference_id TEXT,
+                    provider_payment_id TEXT,
+                    idempotency_key TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK (
+                        status IN (
+                            'pending', 'authorized', 'paid', 'failed', 'refunded', 'cancelled'
+                        )
+                    ),
+                    amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+                    currency TEXT NOT NULL CHECK (length(currency) = 3),
+                    product_code TEXT NOT NULL,
+                    checkout_url TEXT,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    paid_at TEXT,
+                    UNIQUE(provider, idempotency_key),
+                    UNIQUE(provider, provider_preference_id),
+                    UNIQUE(provider, provider_payment_id)
+                );
+                CREATE INDEX IF NOT EXISTS payments_owner_created_idx
+                    ON payments(user_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS payments_builder_idx
+                    ON payments(user_id, builder_session_id, created_at DESC);
+                CREATE UNIQUE INDEX IF NOT EXISTS payments_active_builder_uidx
+                    ON payments(user_id, builder_session_id)
+                    WHERE status IN ('pending', 'authorized', 'paid');
+                CREATE TABLE IF NOT EXISTS entitlements (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    builder_session_id TEXT NOT NULL UNIQUE,
+                    source_payment_id TEXT NOT NULL UNIQUE
+                        REFERENCES payments(id) ON DELETE CASCADE,
+                    status TEXT NOT NULL CHECK (status IN ('active', 'consumed', 'revoked')),
+                    product_code TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    consumed_at TEXT,
+                    revoked_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS entitlements_owner_builder_idx
+                    ON entitlements(user_id, builder_session_id, status);
                 """
             )
             # SQLite does not support ADD COLUMN inside CREATE TABLE IF NOT
@@ -410,6 +510,245 @@ class GuideRepository:
         if record is None:  # pragma: no cover - database invariant
             raise RuntimeError("Guide draft persistence failed.")
         return record
+
+    def create_or_get_payment(
+        self,
+        *,
+        payment_id: str,
+        user_id: str,
+        builder_session_id: str,
+        provider: str,
+        idempotency_key: str,
+        amount_minor: int,
+        currency: str,
+        product_code: str,
+    ) -> tuple[PaymentRecord, bool]:
+        """Create a local pending payment or return the safe reusable record."""
+
+        now = datetime.now(UTC).isoformat()
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM payments
+                WHERE user_id = ? AND builder_session_id = ?
+                  AND status IN ('pending', 'authorized', 'paid')
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (user_id, builder_session_id),
+            ).fetchone()
+            if row is not None:
+                return self._payment_from_row(row), False
+            row = connection.execute(
+                "SELECT * FROM payments WHERE provider = ? AND idempotency_key = ?",
+                (provider, idempotency_key),
+            ).fetchone()
+            if row is not None:
+                record = self._payment_from_row(row)
+                if record.user_id != user_id or record.builder_session_id != builder_session_id:
+                    raise ValueError("Idempotency key already used for another checkout.")
+                return record, False
+            connection.execute(
+                """
+                INSERT INTO payments (
+                    id, user_id, builder_session_id, provider, idempotency_key,
+                    status, amount_minor, currency, product_code, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+                """,
+                (
+                    payment_id,
+                    user_id,
+                    builder_session_id,
+                    provider,
+                    idempotency_key,
+                    amount_minor,
+                    currency,
+                    product_code,
+                    now,
+                    now,
+                ),
+            )
+        record = self.get_payment_for_owner(payment_id, user_id)
+        if record is None:  # pragma: no cover - database invariant
+            raise RuntimeError("Payment persistence failed.")
+        return record, True
+
+    def set_payment_preference(
+        self,
+        *,
+        payment_id: str,
+        provider_preference_id: str,
+        checkout_url: str,
+    ) -> PaymentRecord:
+        now = datetime.now(UTC).isoformat()
+        with self._connection() as connection:
+            result = connection.execute(
+                """
+                UPDATE payments
+                SET provider_preference_id = ?, checkout_url = ?, updated_at = ?
+                WHERE id = ? AND status = 'pending'
+                """,
+                (provider_preference_id, checkout_url, now, payment_id),
+            )
+        if result.rowcount != 1:
+            raise ValueError("Payment can no longer receive a checkout preference.")
+        record = self.get_payment(payment_id)
+        if record is None:  # pragma: no cover - database invariant
+            raise RuntimeError("Payment persistence failed.")
+        return record
+
+    def fail_payment_checkout(self, payment_id: str) -> bool:
+        now = datetime.now(UTC).isoformat()
+        with self._connection() as connection:
+            result = connection.execute(
+                """
+                UPDATE payments SET status = 'failed', updated_at = ?
+                WHERE id = ? AND status = 'pending' AND provider_payment_id IS NULL
+                """,
+                (now, payment_id),
+            )
+        return result.rowcount == 1
+
+    def get_payment(self, payment_id: str) -> PaymentRecord | None:
+        return self._one_payment("SELECT * FROM payments WHERE id = ?", (payment_id,))
+
+    def get_payment_for_owner(self, payment_id: str, user_id: str) -> PaymentRecord | None:
+        return self._one_payment(
+            "SELECT * FROM payments WHERE id = ? AND user_id = ?",
+            (payment_id, user_id),
+        )
+
+    def payment_for_builder_owner(
+        self,
+        builder_session_id: str,
+        user_id: str,
+    ) -> PaymentRecord | None:
+        return self._one_payment(
+            """
+            SELECT * FROM payments
+            WHERE builder_session_id = ? AND user_id = ?
+            ORDER BY CASE status
+                WHEN 'paid' THEN 0 WHEN 'authorized' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END,
+                created_at DESC
+            LIMIT 1
+            """,
+            (builder_session_id, user_id),
+        )
+
+    def apply_provider_payment(
+        self,
+        *,
+        payment_id: str,
+        provider_payment_id: str,
+        status: str,
+        amount_minor: int,
+        currency: str,
+    ) -> PaymentRecord:
+        if status not in PAYMENT_STATUSES:
+            raise ValueError("Unsupported payment status.")
+        now = datetime.now(UTC).isoformat()
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM payments WHERE id = ?", (payment_id,)
+            ).fetchone()
+            if row is None:
+                raise LookupError("Payment not found.")
+            current = self._payment_from_row(row)
+            if current.amount_minor != amount_minor or current.currency != currency:
+                raise ValueError("Provider payment amount or currency mismatch.")
+            collision = connection.execute(
+                """
+                SELECT id FROM payments
+                WHERE provider = ? AND provider_payment_id = ? AND id != ?
+                """,
+                (current.provider, provider_payment_id, current.id),
+            ).fetchone()
+            if collision is not None:
+                raise ValueError("Provider payment is already linked to another order.")
+
+            final_status = status
+            if current.status == "refunded":
+                final_status = "refunded"
+            elif current.status == "paid" and status not in {"refunded"}:
+                final_status = "paid"
+            paid_at = current.paid_at or (now if final_status == "paid" else None)
+            connection.execute(
+                """
+                UPDATE payments
+                SET provider_payment_id = ?, status = ?, updated_at = ?, paid_at = ?
+                WHERE id = ?
+                """,
+                (provider_payment_id, final_status, now, paid_at, current.id),
+            )
+            if final_status == "paid":
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO entitlements (
+                        id, user_id, builder_session_id, source_payment_id,
+                        status, product_code, created_at
+                    ) VALUES (?, ?, ?, ?, 'active', ?, ?)
+                    """,
+                    (
+                        uuid4().hex,
+                        current.user_id,
+                        current.builder_session_id,
+                        current.id,
+                        current.product_code,
+                        now,
+                    ),
+                )
+            elif final_status == "refunded":
+                connection.execute(
+                    """
+                    UPDATE entitlements
+                    SET status = 'revoked', revoked_at = ?
+                    WHERE source_payment_id = ? AND status != 'revoked'
+                    """,
+                    (now, current.id),
+                )
+        record = self.get_payment(payment_id)
+        if record is None:  # pragma: no cover - database invariant
+            raise RuntimeError("Payment persistence failed.")
+        return record
+
+    def claim_builder_entitlement(self, *, user_id: str, builder_session_id: str) -> bool:
+        now = datetime.now(UTC).isoformat()
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM entitlements
+                WHERE user_id = ? AND builder_session_id = ?
+                  AND status IN ('active', 'consumed')
+                LIMIT 1
+                """,
+                (user_id, builder_session_id),
+            ).fetchone()
+            if row is None:
+                return False
+            if row["status"] == "active":
+                connection.execute(
+                    """
+                    UPDATE entitlements SET status = 'consumed', consumed_at = ?
+                    WHERE id = ? AND status = 'active'
+                    """,
+                    (now, row["id"]),
+                )
+        return True
+
+    def entitlement_for_builder(
+        self,
+        *,
+        user_id: str,
+        builder_session_id: str,
+    ) -> EntitlementRecord | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM entitlements
+                WHERE user_id = ? AND builder_session_id = ? LIMIT 1
+                """,
+                (user_id, builder_session_id),
+            ).fetchone()
+        return self._entitlement_from_row(row) if row else None
 
     def update_draft(
         self,
@@ -1059,6 +1398,8 @@ class GuideRepository:
             connection.execute("DELETE FROM guide_jobs WHERE user_id = ?", (user_id,))
             connection.execute("DELETE FROM guide_drafts WHERE user_id = ?", (user_id,))
             connection.execute("DELETE FROM family_profiles WHERE user_id = ?", (user_id,))
+            connection.execute("DELETE FROM entitlements WHERE user_id = ?", (user_id,))
+            connection.execute("DELETE FROM payments WHERE user_id = ?", (user_id,))
         return result.rowcount
 
     def mark_deleted(self, guide_id: str, user_id: str) -> bool:
@@ -1105,6 +1446,11 @@ class GuideRepository:
         with self._connection() as connection:
             row = connection.execute(query, parameters).fetchone()
         return self._draft_from_row(row) if row else None
+
+    def _one_payment(self, query: str, parameters: tuple[object, ...]) -> PaymentRecord | None:
+        with self._connection() as connection:
+            row = connection.execute(query, parameters).fetchone()
+        return self._payment_from_row(row) if row else None
 
     @staticmethod
     def _from_row(row: sqlite3.Row) -> GuideRecord:
@@ -1202,6 +1548,40 @@ class GuideRepository:
             revision=int(row["revision"]),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+        )
+
+    @staticmethod
+    def _payment_from_row(row: sqlite3.Row) -> PaymentRecord:
+        return PaymentRecord(
+            id=row["id"],
+            user_id=row["user_id"],
+            builder_session_id=row["builder_session_id"],
+            provider=row["provider"],
+            provider_preference_id=row["provider_preference_id"],
+            provider_payment_id=row["provider_payment_id"],
+            idempotency_key=row["idempotency_key"],
+            status=row["status"],
+            amount_minor=int(row["amount_minor"]),
+            currency=row["currency"],
+            product_code=row["product_code"],
+            checkout_url=row["checkout_url"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            paid_at=row["paid_at"],
+        )
+
+    @staticmethod
+    def _entitlement_from_row(row: sqlite3.Row) -> EntitlementRecord:
+        return EntitlementRecord(
+            id=row["id"],
+            user_id=row["user_id"],
+            builder_session_id=row["builder_session_id"],
+            source_payment_id=row["source_payment_id"],
+            status=row["status"],
+            product_code=row["product_code"],
+            created_at=row["created_at"],
+            consumed_at=row["consumed_at"],
+            revoked_at=row["revoked_at"],
         )
 
 

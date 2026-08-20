@@ -261,3 +261,95 @@ def guide_job_max_attempts() -> int:
     except ValueError:
         return 3
     return min(max(attempts, 1), 10)
+
+
+def payments_enabled() -> bool:
+    """Enable checkout and entitlement enforcement explicitly.
+
+    Leaving this off preserves the existing pilot flow and prevents a deploy
+    with incomplete credentials from accidentally presenting a real checkout.
+    """
+
+    load_project_env()
+    raw_value = os.getenv("PAYMENTS_ENABLED", "false")
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def mercado_pago_access_token() -> str:
+    load_project_env()
+    return os.getenv("MERCADO_PAGO_ACCESS_TOKEN", "").strip()
+
+
+def mercado_pago_webhook_secret() -> str:
+    load_project_env()
+    return os.getenv("MERCADO_PAGO_WEBHOOK_SECRET", "").strip()
+
+
+def mercado_pago_api_base_url() -> str:
+    load_project_env()
+    return os.getenv("MERCADO_PAGO_API_BASE_URL", "https://api.mercadopago.com").rstrip("/")
+
+
+def mercado_pago_environment() -> str:
+    load_project_env()
+    value = os.getenv("MERCADO_PAGO_ENVIRONMENT", "test").strip().lower()
+    if value not in {"test", "production"}:
+        raise RuntimeError("MERCADO_PAGO_ENVIRONMENT must be test or production.")
+    return value
+
+
+def mercado_pago_webhook_url() -> str:
+    load_project_env()
+    value = os.getenv("MERCADO_PAGO_WEBHOOK_URL", "").strip()
+    if value and not value.startswith("https://"):
+        raise RuntimeError("MERCADO_PAGO_WEBHOOK_URL must use HTTPS.")
+    return value
+
+
+def guide_product_code() -> str:
+    load_project_env()
+    return os.getenv("GUIDE_PRODUCT_CODE", "guide_generation_v1").strip() or "guide_generation_v1"
+
+
+def guide_product_title() -> str:
+    load_project_env()
+    return os.getenv("GUIDE_PRODUCT_TITLE", "Guia de Memórias personalizado").strip()
+
+
+def guide_product_currency() -> str:
+    load_project_env()
+    value = os.getenv("GUIDE_PRODUCT_CURRENCY", "BRL").strip().upper()
+    if len(value) != 3 or not value.isalpha():
+        raise RuntimeError("GUIDE_PRODUCT_CURRENCY must be a three-letter ISO currency code.")
+    return value
+
+
+def guide_product_price_minor() -> int:
+    load_project_env()
+    raw_value = os.getenv("GUIDE_PRODUCT_PRICE_MINOR", "1999")
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise RuntimeError("GUIDE_PRODUCT_PRICE_MINOR must be an integer.") from error
+    if not 100 <= value <= 10_000_000:
+        raise RuntimeError("GUIDE_PRODUCT_PRICE_MINOR must be between 100 and 10000000.")
+    return value
+
+
+def validate_payment_configuration() -> None:
+    """Fail closed when checkout is enabled with an incomplete environment."""
+
+    if not payments_enabled():
+        return
+    if not mercado_pago_access_token():
+        raise RuntimeError("MERCADO_PAGO_ACCESS_TOKEN is required when payments are enabled.")
+    guide_product_price_minor()
+    guide_product_currency()
+    webhook_url = mercado_pago_webhook_url()
+    if app_environment() == "production":
+        if mercado_pago_environment() != "production":
+            raise RuntimeError("MERCADO_PAGO_ENVIRONMENT must be production in APP_ENV=production.")
+        if not mercado_pago_webhook_secret():
+            raise RuntimeError("MERCADO_PAGO_WEBHOOK_SECRET is required in production.")
+        if not webhook_url:
+            raise RuntimeError("MERCADO_PAGO_WEBHOOK_URL is required in production.")

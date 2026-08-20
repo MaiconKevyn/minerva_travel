@@ -15,7 +15,7 @@ from pathlib import Path
 from threading import Event, Thread
 from time import perf_counter
 from typing import Annotated, Any, Literal
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 from uuid import uuid4
 
 import httpx
@@ -115,13 +115,24 @@ from minerva_travel.config import (
     frontend_base_url,
     google_maps_api_key,
     guide_job_max_attempts,
+    guide_product_code,
+    guide_product_currency,
+    guide_product_price_minor,
+    guide_product_title,
     guide_worker_poll_seconds,
     image_generation_concurrency,
     image_provider,
     in_process_guide_worker_enabled,
     landmark_art_generation_enabled,
     landmark_stylized_art_enabled,
+    mercado_pago_access_token,
+    mercado_pago_api_base_url,
+    mercado_pago_environment,
+    mercado_pago_webhook_secret,
+    mercado_pago_webhook_url,
+    payments_enabled,
     pilot_restaurant_recommendations_enabled,
+    validate_payment_configuration,
 )
 from minerva_travel.contract_limits import (
     MAX_CHILD_BIRTH_YEAR,
@@ -205,6 +216,12 @@ from minerva_travel.page_generation import (
     PageGenerationError,
     PageGenerationRetryableError,
     get_guide_page_generator,
+)
+from minerva_travel.payments import (
+    MercadoPagoClient,
+    MercadoPagoError,
+    local_payment_status,
+    verify_mercado_pago_signature,
 )
 from minerva_travel.pdf import (
     ApprovedPagePdfError,
@@ -580,6 +597,40 @@ class BuilderSessionResponse(BaseModel):
     pages: list[BuilderPageResponse]
 
 
+class GuideProductResponse(BaseModel):
+    enabled: bool
+    product_code: str
+    title: str
+    amount_minor: int
+    currency: str
+    environment: Literal["test", "production"]
+
+
+class PaymentCheckoutRequest(StrictRequestModel):
+    builder_session_id: str = Field(min_length=1, max_length=120)
+
+
+class PaymentRefreshRequest(StrictRequestModel):
+    provider_payment_id: str = Field(min_length=1, max_length=32, pattern=r"^\d+$")
+
+
+class PaymentResponse(BaseModel):
+    payment_id: str
+    builder_session_id: str
+    status: Literal["pending", "authorized", "paid", "failed", "refunded", "cancelled"]
+    amount_minor: int = Field(gt=0)
+    currency: str
+    product_code: str
+    checkout_url: str | None = None
+    created_at: str
+    updated_at: str
+    paid_at: str | None = None
+
+
+class MercadoPagoWebhookResponse(BaseModel):
+    received: bool = True
+
+
 class BuilderAttemptSelectionRequest(StrictRequestModel):
     attempt_id: str = Field(min_length=1, max_length=120)
 
@@ -664,7 +715,7 @@ class AccountExportResponse(BaseModel):
 
 API_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     status_code: {"model": ApiErrorResponse, "description": "Erro padronizado da API"}
-    for status_code in (400, 401, 403, 404, 409, 410, 413, 422, 429, 500, 502, 503)
+    for status_code in (400, 401, 402, 403, 404, 409, 410, 413, 422, 429, 500, 502, 503)
 }
 
 
@@ -743,6 +794,7 @@ def _default_error_code(status_code: int) -> str:
     return {
         400: "bad_request",
         401: "authentication_required",
+        402: "payment_required",
         403: "forbidden",
         404: "not_found",
         409: "conflict",
@@ -830,6 +882,7 @@ async def security_and_request_headers(request: Request, call_next):
             "/api/family-profile",
             "/api/guides",
             "/api/jobs",
+            "/api/payments",
             "/download/",
         )
     ):
@@ -1680,6 +1733,16 @@ async def api_generate(
     current_user: CurrentUser,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> GuideGenerationResponse:
+    if payments_enabled():
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "guide_checkout_required",
+                "message": (
+                    "Crie o roteiro pelo montador e conclua o checkout antes de gerar o guia."
+                ),
+            },
+        )
     title = form.title
     children_names = form.children_names
     parents_names = form.parents_names
@@ -2181,6 +2244,306 @@ def delete_family_profile(current_user: CurrentUser) -> DeletedResponse:
     guide_repository().delete_family_profile(current_user.id)
     emit_event("family_profile_deleted", user_id=current_user.id, outcome="succeeded")
     return DeletedResponse(deleted=True)
+
+
+def _payment_configuration_or_503() -> None:
+    try:
+        validate_payment_configuration()
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "payment_configuration_error",
+                "message": "O checkout está temporariamente indisponível.",
+            },
+        ) from error
+
+
+def _mercado_pago_client() -> MercadoPagoClient:
+    _payment_configuration_or_503()
+    return MercadoPagoClient(
+        access_token=mercado_pago_access_token(),
+        api_base_url=mercado_pago_api_base_url(),
+        environment=mercado_pago_environment(),
+    )
+
+
+def _payment_response(record) -> PaymentResponse:
+    return PaymentResponse.model_validate(record.public_payload())
+
+
+def _apply_mercado_pago_payment(record, provider_payment) -> PaymentResponse:
+    if provider_payment.external_reference != record.id:
+        raise ValueError("Provider payment does not belong to this order.")
+    updated = guide_repository().apply_provider_payment(
+        payment_id=record.id,
+        provider_payment_id=provider_payment.id,
+        status=local_payment_status(provider_payment.status),
+        amount_minor=provider_payment.amount_minor,
+        currency=provider_payment.currency,
+    )
+    emit_event(
+        "payment_status_updated",
+        user_id=updated.user_id,
+        outcome="succeeded",
+        stage=updated.status,
+    )
+    return _payment_response(updated)
+
+
+def _claim_builder_payment(user_id: str, builder_session_id: str) -> None:
+    if not payments_enabled():
+        return
+    _payment_configuration_or_503()
+    if guide_repository().claim_builder_entitlement(
+        user_id=user_id,
+        builder_session_id=builder_session_id,
+    ):
+        return
+    raise HTTPException(
+        status_code=402,
+        detail={
+            "code": "guide_payment_required",
+            "message": "Confirme o pagamento deste guia antes de iniciar a geração.",
+        },
+    )
+
+
+@app.get("/api/products/guide", response_model=GuideProductResponse)
+def guide_product() -> GuideProductResponse:
+    if payments_enabled():
+        _payment_configuration_or_503()
+    return GuideProductResponse(
+        enabled=payments_enabled(),
+        product_code=guide_product_code(),
+        title=guide_product_title(),
+        amount_minor=guide_product_price_minor(),
+        currency=guide_product_currency(),
+        environment=mercado_pago_environment(),
+    )
+
+
+@app.post("/api/payments/checkout", response_model=PaymentResponse)
+def create_payment_checkout(
+    payload: PaymentCheckoutRequest,
+    current_user: CurrentUser,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> PaymentResponse:
+    if not payments_enabled():
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "checkout_disabled", "message": "O checkout ainda não está ativo."},
+        )
+    _payment_configuration_or_503()
+    _builder_session_or_404(payload.builder_session_id, current_user)
+    key = (idempotency_key or "").strip()
+    if not key or len(key) > 200:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "idempotency_key_required",
+                "message": "Envie uma Idempotency-Key válida para iniciar o checkout.",
+            },
+        )
+
+    repository = guide_repository()
+    try:
+        payment, created = repository.create_or_get_payment(
+            payment_id=uuid4().hex,
+            user_id=current_user.id,
+            builder_session_id=payload.builder_session_id,
+            provider="mercado_pago",
+            idempotency_key=key,
+            amount_minor=guide_product_price_minor(),
+            currency=guide_product_currency(),
+            product_code=guide_product_code(),
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "checkout_idempotency_conflict", "message": str(error)},
+        ) from error
+    if payment.status == "paid" or payment.checkout_url:
+        return _payment_response(payment)
+
+    frontend_url = frontend_base_url()
+
+    def _back_url(outcome: str) -> str:
+        query = urlencode(
+            {
+                "builder": payment.builder_session_id,
+                "payment": payment.id,
+                "checkout": outcome,
+            }
+        )
+        return f"{frontend_url}/create?{query}"
+
+    try:
+        preference = _mercado_pago_client().create_preference(
+            local_payment_id=payment.id,
+            idempotency_key=payment.idempotency_key,
+            title=guide_product_title(),
+            amount_minor=payment.amount_minor,
+            currency=payment.currency,
+            payer_email=current_user.email,
+            success_url=_back_url("success"),
+            pending_url=_back_url("pending"),
+            failure_url=_back_url("failure"),
+            notification_url=mercado_pago_webhook_url() or None,
+        )
+        payment = repository.set_payment_preference(
+            payment_id=payment.id,
+            provider_preference_id=preference.id,
+            checkout_url=preference.checkout_url,
+        )
+    except (MercadoPagoError, ValueError) as error:
+        if created:
+            repository.fail_payment_checkout(payment.id)
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "checkout_provider_error",
+                "message": "Não foi possível abrir o Mercado Pago. Tente novamente.",
+            },
+        ) from error
+    emit_event(
+        "payment_checkout_created",
+        user_id=current_user.id,
+        outcome="succeeded",
+    )
+    return _payment_response(payment)
+
+
+@app.get(
+    "/api/payments/by-builder/{builder_session_id}",
+    response_model=PaymentResponse,
+)
+def payment_for_builder(
+    builder_session_id: str,
+    current_user: CurrentUser,
+) -> PaymentResponse:
+    _builder_session_or_404(builder_session_id, current_user)
+    record = guide_repository().payment_for_builder_owner(builder_session_id, current_user.id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado.")
+    return _payment_response(record)
+
+
+@app.get("/api/payments/{payment_id}", response_model=PaymentResponse)
+def payment_details(payment_id: str, current_user: CurrentUser) -> PaymentResponse:
+    record = guide_repository().get_payment_for_owner(payment_id, current_user.id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado.")
+    return _payment_response(record)
+
+
+@app.post("/api/payments/{payment_id}/refresh", response_model=PaymentResponse)
+def refresh_payment_from_provider(
+    payment_id: str,
+    payload: PaymentRefreshRequest,
+    current_user: CurrentUser,
+) -> PaymentResponse:
+    """Recover a delayed webhook by verifying the browser return with Mercado Pago."""
+
+    if not payments_enabled():
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "checkout_disabled", "message": "O checkout ainda não está ativo."},
+        )
+    record = guide_repository().get_payment_for_owner(payment_id, current_user.id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado.")
+    if record.provider_payment_id and record.provider_payment_id != payload.provider_payment_id:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "payment_confirmation_mismatch",
+                "message": "Os dados do pagamento não correspondem ao pedido.",
+            },
+        )
+    try:
+        provider_payment = _mercado_pago_client().get_payment(payload.provider_payment_id)
+        return _apply_mercado_pago_payment(record, provider_payment)
+    except MercadoPagoError as error:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "payment_confirmation_failed",
+                "message": "Não foi possível confirmar o pagamento.",
+            },
+        ) from error
+    except (LookupError, ValueError) as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "payment_confirmation_mismatch",
+                "message": "Os dados do pagamento não correspondem ao pedido.",
+            },
+        ) from error
+
+
+@app.post(
+    "/api/webhooks/mercado-pago",
+    response_model=MercadoPagoWebhookResponse,
+    include_in_schema=False,
+)
+async def mercado_pago_webhook(request: Request) -> MercadoPagoWebhookResponse:
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        body = {}
+    body_data = body.get("data") if isinstance(body, dict) else None
+    body_data_id = body_data.get("id") if isinstance(body_data, dict) else None
+    data_id = str(request.query_params.get("data.id") or body_data_id or "").strip()
+    signature = request.headers.get("x-signature", "")
+    provider_request_id = request.headers.get("x-request-id", "")
+    secret = mercado_pago_webhook_secret()
+    if not secret:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "webhook_not_configured",
+                "message": "A confirmação de pagamentos ainda não está configurada.",
+            },
+        )
+    if not verify_mercado_pago_signature(
+        secret=secret,
+        signature_header=signature,
+        request_id=provider_request_id,
+        data_id=data_id,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "invalid_webhook_signature", "message": "Assinatura inválida."},
+        )
+    topic = str(body.get("type") or body.get("topic") or "") if isinstance(body, dict) else ""
+    if topic and topic != "payment":
+        return MercadoPagoWebhookResponse()
+
+    try:
+        provider_payment = _mercado_pago_client().get_payment(data_id)
+    except MercadoPagoError as error:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "payment_confirmation_failed",
+                "message": "Não foi possível confirmar o pagamento.",
+            },
+        ) from error
+    record = guide_repository().get_payment(provider_payment.external_reference)
+    if record is None:
+        return MercadoPagoWebhookResponse()
+    try:
+        _apply_mercado_pago_payment(record, provider_payment)
+    except (LookupError, ValueError) as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "payment_confirmation_mismatch",
+                "message": "Os dados do pagamento não correspondem ao pedido.",
+            },
+        ) from error
+    return MercadoPagoWebhookResponse()
 
 
 def _builder_library_destinations(session: BuilderSession) -> list[dict[str, object]]:
@@ -3430,6 +3793,7 @@ def queue_guide_builder_generation(
                     "message": "Gere e aprove a capa antes de criar o guia completo.",
                 },
             )
+        _claim_builder_payment(current_user.id, session.id)
         if any(page.pending_attempt_id for page in session.pages):
             raise HTTPException(
                 status_code=409,
@@ -4156,6 +4520,8 @@ def generate_builder_page_attempt(
     payload: BuilderPageGenerationRequest | None = None,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> BuilderSessionResponse:
+    session = _builder_session_or_404(session_id, current_user)
+    _claim_builder_payment(current_user.id, session.id)
     return _generate_builder_page_attempt_impl(
         session_id,
         page_id,
@@ -4178,6 +4544,7 @@ def generate_and_approve_builder_page_for_job(
 ) -> None:
     """Generate one planned page idempotently for the durable worker."""
 
+    _claim_builder_payment(owner_id, session_id)
     current_user = AuthenticatedUser(id=owner_id, email=recipient_email)
     with builder_session_lock(session_id):
         session = load_builder_session(session_id, owner_id)
@@ -4392,6 +4759,7 @@ def finalize_builder_guide_for_job(
 ) -> dict[str, object]:
     """Assemble the canonical PDF and deliver its authenticated link."""
 
+    _claim_builder_payment(owner_id, session_id)
     current_user = AuthenticatedUser(id=owner_id, email=recipient_email)
     with builder_session_lock(session_id):
         session = load_builder_session(session_id, owner_id)
@@ -4424,6 +4792,7 @@ def finalize_builder_guide_for_job(
 def complete_guide_builder(session_id: str, current_user: CurrentUser) -> BuilderCompletionResponse:
     with builder_session_lock(session_id):
         session = _builder_session_or_404(session_id, current_user)
+        _claim_builder_payment(current_user.id, session.id)
         try:
             pages = session.approved_manifest()
         except BuilderIncomplete as error:
@@ -4462,6 +4831,7 @@ def generate_guide_builder_pdf(
     try:
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
+            _claim_builder_payment(current_user.id, session.id)
             output, pages = _write_builder_pdf(session)
             filename = _builder_pdf_download_filename(session)
             emailed_to = _notify_guide_ready(session, current_user, len(pages))

@@ -6,8 +6,8 @@ import { PHRASEBOOK_COUNTRIES } from '@/utils/landmark-activities.js';
 /**
  * As perguntas que decidem a compra e que ninguém conseguia responder sem
  * criar uma conta antes: como o livro chega, o que acontece com a foto da
- * família e quanto custa. Nenhuma resposta aqui promete além do que o piloto
- * entrega hoje.
+ * família e quanto custa. O valor em si vem do catálogo do backend na página
+ * de preço, para não ficar desatualizado no conteúdo estático.
  *
  * `details/summary` nativo em vez do acordeão do Radix, de propósito: um FAQ
  * estático não precisa de JavaScript nenhum. Teclado, leitor de tela e busca
@@ -53,12 +53,12 @@ const QUESTIONS = [
     question: 'Quanto custa?',
     answer: (
       <>
-        Nada, por enquanto. Estamos em piloto e o checkout ainda não foi homologado — não há
-        cobrança nem promessa de entrega comercial. O escopo desta fase está na{' '}
+        O valor vigente e a disponibilidade do checkout aparecem na{' '}
         <Link className="font-bold text-primary underline underline-offset-4" to="/pricing">
-          página do piloto
+          página de preço
         </Link>
-        .
+        . É uma compra única por guia e os dados financeiros são processados pelo Mercado Pago.
+        Em ambientes de piloto, o checkout pode permanecer desativado.
       </>
     ),
   },

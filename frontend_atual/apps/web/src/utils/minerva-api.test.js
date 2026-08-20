@@ -1053,6 +1053,97 @@ test('queueGuideBuilderGeneration returns immediately with an authenticated dura
   }
 });
 
+test('guide checkout uses the authenticated payment endpoints and a caller idempotency key', async () => {
+  const originalFetch = globalThis.fetch;
+  await authClient.signup('checkout-owner@example.com', 'Senha123', 'Família Checkout');
+  await authClient.login('checkout-owner@example.com', 'Senha123');
+  const seen = [];
+  globalThis.fetch = async (url, options = {}) => {
+    seen.push({ url: String(url), options });
+    const path = new URL(url).pathname;
+    if (path === '/api/products/guide') {
+      return new Response(JSON.stringify({
+        enabled: true,
+        product_code: 'guide_generation_v1',
+        title: 'Guia de Memórias personalizado',
+        amount_minor: 4990,
+        currency: 'BRL',
+        environment: 'test',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (path === '/api/payments/checkout') {
+      return new Response(JSON.stringify({
+        payment_id: 'payment-1',
+        builder_session_id: 'builder-1',
+        status: 'pending',
+        amount_minor: 4990,
+        currency: 'BRL',
+        product_code: 'guide_generation_v1',
+        checkout_url: 'https://sandbox.mercadopago.com.br/checkout',
+        created_at: '2026-08-19T12:00:00Z',
+        updated_at: '2026-08-19T12:00:00Z',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (path === '/api/payments/payment-1/refresh') {
+      return new Response(JSON.stringify({
+        payment_id: 'payment-1',
+        builder_session_id: 'builder-1',
+        status: 'paid',
+        amount_minor: 4990,
+        currency: 'BRL',
+        product_code: 'guide_generation_v1',
+        checkout_url: 'https://sandbox.mercadopago.com.br/checkout',
+        created_at: '2026-08-19T12:00:00Z',
+        updated_at: '2026-08-19T12:01:00Z',
+        paid_at: '2026-08-19T12:01:00Z',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response('', { status: 404 });
+  };
+
+  try {
+    const product = await minervaApi.getGuideProduct();
+    const checkout = await minervaApi.createGuideCheckout('builder-1', 'checkout-key-1');
+    const missing = await minervaApi.getBuilderPayment('builder-without-payment');
+    const confirmed = await minervaApi.refreshGuidePayment('payment-1', '987654321');
+
+    assert.equal(minervaApi.formatPrice(product.amount_minor, product.currency), 'R$ 49,90');
+    assert.equal(checkout.payment_id, 'payment-1');
+    assert.equal(missing, null);
+    assert.equal(confirmed.status, 'paid');
+    assert.deepEqual(seen.map(({ url }) => new URL(url).pathname), [
+      '/api/products/guide',
+      '/api/payments/checkout',
+      '/api/payments/by-builder/builder-without-payment',
+      '/api/payments/payment-1/refresh',
+    ]);
+    assert.equal(seen[1].options.headers.get('Idempotency-Key'), 'checkout-key-1');
+    assert.deepEqual(JSON.parse(seen[1].options.body), { builder_session_id: 'builder-1' });
+    assert.deepEqual(JSON.parse(seen[3].options.body), { provider_payment_id: '987654321' });
+    seen.forEach(({ options }) => {
+      assert.equal(options.headers.get('Authorization'), 'Bearer local-development-token');
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await authClient.logout();
+  }
+});
+
+test('mercadoPagoReturnPayment only accepts a numeric provider payment id', () => {
+  assert.deepEqual(
+    minervaApi.mercadoPagoReturnPayment(
+      'https://guiadememorias.com.br/create?payment=local-1&payment_id=123456789',
+    ),
+    { localPaymentId: 'local-1', providerPaymentId: '123456789' },
+  );
+  assert.equal(
+    minervaApi.mercadoPagoReturnPayment(
+      'https://guiadememorias.com.br/create?payment=local-1&payment_id=not-a-number',
+    ),
+    null,
+  );
+});
+
 test('listGuideJobs returns authenticated builder previews for the profile', async () => {
   const originalFetch = globalThis.fetch;
   await authClient.signup('builder-library@example.com', 'Senha123', 'Família Biblioteca');

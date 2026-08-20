@@ -49,6 +49,8 @@ Run rollback files in reverse migration order:
 ```bash
 database_url='postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 psql "$database_url" -v ON_ERROR_STOP=1 \
+  -f supabase/rollbacks/202608190001_pay01_mercado_pago_checkout.down.sql
+psql "$database_url" -v ON_ERROR_STOP=1 \
   -f supabase/rollbacks/202607090002_sto01_private_buckets.down.sql
 psql "$database_url" -v ON_ERROR_STOP=1 \
   -f supabase/rollbacks/202607090001_data01_core.down.sql
@@ -64,7 +66,7 @@ through the Storage API, never by deleting rows directly from `storage.objects`.
 
 ## Deployment order
 
-1. Apply both migrations to an empty staging branch.
+1. Apply all migrations to an empty staging branch.
 2. Run database lint and pgTAP tests.
 3. Exercise application reads/writes with two distinct users and a support JWT.
 4. Verify signed downloads from every private bucket.

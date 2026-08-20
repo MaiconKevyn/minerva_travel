@@ -4,11 +4,14 @@ import test from 'node:test';
 
 const source = async (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('pricing is honest while checkout is not implemented', async () => {
+test('pricing reflects the server-owned checkout state without a hard-coded price', async () => {
   const pricing = await source('src/pages/PricingPage.jsx');
 
+  assert.match(pricing, /getGuideProduct/);
+  assert.match(pricing, /formatPrice/);
+  assert.match(pricing, /Mercado Pago/);
   assert.match(pricing, /Sem cobrança ativa/);
-  assert.doesNotMatch(pricing, /€\s*29|Pagamento Seguro|Transação 100% protegida/);
+  assert.doesNotMatch(pricing, /R\$\s*\d|€\s*\d|Transação 100% protegida/);
 });
 
 test('privacy and terms routes are real links', async () => {

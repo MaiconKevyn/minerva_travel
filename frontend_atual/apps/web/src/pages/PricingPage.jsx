@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -7,8 +7,25 @@ import { Check, Heart, ShieldCheck, Sparkles, ArrowRight, Star } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import { Flower, Airplane } from '@/components/DecorativeElements.jsx';
+import { formatPrice, getGuideProduct } from '@/utils/minerva-api.js';
 
 const PricingPage = () => {
+  const [guideProduct, setGuideProduct] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getGuideProduct({ signal: controller.signal })
+      .then(setGuideProduct)
+      .catch((error) => {
+        if (error.name !== 'AbortError') setGuideProduct(null);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const checkoutEnabled = guideProduct?.enabled === true;
+  const price = checkoutEnabled
+    ? formatPrice(guideProduct.amount_minor, guideProduct.currency)
+    : null;
   const features = [
     "Diário infantil em PDF A4",
     "Roteiro confirmado e atividades por fase",
@@ -20,8 +37,8 @@ const PricingPage = () => {
   return (
     <>
       <Helmet>
-        <title>Piloto - Minerva Travel</title>
-        <meta name="description" content="Conheça o escopo do piloto sem cobrança da Minerva Travel." />
+        <title>Preço do guia - Minerva Travel</title>
+        <meta name="description" content="Conheça o conteúdo e o valor do guia personalizado da Minerva Travel." />
       </Helmet>
 
       <div className="min-h-screen flex flex-col bg-background transition-colors duration-200">
@@ -43,13 +60,15 @@ const PricingPage = () => {
                 transition={{ duration: 0.5 }}
               >
                 <span className="text-secondary font-bold tracking-widest uppercase text-sm mb-4 block">
-                  Piloto controlado
+                  {checkoutEnabled ? 'Compra única' : 'Piloto controlado'}
                 </span>
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground mb-6 text-balance">
-                  Produto em validação
+                  Seu guia de memórias personalizado
                 </h1>
                 <p className="text-xl text-muted-foreground font-medium text-balance">
-                  O checkout ainda não foi homologado. Durante esta fase, não há cobrança nem promessa de entrega comercial.
+                  {checkoutEnabled
+                    ? 'Pague uma vez pelo guia completo. O checkout seguro aceita os meios disponibilizados pelo Mercado Pago.'
+                    : 'O checkout permanece desativado neste ambiente enquanto concluímos a homologação.'}
                 </p>
               </motion.div>
             </div>
@@ -77,9 +96,13 @@ const PricingPage = () => {
                   </div>
 
                   <div className="mb-8 rounded-2xl border border-secondary/30 bg-secondary/10 p-5 text-foreground">
-                    <span className="block text-2xl font-extrabold tracking-tight">Sem cobrança ativa</span>
+                    <span className="block text-2xl font-extrabold tracking-tight">
+                      {checkoutEnabled ? price : 'Sem cobrança ativa'}
+                    </span>
                     <span className="mt-1 block text-sm text-muted-foreground font-medium">
-                      Preço, impostos, reembolso e SLA serão publicados antes de qualquer venda.
+                      {checkoutEnabled
+                        ? 'Pagamento único por este guia, processado pelo Mercado Pago.'
+                        : 'O preço aparece aqui assim que o checkout deste ambiente for ativado.'}
                     </span>
                   </div>
 
@@ -106,7 +129,7 @@ const PricingPage = () => {
                     className="w-full rounded-full text-lg py-7 bg-primary hover:bg-primary/90 text-white shadow-[0_8px_30px_rgb(232,122,93,0.3)] hover:shadow-[0_8px_40px_rgb(232,122,93,0.4)] transition-all duration-300 hover:-translate-y-1 group"
                   >
                     <Link to="/create">
-                      Criar um guia de teste
+                      {checkoutEnabled ? 'Criar e comprar meu guia' : 'Criar um guia de teste'}
                       <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </Link>
                   </Button>
@@ -125,8 +148,14 @@ const PricingPage = () => {
                 <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
                   <ShieldCheck className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="font-bold text-foreground">Piloto sem Pagamento</h3>
-                <p className="text-sm text-muted-foreground">Nenhum cartão ou dado financeiro é solicitado.</p>
+                <h3 className="font-bold text-foreground">
+                  {checkoutEnabled ? 'Checkout Mercado Pago' : 'Piloto sem pagamento'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {checkoutEnabled
+                    ? 'Os dados financeiros são informados no ambiente seguro do Mercado Pago.'
+                    : 'Nenhum cartão ou dado financeiro é solicitado.'}
+                </p>
               </div>
               <div className="flex flex-col items-center gap-3">
                 <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">

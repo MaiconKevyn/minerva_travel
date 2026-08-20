@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   CircleCheck,
+  CreditCard,
   Download,
   ImageIcon,
   Loader2,
@@ -15,14 +16,20 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   approveBuilderPage,
   builderGenerationRetryDelaySeconds,
+  createGuideCheckout,
   createIdempotencyKey,
   downloadGuidePdf,
   fetchBuilderAssetObjectUrl,
   fetchGuideBuilderSession,
+  formatPrice,
   generateBuilderPageAttempt,
+  getBuilderPayment,
+  getGuideProduct,
   getGuideJob,
   isRetryableBuilderGenerationError,
+  mercadoPagoReturnPayment,
   queueGuideBuilderGeneration,
+  refreshGuidePayment,
 } from '@/utils/minerva-api.js';
 
 const MAX_COVER_ATTEMPTS = 4;
@@ -62,6 +69,10 @@ const GuideAssembly = ({ session: initialSession }) => {
   const [job, setJob] = useState(null);
   const [jobBusy, setJobBusy] = useState(false);
   const [jobError, setJobError] = useState('');
+  const [guideProduct, setGuideProduct] = useState(null);
+  const [payment, setPayment] = useState(undefined);
+  const [paymentBusy, setPaymentBusy] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
   const generationKeyRef = useRef('');
   const queueKeyRef = useRef('');
 
@@ -73,6 +84,8 @@ const GuideAssembly = ({ session: initialSession }) => {
     (attempt) => attempt.id === cover.selected_attempt_id,
   ) || cover?.attempts.at(-1) || null;
   const generatedPageCount = Math.max(session.pages.length - 1, 0);
+  const paymentRequired = guideProduct?.enabled === true;
+  const paymentReady = Boolean(guideProduct && (!paymentRequired || payment?.status === 'paid'));
 
   const loadCover = useCallback(async (attempt) => {
     if (!attempt?.asset_url) {
@@ -101,6 +114,88 @@ const GuideAssembly = ({ session: initialSession }) => {
     return latest;
   }, [session.session_id]);
 
+  const refreshPayment = useCallback(async ({ signal } = {}) => {
+    const latest = await getBuilderPayment(session.session_id, { signal });
+    setPayment(latest);
+    return latest;
+  }, [session.session_id]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setPaymentError('');
+    getGuideProduct({ signal: controller.signal })
+      .then(async (product) => {
+        setGuideProduct(product);
+        if (!product.enabled) {
+          setPayment(null);
+          return;
+        }
+        const latest = await refreshPayment({ signal: controller.signal });
+        const returnedPayment = mercadoPagoReturnPayment();
+        if (
+          latest
+          && returnedPayment?.localPaymentId === latest.payment_id
+          && latest.status !== 'refunded'
+        ) {
+          const confirmed = await refreshGuidePayment(
+            latest.payment_id,
+            returnedPayment.providerPaymentId,
+            { signal: controller.signal },
+          );
+          setPayment(confirmed);
+        }
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          setPaymentError(error.message || 'Não foi possível consultar o pagamento.');
+        }
+      });
+    return () => controller.abort();
+  }, [refreshPayment]);
+
+  useEffect(() => {
+    if (!paymentRequired || payment?.status !== 'pending') return undefined;
+    const timer = window.setInterval(() => {
+      refreshPayment().catch((error) => {
+        setPaymentError(error.message || 'Não foi possível atualizar o pagamento.');
+      });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [payment?.status, paymentRequired, refreshPayment]);
+
+  const handleCheckout = async () => {
+    if (paymentBusy) return;
+    if (payment?.checkout_url && payment.status === 'pending') {
+      window.location.assign(payment.checkout_url);
+      return;
+    }
+    setPaymentBusy(true);
+    setPaymentError('');
+    try {
+      const latest = await createGuideCheckout(session.session_id, createIdempotencyKey());
+      setPayment(latest);
+      if (latest.status !== 'paid' && latest.checkout_url) {
+        window.location.assign(latest.checkout_url);
+      }
+    } catch (error) {
+      setPaymentError(error.message || 'Não foi possível abrir o Mercado Pago.');
+    } finally {
+      setPaymentBusy(false);
+    }
+  };
+
+  const handleRefreshPayment = async () => {
+    setPaymentBusy(true);
+    setPaymentError('');
+    try {
+      await refreshPayment();
+    } catch (error) {
+      setPaymentError(error.message || 'Não foi possível atualizar o pagamento.');
+    } finally {
+      setPaymentBusy(false);
+    }
+  };
+
   useEffect(() => {
     const jobId = session.generation_job_id;
     if (!jobId) return undefined;
@@ -126,7 +221,7 @@ const GuideAssembly = ({ session: initialSession }) => {
   }, [session.generation_job_id]);
 
   const handleGenerateCover = async () => {
-    if (!cover || coverBusy || cover.approved_at) return;
+    if (!cover || coverBusy || cover.approved_at || !paymentReady) return;
     setCoverBusy('generate');
     setCoverError('');
     const key = generationKeyRef.current || createIdempotencyKey();
@@ -181,7 +276,7 @@ const GuideAssembly = ({ session: initialSession }) => {
   };
 
   const handleQueueGuide = async () => {
-    if (!cover?.approved_at || jobBusy) return;
+    if (!cover?.approved_at || jobBusy || !paymentReady) return;
     setJobBusy(true);
     setJobError('');
     const key = queueKeyRef.current || createIdempotencyKey();
@@ -247,6 +342,70 @@ const GuideAssembly = ({ session: initialSession }) => {
         </section>
 
         <aside className="space-y-5">
+          {paymentRequired && payment?.status === 'paid' && (
+            <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-950">
+              <div className="flex items-center gap-3">
+                <CircleCheck className="h-6 w-6 shrink-0 text-emerald-700" aria-hidden="true" />
+                <div>
+                  <p className="font-bold">Pagamento confirmado</p>
+                  <p className="text-sm font-medium text-emerald-900">
+                    Seu crédito está vinculado a este guia.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {paymentRequired && payment?.status !== 'paid' && (
+            <div className="rounded-[2rem] border-2 border-primary/25 bg-primary/5 p-6 shadow-sm">
+              <CreditCard className="h-10 w-10 text-primary" aria-hidden="true" />
+              <h2 className="mt-4 font-serif text-2xl font-bold text-foreground">
+                {payment?.status === 'pending' ? 'Aguardando confirmação' : 'Pagamento necessário'}
+              </h2>
+              <p className="mt-2 text-sm font-medium text-muted-foreground">
+                {payment?.status === 'pending'
+                  ? 'Se você pagou por Pix, a confirmação pode levar alguns instantes. Esta tela atualiza automaticamente.'
+                  : `Pague ${formatPrice(guideProduct.amount_minor, guideProduct.currency)} no ambiente seguro do Mercado Pago para liberar a criação.`}
+              </p>
+              <div className="mt-5 grid gap-3">
+                <Button
+                  type="button"
+                  onClick={handleCheckout}
+                  disabled={paymentBusy}
+                  className="rounded-full py-6 font-bold"
+                >
+                  {paymentBusy ? (
+                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Aguarde…</>
+                  ) : (
+                    <><CreditCard className="mr-2 h-5 w-5" /> {payment?.status === 'pending' ? 'Voltar ao Mercado Pago' : 'Pagar com Mercado Pago'}</>
+                  )}
+                </Button>
+                {payment?.status === 'pending' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleRefreshPayment}
+                    disabled={paymentBusy}
+                    className="rounded-full border-2 py-6 font-bold"
+                  >
+                    <RefreshCcw className="mr-2 h-5 w-5" /> Atualizar confirmação
+                  </Button>
+                )}
+              </div>
+              {paymentError && <p className="mt-4 text-sm font-bold text-destructive" role="alert">{paymentError}</p>}
+            </div>
+          )}
+
+          {!guideProduct && (
+            <div className="rounded-2xl border border-border bg-card p-4" role="status">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
+                <p className="text-sm font-bold text-foreground">Conferindo a liberação do guia…</p>
+              </div>
+              {paymentError && <p className="mt-3 text-sm font-bold text-destructive">{paymentError}</p>}
+            </div>
+          )}
+
           {!cover?.approved_at && (
             <div className="rounded-[2rem] border-2 border-border bg-card p-6 shadow-sm">
               <h2 className="font-serif text-2xl font-bold text-foreground">{selectedAttempt ? 'Quer mudar alguma coisa?' : 'Gerar a capa'}</h2>
@@ -270,7 +429,7 @@ const GuideAssembly = ({ session: initialSession }) => {
                 <Button
                   type="button"
                   onClick={handleGenerateCover}
-                  disabled={Boolean(coverBusy) || (selectedAttempt && !revisionInstruction.trim())}
+                  disabled={!paymentReady || Boolean(coverBusy) || (selectedAttempt && !revisionInstruction.trim())}
                   className="rounded-full py-6 font-bold"
                 >
                   {coverBusy === 'generate' ? (

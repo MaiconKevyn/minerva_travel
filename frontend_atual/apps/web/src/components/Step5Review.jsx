@@ -23,8 +23,12 @@ import { Button } from '@/components/ui/button';
 import {
   categoryLabelForAttraction,
   buildGuideItineraryPayload,
+  createGuideCheckout,
   createGuideBuilder,
+  createIdempotencyKey,
   fetchGuideBuilderSession,
+  formatPrice,
+  getGuideProduct,
   RESTAURANT_RECOMMENDATIONS_EXTRA,
   selectGuideLandmarks,
 } from '@/utils/minerva-api.js';
@@ -79,6 +83,19 @@ const Step5Review = () => {
   const [isRestoringSession, setIsRestoringSession] = useState(Boolean(builderSessionId));
   const [sessionRestoreError, setSessionRestoreError] = useState('');
   const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const [guideProduct, setGuideProduct] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getGuideProduct({ signal: controller.signal })
+      .then(setGuideProduct)
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          console.error('Não foi possível consultar o produto:', error);
+        }
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!builderSessionId || builderSession) {
@@ -168,6 +185,20 @@ const Step5Review = () => {
     try {
       const session = await createGuideBuilder(guideData);
       await checkpointBuilderSession(session.session_id);
+      const product = guideProduct || await getGuideProduct();
+      if (!product.enabled) {
+        setBuilderSession(session);
+        return;
+      }
+      const payment = await createGuideCheckout(session.session_id, createIdempotencyKey());
+      if (payment.status === 'paid') {
+        setBuilderSession(session);
+        return;
+      }
+      if (payment.checkout_url) {
+        window.location.assign(payment.checkout_url);
+        return;
+      }
       setBuilderSession(session);
     } catch (error) {
       console.error('Não foi possível iniciar a criação por páginas:', error);
@@ -607,9 +638,9 @@ const Step5Review = () => {
               O guia chega no seu e-mail
             </h3>
             <p className="mt-1 text-sm font-medium text-muted-foreground">
-              Na próxima tela você revisa apenas a capa. Depois de aprová-la, um único clique
-              inicia o guia completo; você pode sair do site e receberá o link do PDF no e-mail
-              da sua conta quando tudo estiver pronto.
+              {guideProduct?.enabled
+                ? 'Seu roteiro será salvo antes de abrir o Mercado Pago. Assim que o pagamento for confirmado, você volta para revisar a capa e criar o guia completo.'
+                : 'Na próxima tela você revisa apenas a capa. Depois de aprová-la, um único clique inicia o guia completo; você pode sair do site e receberá o link do PDF no e-mail da sua conta quando tudo estiver pronto.'}
             </p>
           </div>
         </div>
@@ -623,7 +654,12 @@ const Step5Review = () => {
           className="w-full max-w-md rounded-full bg-primary px-6 py-6 text-base font-bold text-white shadow-[0_8px_30px_rgb(241,97,59,0.3)] transition-all hover:-translate-y-1 hover:bg-primary/90 disabled:opacity-70 disabled:hover:translate-y-0 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
         >
           {isGenerating ? (
-            <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Preparando as páginas...</>
+            <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Preparando o checkout...</>
+          ) : guideProduct?.enabled ? (
+            <>
+              <Sparkles className="w-6 h-6 mr-3 inline-block" /> Comprar por{' '}
+              {formatPrice(guideProduct.amount_minor, guideProduct.currency)}
+            </>
           ) : (
             <><Sparkles className="w-6 h-6 mr-3 inline-block" /> Criar e revisar a capa</>
           )}
@@ -636,7 +672,7 @@ const Step5Review = () => {
       )}
       {isGenerating && (
         <p className="mt-4 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
-          Preparando a capa e a ordem definitiva do guia. Nenhuma imagem será gerada sem sua confirmação.
+          Salvando seu roteiro antes de abrir o Mercado Pago. Nenhuma imagem será gerada sem sua confirmação nem antes da liberação do pagamento.
         </p>
       )}
     </div>

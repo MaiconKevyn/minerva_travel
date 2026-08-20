@@ -302,7 +302,7 @@ test('home promises exactly the activity catalogue the product ships', () => {
   assert.match(showcase, /activityOptionsByCategory/);
   assert.doesNotMatch(showcase, /\b1[0-9] atividades\b/);
   assert.match(faq, /PHRASEBOOK_COUNTRIES/);
-  // Enquanto o checkout não existe, a home não pode sugerir cobrança.
+  // O preço numérico vem do backend; a home estática não pode congelá-lo.
   assert.match(faq, /piloto/i);
   assert.doesNotMatch(faq, /R\$|€\s*\d/);
 });

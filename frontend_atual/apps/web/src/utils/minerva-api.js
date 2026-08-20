@@ -30,6 +30,12 @@ export const createIdempotencyKey = () => {
   return `guide-${Date.now()}-${Math.random().toString(36).slice(2, 14)}`;
 };
 
+export const formatPrice = (amountMinor, currency = 'BRL') =>
+  new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency,
+  }).format(Number(amountMinor || 0) / 100);
+
 export const ATTRACTION_CATEGORY_LABELS = {
   animals: 'Animais',
   architecture: 'Arquitetura',
@@ -1253,6 +1259,78 @@ export const createGuideBuilder = async (guideData) => {
     throw new Error(await responseErrorMessage(response, 'Não foi possível iniciar a montagem'));
   }
   return response.json();
+};
+
+export const getGuideProduct = async ({ signal } = {}) => {
+  const response = await authenticatedFetch(`${apiBaseUrl()}/api/products/guide`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) {
+    throw await responseApiError(response, 'Não foi possível consultar o valor do guia');
+  }
+  return response.json();
+};
+
+export const createGuideCheckout = async (
+  builderSessionId,
+  idempotencyKey = createIdempotencyKey(),
+) => {
+  const response = await authenticatedFetch(`${apiBaseUrl()}/api/payments/checkout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({ builder_session_id: builderSessionId }),
+  });
+  if (!response.ok) {
+    throw await responseApiError(response, 'Não foi possível iniciar o pagamento');
+  }
+  return response.json();
+};
+
+export const getBuilderPayment = async (builderSessionId, { signal } = {}) => {
+  const response = await authenticatedFetch(
+    `${apiBaseUrl()}/api/payments/by-builder/${encodeURIComponent(builderSessionId)}`,
+    { method: 'GET', headers: { Accept: 'application/json' }, signal },
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw await responseApiError(response, 'Não foi possível consultar o pagamento');
+  }
+  return response.json();
+};
+
+export const refreshGuidePayment = async (paymentId, providerPaymentId, { signal } = {}) => {
+  const response = await authenticatedFetch(
+    `${apiBaseUrl()}/api/payments/${encodeURIComponent(paymentId)}/refresh`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider_payment_id: providerPaymentId }),
+      signal,
+    },
+  );
+  if (!response.ok) {
+    throw await responseApiError(response, 'Não foi possível confirmar o pagamento');
+  }
+  return response.json();
+};
+
+export const mercadoPagoReturnPayment = (href = globalThis.location?.href || '') => {
+  try {
+    const params = new URL(href, 'https://minerva.local').searchParams;
+    const localPaymentId = String(params.get('payment') || '').trim();
+    const providerPaymentId = String(
+      params.get('payment_id') || params.get('collection_id') || '',
+    ).trim();
+    if (!localPaymentId || !/^\d+$/.test(providerPaymentId)) return null;
+    return { localPaymentId, providerPaymentId };
+  } catch {
+    return null;
+  }
 };
 
 export const fetchGuideBuilderSession = async (sessionId) =>
