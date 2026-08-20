@@ -23,10 +23,10 @@ from minerva_travel.activity_page_compositor import (
     COVER_LOCKUP_TOP,
     HERE_VS_HOME_TITLE,
     NEWSPAPER_HEADLINE_TITLE,
-    PAGE_TOP_BAND,
     SCENE_ARTWORK_SIZE,
     SPOT_SCENE_SIZE,
     SUMMARY_MAX_STOPS,
+    SUMMARY_ROUTE_TOP,
     TRAVEL_DIARY_TITLE,
     ActivityPageCompositionError,
     compose_anagram_page,
@@ -1945,7 +1945,9 @@ def summary_page_prompt(
             f"{'LEFT' if a_direita else 'RIGHT'} half of this band empty."
         )
     faixas = "\n".join(faixas_linhas)
-    topo_pct = round(PAGE_TOP_BAND[3] / altura_pagina * 100)
+    # A reserva pedida e a faixa inteira ate a primeira parada, nao so o que
+    # o codigo pinta: pedir menos e receber monumento dentro da cabeceira.
+    topo_pct = round(SUMMARY_ROUTE_TOP / altura_pagina * 100)
     revision = _revision_directive(revision_instruction, has_revision_reference)
     reference = (
         "The supplied input image is the selected current-page attempt and is only a "
@@ -1970,11 +1972,22 @@ signpost, page number, watermark or signature anywhere in this artwork. Trusted 
 numbered list of stops underneath, in the book's own typeface. A vignette must be recognizable on
 its own, without a name written next to it.
 
-LAYOUT — the application prints a title panel over the top {topo_pct} percent of the page and
-writes each stop's name itself, so this artwork must leave room for both. Divide the rest of the
-page into one horizontal band per stop and place each vignette inside its own band, on the side
-named below. THE OTHER SIDE OF EACH BAND MUST STAY EMPTY — plain, calm background with no motif,
-no scenery and no decoration — because the stop's name is printed there.
+BACKGROUND — one single flat pale colour behind the whole page, edge to edge, the same tone from
+top to bottom. No panel, no strip, no framed area, no change of tone anywhere.
+
+LAYOUT — the application writes the guide title across the top {topo_pct} percent of the page and
+prints each stop's name itself, so this artwork must leave room for both. Keep that top strip as
+plain background: nothing may reach into it, and no vignette may be tall enough to be clipped by
+it. Divide the rest of the page into one horizontal band per stop and place each vignette inside
+its own band, on the side named below. THE OTHER SIDE OF EACH BAND MUST STAY EMPTY — plain, calm
+background with no motif, no scenery and no decoration — because the stop's name is printed there.
+
+Every vignette must be COMPLETE inside its own band: the whole monument, from its spire, roof or
+dome down to its base, with a little breathing room above and below. A landmark with its top or
+its base cut off looks like a printing accident. NOTHING may touch or bleed off the top, bottom,
+left or right edge of the page — every drawn thing ends inside the page, surrounded by background.
+Make the vignettes generous — they are the subject of this page — but never bigger than the band
+that holds them.
 
 {faixas}
 

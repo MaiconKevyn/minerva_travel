@@ -2264,27 +2264,44 @@ def _draw_scene_page_header(
     overline: str,
     title: str,
     arched: str,
+    compact: bool = False,
 ) -> None:
-    """A cabeceira das paginas ilustradas: sobrelinha, titulo e a linha em arco."""
+    """A cabeceira das paginas ilustradas: sobrelinha, titulo e a linha em arco.
+
+    A versao compacta serve a pagina do roteiro, onde quem tem de ocupar a
+    folha sao as ilustracoes das paradas — nao o letreiro.
+    """
+
+    if compact:
+        y_sobrelinha, corpo_sobrelinha = 28, 19
+        y_titulo, maior, menor, teto = 64, 60, 30, 88
+        linha_do_arco, corpo_do_arco = 190, 22
+    else:
+        y_sobrelinha, corpo_sobrelinha = 44, 21
+        y_titulo, maior, menor, teto = 100, 78, 34, TITULO_ALTURA_MAXIMA
+        linha_do_arco, corpo_do_arco = 286, 25
 
     if overline:
         _draw_tracked(
-            draw, overline.upper(), 44, size=21, fill=MUTED_INK, maximum_width=880
+            draw,
+            overline.upper(),
+            y_sobrelinha,
+            size=corpo_sobrelinha,
+            fill=MUTED_INK,
+            maximum_width=880,
         )
-    # O titulo vai de 100 ate a linha em arco (286), menos a altura das letras
+    # O titulo vai do seu topo ate a linha em arco, menos a altura das letras
     # do arco. Em duas linhas, sem esse teto, a segunda descia sobre o arco.
-    _draw_centered_fit(
-        draw, title, 100, 78, 34, 880, bold=True, maximum_height=TITULO_ALTURA_MAXIMA
-    )
+    _draw_centered_fit(draw, title, y_titulo, maior, menor, 880, bold=True, maximum_height=teto)
     if arched:
-        # Arco lido em 286, entao o centro da circunferencia fica um raio acima.
+        # Fundo do circulo na linha do arco: o centro fica um raio acima.
         RAIO = 430
         _arc_text(
             image,
             arched.upper(),
-            center=(PAGE_IMAGE_SIZE[0] // 2, 286 - RAIO),
+            center=(PAGE_IMAGE_SIZE[0] // 2, linha_do_arco - RAIO),
             radius=RAIO,
-            size=25,
+            size=corpo_do_arco,
             fill=ACCENT,
             below=True,
         )
@@ -2421,8 +2438,22 @@ SUMMARY_BULLET_GAP = 20
 # alternando de lado, e o nome na metade vazia da mesma faixa. O modelo so
 # desenha as vinhetas; a rota pontilhada e os nomes sao do codigo, que assim
 # sabe exatamente onde cada parada esta.
-SUMMARY_ROUTE_TOP = 372
-SUMMARY_ROUTE_BOTTOM = 1470
+# O letreiro nao e o assunto da pagina: as paradas sao. Com 340 px de faixa a
+# torre chegava a ser tapada pela cabeceira e saia sem a ponta.
+SUMMARY_HEADER_HEIGHT = 232
+# O prompt reserva MAIS do que o codigo pinta. A ponta da torre chegou a 200 e
+# foi apagada pelo proprio retangulo da cabeceira; esta folga de 84 px entre o
+# fim da pintura e o inicio da primeira faixa absorve o transbordo do modelo.
+SUMMARY_ROUTE_TOP = 316
+# Acima disto, o que a cabeceira ia cobrir nao e fundo: e monumento. Pintar por
+# cima decapitaria a parada, e em silencio — o pior desfecho possivel. O numero
+# vem de medicao: 3% e o degrau entre a antena que so encosta na linha (2,7%) e
+# um corte que pega estrutura de verdade (a partir de 4,7%).
+SUMMARY_HEADER_INTRUSION_LIMIT = 0.03
+# Margem de verdade no pe da folha: com a ultima faixa terminando a 58 px
+# da borda, o modelo leu aquilo como permissao para sangrar, e o Louvre
+# saiu sem base.
+SUMMARY_ROUTE_BOTTOM = 1424
 SUMMARY_HALF = PAGE_IMAGE_SIZE[0] // 2
 SUMMARY_ROUTE_DOT = 7
 SUMMARY_ROUTE_STEP = 34
@@ -2446,6 +2477,65 @@ def summary_band(index: int, total: int) -> tuple[int, int, bool]:
     altura = (SUMMARY_ROUTE_BOTTOM - SUMMARY_ROUTE_TOP) // max(1, total)
     topo = SUMMARY_ROUTE_TOP + index * altura
     return topo, topo + altura, index % 2 == 0
+
+
+def _ground_colour(image: Image.Image, boxes: Sequence[tuple[int, int, int, int]]) -> str:
+    """A cor chapada que a arte usou, medida onde o contrato manda ficar vazio.
+
+    Pintar a cabeceira com uma cor da paleta abria um corte visivel no meio da
+    folha, como se fossem duas paginas coladas. Tirando a cor do proprio
+    desenho, a emenda deixa de existir.
+
+    A mediana por canal, e nao a media: um motivo que escape para a metade
+    vazia puxaria a media para o lado dele, mas nao move a mediana.
+    """
+
+    canais: list[list[int]] = [[], [], []]
+    for box in boxes:
+        recorte = image.crop(box).resize((32, 32), Image.Resampling.BILINEAR).convert("RGB")
+        pixels = recorte.load()
+        if pixels is None:  # pragma: no cover - Pillow devolve None so em erro
+            continue
+        for x in range(32):
+            for y in range(32):
+                for indice, valor in enumerate(cast(tuple[int, ...], pixels[x, y])):
+                    canais[indice].append(valor)
+    if not canais[0]:
+        return BAND
+    mediana = tuple(sorted(canal)[len(canal) // 2] for canal in canais)
+    return "#{:02X}{:02X}{:02X}".format(*mediana)
+
+
+def _edge_crossing_fraction(
+    image: Image.Image,
+    y: int,
+    ground: str,
+    *,
+    tolerance: int = 40,
+    thickness: int = 8,
+) -> float:
+    """Fracao das colunas em que algo atravessa a linha onde o codigo vai pintar.
+
+    Medir a AREA da faixa nao separa nada: o giz deixa 2 a 5% de ruido e a ponta
+    fina de uma torre acrescenta pouco mais que isso. Na linha do corte o sinal
+    e limpo. Medido nesta arte: coluna sem desenho da 0 a 1%, a antena da torre
+    da 2,7%, e o corpo de um monumento passa de 30%.
+    """
+
+    alvo = tuple(int(ground[i : i + 2], 16) for i in (1, 3, 5))
+    pixels = image.convert("RGB").load()
+    if pixels is None:  # pragma: no cover - Pillow devolve None so em erro
+        return 0.0
+    largura, altura = image.size
+    colunas = range(0, largura, 2)
+    atravessadas = 0
+    for x in colunas:
+        for dy in range(-thickness, thickness + 1, 4):
+            cor = cast(tuple[int, ...], pixels[x, max(0, min(altura - 1, y + dy))])
+            if max(abs(cor[i] - alvo[i]) for i in range(3)) > tolerance:
+                atravessadas += 1
+                break
+    return atravessadas / len(colunas)
 
 
 def _draw_dotted_route(draw: ImageDraw.ImageDraw, pontos: Sequence[tuple[float, float]]) -> None:
@@ -2495,14 +2585,35 @@ def compose_summary_page(
     paradas = paradas[:SUMMARY_MAX_STOPS]
 
     image = _load_artwork(artwork_path)
+
+    # As metades vazias sao a unica area que o contrato garante chapada: e de
+    # la que sai a cor da cabeceira, para a pagina inteira ficar de uma cor so.
+    metades_vazias = []
+    for indice in range(len(paradas)):
+        topo, base, vinheta_a_direita = summary_band(indice, len(paradas))
+        metades_vazias.append(
+            (0, topo, SUMMARY_HALF, base)
+            if vinheta_a_direita
+            else (SUMMARY_HALF, topo, PAGE_IMAGE_SIZE[0], base)
+        )
+    fundo = _ground_colour(image, metades_vazias)
+
+    invasao = _edge_crossing_fraction(image, SUMMARY_HEADER_HEIGHT, fundo)
+    if invasao > SUMMARY_HEADER_INTRUSION_LIMIT:
+        raise ActivityPageCompositionError(
+            f"A arte do roteiro cruza a linha do título em {invasao:.0%} da largura; "
+            "pintar por cima decapitaria a parada."
+        )
+
     draw = ImageDraw.Draw(image)
-    draw.rectangle(PAGE_TOP_BAND, fill=BAND)
+    draw.rectangle((0, 0, PAGE_IMAGE_SIZE[0], SUMMARY_HEADER_HEIGHT), fill=fundo)
     _draw_scene_page_header(
         image,
         draw,
         overline=_bounded(family_title, "family_title", 60),
         title=SUMMARY_TITLE,
         arched=_bounded(trip_date, "trip_date", 60) if trip_date.strip() else "",
+        compact=True,
     )
 
     # Um corpo so para todas as paradas: deixar cada nome escolher o seu fazia

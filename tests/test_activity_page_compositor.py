@@ -45,9 +45,11 @@ from minerva_travel.activity_page_compositor import (
     compose_investigator_page,
     compose_landmark_page,
     compose_spot_the_difference_page,
+    compose_summary_page,
     compose_word_search_page,
     crop_scene_for_panel,
     family_coloring_instruction_for,
+    summary_band,
     validate_activity_page,
 )
 from minerva_travel.investigator_activity import (
@@ -542,3 +544,60 @@ def test_a_long_landmark_name_wraps_without_touching_the_arched_place(tmp_path):
         ]
         assert arco, "a linha em arco não foi impressa"
         assert arco[0] - titulo[-1] >= 24, "o título encostou no arco"
+
+
+def _arte_de_roteiro(path: Path, *, invade: bool) -> Path:
+    """Arte de roteiro chapada, com ou sem monumento entrando na cabeceira."""
+
+    imagem = Image.new("RGB", (1024, 1536), "#FEF3D4")
+    desenho = ImageDraw.Draw(imagem)
+    for indice in range(2):
+        topo, base, a_direita = summary_band(indice, 2)
+        cx = 768 if a_direita else 256
+        alto = 140 if not invade else 340
+        desenho.polygon(
+            [(cx, topo + 40 - alto), (cx - 130, base - 60), (cx + 130, base - 60)],
+            fill="#2E5FA3",
+        )
+    imagem.save(path, "PNG")
+    return path
+
+
+def test_the_route_page_refuses_to_behead_a_landmark(tmp_path):
+    """Pintar a cabeceira por cima de um monumento é o pior desfecho: silencioso.
+
+    A folga entre o que o prompt reserva e o que o código pinta é a defesa
+    principal; esta guarda é a rede embaixo dela. Sem ela, uma torre que subiu
+    demais sai sem a ponta e nada avisa.
+    """
+
+    with pytest.raises(ActivityPageCompositionError, match="decapitaria"):
+        compose_summary_page(
+            _arte_de_roteiro(tmp_path / "invade.png", invade=True),
+            tmp_path / "saida.png",
+            family_title="Família Moraes",
+            trip_date="Setembro de 2026",
+            landmark_names=["Torre Eiffel", "Museu do Louvre"],
+        )
+
+
+def test_the_route_page_takes_its_background_colour_from_the_artwork(tmp_path):
+    """A página inteira fica de uma cor só, tirada do próprio desenho.
+
+    Pintar a cabeceira com uma cor da paleta abria um corte visível no meio da
+    folha, como se fossem duas páginas coladas.
+    """
+
+    saida = tmp_path / "roteiro.png"
+    compose_summary_page(
+        _arte_de_roteiro(tmp_path / "arte.png", invade=False),
+        saida,
+        family_title="Família Moraes",
+        trip_date="Setembro de 2026",
+        landmark_names=["Torre Eiffel", "Museu do Louvre"],
+    )
+
+    with Image.open(saida) as imagem:
+        pagina = imagem.convert("RGB")
+        # Um pixel dentro da cabeceira e outro bem abaixo dela, os dois no fundo.
+        assert pagina.getpixel((20, 20)) == pagina.getpixel((20, 1500))
