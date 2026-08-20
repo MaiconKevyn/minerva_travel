@@ -25,10 +25,12 @@ from minerva_travel.activity_page_compositor import (
     NEWSPAPER_HEADLINE_TITLE,
     SCENE_ARTWORK_SIZE,
     SPOT_SCENE_SIZE,
+    SUMMARY_HEADER_RETRIES,
     SUMMARY_MAX_STOPS,
     SUMMARY_ROUTE_TOP,
     TRAVEL_DIARY_TITLE,
     ActivityPageCompositionError,
+    SummaryHeaderIntrusionError,
     compose_anagram_page,
     compose_best_memory_page,
     compose_coloring_page,
@@ -523,21 +525,33 @@ class OpenAIGuidePageGenerator:
         # Sem foto e sem capa como referência: a página é só do roteiro, e
         # passar a família como entrada é o que a fazia reaparecer.
         references = [reference_page] if reference_page is not None else []
-        response = self._generate_activity_artwork(prompt, references)
         artwork = _provider_artwork_path(output_path)
-        try:
-            _persist_page_image(response, artwork)
-            return compose_summary_page(
-                artwork,
-                output_path,
-                family_title=family_title,
-                trip_date=trip_date,
-                landmark_names=landmark_names,
-            )
-        except (ActivityPageCompositionError, OSError, ValueError) as error:
-            raise PageGenerationError("Não foi possível finalizar o roteiro.") from error
-        finally:
-            artwork.unlink(missing_ok=True)
+        # Quando a arte sobe até a faixa do título, pedir outra é a saída certa:
+        # pintar por cima decapita a parada, e derrubar o guia inteiro por causa
+        # de uma vinheta mal posicionada é pior que os dois. Só na última
+        # tentativa a página é composta assim mesmo — um guia sem a página do
+        # roteiro não vira PDF nenhum.
+        for tentativa in range(1, SUMMARY_HEADER_RETRIES + 1):
+            ultima = tentativa == SUMMARY_HEADER_RETRIES
+            try:
+                _persist_page_image(self._generate_activity_artwork(prompt, references), artwork)
+                return compose_summary_page(
+                    artwork,
+                    output_path,
+                    family_title=family_title,
+                    trip_date=trip_date,
+                    landmark_names=landmark_names,
+                    enforce_header=not ultima,
+                )
+            except SummaryHeaderIntrusionError:
+                if ultima:
+                    raise
+                continue
+            except (ActivityPageCompositionError, OSError, ValueError) as error:
+                raise PageGenerationError("Não foi possível finalizar o roteiro.") from error
+            finally:
+                artwork.unlink(missing_ok=True)
+        raise PageGenerationError("Não foi possível finalizar o roteiro.")
 
     def generate_destination_intro_page(
         self,

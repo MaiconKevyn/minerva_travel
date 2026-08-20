@@ -2450,6 +2450,7 @@ SUMMARY_ROUTE_TOP = 316
 # vem de medicao: 3% e o degrau entre a antena que so encosta na linha (2,7%) e
 # um corte que pega estrutura de verdade (a partir de 4,7%).
 SUMMARY_HEADER_INTRUSION_LIMIT = 0.03
+SUMMARY_HEADER_RETRIES = 3
 # Margem de verdade no pe da folha: com a ultima faixa terminando a 58 px
 # da borda, o modelo leu aquilo como permissao para sangrar, e o Louvre
 # saiu sem base.
@@ -2563,6 +2564,10 @@ def _draw_dotted_route(draw: ImageDraw.ImageDraw, pontos: Sequence[tuple[float, 
             draw.ellipse((x - raio, y - raio, x + raio, y + raio), fill=INK)
 
 
+class SummaryHeaderIntrusionError(ActivityPageCompositionError):
+    """A arte subiu ate a faixa do titulo; vale pedir outra em vez de decapitar."""
+
+
 def compose_summary_page(
     artwork_path: Path,
     output_path: Path,
@@ -2570,6 +2575,7 @@ def compose_summary_page(
     family_title: str,
     trip_date: str,
     landmark_names: Sequence[str],
+    enforce_header: bool = True,
 ) -> Path:
     """Monta o roteiro: vinhetas do modelo, rota e nomes do codigo.
 
@@ -2599,8 +2605,8 @@ def compose_summary_page(
     fundo = _ground_colour(image, metades_vazias)
 
     invasao = _edge_crossing_fraction(image, SUMMARY_HEADER_HEIGHT, fundo)
-    if invasao > SUMMARY_HEADER_INTRUSION_LIMIT:
-        raise ActivityPageCompositionError(
+    if enforce_header and invasao > SUMMARY_HEADER_INTRUSION_LIMIT:
+        raise SummaryHeaderIntrusionError(
             f"A arte do roteiro cruza a linha do título em {invasao:.0%} da largura; "
             "pintar por cima decapitaria a parada."
         )

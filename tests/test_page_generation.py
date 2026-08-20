@@ -1321,3 +1321,66 @@ def _tem_tinta_escura(pagina: Image.Image, caixa: tuple[int, int, int, int]) -> 
     )
     # Longe do corredor da rota, tinta escura só pode ser texto.
     return escuros > 200
+
+
+def _route_artwork(*, intrudes: bool) -> bytes:
+    """Arte de roteiro chapada, com ou sem vinheta subindo até a cabeceira."""
+
+    imagem = Image.new("RGB", (1024, 1536), "#FDF4DC")
+    desenho = ImageDraw.Draw(imagem)
+    for indice in range(2):
+        topo, base, a_direita = summary_band(indice, 2)
+        cx = 768 if a_direita else 256
+        # Na versão que invade, a primeira vinheta sobe acima da linha do título.
+        alto = topo + 40 - (340 if intrudes and indice == 0 else 0)
+        desenho.polygon([(cx, alto), (cx - 130, base - 60), (cx + 130, base - 60)], fill="#2E5FA3")
+    buffer = BytesIO()
+    imagem.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_the_route_page_asks_for_new_art_instead_of_beheading_a_landmark(tmp_path):
+    """Arte que sobe até a faixa do título vale outra tentativa, não um guia perdido.
+
+    A guarda existe para não decapitar a parada em silêncio, mas na primeira
+    versão ela derrubava o guia inteiro — e um guia sem a página do roteiro não
+    vira PDF nenhum. Uma vinheta mal posicionada é problema transitório.
+    """
+
+    entregas = [
+        _route_artwork(intrudes=True),
+        _route_artwork(intrudes=False),
+    ]
+    chamadas = []
+
+    def transport(_method, _url, **_kwargs):
+        chamadas.append(1)
+        return _response(entregas[min(len(chamadas) - 1, len(entregas) - 1)])
+
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    saida = generator.generate_summary_page(
+        output_path=tmp_path / "roteiro.png",
+        family_title="Família Moraes",
+        trip_date="Setembro de 2026",
+        landmark_names=["Torre Eiffel", "Museu do Louvre"],
+    )
+
+    assert saida.is_file()
+    assert len(chamadas) == 2, "a arte que invadia devia ter sido descartada"
+
+
+def test_the_route_page_still_ships_when_every_attempt_intrudes(tmp_path):
+    """Na última tentativa a página sai assim mesmo: pior é não existir."""
+
+    def transport(_method, _url, **_kwargs):
+        return _response(_route_artwork(intrudes=True))
+
+    generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
+    saida = generator.generate_summary_page(
+        output_path=tmp_path / "roteiro.png",
+        family_title="Família Moraes",
+        trip_date="Setembro de 2026",
+        landmark_names=["Torre Eiffel", "Museu do Louvre"],
+    )
+
+    assert saida.is_file()
