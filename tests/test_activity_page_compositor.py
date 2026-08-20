@@ -4,6 +4,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from minerva_travel.activity_page_compositor import (
+    ACCENT,
     BEST_MEMORY_REQUIRED_COPY,
     COLORING_ART_REGION,
     COLORING_INSTRUCTION_TEMPLATE,
@@ -34,6 +35,7 @@ from minerva_travel.activity_page_compositor import (
     coloring_instruction_for,
     compose_best_memory_page,
     compose_coloring_page,
+    compose_cover_page,
     compose_detail_hunt_page,
     compose_drawing_page,
     compose_family_coloring_page,
@@ -57,6 +59,7 @@ from minerva_travel.word_search import build_word_search_grid
 # coordenada de pixel em teste.
 PAPEL_RGB = tuple(int(PAPER[i : i + 2], 16) for i in (1, 3, 5))
 TINTA_RGB = tuple(int(INK[i : i + 2], 16) for i in (1, 3, 5))
+ACENTO_RGB = tuple(int(ACCENT[i : i + 2], 16) for i in (1, 3, 5))
 
 
 def _scene(path: Path, color: str = "#d9eaf2") -> Path:
@@ -465,3 +468,74 @@ def test_the_generated_scene_and_the_printed_panel_share_one_aspect():
     panel_width, panel_height = SPOT_PANEL_SIZE
 
     assert scene_width / scene_height == panel_width / panel_height
+
+
+# Nomes e datas que existem de verdade, e que antes derrubavam a página ou
+# apagavam a data sem erro nenhum. A checagem é de tinta na folha, porque o
+# defeito era justamente o silêncio: a data sumia e nada reclamava.
+NOME_LONGO_DE_FAMILIA = "Família Wanderley Mendonça de Albuquerque Filho"
+DATA_LONGA = "Última semana de setembro e primeira de outubro de 2026"
+PONTO_DE_NOME_LONGO = "Santuário Nacional de Nossa Senhora da Conceição Aparecida"
+
+
+def _tem_tinta(page: Image.Image, box: tuple[int, int, int, int]) -> bool:
+    recorte = page.crop(box)
+    cores = recorte.getcolors(maxcolors=recorte.width * recorte.height) or []
+    return any(cor == TINTA_RGB for _quantidade, cor in cores)
+
+
+def test_cover_survives_a_long_family_name_and_a_long_trip_date(tmp_path):
+    """Nome comprido quebrava a capa; data comprida sumia dela.
+
+    `_bounded` aceita 60 caracteres, mas o título só cabia em uma linha até
+    ~44 e o arco desistia em silêncio quando abria demais. Uma família de nome
+    longo ficava sem capa nenhuma, para sempre.
+    """
+
+    saida = tmp_path / "capa.png"
+    compose_cover_page(
+        _artwork(tmp_path / "art.png"),
+        saida,
+        family_title=NOME_LONGO_DE_FAMILIA,
+        trip_date=DATA_LONGA,
+    )
+
+    with Image.open(saida) as imagem:
+        pagina = imagem.convert("RGB")
+        # O título quebrou em duas linhas dentro da faixa reservada a ele.
+        assert _tem_tinta(pagina, (72, 640, 952, 780))
+        # E a data continua na folha, em vez de desaparecer sem aviso.
+        assert _tem_tinta(pagina, (72, 790, 952, 870))
+
+
+def test_a_long_landmark_name_wraps_without_touching_the_arched_place(tmp_path):
+    """O nome em duas linhas não pode descer sobre a linha em arco.
+
+    Com o teto antigo a segunda linha parava a 13 px do arco e encostava nele.
+    """
+
+    saida = tmp_path / "ponto.png"
+    compose_landmark_page(
+        _scene(tmp_path / "art.png"),
+        saida,
+        landmark_name=PONTO_DE_NOME_LONGO,
+        location="Aparecida, Brasil",
+        family_title="Família Moraes",
+        trip_date="Setembro de 2026",
+        description="A maior igreja dedicada a Nossa Senhora no mundo.",
+        curiosity="A imagem foi encontrada por três pescadores dentro do rio.",
+    )
+
+    with Image.open(saida) as imagem:
+        pagina = imagem.convert("RGB")
+        titulo = [y for y in range(90, 340) if _tem_tinta(pagina, (0, y, 1024, y + 1))]
+        assert titulo, "o título não foi impresso"
+        arco = [
+            y
+            for y in range(90, 340)
+            if any(
+                pagina.getpixel((x, y)) == ACENTO_RGB for x in range(0, 1024, 2)
+            )
+        ]
+        assert arco, "a linha em arco não foi impressa"
+        assert arco[0] - titulo[-1] >= 24, "o título encostou no arco"

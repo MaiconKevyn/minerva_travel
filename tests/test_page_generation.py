@@ -365,7 +365,11 @@ def test_cover_revision_uses_original_photo_selected_cover_and_user_feedback(tmp
     assert "requested visual style replaces" in prompt
     assert "TEXT-FREE CONTRACT" in prompt
     assert '"Família Moraes"' not in prompt
-    assert "change family identity or the required member count" in prompt
+    assert "the required\nmember count" in prompt
+    # A referencia da revisao e a pagina JA composta, com o brasao impresso por
+    # cima. Sem avisar, o modelo redesenhava aquelas letras e o compositor
+    # carimbava de novo: duas tipografias na mesma capa.
+    assert "the lettering is not part of the artwork" in prompt
 
 
 def test_summary_revision_uses_selected_page_and_visible_variation_default(tmp_path):

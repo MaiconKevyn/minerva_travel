@@ -6,7 +6,7 @@ para comparar o antes e o depois sem precisar gerar um guia inteiro.
 
 | página | o que mostra |
 |---|---|
-| `01-capa` | capa sem foto da família, montada a partir do texto |
+| `01-capa` | capa da família, redesenhada a partir do retrato |
 | `02-nosso-roteiro` | sumário da viagem com a rota entre as paradas |
 | `03-destino-paris` | abertura de destino |
 | `04-torre-eiffel` | página de ponto turístico |
@@ -19,10 +19,20 @@ estilo canônico mora em `src/minerva_travel/visual_identity.py`.
 
 ## Duas coisas que as amostras expõem
 
-**Dois mundos tipográficos.** Compare `06-colorir-louvre` com `02-nosso-roteiro`:
-o primeiro usa Zilla Slab, desenhada pelo compositor; o segundo tem a
-tipografia desenhada pela IA, porque páginas ilustradas não passam pelo
-compositor. Some quando esses títulos migrarem para o código.
+**Dois mundos tipográficos — já resolvido no código, ainda visível aqui.**
+Compare `06-colorir-louvre` com `02-nosso-roteiro`: o primeiro usa Zilla Slab,
+desenhada pelo compositor; o segundo tem a tipografia desenhada pela IA. As
+quatro páginas ilustradas (capa, roteiro, destino e ponto turístico) já
+migraram para o código — a arte chega sem letra nenhuma e o compositor escreve
+por cima. **Estas imagens são anteriores à migração** e só somem quando forem
+regeradas:
+
+```bash
+python scripts/generate_sample_guide.py --tudo
+```
+
+O mesmo comando republica o folheável do site e os cards de exemplo, que são
+cópias do mesmo render — foi a geração à mão que as fez divergir.
 
 **Os painéis continuam.** A referência não usa caixa nenhuma, mas as nossas
 carregam função — grade, instrução, lista. Desvio consciente.

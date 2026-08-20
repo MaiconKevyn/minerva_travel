@@ -1723,7 +1723,16 @@ def _draw_centered_fit(
     maximum_width: int,
     *,
     bold: bool = False,
+    maximum_height: int | None = None,
 ) -> None:
+    """Titulo centrado, em uma linha; em duas quando o nome e comprido demais.
+
+    Sem a segunda linha o titulo simplesmente estourava e a pagina virava
+    impossivel de gerar — e nao para nomes inventados: "Santuario Nacional de
+    Nossa Senhora da Conceicao Aparecida" nao cabe em uma linha, nem
+    "Familia Wanderley Mendonca de Albuquerque Filho".
+    """
+
     for size in range(maximum_size, minimum_size - 1, -1):
         font = _font(size, bold=bold)
         bbox = draw.textbbox((0, 0), text, font=font)
@@ -1731,7 +1740,51 @@ def _draw_centered_fit(
         if width <= maximum_width:
             draw.text(((PAGE_IMAGE_SIZE[0] - width) / 2, y), text, font=font, fill=INK)
             return
-    raise ActivityPageCompositionError("O nome do ponto turístico não cabe no título.")
+
+    for size in range(maximum_size, minimum_size - 1, -1):
+        font = _font(size, bold=bold)
+        linhas = _split_in_two(draw, text, font, maximum_width)
+        if linhas is None:
+            continue
+        altura = font.getbbox("Ág")[3] - font.getbbox("Ág")[1] + 8
+        # A segunda linha precisa caber no espaco reservado, senao ela desce
+        # em cima da linha em arco logo abaixo do titulo.
+        if maximum_height is not None and 2 * altura > maximum_height:
+            continue
+        for indice, linha in enumerate(linhas):
+            largura = draw.textbbox((0, 0), linha, font=font)[2]
+            draw.text(
+                ((PAGE_IMAGE_SIZE[0] - largura) / 2, y + indice * altura),
+                linha,
+                font=font,
+                fill=INK,
+            )
+        return
+    raise ActivityPageCompositionError("O nome não cabe no título nem em duas linhas.")
+
+
+def _split_in_two(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    maximum_width: int,
+) -> list[str] | None:
+    """Quebra o titulo no espaco que deixa as duas linhas mais parecidas."""
+
+    palavras = text.split()
+    if len(palavras) < 2:
+        return None
+    melhor: tuple[float, list[str]] | None = None
+    for corte in range(1, len(palavras)):
+        primeira = " ".join(palavras[:corte])
+        segunda = " ".join(palavras[corte:])
+        larguras = [draw.textbbox((0, 0), linha, font=font)[2] for linha in (primeira, segunda)]
+        if max(larguras) > maximum_width:
+            continue
+        desequilibrio = abs(larguras[0] - larguras[1])
+        if melhor is None or desequilibrio < melhor[0]:
+            melhor = (desequilibrio, [primeira, segunda])
+    return melhor[1] if melhor else None
 
 
 def _shared_fit_size(
@@ -1899,9 +1952,21 @@ def _draw_tracked(
     fill: str,
     left: int | None = None,
     tracking: float = 0.16,
+    maximum_width: int | None = None,
 ) -> float:
-    """Caixa alta espacada, letra a letra, devolvendo a largura ocupada."""
+    """Caixa alta espacada, letra a letra, devolvendo a largura ocupada.
 
+    Encolhe ate caber. Sem isso a sobrelinha de uma familia de nome longo com
+    uma data longa saia pelos dois lados da pagina, cortada pela borda.
+    """
+
+    limite = maximum_width if maximum_width is not None else PAGE_TEXT_RIGHT - PAGE_TEXT_LEFT
+    for corpo in range(size, 13, -1):
+        fonte = _font(corpo, bold=True)
+        larguras = [fonte.getlength(letra) + corpo * tracking for letra in text]
+        if sum(larguras) <= limite:
+            size = corpo
+            break
     fonte = _font(size, bold=True)
     larguras = [fonte.getlength(letra) + size * tracking for letra in text]
     total = sum(larguras)
@@ -1917,6 +1982,64 @@ def _bounded(value: str, label: str, maximum: int) -> str:
     if not normalized or len(normalized) > maximum:
         raise ActivityPageCompositionError(f"Conteúdo inválido em {label}.")
     return normalized
+
+
+# O limite do arco e o quanto ele SOBE, nao o angulo. Com teto de 150 graus e
+# raio 400, as pontas subiam 296 px: a data de uma viagem longa dava a volta no
+# titulo da capa e saia pelas bordas. Medido em pixels, o arco continua arco.
+_ARCO_SUBIDA_MAXIMA = 56
+# Abaixo disto o texto em arco fica menor que o corpo do rodape e ilegivel.
+_ARCO_CORPO_MINIMO = 15
+# Teto do titulo em duas linhas nas paginas ilustradas. Medido: com 148 a
+# segunda linha parava a 13 px do arco e encostava nele; com 120 sobram 41.
+TITULO_ALTURA_MAXIMA = 120
+
+
+def _abertura_maxima(radius: int) -> float:
+    """Angulo em que as pontas do arco sobem exatamente _ARCO_SUBIDA_MAXIMA."""
+
+    if radius <= _ARCO_SUBIDA_MAXIMA:
+        return math.pi
+    return 2 * math.acos(1 - _ARCO_SUBIDA_MAXIMA / radius)
+
+
+def _shrunk_to_arc(
+    text: str,
+    size: int,
+    radius: int,
+    tracking: float,
+) -> tuple[int, ImageFont.FreeTypeFont | ImageFont.ImageFont, list[float]] | None:
+    """Menor corpo em que o texto ainda cabe no arco, ou None se nem assim cabe."""
+
+    limite = _abertura_maxima(radius)
+    for corpo in range(size - 1, _ARCO_CORPO_MINIMO - 1, -1):
+        fonte = _font(corpo, bold=True)
+        larguras = [fonte.getlength(letra) + corpo * tracking for letra in text]
+        if sum(larguras) / radius <= limite:
+            return corpo, fonte, larguras
+    return None
+
+
+def _draw_straight_fallback(
+    image: Image.Image,
+    text: str,
+    center: tuple[int, int],
+    radius: int,
+    size: int,
+    fill: str,
+    *,
+    below: bool,
+) -> None:
+    """Ultimo recurso: a linha reta, na altura em que o arco seria lido."""
+
+    linha = center[1] + radius if below else center[1] - radius
+    draw = ImageDraw.Draw(image)
+    for corpo in range(size, _ARCO_CORPO_MINIMO - 1, -1):
+        fonte = _font(corpo, bold=True)
+        largura = draw.textlength(text, font=fonte)
+        if largura <= PAGE_IMAGE_SIZE[0] - 2 * 76:
+            draw.text(((PAGE_IMAGE_SIZE[0] - largura) / 2, linha), text, font=fonte, fill=fill)
+            return
 
 
 def _arc_text(
@@ -1952,8 +2075,18 @@ def _arc_text(
     # Comprimento de arco -> angulo. Texto largo abre mais o arco, e nunca
     # transborda porque o arco se ajusta a ele.
     abertura = total / radius
-    if abertura > math.radians(150):
-        return
+    if abertura > _abertura_maxima(radius):
+        # Encolher antes de desistir. Sumir em silencio era o pior desfecho:
+        # `timing` e texto livre do usuario, entao "Ultima semana de setembro
+        # e primeira de outubro de 2026" apagava a data da capa sem erro.
+        encolhido = _shrunk_to_arc(text, size, radius, tracking)
+        if encolhido is None:
+            _draw_straight_fallback(image, text, center, radius, size, fill, below=below)
+            return
+        size, fonte, larguras = encolhido
+        espaco = size * tracking
+        total = sum(larguras)
+        abertura = total / radius
 
     cx, cy = center
     # Para cima o texto corre da esquerda para a direita sobre o topo do
@@ -2021,7 +2154,11 @@ def compose_cover_page(
         fill=INK,
     )
     draw = ImageDraw.Draw(image)
-    _draw_centered_fit(draw, titulo, TOPO_DO_TITULO, 96, 44, 880, bold=True)
+    # Entre o topo do titulo e a linha do arco de baixo, com folga para as
+    # letras do arco: e o teto que a segunda linha tem que respeitar.
+    _draw_centered_fit(
+        draw, titulo, TOPO_DO_TITULO, 96, 44, 880, bold=True, maximum_height=112
+    )
     # Fundo do circulo em LINHA_INFERIOR: centro fica um raio acima.
     _arc_text(
         image,
@@ -2125,8 +2262,14 @@ def _draw_scene_page_header(
     """A cabeceira das paginas ilustradas: sobrelinha, titulo e a linha em arco."""
 
     if overline:
-        _draw_tracked(draw, overline.upper(), 44, size=21, fill=MUTED_INK)
-    _draw_centered_fit(draw, title, 100, 78, 34, 880, bold=True)
+        _draw_tracked(
+            draw, overline.upper(), 44, size=21, fill=MUTED_INK, maximum_width=880
+        )
+    # O titulo vai de 100 ate a linha em arco (286), menos a altura das letras
+    # do arco. Em duas linhas, sem esse teto, a segunda descia sobre o arco.
+    _draw_centered_fit(
+        draw, title, 100, 78, 34, 880, bold=True, maximum_height=TITULO_ALTURA_MAXIMA
+    )
     if arched:
         # Arco lido em 286, entao o centro da circunferencia fica um raio acima.
         RAIO = 430
