@@ -23,6 +23,7 @@ from minerva_travel.activity_page_compositor import (
     MEMORY_BLANK_REGION,
     PAINTING_TITLE,
     PAPER,
+    SCENE_ARTWORK_SIZE,
     SPOT_PANEL_GAP,
     SPOT_PANEL_LEFT,
     SPOT_PANEL_SIZE,
@@ -38,7 +39,7 @@ from minerva_travel.activity_page_compositor import (
     compose_family_coloring_page,
     compose_homecoming_page,
     compose_investigator_page,
-    compose_landmark_visited_checkbox,
+    compose_landmark_page,
     compose_spot_the_difference_page,
     compose_word_search_page,
     crop_scene_for_panel,
@@ -56,6 +57,16 @@ from minerva_travel.word_search import build_word_search_grid
 # coordenada de pixel em teste.
 PAPEL_RGB = tuple(int(PAPER[i : i + 2], 16) for i in (1, 3, 5))
 TINTA_RGB = tuple(int(INK[i : i + 2], 16) for i in (1, 3, 5))
+
+
+def _scene(path: Path, color: str = "#d9eaf2") -> Path:
+    """A cena deitada que as páginas ilustradas recebem do provedor."""
+
+    image = Image.new("RGB", SCENE_ARTWORK_SIZE, color)
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((560, 180, 980, 800), fill="#7ca6bd", outline="#31566c", width=16)
+    image.save(path, "PNG")
+    return path
 
 
 def _artwork(path: Path, color: str = "#d9eaf2") -> Path:
@@ -144,7 +155,16 @@ def test_family_coloring_instruction_is_exact_point_specific_copy():
 
 def test_landmark_compositor_adds_one_empty_printable_visited_checkbox(tmp_path):
     output = tmp_path / "landmark.png"
-    compose_landmark_visited_checkbox(_artwork(tmp_path / "art.png"), output)
+    compose_landmark_page(
+        _scene(tmp_path / "art.png"),
+        output,
+        landmark_name="Torre Eiffel",
+        location="Paris, França",
+        family_title="Família Moraes",
+        trip_date="Setembro de 2026",
+        description="Uma torre de ferro que virou o símbolo da cidade.",
+        curiosity="Em dias quentes o ferro se estica e a torre fica mais alta.",
+    )
 
     validate_activity_page(output)
     left, top, right, bottom = LANDMARK_VISITED_CHECKBOX

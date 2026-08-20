@@ -185,14 +185,6 @@ def _draw_visited_marker(draw: ImageDraw.ImageDraw) -> None:
     draw.text((438, 1424), LANDMARK_VISITED_LABEL, font=_font(30, bold=True), fill=INK)
 
 
-def compose_landmark_visited_checkbox(artwork_path: Path, output_path: Path) -> Path:
-    """Add the exact printable visit marker to a completed landmark page."""
-
-    image = _load_artwork(artwork_path)
-    _draw_visited_marker(ImageDraw.Draw(image))
-    return _atomic_save(image, output_path)
-
-
 def compose_coloring_page(
     artwork_path: Path,
     output_path: Path,
