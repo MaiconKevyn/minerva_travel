@@ -6,6 +6,7 @@ import httpx
 import pytest
 from PIL import Image, ImageDraw
 
+from minerva_travel.activity_page_compositor import BAND, LANDMARK_SCENE_SIZE
 from minerva_travel.page_generation import (
     SPOT_SCENE_SIZE,
     OpenAIGuidePageGenerator,
@@ -22,6 +23,8 @@ from minerva_travel.page_generation import (
     landmark_page_prompt,
     summary_page_prompt,
 )
+
+BAND_RGB = tuple(int(BAND[i : i + 2], 16) for i in (1, 3, 5))
 
 
 def _png_bytes(size=(1024, 1536), color="#4f86b7") -> bytes:
@@ -383,7 +386,7 @@ def test_landmark_page_defaults_to_generation_without_people_or_family_inputs(tm
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(color="#d09a55"))
+        return _response(_png_bytes(size=LANDMARK_SCENE_SIZE, color="#d09a55"))
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
     output = tmp_path / "landmark.png"
@@ -408,14 +411,20 @@ def test_landmark_page_defaults_to_generation_without_people_or_family_inputs(tm
     assert "Do not depict any person" in prompt
     assert "silhouette, or crowd" in prompt
     assert "overrides any user revision feedback" in prompt
-    assert '"Uma torre de ferro que virou símbolo de Paris."' in prompt
-    assert '"Observe as formas geométricas que se repetem."' in prompt
-    assert '"Conheça o lugar"' in prompt
-    assert '"Você sabia?"' in prompt
-    assert "bottom 10 percent" in prompt
-    assert "Do not draw any checkbox" in prompt
+    # O texto saiu do prompt: quem escreve o nome, o lugar e os dois blocos e o
+    # compositor, na fonte do caderno. Enquanto o modelo desenhava o titulo,
+    # cada parada saia numa tipografia diferente da anterior.
+    assert "TEXT-FREE CONTRACT" in prompt
+    assert '"Uma torre de ferro que virou símbolo de Paris."' not in prompt
+    assert "Conheça o lugar" not in prompt
+    assert "checkbox" in prompt
     with Image.open(output) as image:
-        assert image.convert("RGB").getpixel((390, 1447)) == (255, 255, 255)
+        page = image.convert("RGB")
+        assert page.getpixel((390, 1447)) == (255, 255, 255)
+        # As faixas chapadas cobrem o topo e o rodape; o miolo segue sendo arte.
+        assert page.getpixel((12, 12)) == BAND_RGB
+        assert page.getpixel((12, 1520)) == BAND_RGB
+        assert page.getpixel((512, 700)) == (208, 154, 85)
 
 
 def test_landmark_page_can_include_same_family_with_canonical_references(tmp_path):
@@ -423,7 +432,7 @@ def test_landmark_page_can_include_same_family_with_canonical_references(tmp_pat
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(color="#d09a55"))
+        return _response(_png_bytes(size=LANDMARK_SCENE_SIZE, color="#d09a55"))
 
     photo, cover = _family_references(tmp_path)
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
@@ -459,7 +468,7 @@ def test_landmark_revision_without_family_uses_only_selected_page_and_removes_pe
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(color="#6faec9"))
+        return _response(_png_bytes(size=LANDMARK_SCENE_SIZE, color="#6faec9"))
 
     reference = tmp_path / "landmark-with-family.png"
     reference.write_bytes(_png_bytes())
@@ -485,8 +494,8 @@ def test_landmark_revision_without_family_uses_only_selected_page_and_removes_pe
     prompt = kwargs["data"]["prompt"]
     assert "Remove every person that may appear in it" in prompt
     assert "This invariant overrides any user revision feedback" in prompt
-    assert '"Uma torre de ferro que virou símbolo de Paris."' in prompt
-    assert '"Observe as formas geométricas que se repetem."' in prompt
+    assert "TEXT-FREE CONTRACT" in prompt
+    assert '"Uma torre de ferro que virou símbolo de Paris."' not in prompt
 
 
 def test_openai_page_generator_rejects_missing_key(monkeypatch):
@@ -538,7 +547,7 @@ def test_openai_error_exposes_only_safe_diagnostic_identifiers(tmp_path):
     assert "private family prompt" not in str(captured.value)
 
 
-def test_landmark_prompt_keeps_exact_description_and_curiosity_during_revision():
+def test_landmark_prompt_stays_text_free_and_reserves_the_bands_during_revision():
     prompt = landmark_page_prompt(
         family_title="Família Moraes",
         trip_date="2026",
@@ -551,12 +560,11 @@ def test_landmark_prompt_keeps_exact_description_and_curiosity_during_revision()
         has_revision_reference=True,
     )
 
-    assert '"Uma torre de ferro que virou símbolo de Paris."' in prompt
-    assert '"Observe como as formas se repetem do chão até o topo."' in prompt
-    assert '"Conheça o lugar"' in prompt
-    assert '"Você sabia?"' in prompt
     assert '"Use tons mais quentes."' in prompt
-    assert "render exactly these strings, verbatim, once each" in prompt
+    assert "TEXT-FREE CONTRACT" in prompt
+    # A arte e a janela, nao a pagina: sem isso o modelo compunha para o quadro
+    # inteiro e o monumento saia cortado pelos pes na faixa de baixo.
+    assert "printed whole, edge to edge, with nothing cropped away" in prompt
 
 
 def test_activity_prompt_maps_fixed_reference_order_and_forbids_people_and_model_text():

@@ -41,6 +41,8 @@ PAPER = identidade.PAPEL
 # Ocre suave em vez do azul-acinzentado: as réguas e molduras passam a ser as
 # mesmas do guia impresso que serve de referência do produto.
 PANEL_OUTLINE = identidade.CREME
+# A faixa chapada onde o tipo assenta, na pagina do ponto turistico.
+BAND = identidade.CREME
 _PAPEL_RGB = tuple(int(PAPER[i : i + 2], 16) for i in (1, 3, 5))
 # Folga so para o antisserrilhado da tipografia, nao para deixar arte passar.
 _TOLERANCIA_PAPEL = 4
@@ -134,6 +136,20 @@ HOMECOMING_REQUIRED_COPY = (
     "Mas todas essas lembranças vão continuar com a gente.",
     "Uma coisa que quero contar quando chegar em casa:",
 )
+# A pagina do ponto turistico e composta como a capa: a arte chega sem letra
+# nenhuma e o codigo escreve por cima, em duas faixas chapadas que sangram ate
+# a borda — o gesto da referencia, onde o tipo assenta sobre blocos de cor.
+# A cena chega deitada, no formato exato da janela. Pedir a arte no formato da
+# pagina e depois tapar dois tercos dela era o que cortava o monumento pelos pes:
+# o modelo compunha para o quadro inteiro que recebia, e a faixa caia por cima.
+LANDMARK_SCENE_SIZE = (1536, 1024)
+LANDMARK_TOP_BAND = (0, 0, PAGE_IMAGE_SIZE[0], 340)
+LANDMARK_SCENE_BOX = (0, 340, PAGE_IMAGE_SIZE[0], 1023)
+LANDMARK_BOTTOM_BAND = (0, 1023, PAGE_IMAGE_SIZE[0], PAGE_IMAGE_SIZE[1])
+LANDMARK_TEXT_LEFT = 76
+LANDMARK_TEXT_RIGHT = PAGE_IMAGE_SIZE[0] - 76
+LANDMARK_BLOCKS_TOP = 1076
+LANDMARK_BLOCKS_BOTTOM = 1372
 LANDMARK_VISITED_LABEL = "Já visitei"
 LANDMARK_VISITED_PANEL = (326, 1392, 698, 1500)
 LANDMARK_VISITED_CHECKBOX = (366, 1423, 414, 1471)
@@ -155,11 +171,7 @@ class ActivityPageCompositionError(ValueError):
     """An activity specification or artwork cannot produce a usable page."""
 
 
-def compose_landmark_visited_checkbox(artwork_path: Path, output_path: Path) -> Path:
-    """Add the exact printable visit marker to a completed landmark page."""
-
-    image = _load_artwork(artwork_path)
-    draw = ImageDraw.Draw(image)
+def _draw_visited_marker(draw: ImageDraw.ImageDraw) -> None:
     _panel(draw, LANDMARK_VISITED_PANEL, radius=20)
     draw.rounded_rectangle(
         LANDMARK_VISITED_CHECKBOX,
@@ -169,6 +181,13 @@ def compose_landmark_visited_checkbox(artwork_path: Path, output_path: Path) -> 
         width=4,
     )
     draw.text((438, 1424), LANDMARK_VISITED_LABEL, font=_font(30, bold=True), fill=INK)
+
+
+def compose_landmark_visited_checkbox(artwork_path: Path, output_path: Path) -> Path:
+    """Add the exact printable visit marker to a completed landmark page."""
+
+    image = _load_artwork(artwork_path)
+    _draw_visited_marker(ImageDraw.Draw(image))
     return _atomic_save(image, output_path)
 
 
@@ -1693,11 +1712,12 @@ def _draw_centered(
     size: int,
     *,
     bold: bool = False,
+    fill: str = INK,
 ) -> None:
     font = _font(size, bold=bold)
     bbox = draw.textbbox((0, 0), text, font=font)
     x = (PAGE_IMAGE_SIZE[0] - (bbox[2] - bbox[0])) / 2
-    draw.text((x, y), text, font=font, fill=INK)
+    draw.text((x, y), text, font=font, fill=fill)
 
 
 def _draw_centered_fit(
@@ -1838,6 +1858,28 @@ def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFon
     return ImageFont.load_default(size=size)
 
 
+def _draw_tracked(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    y: int,
+    *,
+    size: int,
+    fill: str,
+    left: int | None = None,
+    tracking: float = 0.16,
+) -> float:
+    """Caixa alta espacada, letra a letra, devolvendo a largura ocupada."""
+
+    fonte = _font(size, bold=True)
+    larguras = [fonte.getlength(letra) + size * tracking for letra in text]
+    total = sum(larguras)
+    x = float(left) if left is not None else (PAGE_IMAGE_SIZE[0] - total) / 2
+    for letra, largura in zip(text, larguras, strict=True):
+        draw.text((x, y), letra, font=fonte, fill=fill)
+        x += largura
+    return total
+
+
 def _bounded(value: str, label: str, maximum: int) -> str:
     normalized = " ".join(str(value).split())
     if not normalized or len(normalized) > maximum:
@@ -1896,7 +1938,11 @@ def _arc_text(
             altura_glifo = max(1, int(caixa[3] - caixa[1]))
             selo = Image.new("RGBA", (largura_glifo + 4, altura_glifo + 4), (0, 0, 0, 0))
             ImageDraw.Draw(selo).text((-caixa[0] + 2, -caixa[1] + 2), letra, font=fonte, fill=fill)
-            girado = selo.rotate(-math.degrees(meio) * sentido, resample=Image.Resampling.BICUBIC, expand=True)
+            girado = selo.rotate(
+                -math.degrees(meio) * sentido,
+                resample=Image.Resampling.BICUBIC,
+                expand=True,
+            )
             x = cx + radius * math.sin(meio)
             y = cy - sentido * radius * math.cos(meio)
             image.paste(girado, (round(x - girado.width / 2), round(y - girado.height / 2)), girado)
@@ -1954,4 +2000,126 @@ def compose_cover_page(
         fill=INK,
         below=True,
     )
+    return _atomic_save(image, output_path)
+
+
+def _fitted_scene(path: Path) -> Image.Image:
+    """Recorta a cena deitada para a janela da pagina, sem esticar o desenho."""
+
+    try:
+        with Image.open(path) as aberta:
+            if aberta.format != "PNG":
+                raise ActivityPageCompositionError("A cena do ponto turístico não é PNG.")
+            cena = aberta.convert("RGB")
+    except (UnidentifiedImageError, OSError) as error:
+        raise ActivityPageCompositionError("A cena do ponto turístico é inválida.") from error
+
+    esquerda, topo, direita, base = LANDMARK_SCENE_BOX
+    largura, altura = direita - esquerda, base - topo
+    escala = max(largura / cena.width, altura / cena.height)
+    redimensionada = cena.resize(
+        (max(largura, round(cena.width * escala)), max(altura, round(cena.height * escala))),
+        Image.Resampling.LANCZOS,
+    )
+    corte_x = (redimensionada.width - largura) // 2
+    corte_y = (redimensionada.height - altura) // 2
+    return redimensionada.crop((corte_x, corte_y, corte_x + largura, corte_y + altura))
+
+
+def compose_landmark_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    landmark_name: str,
+    location: str,
+    family_title: str,
+    trip_date: str,
+    description: str = "",
+    curiosity: str = "",
+    curiosity_label: str = "Você sabia?",
+) -> Path:
+    """Escreve a pagina do ponto turistico sobre uma arte sem letra nenhuma.
+
+    Esta e a pagina que mais se repete no livro — uma por parada. Enquanto o
+    modelo desenhava o titulo, cada parada saia numa tipografia diferente da
+    anterior e das paginas de atividade, que sempre vieram do compositor.
+
+    O tipo assenta em duas faixas chapadas que sangram ate a borda, como na
+    referencia, em vez de cartoes flutuando sobre a ilustracao: a faixa e parte
+    do desenho, a caixa seria um remendo.
+    """
+
+    nome = _bounded(landmark_name, "landmark_name", 100)
+    lugar = " ".join(location.split())
+    assinatura = " • ".join(
+        parte for parte in (family_title.strip(), trip_date.strip()) if parte.strip()
+    )
+
+    image = Image.new("RGB", PAGE_IMAGE_SIZE, BAND)
+    image.paste(_fitted_scene(artwork_path), (LANDMARK_SCENE_BOX[0], LANDMARK_SCENE_BOX[1]))
+    draw = ImageDraw.Draw(image)
+
+    if assinatura:
+        _draw_tracked(
+            draw,
+            _bounded(assinatura, "assinatura", 120).upper(),
+            44,
+            size=21,
+            fill=MUTED_INK,
+        )
+    _draw_centered_fit(draw, nome, 100, 78, 34, 880, bold=True)
+    if lugar:
+        # Arco lido em 286, entao o centro da circunferencia fica um raio acima.
+        RAIO_DO_LUGAR = 430
+        _arc_text(
+            image,
+            _bounded(lugar, "location", 80).upper(),
+            center=(PAGE_IMAGE_SIZE[0] // 2, 286 - RAIO_DO_LUGAR),
+            radius=RAIO_DO_LUGAR,
+            size=25,
+            fill=ACCENT,
+            below=True,
+        )
+
+    blocos = [
+        (rotulo, " ".join(texto.split()))
+        for rotulo, texto in (
+            ("Conheça o lugar", description),
+            (curiosity_label or "Você sabia?", curiosity),
+        )
+        if " ".join(texto.split())
+    ]
+    if blocos:
+        vao = 26
+        altura = (LANDMARK_BLOCKS_BOTTOM - LANDMARK_BLOCKS_TOP - vao * (len(blocos) - 1)) // len(
+            blocos
+        )
+        topo = LANDMARK_BLOCKS_TOP
+        for indice, (rotulo, texto) in enumerate(blocos):
+            if indice:
+                meio = topo - vao // 2
+                draw.line(
+                    (LANDMARK_TEXT_LEFT, meio, LANDMARK_TEXT_RIGHT, meio),
+                    fill=MUTED_INK,
+                    width=2,
+                )
+            _draw_tracked(
+                draw,
+                _bounded(rotulo, "curiosity_label", 60).upper(),
+                topo,
+                size=21,
+                fill=ACCENT,
+                left=LANDMARK_TEXT_LEFT,
+            )
+            _draw_wrapped_fit(
+                draw,
+                texto,
+                (LANDMARK_TEXT_LEFT, topo + 40, LANDMARK_TEXT_RIGHT, topo + altura),
+                maximum_size=26,
+                minimum_size=17,
+                fill=INK,
+            )
+            topo += altura + vao
+
+    _draw_visited_marker(draw)
     return _atomic_save(image, output_path)

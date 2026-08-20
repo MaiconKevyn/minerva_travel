@@ -20,6 +20,7 @@ from PIL import Image, UnidentifiedImageError
 
 from minerva_travel.activity_page_compositor import (
     HERE_VS_HOME_TITLE,
+    LANDMARK_SCENE_SIZE,
     NEWSPAPER_HEADLINE_TITLE,
     SPOT_SCENE_SIZE,
     TRAVEL_DIARY_TITLE,
@@ -37,7 +38,7 @@ from minerva_travel.activity_page_compositor import (
     compose_flight_vocabulary_page,
     compose_homecoming_page,
     compose_investigator_page,
-    compose_landmark_visited_checkbox,
+    compose_landmark_page,
     compose_language_page,
     compose_maze_page,
     compose_passport_page,
@@ -97,6 +98,7 @@ PAGE_IMAGE_SIZE_PARAM = "1024x1536"
 # A cena dos erros é a única arte deitada: em pé, o painel largo cortava o
 # monumento ao meio e escondia dois terços dos objetos do jogo.
 SPOT_SCENE_SIZE_PARAM = f"{SPOT_SCENE_SIZE[0]}x{SPOT_SCENE_SIZE[1]}"
+LANDMARK_SCENE_SIZE_PARAM = f"{LANDMARK_SCENE_SIZE[0]}x{LANDMARK_SCENE_SIZE[1]}"
 MAX_PAGE_IMAGE_BYTES = 25 * 1024 * 1024
 
 
@@ -588,18 +590,35 @@ class OpenAIGuidePageGenerator:
             references = [family_photo, family_cover]
             if reference_page is not None:
                 references.append(reference_page)
-            response = self._edit_with_references(prompt, references)
+            response = self._edit_with_references(
+                prompt, references, size=LANDMARK_SCENE_SIZE_PARAM
+            )
         elif reference_page is not None:
-            response = self._edit_with_references(prompt, [reference_page])
+            response = self._edit_with_references(
+                prompt, [reference_page], size=LANDMARK_SCENE_SIZE_PARAM
+            )
         else:
-            response = self._generate_from_prompt(prompt)
-        _persist_page_image(response, output_path)
+            response = self._generate_from_prompt(prompt, size=LANDMARK_SCENE_SIZE_PARAM)
+        artwork = _provider_artwork_path(output_path)
         try:
-            return compose_landmark_visited_checkbox(output_path, output_path)
+            _persist_page_image(response, artwork, expected_size=LANDMARK_SCENE_SIZE)
+            return compose_landmark_page(
+                artwork,
+                output_path,
+                landmark_name=landmark_name,
+                location=", ".join(part for part in (city, country) if part),
+                family_title=family_title,
+                trip_date=trip_date,
+                description=description,
+                curiosity=curiosity,
+                curiosity_label=curiosity_label,
+            )
         except (ActivityPageCompositionError, OSError, ValueError) as error:
             raise PageGenerationError(
-                "Não foi possível adicionar o marcador Já visitei."
+                "Não foi possível finalizar a página do ponto turístico."
             ) from error
+        finally:
+            artwork.unlink(missing_ok=True)
 
     def generate_coloring_page(
         self,
@@ -1973,21 +1992,6 @@ def landmark_page_prompt(
     has_revision_reference: bool = False,
 ) -> str:
     location = ", ".join(part for part in (city, country) if part)
-    normalized_description = " ".join(description.split())
-    normalized_curiosity = " ".join(curiosity.split())
-    normalized_curiosity_label = " ".join(curiosity_label.split()) or "Você sabia?"
-    enriched_copy = "\n".join(
-        json.dumps(value, ensure_ascii=False)
-        for value in (
-            "Conheça o lugar",
-            normalized_description,
-            normalized_curiosity_label,
-            normalized_curiosity,
-        )
-        if value
-    )
-    if enriched_copy:
-        enriched_copy = f"\n{enriched_copy}"
     people_contract = (
         _family_continuity_directive(expected_visible_family_member_count, has_revision_reference)
         if include_family
@@ -2003,28 +2007,26 @@ def landmark_page_prompt(
     )
     revision = _revision_directive(revision_instruction, has_revision_reference)
     return f"""
-Create a complete vertical page for a premium children's illustrated family travel guide.
+Create the wide horizontal illustration that fills the window of a page in a premium children's
+illustrated family travel guide.
 {_HOUSE_STYLE}
 Show a recognizable, accurate flat crayon-textured illustration of {landmark_name}
 in {location}, {subject}.
 
-Use an original travel-journal hierarchy: a large landmark title, location subtitle, one concise
-`Conheça o lugar` learning block, one separate curiosity or observation card, and the recognizable
-illustration as the main visual. Decorative stars, route lines, and warm paper texture are welcome,
-but do not copy any reference-book characters, border, wording, page number, or layout.
+TEXT-FREE CONTRACT — do not render any letter, word, number, title, subtitle, caption, sign,
+label, checkbox, page number, monogram, watermark or signature anywhere in this artwork. Trusted
+code prints the landmark name, the place, the learning note and the curiosity around it, in the
+book's own typeface, and places the printable `Já visitei` checkbox itself.
 
-Keep the bottom 10 percent calm, pale, and free from text, people, or important illustration
-details. The application will place the exact printable `Já visitei` checkbox there after image
-generation. Do not draw any checkbox, visit marker, or `Já visitei` text yourself.
+This artwork is printed whole, edge to edge, with nothing cropped away, so compose for the wide
+landscape frame you were given. Show the landmark WHOLE — its base, foundation or waterline
+included, with a strip of calm ground under it — and let the scenery run out to the left and
+right edges instead of floating in the middle of an empty field. Decorative stars, route lines
+and warm paper texture are welcome, but do not copy any reference-book characters, border,
+wording, page number, or layout.
 
-TEXT CONTRACT — render exactly these strings, verbatim, once each:
-"{landmark_name}"
-"{location}"
-"{family_title} • {trip_date}"{enriched_copy}
-
-Typography must be highly legible, correctly accented and high contrast. Do not add facts or
-claims that were not provided. No other readable text, logos, prices, watermark, signature,
-mockup border or UI. Output the finished flat guide page.
+Do not add facts or claims that were not provided. No logos, prices, mockup border or UI.
+Output the finished flat illustration.
 {revision}
 {people_contract}
 """.strip()
