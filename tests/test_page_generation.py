@@ -150,7 +150,7 @@ def test_openai_long_rate_limit_is_returned_as_retryable_without_holding_request
     assert not (tmp_path / "destination.png").exists()
 
 
-def test_cover_prompt_requires_exact_family_copy_and_visible_people():
+def test_cover_prompt_stays_text_free_and_keeps_every_visible_person():
     prompt = cover_page_prompt(
         family_title="Família Moraes",
         trip_date="Julho de 2026",
@@ -158,11 +158,16 @@ def test_cover_prompt_requires_exact_family_copy_and_visible_people():
         expected_visible_family_member_count=4,
     )
 
-    assert '"Família Moraes"' in prompt
-    assert '"Julho de 2026"' in prompt
+    # A capa com foto tambem deixou de escrever: o compositor imprime o brasao
+    # por cima. Enquanto o prompt pedia o nome, ele saia desenhado pela IA E
+    # impresso pelo codigo, um em cima do outro.
+    assert "TEXT-FREE CONTRACT" in prompt
+    assert '"Família Moraes"' not in prompt
+    assert '"Julho de 2026"' not in prompt
+    # Quem aparece na capa continua sendo a familia inteira.
     assert "exactly 4 visible people" in prompt
-    assert "verbatim" in prompt
-    assert "Do not include any other readable text" in prompt
+    # E o meio da pagina fica livre para o brasao cair sem cobrir rosto.
+    assert "between 38 and 62 percent of the page height" in prompt
 
 
 def test_summary_prompt_lists_every_stop_without_writing_it_on_the_art():
@@ -358,7 +363,8 @@ def test_cover_revision_uses_original_photo_selected_cover_and_user_feedback(tmp
     assert "Input image 1 is the original family photo" in prompt
     assert '"Mude o estilo para animação 3D e use tons azuis."' in prompt
     assert "requested visual style replaces" in prompt
-    assert '"Família Moraes"' in prompt
+    assert "TEXT-FREE CONTRACT" in prompt
+    assert '"Família Moraes"' not in prompt
     assert "change family identity or the required member count" in prompt
 
 

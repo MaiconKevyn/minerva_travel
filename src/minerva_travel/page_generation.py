@@ -1892,15 +1892,16 @@ and poses.
 {people}
 Add subtle scenery inspired only by these confirmed places: {landmarks}.{styling}
 
-TEXT CONTRACT — render exactly these two lines, verbatim, once each:
-"{family_title}"
-"{trip_date}"
+TEXT-FREE CONTRACT — do not render any letter, word, number, title, date, monogram, label or
+signature anywhere on this page. Trusted code prints the family name and the trip date on top
+afterwards, in the book's own typeface.
 
-Typography: large, elegant, highly legible Portuguese title; clean spacing; strong contrast;
-correct accents; no broken or invented letters. The title belongs near the upper third and the
-date near the lower third without covering faces.
+Leave the middle of the page calm and uncluttered so that lockup has room to sit: no face, body
+or important motif may cross the central band between 38 and 62 percent of the page height. Place
+the family in the lower half of the cover, standing on the ground of the scene, and let the
+scenery fill the upper part — the printed name lands between them.
 
-Do not include any other readable text. No logos, watermark, signature, mockup border or UI.
+No logos, watermark, signature, mockup border or UI.
 Output the finished flat cover artwork, not a book photographed in a scene.
 {revision}
 """.strip()
