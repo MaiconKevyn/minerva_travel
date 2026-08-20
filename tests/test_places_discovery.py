@@ -1,4 +1,6 @@
 import json
+import logging
+from contextlib import contextmanager
 
 import httpx
 
@@ -912,3 +914,106 @@ def _geocode_response(city: str, country: str, lat: float, lng: float) -> httpx.
             ],
         },
     )
+
+
+@contextmanager
+def _captured_events():
+    """Escuta o logger de eventos direto: ele não propaga e fala com o stderr
+    do momento da importação, então caplog e capfd não o enxergam."""
+
+    registros: list[str] = []
+    handler = logging.Handler()
+    handler.emit = lambda record: registros.append(record.getMessage())  # type: ignore[method-assign]
+    logger = logging.getLogger("minerva.events")
+    logger.addHandler(handler)
+    try:
+        yield registros
+    finally:
+        logger.removeHandler(handler)
+
+
+def test_a_denied_photo_media_call_emits_a_diagnosable_event():
+    """A foto do passo 2 morria em silêncio quando o Google negava a mídia.
+
+    O card saía com o alfinete cinza e nenhum log dizia o porquê — nem para
+    nós. O evento carrega o status simbólico do Google (PERMISSION_DENIED,
+    e não só 403), que é o que diz QUAL restrição de chave está errada.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "places:searchText" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "places": [
+                        _place(
+                            "eiffel",
+                            "Torre Eiffel",
+                            ["tourist_attraction"],
+                            photos=[{"name": "places/eiffel/photos/photo-1"}],
+                        )
+                    ]
+                },
+            )
+        if "/photos/photo-1/media" in url:
+            return httpx.Response(
+                403,
+                json={"error": {"status": "PERMISSION_DENIED", "code": 403}},
+            )
+        raise AssertionError(f"Unexpected request: {url}")
+
+    destinations, _selected = build_custom_destinations(
+        parse_custom_landmarks("Torre Eiffel, Paris, Franca")
+    )
+
+    with _captured_events() as registros:
+        with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+            metadata = resolve_landmark_locations(
+                destinations,
+                api_key="test-key",
+                client=client,
+                include_photos=True,
+            )
+
+    # A resolução continua de pé: coordenadas vêm, só a foto falta.
+    resolved = metadata["custom-paris:torre-eiffel"]
+    assert "image_url" not in resolved
+    assert resolved["latitude"] is not None
+
+    eventos = [json.loads(linha) for linha in registros if '"google_places"' in linha]
+    assert any(
+        e["stage"] == "photo_media"
+        and e["outcome"] == "failed"
+        and e["error_code"] == "PERMISSION_DENIED"
+        and e["http_status"] == 403
+        for e in eventos
+    ), eventos
+
+
+def test_a_place_without_any_photo_emits_a_distinct_event():
+    """Sem foto no lugar não é o mesmo defeito que mídia negada: o log separa."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "places:searchText" in str(request.url):
+            return httpx.Response(
+                200,
+                json={"places": [_place("eiffel", "Torre Eiffel", ["tourist_attraction"])]},
+            )
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    destinations, _selected = build_custom_destinations(
+        parse_custom_landmarks("Torre Eiffel, Paris, Franca")
+    )
+
+    with _captured_events() as registros:
+        with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+            resolve_landmark_locations(
+                destinations,
+                api_key="test-key",
+                client=client,
+                include_photos=True,
+            )
+
+    eventos = [json.loads(linha) for linha in registros if '"google_places"' in linha]
+    assert any(e["stage"] == "photo_absent" for e in eventos), eventos

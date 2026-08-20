@@ -1861,7 +1861,7 @@ def _wrapped_block(
             linhas = _wrap_text(draw, text, font, width)
         except ActivityPageCompositionError:
             continue
-        altura = max(1, font.getbbox("Ág")[3] - font.getbbox("Ág")[1] + 5)
+        altura = int(max(1, font.getbbox("Ág")[3] - font.getbbox("Ág")[1] + 5))
         return size, linhas, len(linhas) * altura
     raise ActivityPageCompositionError("O texto não cabe no cartão.")
 

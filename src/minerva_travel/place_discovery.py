@@ -7,6 +7,7 @@ import httpx
 
 from minerva_travel.itinerary_intent import parse_itinerary_intent, search_profiles_from_intent
 from minerva_travel.models import Destination, DynamicItineraryRequest
+from minerva_travel.observability import emit_event
 
 GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 GOOGLE_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
@@ -395,6 +396,7 @@ def _location_photo_metadata(
     photo = _first_place_photo(place)
     photo_name = str(photo.get("name") or "")
     if not photo_name:
+        emit_event("google_places", stage="photo_absent", outcome="failed")
         return {}
     if photo_name not in photo_uri_cache:
         photo_uri_cache[photo_name] = _fetch_place_photo_uri(client, api_key, photo_name)
@@ -472,7 +474,19 @@ def _search_landmark_location(
             json=body,
         )
         response.raise_for_status()
+    except httpx.HTTPStatusError as error:
+        # Sem este evento a falha era muda: o card saia sem foto e sem mapa e
+        # nenhum log dizia que o Google recusou a busca.
+        emit_event(
+            "google_places",
+            stage="text_search",
+            outcome="failed",
+            http_status=error.response.status_code,
+            error_code=_google_error_code(error.response),
+        )
+        return []
     except httpx.HTTPError:
+        emit_event("google_places", stage="text_search", outcome="failed", error_code="network")
         return []
     return response.json().get("places", [])
 
@@ -648,6 +662,18 @@ def _enrich_visible_stops_with_photos(
             stop["image"] = photo_uri
 
 
+def _google_error_code(response: httpx.Response | None) -> str:
+    """O status simbolico do erro do Google (ex.: PERMISSION_DENIED), sem o corpo."""
+
+    if response is None:
+        return "network"
+    try:
+        status = response.json().get("error", {}).get("status")
+    except ValueError:
+        status = None
+    return str(status or response.status_code)[:40]
+
+
 def _fetch_place_photo_uri(
     client: httpx.Client,
     api_key: str,
@@ -660,7 +686,16 @@ def _fetch_place_photo_uri(
     )
     try:
         response.raise_for_status()
-    except httpx.HTTPStatusError:
+    except httpx.HTTPStatusError as error:
+        # E aqui que a foto do passo 2 morre quando a chave nao pode chamar a
+        # midia do Places: em silencio. O evento diz o codigo do Google.
+        emit_event(
+            "google_places",
+            stage="photo_media",
+            outcome="failed",
+            http_status=error.response.status_code,
+            error_code=_google_error_code(error.response),
+        )
         return None
     payload = response.json()
     photo_uri = payload.get("photoUri")
