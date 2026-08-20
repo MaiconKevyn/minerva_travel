@@ -205,6 +205,15 @@ def _gerar_ponto(gerador: OpenAIGuidePageGenerator, trabalho: Path, chave: str) 
     return saida
 
 
+# O nome do PNG que cada passo deixa no rascunho, para poder republicar sem gerar.
+RASCUNHOS = {
+    "capa": "capa",
+    "roteiro": "roteiro",
+    "destino": "destino",
+    "torre": "torre",
+    "louvre": "louvre",
+}
+
 PASSOS = {
     "capa": gerar_capa,
     "roteiro": gerar_roteiro,
@@ -252,6 +261,11 @@ def main() -> int:
         action="store_true",
         help="gera e para, sem escrever nos diretórios do site",
     )
+    parser.add_argument(
+        "--somente-publicar",
+        action="store_true",
+        help="não gera nada: publica os PNGs que já estão no rascunho",
+    )
     argumentos = parser.parse_args()
 
     escolhidas = list(PASSOS) if argumentos.tudo else (argumentos.paginas or [])
@@ -262,17 +276,26 @@ def main() -> int:
 
     trabalho = argumentos.rascunho.resolve()
     trabalho.mkdir(parents=True, exist_ok=True)
-    gerador = _gerador()
+    gerador = None if argumentos.somente_publicar else _gerador()
 
     for chave in escolhidas:
         inicio = time.time()
         print(f"» {chave}…", flush=True)
-        try:
-            pagina = PASSOS[chave](gerador, trabalho)
-        except PageGenerationError as erro:
-            print(f"  falhou: {erro}", file=sys.stderr)
-            return 1
-        print(f"  gerada em {time.time() - inicio:.0f}s: {pagina}")
+        if argumentos.somente_publicar:
+            # Cada página custa uma geração; conferir as cinco e depois ter de
+            # gerar tudo outra vez só para publicar era desperdício puro.
+            pagina = trabalho / f"{RASCUNHOS[chave]}.png"
+            if not pagina.is_file():
+                print(f"  falta o rascunho: {pagina}", file=sys.stderr)
+                return 1
+            print(f"  reaproveitada: {pagina}")
+        else:
+            try:
+                pagina = PASSOS[chave](gerador, trabalho)
+            except PageGenerationError as erro:
+                print(f"  falhou: {erro}", file=sys.stderr)
+                return 1
+            print(f"  gerada em {time.time() - inicio:.0f}s: {pagina}")
         if argumentos.sem_publicar:
             continue
         for alvo in publicar(pagina, DESTINOS[chave]):

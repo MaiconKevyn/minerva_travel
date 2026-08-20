@@ -1993,6 +1993,12 @@ _ARCO_CORPO_MINIMO = 15
 # Teto do titulo em duas linhas nas paginas ilustradas. Medido: com 148 a
 # segunda linha parava a 13 px do arco e encostava nele; com 120 sobram 41.
 TITULO_ALTURA_MAXIMA = 120
+# O brasao da capa mora no terco de cima, nao no meio. No meio ele atravessava
+# a cabeca das pessoas: pedir que a familia inteira coubesse abaixo de 62% da
+# altura espremia quatro pessoas no rodape, e o modelo cedia. Acima delas, o
+# tipo tem ceu de sobra e a familia fica com dois tercos da folha.
+COVER_LOCKUP_TOP = 300
+COVER_LOCKUP_BOTTOM = 508
 
 
 def _abertura_maxima(radius: int) -> float:
@@ -2138,9 +2144,9 @@ def compose_cover_page(
     data = _bounded(trip_date, "trip_date", 60)
 
     centro_x = PAGE_IMAGE_SIZE[0] // 2
-    LINHA_SUPERIOR = 604   # onde o arco de cima e lido
-    TOPO_DO_TITULO = 648
-    LINHA_INFERIOR = 812   # onde o arco de baixo e lido
+    LINHA_SUPERIOR = COVER_LOCKUP_TOP
+    TOPO_DO_TITULO = COVER_LOCKUP_TOP + 44
+    LINHA_INFERIOR = COVER_LOCKUP_BOTTOM
     RAIO_SUPERIOR = 430
     RAIO_INFERIOR = 400
 
@@ -2424,6 +2430,9 @@ SUMMARY_ROUTE_STEP = 34
 SUMMARY_ROUTE_MARGIN = 0.10
 # Quao longe do eixo da pagina a rota se afasta, de cada lado.
 SUMMARY_ROUTE_INSET = 96
+# Folga entre o eixo da pagina e o rotulo. A vinheta transborda um pouco a
+# metade dela — o Louvre passou do eixo e a bolinha encostou no predio.
+SUMMARY_LABEL_INSET = 56
 
 
 def summary_band(index: int, total: int) -> tuple[int, int, bool]:
@@ -2498,7 +2507,15 @@ def compose_summary_page(
 
     # Um corpo so para todas as paradas: deixar cada nome escolher o seu fazia
     # a parada de nome longo aparecer menor que a vizinha na mesma pagina.
-    largura_do_nome = SUMMARY_HALF - PAGE_TEXT_LEFT - 2 * SUMMARY_BULLET_RADIUS - SUMMARY_BULLET_GAP
+    # A mesma largura dos dois lados: com a folga so de um lado, um nome longo
+    # cabia a esquerda e estourava a margem a direita.
+    largura_do_nome = (
+        SUMMARY_HALF
+        - PAGE_TEXT_LEFT
+        - SUMMARY_LABEL_INSET
+        - 2 * SUMMARY_BULLET_RADIUS
+        - SUMMARY_BULLET_GAP
+    )
     corpo = _shared_fit_size(
         draw, paradas, maximum_size=34, minimum_size=17, maximum_width=largura_do_nome
     )
@@ -2518,7 +2535,9 @@ def compose_summary_page(
         )
 
         # O nome ocupa a metade que a vinheta deixou vazia.
-        esquerda = PAGE_TEXT_LEFT if vinheta_a_direita else SUMMARY_HALF + 20
+        esquerda = (
+            PAGE_TEXT_LEFT if vinheta_a_direita else SUMMARY_HALF + SUMMARY_LABEL_INSET
+        )
         _draw_numbered_bullet(draw, str(indice + 1), (esquerda, meio))
         caixa = draw.textbbox((0, 0), parada, font=fonte)
         draw.text(

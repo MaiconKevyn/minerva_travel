@@ -19,6 +19,8 @@ import httpx
 from PIL import Image, UnidentifiedImageError
 
 from minerva_travel.activity_page_compositor import (
+    COVER_LOCKUP_BOTTOM,
+    COVER_LOCKUP_TOP,
     HERE_VS_HOME_TITLE,
     NEWSPAPER_HEADLINE_TITLE,
     PAGE_TOP_BAND,
@@ -1822,6 +1824,10 @@ def cover_page_prompt(
     has_revision_reference: bool = False,
 ) -> str:
     landmarks = ", ".join(landmark_names)
+    # A faixa reservada vem do compositor, com uma folga para as letras do arco:
+    # numero redigitado aqui e numero que descola do que o codigo desenha.
+    faixa_alta = round((COVER_LOCKUP_TOP - 60) / PAGE_IMAGE_SIZE[1] * 100)
+    faixa_baixa = round((COVER_LOCKUP_BOTTOM + 60) / PAGE_IMAGE_SIZE[1] * 100)
     revision = _revision_directive(revision_instruction, has_revision_reference)
 
     if not has_family_photo:
@@ -1853,8 +1859,8 @@ TEXT-FREE CONTRACT — do not render any letter, word, number, title, date, mono
 signature anywhere on this page. Trusted code prints the family name and the trip date on top
 afterwards, in the book's own typeface.
 
-Leave the middle of the page calm and uncluttered so that lockup has room to sit: no motif may
-cross the central band between 38 and 62 percent of the page height.
+Leave the UPPER THIRD of the page calm and uncluttered so that lockup has room to sit: no motif
+may cross the band between {faixa_alta} and {faixa_baixa} percent of the page height.
 
 No logos, watermark, signature, mockup border or UI.
 Output the finished flat cover artwork, not a book photographed in a scene.
@@ -1897,10 +1903,11 @@ TEXT-FREE CONTRACT — do not render any letter, word, number, title, date, mono
 signature anywhere on this page. Trusted code prints the family name and the trip date on top
 afterwards, in the book's own typeface.
 
-Leave the middle of the page calm and uncluttered so that lockup has room to sit: no face, body
-or important motif may cross the central band between 38 and 62 percent of the page height. Place
-the family in the lower half of the cover, standing on the ground of the scene, and let the
-scenery fill the upper part — the printed name lands between them.
+Leave the UPPER THIRD of the page calm and uncluttered so that lockup has room to sit: no face,
+head, body or important motif may cross the band between {faixa_alta} and {faixa_baixa} percent of
+the page height — keep it open sky, water or plain background. Place the family lower down,
+standing on the ground of the scene, with every head below {faixa_baixa} percent. The printed name
+lands above them.
 
 No logos, watermark, signature, mockup border or UI.
 Output the finished flat cover artwork, not a book photographed in a scene.

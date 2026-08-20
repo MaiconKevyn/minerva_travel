@@ -8,6 +8,8 @@ from PIL import Image, ImageDraw
 
 from minerva_travel.activity_page_compositor import (
     BAND,
+    COVER_LOCKUP_BOTTOM,
+    COVER_LOCKUP_TOP,
     SCENE_ARTWORK_SIZE,
     SUMMARY_ROUTE_INSET,
     compose_summary_page,
@@ -172,8 +174,13 @@ def test_cover_prompt_stays_text_free_and_keeps_every_visible_person():
     assert '"Julho de 2026"' not in prompt
     # Quem aparece na capa continua sendo a familia inteira.
     assert "exactly 4 visible people" in prompt
-    # E o meio da pagina fica livre para o brasao cair sem cobrir rosto.
-    assert "between 38 and 62 percent of the page height" in prompt
+    # E a faixa reservada ao brasao vem da geometria do compositor. No meio da
+    # pagina ele atravessava a cabeca das pessoas: espremer quatro pessoas
+    # abaixo de 62% da altura era um pedido que o modelo nao atendia.
+    alta = round((COVER_LOCKUP_TOP - 60) / 1536 * 100)
+    baixa = round((COVER_LOCKUP_BOTTOM + 60) / 1536 * 100)
+    assert f"between {alta} and {baixa} percent of" in prompt
+    assert "every head below" in prompt
 
 
 def test_summary_prompt_lists_every_stop_without_writing_it_on_the_art():

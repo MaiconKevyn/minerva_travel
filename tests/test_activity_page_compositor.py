@@ -10,6 +10,8 @@ from minerva_travel.activity_page_compositor import (
     COLORING_INSTRUCTION_TEMPLATE,
     COLORING_MIN_WHITE_FRACTION,
     COLORING_TITLE,
+    COVER_LOCKUP_BOTTOM,
+    COVER_LOCKUP_TOP,
     DETAIL_HUNT_TITLE,
     DRAWING_BLANK_REGION,
     FAMILY_COLORING_INSTRUCTION_TEMPLATE,
@@ -502,10 +504,11 @@ def test_cover_survives_a_long_family_name_and_a_long_trip_date(tmp_path):
 
     with Image.open(saida) as imagem:
         pagina = imagem.convert("RGB")
-        # O título quebrou em duas linhas dentro da faixa reservada a ele.
-        assert _tem_tinta(pagina, (72, 640, 952, 780))
+        # As caixas vêm da geometria do compositor: número redigitado aqui é
+        # número que descola do que o código desenha.
+        assert _tem_tinta(pagina, (72, COVER_LOCKUP_TOP + 30, 952, COVER_LOCKUP_BOTTOM - 20))
         # E a data continua na folha, em vez de desaparecer sem aviso.
-        assert _tem_tinta(pagina, (72, 790, 952, 870))
+        assert _tem_tinta(pagina, (72, COVER_LOCKUP_BOTTOM - 20, 952, COVER_LOCKUP_BOTTOM + 60))
 
 
 def test_a_long_landmark_name_wraps_without_touching_the_arched_place(tmp_path):

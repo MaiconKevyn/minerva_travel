@@ -1,8 +1,19 @@
 # Amostras da identidade Destinations
 
 Um roteiro simples — Família Knopp em Paris, setembro de 2026 — gerado pelo
-pipeline de produção depois da troca de identidade (commit `b06acf5`). Serve
-para comparar o antes e o depois sem precisar gerar um guia inteiro.
+pipeline de produção. Serve para ver o resultado sem precisar gerar um guia
+inteiro. A família da capa é inventada e descrita por escrito; nenhuma foto de
+pessoa real entra neste fluxo.
+
+Para regerar tudo:
+
+```bash
+python scripts/generate_sample_guide.py --tudo
+```
+
+O mesmo comando republica o folheável da página inicial e os cards de exemplo,
+que são cópias do mesmo render — foi a geração à mão que as fez divergir. Use
+`--somente-publicar` para republicar os PNGs do rascunho sem gastar geração.
 
 | página | o que mostra |
 |---|---|
@@ -19,38 +30,27 @@ estilo canônico mora em `src/minerva_travel/visual_identity.py`.
 
 ## Duas coisas que as amostras expõem
 
-**Dois mundos tipográficos — já resolvido no código, ainda visível aqui.**
-Compare `06-colorir-louvre` com `02-nosso-roteiro`: o primeiro usa Zilla Slab,
-desenhada pelo compositor; o segundo tem a tipografia desenhada pela IA. As
-quatro páginas ilustradas (capa, roteiro, destino e ponto turístico) já
-migraram para o código — a arte chega sem letra nenhuma e o compositor escreve
-por cima. **Estas imagens são anteriores à migração** e só somem quando forem
-regeradas:
-
-```bash
-python scripts/generate_sample_guide.py --tudo
-```
-
-O mesmo comando republica o folheável do site e os cards de exemplo, que são
-cópias do mesmo render — foi a geração à mão que as fez divergir.
+**Uma tipografia só.** Toda letra destas páginas foi escrita pelo compositor,
+em Zilla Slab: a arte chega sem nenhuma. Antes, as páginas ilustradas traziam
+a tipografia que a IA desenhava — diferente a cada geração e diferente das
+páginas de atividade, dentro do mesmo livro.
 
 **Os painéis continuam.** A referência não usa caixa nenhuma, mas as nossas
 carregam função — grade, instrução, lista. Desvio consciente.
 
 ## Tinta por folha
 
-Medido sobre estas amostras, com o estilo antigo como comparação:
+Medido sobre estas amostras (fração da folha coberta, como a impressora vê):
 
 | página | tinta |
 |---|---|
 | colorir | 9% |
-| minha melhor memória | 11% |
-| labirinto | 12% |
-| nosso roteiro | 21% |
-| destino | 22% |
-| torre eiffel | 24% |
-| capa | 27% |
-| *caça-palavras no estilo antigo* | *17%* |
+| minha melhor memória | 10% |
+| labirinto | 11% |
+| destino | 13% |
+| torre eiffel | 14% |
+| nosso roteiro | 17% |
+| capa | 26% |
 
 O fundo claro é uma adaptação deliberada: a referência usa fundos saturados
 nos cartões de título, mas estas folhas são impressas em casa e escritas a
