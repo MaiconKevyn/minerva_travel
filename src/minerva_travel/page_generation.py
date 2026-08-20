@@ -47,6 +47,7 @@ from minerva_travel.activity_page_compositor import (
     compose_investigator_page,
     compose_landmark_page,
     compose_language_page,
+    compose_language_welcome_page,
     compose_maze_page,
     compose_passport_page,
     compose_postcard_page,
@@ -72,7 +73,7 @@ from minerva_travel.dot_to_dot import (
     build_dot_to_dot,
     dot_count_for,
 )
-from minerva_travel.flight_vocabulary import flight_vocabulary_for
+from minerva_travel.flight_vocabulary import flight_vocabulary_for, language_welcome_for
 from minerva_travel.image_generation import simplify_child_coloring_lineart
 from minerva_travel.investigator_activity import (
     InvestigatorChildProfile,
@@ -163,6 +164,16 @@ class GuidePageGenerator(Protocol):
         curiosity: str,
         curiosity_label: str,
         landmark_names: list[str],
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path: ...
+
+    def generate_language_welcome_page(
+        self,
+        *,
+        output_path: Path,
+        country: str,
+        landmark_name: str,
         revision_instruction: str = "",
         reference_page: Path | None = None,
     ) -> Path: ...
@@ -597,6 +608,48 @@ class OpenAIGuidePageGenerator:
         except (ActivityPageCompositionError, OSError, ValueError) as error:
             raise PageGenerationError(
                 "Não foi possível finalizar a abertura do destino."
+            ) from error
+        finally:
+            artwork.unlink(missing_ok=True)
+
+    def generate_language_welcome_page(
+        self,
+        *,
+        output_path: Path,
+        country: str,
+        landmark_name: str,
+        revision_instruction: str = "",
+        reference_page: Path | None = None,
+    ) -> Path:
+        welcome = language_welcome_for(country)
+        if welcome is None:
+            raise PageGenerationError("Não temos o idioma deste país conferido.")
+        prompt = language_welcome_artwork_prompt(
+            language=welcome.language,
+            country=welcome.country,
+            landmark_name=landmark_name,
+            revision_instruction=revision_instruction,
+            has_revision_reference=reference_page is not None,
+        )
+        response = (
+            self._edit_with_references(prompt, [reference_page])
+            if reference_page is not None
+            else self._generate_from_prompt(prompt)
+        )
+        artwork = _provider_artwork_path(output_path)
+        try:
+            _persist_page_image(response, artwork)
+            return compose_language_welcome_page(
+                artwork,
+                output_path,
+                language=welcome.language,
+                greeting=welcome.greeting,
+                words=[(w.word, w.pronunciation, w.meaning) for w in welcome.words],
+                curiosity=welcome.curiosity,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError(
+                "Não foi possível finalizar a abertura de idioma."
             ) from error
         finally:
             artwork.unlink(missing_ok=True)
@@ -2054,6 +2107,57 @@ Do not add or infer any fact, date, number, historical claim, superlative, recom
 activity. No logos, prices, mockup border or UI. Output the finished flat illustration.
 {revision}
 {people_contract}
+""".strip()
+
+
+def language_welcome_artwork_prompt(
+    *,
+    language: str,
+    country: str,
+    landmark_name: str,
+    revision_instruction: str = "",
+    has_revision_reference: bool = False,
+) -> str:
+    """A arte da abertura de idioma: o pais recebendo a familia, sem letra.
+
+    A pagina abre o capitulo do pais, entao a ancora visual e o primeiro ponto
+    turistico confirmado dele — a mesma disciplina da abertura de destino. Os
+    baloes de fala ficam VAZIOS por contrato: o modelo escreveria a saudacao
+    com a ortografia que inventasse, e ortografia inventada sai impressa.
+    """
+
+    # As porcentagens vem da grade do compositor, nunca redigitadas aqui.
+    texto_pct = round(SCENE_TEXT_BOTTOM / PAGE_IMAGE_SIZE[1] * 100)
+    cenario_pct = 100 - texto_pct
+    revision = _revision_directive(revision_instruction, has_revision_reference)
+    return f"""
+Create a complete vertical page illustration for a premium children's illustrated family travel
+guide — one single picture covering the whole page, edge to edge, with no panel, no framed area,
+no strip and no change of tone anywhere. This page welcomes the family to {country} and its
+language ({language}).
+{_HOUSE_STYLE}
+
+TEXT-FREE CONTRACT — do not render any letter, word, number, title, caption, sign, label,
+monogram, watermark or signature anywhere in this artwork. Trusted code prints the greeting, the
+practice words and the curiosity around it, in the book's own typeface. Speech bubbles must be
+COMPLETELY EMPTY — no letters, no dots, no squiggles pretending to be writing.
+
+COMPOSITION — the application writes the reading blocks straight onto this picture, so the page
+is divided by content, not by panels:
+- Everything ABOVE {texto_pct} percent of the page height stays CALM: open sky or plain
+  background in one flat tone, because text is printed over it and must stay readable.
+- The scenery lives in the BOTTOM {cenario_pct} percent, running to the left and right edges and
+  down to the bottom edge: a recognizable flat crayon-textured illustration of {landmark_name},
+  WHOLE — spire, roof or dome included, drawn smaller if needed so nothing rises into the calm
+  area — with friendly scenery of {country} around it.
+- Two or three small EMPTY speech bubbles drift near the very top corners among little clouds,
+  the way leaves frame other pages: they say "people talk here" without a single letter.
+
+PEOPLE-FREE CONTRACT — do not depict any person, face, body, silhouette or crowd.
+
+Do not add facts or claims that were not provided. No logos, prices, mockup border or UI.
+Output the finished flat illustration.
+{revision}
 """.strip()
 
 

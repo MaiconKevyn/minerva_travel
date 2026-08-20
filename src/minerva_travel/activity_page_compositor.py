@@ -2681,3 +2681,148 @@ def compose_summary_page(
 
     _draw_dotted_route(draw, ancoras)
     return _atomic_save(image, output_path)
+
+
+WELCOME_OVERLINE = "O primeiro olá"
+WELCOME_ROW_HEIGHT = 82
+# A coluna da pronúncia. Alinhada à direita da página ela ficava a um vão de
+# 700px da palavra — o olho perdia o par. Coluna fixa mantém o par junto.
+WELCOME_SPEECH_COLUMN = 470
+WELCOME_CARD_GAP = 26
+# A faixa onde o pill da missão pousa, a mesma altura do "Já visitei".
+WELCOME_PILL_TOP = 1392
+WELCOME_PILL_BOTTOM = 1500
+
+
+def _draw_mission_pill(draw: ImageDraw.ImageDraw, label: str) -> None:
+    """O pill de missão com quadradinho, na gramática do "Já visitei".
+
+    A largura veste o texto: o rótulo muda de idioma para idioma ("Eu disse
+    Konnichiwa!" é bem mais largo que "Eu disse Ciao!"), e um painel fixo ou
+    cortava ou sobrava.
+    """
+
+    fonte = _font(30, bold=True)
+    caixa = draw.textbbox((0, 0), label, font=fonte)
+    largura_texto = caixa[2] - caixa[0]
+    lado = 48
+    respiro = 40
+    largura = int(respiro + lado + 24 + largura_texto + respiro)
+    esquerda = (PAGE_IMAGE_SIZE[0] - largura) // 2
+    _panel(draw, (esquerda, WELCOME_PILL_TOP, esquerda + largura, WELCOME_PILL_BOTTOM), radius=20)
+    topo_caixa = WELCOME_PILL_TOP + 31
+    draw.rounded_rectangle(
+        (esquerda + respiro, topo_caixa, esquerda + respiro + lado, topo_caixa + lado),
+        radius=5,
+        fill="white",
+        outline=INK,
+        width=4,
+    )
+    draw.text(
+        (esquerda + respiro + lado + 24, WELCOME_PILL_TOP + 32),
+        label,
+        font=fonte,
+        fill=INK,
+    )
+
+
+def compose_language_welcome_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    language: str,
+    greeting: str,
+    words: Sequence[tuple[str, str, str]],
+    curiosity: str,
+    curiosity_label: str = "Você sabia?",
+) -> Path:
+    """A abertura de idioma do país, na gramática das páginas ilustradas.
+
+    O título da página é a própria saudação nativa — a criança lê "Bonjour !"
+    antes de qualquer explicação. As cinco linhas são o arco de uma conversa,
+    com a pronúncia em destaque porque ela é o que a criança de fato fala; a
+    curiosidade do idioma vai no cartão rosa; e a missão no rodapé é dizer a
+    saudação para alguém de verdade.
+    """
+
+    if len(words) != 5:
+        raise ActivityPageCompositionError("A abertura de idioma precisa de cinco palavras.")
+
+    image = _load_artwork(artwork_path)
+    draw = ImageDraw.Draw(image)
+
+    _draw_scene_page_header(
+        image,
+        draw,
+        overline=WELCOME_OVERLINE,
+        title=_bounded(greeting, "greeting", 40),
+        arched=_bounded(f"Olá, em {language}", "language", 40),
+    )
+
+    topo = SCENE_NOTES_TOP
+    for palavra, pronuncia, significado in words:
+        _draw_star(
+            draw,
+            (SCENE_TEXT_LEFT + SCENE_STAR_RADIUS, topo + 20),
+            SCENE_STAR_RADIUS,
+            HIGHLIGHT,
+        )
+        texto_x = SCENE_TEXT_LEFT + 2 * SCENE_STAR_RADIUS + 22
+        draw.text(
+            (texto_x, topo),
+            _bounded(palavra, "palavra", 40),
+            font=_font(31, bold=True),
+            fill=INK,
+        )
+        # A pronúncia é o que a criança lê em voz alta — na voz que as páginas
+        # de idioma já falam, em coluna fixa para o par palavra-fala ficar junto.
+        fala = f"fale assim: {_bounded(pronuncia, 'pronúncia', 40)}"
+        draw.text(
+            (WELCOME_SPEECH_COLUMN, topo + 7),
+            fala,
+            font=_font(22, bold=True),
+            fill=ACCENT,
+        )
+        draw.text(
+            (texto_x, topo + 44),
+            _bounded(significado, "significado", 60),
+            font=_font(20),
+            fill=MUTED_INK,
+        )
+        topo += WELCOME_ROW_HEIGHT
+
+    texto = " ".join(curiosity.split())
+    if texto:
+        topo += WELCOME_CARD_GAP
+        largura = SCENE_TEXT_RIGHT - SCENE_TEXT_LEFT - 72
+        _corpo, _linhas, altura = _wrapped_block(
+            draw, texto, largura, maximum_size=25, minimum_size=17
+        )
+        base = min(SCENE_TEXT_BOTTOM + 60, topo + 82 + altura + 28)
+        draw.rounded_rectangle(
+            (SCENE_TEXT_LEFT, topo, SCENE_TEXT_RIGHT, base),
+            radius=SCENE_CARD_RADIUS,
+            fill=_tint(CARD_TINT, 0.34),
+        )
+        _draw_star(draw, (SCENE_TEXT_LEFT + 36, topo + 44), SCENE_STAR_RADIUS, HIGHLIGHT)
+        _draw_tracked(
+            draw,
+            _bounded(curiosity_label, "curiosity_label", 60).upper(),
+            topo + 30,
+            size=21,
+            fill=ACCENT,
+            left=SCENE_TEXT_LEFT + 2 * SCENE_STAR_RADIUS + 44,
+            maximum_width=SCENE_TEXT_RIGHT - SCENE_TEXT_LEFT - 120,
+        )
+        _draw_wrapped_fit(
+            draw,
+            texto,
+            (SCENE_TEXT_LEFT + 36, topo + 82, SCENE_TEXT_RIGHT - 36, base - 24),
+            maximum_size=25,
+            minimum_size=17,
+            fill=INK,
+        )
+
+    saudacao_limpa = greeting.strip(" !¡?¿").strip()
+    _draw_mission_pill(draw, f"Eu disse {saudacao_limpa}!")
+    return _atomic_save(image, output_path)
