@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 
@@ -290,12 +291,14 @@ def mercado_pago_api_base_url() -> str:
     return os.getenv("MERCADO_PAGO_API_BASE_URL", "https://api.mercadopago.com").rstrip("/")
 
 
-def mercado_pago_environment() -> str:
+def mercado_pago_environment() -> Literal["test", "production"]:
     load_project_env()
     value = os.getenv("MERCADO_PAGO_ENVIRONMENT", "test").strip().lower()
-    if value not in {"test", "production"}:
-        raise RuntimeError("MERCADO_PAGO_ENVIRONMENT must be test or production.")
-    return value
+    if value == "test":
+        return "test"
+    if value == "production":
+        return "production"
+    raise RuntimeError("MERCADO_PAGO_ENVIRONMENT must be test or production.")
 
 
 def mercado_pago_webhook_url() -> str:

@@ -567,10 +567,10 @@ class GuideRepository:
                     now,
                 ),
             )
-        record = self.get_payment_for_owner(payment_id, user_id)
-        if record is None:  # pragma: no cover - database invariant
+        persisted = self.get_payment_for_owner(payment_id, user_id)
+        if persisted is None:  # pragma: no cover - database invariant
             raise RuntimeError("Payment persistence failed.")
-        return record, True
+        return persisted, True
 
     def set_payment_preference(
         self,
