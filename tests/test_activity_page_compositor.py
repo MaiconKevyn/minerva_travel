@@ -26,7 +26,6 @@ from minerva_travel.activity_page_compositor import (
     MEMORY_BLANK_REGION,
     PAINTING_TITLE,
     PAPER,
-    SCENE_ARTWORK_SIZE,
     SPOT_PANEL_GAP,
     SPOT_PANEL_LEFT,
     SPOT_PANEL_SIZE,
@@ -69,7 +68,7 @@ ACENTO_RGB = tuple(int(ACCENT[i : i + 2], 16) for i in (1, 3, 5))
 def _scene(path: Path, color: str = "#d9eaf2") -> Path:
     """A cena deitada que as páginas ilustradas recebem do provedor."""
 
-    image = Image.new("RGB", SCENE_ARTWORK_SIZE, color)
+    image = Image.new("RGB", (1024, 1536), color)
     draw = ImageDraw.Draw(image)
     draw.ellipse((560, 180, 980, 800), fill="#7ca6bd", outline="#31566c", width=16)
     image.save(path, "PNG")

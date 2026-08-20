@@ -23,7 +23,7 @@ from minerva_travel.activity_page_compositor import (
     COVER_LOCKUP_TOP,
     HERE_VS_HOME_TITLE,
     NEWSPAPER_HEADLINE_TITLE,
-    SCENE_ARTWORK_SIZE,
+    SCENE_TEXT_BOTTOM,
     SPOT_SCENE_SIZE,
     SUMMARY_HEADER_RETRIES,
     SUMMARY_MAX_STOPS,
@@ -107,7 +107,6 @@ PAGE_IMAGE_SIZE_PARAM = "1024x1536"
 # A cena dos erros é a única arte deitada: em pé, o painel largo cortava o
 # monumento ao meio e escondia dois terços dos objetos do jogo.
 SPOT_SCENE_SIZE_PARAM = f"{SPOT_SCENE_SIZE[0]}x{SPOT_SCENE_SIZE[1]}"
-SCENE_ARTWORK_SIZE_PARAM = f"{SCENE_ARTWORK_SIZE[0]}x{SCENE_ARTWORK_SIZE[1]}"
 MAX_PAGE_IMAGE_BYTES = 25 * 1024 * 1024
 
 
@@ -579,13 +578,13 @@ class OpenAIGuidePageGenerator:
             has_revision_reference=reference_page is not None,
         )
         response = (
-            self._edit_with_references(prompt, [reference_page], size=SCENE_ARTWORK_SIZE_PARAM)
+            self._edit_with_references(prompt, [reference_page])
             if reference_page is not None
-            else self._generate_from_prompt(prompt, size=SCENE_ARTWORK_SIZE_PARAM)
+            else self._generate_from_prompt(prompt)
         )
         artwork = _provider_artwork_path(output_path)
         try:
-            _persist_page_image(response, artwork, expected_size=SCENE_ARTWORK_SIZE)
+            _persist_page_image(response, artwork)
             return compose_destination_intro_page(
                 artwork,
                 output_path,
@@ -641,18 +640,14 @@ class OpenAIGuidePageGenerator:
             references = [family_photo, family_cover]
             if reference_page is not None:
                 references.append(reference_page)
-            response = self._edit_with_references(
-                prompt, references, size=SCENE_ARTWORK_SIZE_PARAM
-            )
+            response = self._edit_with_references(prompt, references)
         elif reference_page is not None:
-            response = self._edit_with_references(
-                prompt, [reference_page], size=SCENE_ARTWORK_SIZE_PARAM
-            )
+            response = self._edit_with_references(prompt, [reference_page])
         else:
-            response = self._generate_from_prompt(prompt, size=SCENE_ARTWORK_SIZE_PARAM)
+            response = self._generate_from_prompt(prompt)
         artwork = _provider_artwork_path(output_path)
         try:
-            _persist_page_image(response, artwork, expected_size=SCENE_ARTWORK_SIZE)
+            _persist_page_image(response, artwork)
             return compose_landmark_page(
                 artwork,
                 output_path,
@@ -2028,12 +2023,15 @@ def destination_intro_page_prompt(
     has_revision_reference: bool = False,
 ) -> str:
     visual_anchors = ", ".join(landmark_names)
+    texto_pct = round(SCENE_TEXT_BOTTOM / PAGE_IMAGE_SIZE[1] * 100)
+    cenario_pct = 100 - texto_pct
     location = ", ".join(part for part in (city, country) if part)
     revision = _revision_directive(revision_instruction, has_revision_reference)
     people_contract = _destination_without_people_directive(has_revision_reference)
     return f"""
-Create the wide horizontal illustration that opens the chapter about {location} in a premium
-children's illustrated family travel guide.
+Create a complete vertical page illustration that opens the chapter about {location} in a premium
+children's illustrated family travel guide — one single picture covering the whole page, edge to
+edge, with no panel, no framed area, no strip and no change of tone anywhere.
 {_HOUSE_STYLE}
 
 TEXT-FREE CONTRACT — do not render any letter, word, number, title, subtitle, caption, sign,
@@ -2041,11 +2039,16 @@ label, page number, monogram, watermark or signature anywhere in this artwork. T
 the destination name, the country, the learning notes and the curiosity around it, in the book's
 own typeface.
 
-This artwork is printed whole, edge to edge, with nothing cropped away, so compose for the wide
-landscape frame you were given. Use these confirmed places only as visual anchors for the scene:
-{visual_anchors}. Show them whole, with their base or waterline included, and let the scenery run
-out to the left and right edges instead of floating in the middle of an empty field. Do not copy
-any reference-book characters, border, wording, page number, or layout.
+COMPOSITION — the application writes the destination name and the reading blocks straight onto
+this picture, so the page is divided by content, not by panels:
+- Everything ABOVE {texto_pct} percent of the page height stays CALM: open sky, water or plain
+  background in one flat tone, because text is printed over it and must stay readable.
+- The city skyline lives in the BOTTOM {cenario_pct} percent, running all the way to the left and
+  right edges and down to the bottom edge, filling that band generously.
+Use these confirmed places only as visual anchors for the scene: {visual_anchors}. Show them
+whole, with their base or waterline included. A few small motifs may drift into the calm area
+near the very top corners, the way leaves and clouds frame a page, as long as the middle stays
+open. Do not copy any reference-book characters, border, wording, page number, or layout.
 
 Do not add or infer any fact, date, number, historical claim, superlative, recommendation, or
 activity. No logos, prices, mockup border or UI. Output the finished flat illustration.
@@ -2070,6 +2073,10 @@ def landmark_page_prompt(
     has_revision_reference: bool = False,
 ) -> str:
     location = ", ".join(part for part in (city, country) if part)
+    # As duas porcentagens vem da grade do compositor: numero redigitado aqui e
+    # numero que descola do que o codigo desenha.
+    texto_pct = round(SCENE_TEXT_BOTTOM / PAGE_IMAGE_SIZE[1] * 100)
+    cenario_pct = 100 - texto_pct
     people_contract = (
         _family_continuity_directive(expected_visible_family_member_count, has_revision_reference)
         if include_family
@@ -2085,8 +2092,9 @@ def landmark_page_prompt(
     )
     revision = _revision_directive(revision_instruction, has_revision_reference)
     return f"""
-Create the wide horizontal illustration that fills the window of a page in a premium children's
-illustrated family travel guide.
+Create a complete vertical page illustration for a premium children's illustrated family travel
+guide — one single picture covering the whole page, edge to edge, with no panel, no framed area,
+no strip and no change of tone anywhere.
 {_HOUSE_STYLE}
 Show a recognizable, accurate flat crayon-textured illustration of {landmark_name}
 in {location}, {subject}.
@@ -2096,12 +2104,21 @@ label, checkbox, page number, monogram, watermark or signature anywhere in this 
 code prints the landmark name, the place, the learning note and the curiosity around it, in the
 book's own typeface, and places the printable `Já visitei` checkbox itself.
 
-This artwork is printed whole, edge to edge, with nothing cropped away, so compose for the wide
-landscape frame you were given. Show the landmark WHOLE — its base, foundation or waterline
-included, with a strip of calm ground under it — and let the scenery run out to the left and
-right edges instead of floating in the middle of an empty field. Decorative stars, route lines
-and warm paper texture are welcome, but do not copy any reference-book characters, border,
-wording, page number, or layout.
+COMPOSITION — the application writes the title and the reading blocks straight onto this picture,
+so the page is divided by content, not by panels:
+- Everything ABOVE {texto_pct} percent of the page height stays CALM: open sky, water or plain
+  background in one flat tone. No monument, no foliage mass, no busy motif there — text is
+  printed over it and must stay readable.
+- The landmark and its scenery live in the BOTTOM {cenario_pct} percent, running all the way to
+  the left and right edges and down to the bottom edge, filling that band generously.
+- The landmark must fit ENTIRELY inside that bottom band — its very tip, spire or antenna
+  included. A tall monument like a tower or a cathedral is drawn SMALLER so that it fits; it may
+  never rise into the calm area above, where the printed text would cover its top and make it look
+  decapitated. Its base or waterline stays visible too.
+A few small motifs may drift into the calm area near the very top corners, the way leaves and
+clouds frame a page, as long as the middle stays open. Decorative stars and warm paper texture
+are welcome, but do not copy any reference-book characters, border, wording, page number, or
+layout.
 
 Do not add facts or claims that were not provided. No logos, prices, mockup border or UI.
 Output the finished flat illustration.

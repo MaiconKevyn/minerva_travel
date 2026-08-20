@@ -10,7 +10,7 @@ from minerva_travel.activity_page_compositor import (
     BAND,
     COVER_LOCKUP_BOTTOM,
     COVER_LOCKUP_TOP,
-    SCENE_ARTWORK_SIZE,
+    SCENE_TEXT_BOTTOM,
     SUMMARY_ROUTE_INSET,
     compose_summary_page,
     summary_band,
@@ -95,7 +95,7 @@ def test_openai_rate_limit_retries_with_bounded_exponential_backoff(tmp_path):
         [
             _error_response(429),
             _error_response(429),
-            _response(_png_bytes(size=SCENE_ARTWORK_SIZE)),
+            _response(_png_bytes()),
         ]
     )
     sleeps = []
@@ -230,8 +230,8 @@ def test_destination_intro_prompt_stays_text_free_and_forbids_people():
         "O Big Ben é o nome do sino que fica dentro da torre.",
     ):
         assert copia not in prompt
-    # A arte e a janela, nao a pagina.
-    assert "printed whole, edge to edge, with nothing cropped away" in prompt
+    # A arte e a pagina inteira, sem janela e sem faixa.
+    assert "no framed area" in prompt and "no strip" in prompt
     assert "Do not add or infer any fact" in prompt
     assert "Do not depict any person" in prompt
 
@@ -241,7 +241,7 @@ def test_destination_intro_uses_generation_then_only_selected_page_for_revision(
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#6f9fb8"))
+        return _response(_png_bytes(color="#6f9fb8"))
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
     first = tmp_path / "destination-1.png"
@@ -426,7 +426,7 @@ def test_landmark_page_defaults_to_generation_without_people_or_family_inputs(tm
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#d09a55"))
+        return _response(_png_bytes(color="#d09a55"))
 
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
     output = tmp_path / "landmark.png"
@@ -461,10 +461,13 @@ def test_landmark_page_defaults_to_generation_without_people_or_family_inputs(tm
     with Image.open(output) as image:
         page = image.convert("RGB")
         assert page.getpixel((390, 1447)) == (255, 255, 255)
-        # As faixas chapadas cobrem o topo e o rodape; o miolo segue sendo arte.
-        assert page.getpixel((12, 12)) == BAND_RGB
-        assert page.getpixel((12, 1520)) == BAND_RGB
-        assert page.getpixel((512, 700)) == (208, 154, 85)
+        # Sem faixa nenhuma: a arte chega ate as quatro bordas da folha, e e a
+        # mesma cor em cima, embaixo e no meio.
+        arte = (208, 154, 85)
+        assert page.getpixel((12, 12)) == arte
+        assert page.getpixel((12, 1520)) == arte
+        # Abaixo da zona de texto e acima do carimbo: arte pura.
+        assert page.getpixel((512, 1150)) == arte
 
 
 def test_landmark_page_can_include_same_family_with_canonical_references(tmp_path):
@@ -472,7 +475,7 @@ def test_landmark_page_can_include_same_family_with_canonical_references(tmp_pat
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#d09a55"))
+        return _response(_png_bytes(color="#d09a55"))
 
     photo, cover = _family_references(tmp_path)
     generator = OpenAIGuidePageGenerator(api_key="test-key", transport=transport)
@@ -508,7 +511,7 @@ def test_landmark_revision_without_family_uses_only_selected_page_and_removes_pe
 
     def transport(method, url, **kwargs):
         calls.append((method, url, kwargs))
-        return _response(_png_bytes(size=SCENE_ARTWORK_SIZE, color="#6faec9"))
+        return _response(_png_bytes(color="#6faec9"))
 
     reference = tmp_path / "landmark-with-family.png"
     reference.write_bytes(_png_bytes())
@@ -587,7 +590,7 @@ def test_openai_error_exposes_only_safe_diagnostic_identifiers(tmp_path):
     assert "private family prompt" not in str(captured.value)
 
 
-def test_landmark_prompt_stays_text_free_and_reserves_the_bands_during_revision():
+def test_landmark_prompt_stays_text_free_and_keeps_the_page_whole_during_revision():
     prompt = landmark_page_prompt(
         family_title="Família Moraes",
         trip_date="2026",
@@ -602,9 +605,12 @@ def test_landmark_prompt_stays_text_free_and_reserves_the_bands_during_revision(
 
     assert '"Use tons mais quentes."' in prompt
     assert "TEXT-FREE CONTRACT" in prompt
-    # A arte e a janela, nao a pagina: sem isso o modelo compunha para o quadro
-    # inteiro e o monumento saia cortado pelos pes na faixa de baixo.
-    assert "printed whole, edge to edge, with nothing cropped away" in prompt
+    # A arte e a pagina inteira, sem janela e sem faixa: a versao com janela
+    # deitada abria dois cortes horizontais na folha.
+    assert "no framed area" in prompt and "no strip" in prompt
+    # E a grade do texto vem do compositor, nao de numero redigitado no prompt.
+    alto = round(SCENE_TEXT_BOTTOM / 1536 * 100)
+    assert f"ABOVE {alto} percent of the page height stays CALM" in prompt
 
 
 def test_activity_prompt_maps_fixed_reference_order_and_forbids_people_and_model_text():

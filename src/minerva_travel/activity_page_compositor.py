@@ -44,6 +44,7 @@ PANEL_OUTLINE = identidade.CREME
 # A faixa chapada onde o tipo assenta, nas paginas ilustradas.
 BAND = identidade.CREME
 HIGHLIGHT = identidade.MOSTARDA
+CARD_TINT = identidade.ROSA
 _PAPEL_RGB = tuple(int(PAPER[i : i + 2], 16) for i in (1, 3, 5))
 # Folga so para o antisserrilhado da tipografia, nao para deixar arte passar.
 _TOLERANCIA_PAPEL = 4
@@ -137,21 +138,17 @@ HOMECOMING_REQUIRED_COPY = (
     "Mas todas essas lembranças vão continuar com a gente.",
     "Uma coisa que quero contar quando chegar em casa:",
 )
-# A pagina do ponto turistico e composta como a capa: a arte chega sem letra
-# nenhuma e o codigo escreve por cima, em duas faixas chapadas que sangram ate
-# a borda — o gesto da referencia, onde o tipo assenta sobre blocos de cor.
-# A grade das paginas ilustradas: a cena chega deitada, no formato exato da
-# janela entre as duas faixas chapadas onde o codigo escreve. Pedir a arte no formato da
-# pagina e depois tapar dois tercos dela era o que cortava o monumento pelos pes:
-# o modelo compunha para o quadro inteiro que recebia, e a faixa caia por cima.
-SCENE_ARTWORK_SIZE = (1536, 1024)
-PAGE_TOP_BAND = (0, 0, PAGE_IMAGE_SIZE[0], 340)
-PAGE_SCENE_BOX = (0, 340, PAGE_IMAGE_SIZE[0], 1023)
-PAGE_BOTTOM_BAND = (0, 1023, PAGE_IMAGE_SIZE[0], PAGE_IMAGE_SIZE[1])
+# A pagina ilustrada nao tem janela nem faixa: a arte cobre a folha inteira e
+# o texto assenta em cima dela, nas zonas que o prompt mantem calmas. Foi a
+# janela deitada que abriu os dois cortes horizontais na pagina.
+SCENE_TEXT_LEFT = 76
+SCENE_TEXT_RIGHT = PAGE_IMAGE_SIZE[0] - 76
+SCENE_NOTES_TOP = 352
+SCENE_TEXT_BOTTOM = 900
+SCENE_CARD_RADIUS = 30
+SCENE_STAR_RADIUS = 17
 PAGE_TEXT_LEFT = 76
 PAGE_TEXT_RIGHT = PAGE_IMAGE_SIZE[0] - 76
-PAGE_BLOCKS_TOP = 1076
-PAGE_BLOCKS_BOTTOM = 1372
 LANDMARK_VISITED_LABEL = "Já visitei"
 LANDMARK_VISITED_PANEL = (326, 1392, 698, 1500)
 LANDMARK_VISITED_CHECKBOX = (366, 1423, 414, 1471)
@@ -1848,6 +1845,27 @@ def _draw_centered_fit_box(
     raise ActivityPageCompositionError("O nome da criança não cabe no cartão de missão.")
 
 
+def _wrapped_block(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    width: int,
+    *,
+    maximum_size: int,
+    minimum_size: int,
+) -> tuple[int, list[str], int]:
+    """Corpo, linhas e altura do texto embrulhado nesta largura."""
+
+    for size in range(maximum_size, minimum_size - 1, -1):
+        font = _font(size)
+        try:
+            linhas = _wrap_text(draw, text, font, width)
+        except ActivityPageCompositionError:
+            continue
+        altura = max(1, font.getbbox("Ág")[3] - font.getbbox("Ág")[1] + 5)
+        return size, linhas, len(linhas) * altura
+    raise ActivityPageCompositionError("O texto não cabe no cartão.")
+
+
 def _draw_wrapped_fit(
     draw: ImageDraw.ImageDraw,
     text: str,
@@ -2178,27 +2196,13 @@ def compose_cover_page(
     return _atomic_save(image, output_path)
 
 
-def _fitted_scene(path: Path) -> Image.Image:
-    """Recorta a cena deitada para a janela da pagina, sem esticar o desenho."""
+def _tint(color: str, amount: float) -> str:
+    """Mistura a cor com o papel: o cartao da referencia e um tom lavado."""
 
-    try:
-        with Image.open(path) as aberta:
-            if aberta.format != "PNG":
-                raise ActivityPageCompositionError("A cena do ponto turístico não é PNG.")
-            cena = aberta.convert("RGB")
-    except (UnidentifiedImageError, OSError) as error:
-        raise ActivityPageCompositionError("A cena do ponto turístico é inválida.") from error
-
-    esquerda, topo, direita, base = PAGE_SCENE_BOX
-    largura, altura = direita - esquerda, base - topo
-    escala = max(largura / cena.width, altura / cena.height)
-    redimensionada = cena.resize(
-        (max(largura, round(cena.width * escala)), max(altura, round(cena.height * escala))),
-        Image.Resampling.LANCZOS,
-    )
-    corte_x = (redimensionada.width - largura) // 2
-    corte_y = (redimensionada.height - altura) // 2
-    return redimensionada.crop((corte_x, corte_y, corte_x + largura, corte_y + altura))
+    alvo = tuple(int(color[i : i + 2], 16) for i in (1, 3, 5))
+    papel = _PAPEL_RGB
+    misturado = tuple(round(p + (a - p) * amount) for p, a in zip(papel, alvo, strict=True))
+    return "#{:02X}{:02X}{:02X}".format(*misturado)
 
 
 def _draw_star(
@@ -2216,45 +2220,6 @@ def _draw_star(
         angulo = -math.pi / 2 + indice * math.pi / 5
         pontas.append((cx + raio * math.cos(angulo), cy + raio * math.sin(angulo)))
     draw.polygon(pontas, fill=fill)
-
-
-def _draw_band_blocks(
-    draw: ImageDraw.ImageDraw,
-    blocos: Sequence[tuple[str, str]],
-    *,
-    bottom: int = PAGE_BLOCKS_BOTTOM,
-) -> None:
-    """Distribui os blocos rotulados pela faixa de baixo, separados por um fio."""
-
-    presentes = [
-        (rotulo, " ".join(texto.split())) for rotulo, texto in blocos if " ".join(texto.split())
-    ]
-    if not presentes:
-        return
-    vao = 26
-    altura = (bottom - PAGE_BLOCKS_TOP - vao * (len(presentes) - 1)) // len(presentes)
-    topo = PAGE_BLOCKS_TOP
-    for indice, (rotulo, texto) in enumerate(presentes):
-        if indice:
-            meio = topo - vao // 2
-            draw.line((PAGE_TEXT_LEFT, meio, PAGE_TEXT_RIGHT, meio), fill=MUTED_INK, width=2)
-        _draw_tracked(
-            draw,
-            _bounded(rotulo, "rótulo do bloco", 60).upper(),
-            topo,
-            size=21,
-            fill=ACCENT,
-            left=PAGE_TEXT_LEFT,
-        )
-        _draw_wrapped_fit(
-            draw,
-            texto,
-            (PAGE_TEXT_LEFT, topo + 40, PAGE_TEXT_RIGHT, topo + altura),
-            maximum_size=26,
-            minimum_size=17,
-            fill=INK,
-        )
-        topo += altura + vao
 
 
 def _draw_scene_page_header(
@@ -2307,6 +2272,88 @@ def _draw_scene_page_header(
         )
 
 
+def _draw_scene_notes(
+    draw: ImageDraw.ImageDraw,
+    *,
+    label: str = "",
+    notes: Sequence[str] = (),
+    curiosity_label: str = "",
+    curiosity: str = "",
+) -> None:
+    """Assenta o texto sobre a ilustracao, sem faixa por baixo.
+
+    As notas vao direto no chao chapado, com a estrelinha da referencia; so a
+    curiosidade ganha cartao, porque e o bloco mais longo e o unico que precisa
+    de garantia de contraste. Faixa chapada atras de tudo abria dois cortes
+    horizontais na folha — a pagina deixava de ser uma ilustracao so.
+    """
+
+    topo = SCENE_NOTES_TOP
+    if label:
+        _draw_tracked(
+            draw,
+            _bounded(label, "rótulo", 60).upper(),
+            topo,
+            size=21,
+            fill=ACCENT,
+            left=SCENE_TEXT_LEFT,
+            maximum_width=SCENE_TEXT_RIGHT - SCENE_TEXT_LEFT,
+        )
+        topo += 40
+
+    presentes = [" ".join(nota.split()) for nota in notes if " ".join(nota.split())]
+    for nota in presentes:
+        _draw_star(
+            draw,
+            (SCENE_TEXT_LEFT + SCENE_STAR_RADIUS, topo + 22),
+            SCENE_STAR_RADIUS,
+            HIGHLIGHT,
+        )
+        _draw_wrapped_fit(
+            draw,
+            nota,
+            (SCENE_TEXT_LEFT + 2 * SCENE_STAR_RADIUS + 22, topo, SCENE_TEXT_RIGHT, topo + 96),
+            maximum_size=27,
+            minimum_size=18,
+            fill=INK,
+        )
+        topo += 110
+
+    texto = " ".join(curiosity.split())
+    if not texto:
+        return
+    # O cartao veste o texto: com altura fixa ele sobrava vazio embaixo e
+    # avancava sem precisar sobre a ilustracao.
+    largura = SCENE_TEXT_RIGHT - SCENE_TEXT_LEFT - 72
+    _corpo, _linhas, altura = _wrapped_block(
+        draw, texto, largura, maximum_size=26, minimum_size=17
+    )
+    base = min(SCENE_TEXT_BOTTOM, topo + 82 + altura + 28)
+    draw.rounded_rectangle(
+        (SCENE_TEXT_LEFT, topo, SCENE_TEXT_RIGHT, base),
+        radius=SCENE_CARD_RADIUS,
+        fill=_tint(CARD_TINT, 0.34),
+    )
+    _draw_star(draw, (SCENE_TEXT_LEFT + 36, topo + 44), SCENE_STAR_RADIUS, HIGHLIGHT)
+    _draw_tracked(
+        draw,
+        _bounded(curiosity_label or "Você sabia?", "curiosity_label", 60).upper(),
+        topo + 30,
+        size=21,
+        fill=ACCENT,
+        left=SCENE_TEXT_LEFT + 2 * SCENE_STAR_RADIUS + 44,
+        maximum_width=SCENE_TEXT_RIGHT - SCENE_TEXT_LEFT - 120,
+    )
+    _draw_wrapped_fit(
+        draw,
+        texto,
+        (SCENE_TEXT_LEFT + 36, topo + 82, SCENE_TEXT_RIGHT - 36, base - 24),
+        maximum_size=26,
+        minimum_size=17,
+        fill=INK,
+    )
+
+
 def compose_landmark_page(
     artwork_path: Path,
     output_path: Path,
@@ -2325,9 +2372,9 @@ def compose_landmark_page(
     modelo desenhava o titulo, cada parada saia numa tipografia diferente da
     anterior e das paginas de atividade, que sempre vieram do compositor.
 
-    O tipo assenta em duas faixas chapadas que sangram ate a borda, como na
-    referencia, em vez de cartoes flutuando sobre a ilustracao: a faixa e parte
-    do desenho, a caixa seria um remendo.
+    A arte cobre a folha inteira e o tipo assenta em cima dela. A versao com
+    janela deitada e faixas chapadas cortava a pagina em tres, e a pagina
+    deixava de parecer uma ilustracao so.
     """
 
     nome = _bounded(landmark_name, "landmark_name", 100)
@@ -2336,8 +2383,7 @@ def compose_landmark_page(
         parte for parte in (family_title.strip(), trip_date.strip()) if parte.strip()
     )
 
-    image = Image.new("RGB", PAGE_IMAGE_SIZE, BAND)
-    image.paste(_fitted_scene(artwork_path), (PAGE_SCENE_BOX[0], PAGE_SCENE_BOX[1]))
+    image = _load_artwork(artwork_path)
     draw = ImageDraw.Draw(image)
 
     _draw_scene_page_header(
@@ -2347,22 +2393,18 @@ def compose_landmark_page(
         title=nome,
         arched=_bounded(lugar, "location", 80) if lugar else "",
     )
-
-    _draw_band_blocks(
+    _draw_scene_notes(
         draw,
-        [
-            ("Conheça o lugar", description),
-            (curiosity_label or "Você sabia?", curiosity),
-        ],
+        label="Conheça o lugar" if description.strip() else "",
+        notes=[description],
+        curiosity_label=curiosity_label,
+        curiosity=curiosity,
     )
     _draw_visited_marker(draw)
     return _atomic_save(image, output_path)
 
 
 DESTINATION_OVERLINE = "Descubra este destino"
-DESTINATION_NOTES_TOP = 1050
-DESTINATION_NOTE_HEIGHT = 88
-DESTINATION_TEXT_BOTTOM = 1470
 
 
 def compose_destination_intro_page(
@@ -2378,13 +2420,11 @@ def compose_destination_intro_page(
     """Monta a abertura do destino na mesma grade da pagina do ponto turistico.
 
     As duas paginas abrem o mesmo capitulo e precisam abrir igual: cabeceira em
-    cima, cena deitada no meio, texto na faixa de baixo. Enquanto o modelo
-    escrevia, cada abertura chegava com um desenho de titulo proprio.
+    cima, texto assentado sobre a ilustracao, cenario cobrindo a folha inteira.
     """
 
     destino = _bounded(title, "title", 80)
-    image = Image.new("RGB", PAGE_IMAGE_SIZE, BAND)
-    image.paste(_fitted_scene(artwork_path), (PAGE_SCENE_BOX[0], PAGE_SCENE_BOX[1]))
+    image = _load_artwork(artwork_path)
     draw = ImageDraw.Draw(image)
     _draw_scene_page_header(
         image,
@@ -2393,40 +2433,12 @@ def compose_destination_intro_page(
         title=destino,
         arched=_bounded(subtitle, "subtitle", 80) if subtitle.strip() else "",
     )
-
-    topo = DESTINATION_NOTES_TOP
-    for nota in [" ".join(ponto.split()) for ponto in learning_points if ponto.strip()][:2]:
-        _draw_star(draw, (PAGE_TEXT_LEFT + 16, topo + 22), 16, HIGHLIGHT)
-        _draw_wrapped_fit(
-            draw,
-            nota,
-            (PAGE_TEXT_LEFT + 52, topo, PAGE_TEXT_RIGHT, topo + DESTINATION_NOTE_HEIGHT),
-            maximum_size=26,
-            minimum_size=17,
-            fill=INK,
-        )
-        topo += DESTINATION_NOTE_HEIGHT + 12
-
-    if curiosity.strip():
-        meio = topo + 12
-        draw.line((PAGE_TEXT_LEFT, meio, PAGE_TEXT_RIGHT, meio), fill=MUTED_INK, width=2)
-        rotulo = meio + 24
-        _draw_tracked(
-            draw,
-            _bounded(curiosity_label or "Você sabia?", "curiosity_label", 60).upper(),
-            rotulo,
-            size=21,
-            fill=ACCENT,
-            left=PAGE_TEXT_LEFT,
-        )
-        _draw_wrapped_fit(
-            draw,
-            " ".join(curiosity.split()),
-            (PAGE_TEXT_LEFT, rotulo + 40, PAGE_TEXT_RIGHT, DESTINATION_TEXT_BOTTOM),
-            maximum_size=26,
-            minimum_size=17,
-            fill=INK,
-        )
+    _draw_scene_notes(
+        draw,
+        notes=list(learning_points)[:2],
+        curiosity_label=curiosity_label,
+        curiosity=curiosity,
+    )
     return _atomic_save(image, output_path)
 
 
