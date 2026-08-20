@@ -1843,3 +1843,115 @@ def _bounded(value: str, label: str, maximum: int) -> str:
     if not normalized or len(normalized) > maximum:
         raise ActivityPageCompositionError(f"Conteúdo inválido em {label}.")
     return normalized
+
+
+def _arc_text(
+    image: Image.Image,
+    text: str,
+    *,
+    center: tuple[int, int],
+    radius: int,
+    size: int,
+    fill: str,
+    below: bool = False,
+    tracking: float = 0.14,
+) -> None:
+    """Escreve o texto curvado sobre um arco, glifo a glifo.
+
+    E o gesto que assina a referencia: a linha secundaria correndo em arco
+    sobre e sob o titulo. O PIL nao tem texto em caminho, entao cada letra e
+    desenhada isolada, girada para a tangente e colada na posicao.
+
+    O angulo vem da LARGURA do texto, nunca de um valor fixo: com raio fixo,
+    "Familia Knopp - Setembro de 2026" estourava o arco e saia cortada, o que
+    ja aconteceu no primeiro esboco desta identidade.
+    """
+
+    fonte = _font(size, bold=True)
+    letras = list(text)
+    espaco = size * tracking
+    larguras = [fonte.getlength(letra) + espaco for letra in letras]
+    total = sum(larguras)
+    if total <= 0 or radius <= 0:
+        return
+
+    # Comprimento de arco -> angulo. Texto largo abre mais o arco, e nunca
+    # transborda porque o arco se ajusta a ele.
+    abertura = total / radius
+    if abertura > math.radians(150):
+        return
+
+    cx, cy = center
+    # Para cima o texto corre da esquerda para a direita sobre o topo do
+    # circulo; para baixo, o sentido se inverte para as letras nao ficarem
+    # de cabeca para baixo.
+    sentido = 1 if not below else -1
+    angulo = -abertura / 2
+
+    for letra, largura in zip(letras, larguras, strict=True):
+        meio = angulo + largura / (2 * radius)
+        if letra.strip():
+            caixa = fonte.getbbox(letra)
+            largura_glifo = max(1, int(caixa[2] - caixa[0]))
+            altura_glifo = max(1, int(caixa[3] - caixa[1]))
+            selo = Image.new("RGBA", (largura_glifo + 4, altura_glifo + 4), (0, 0, 0, 0))
+            ImageDraw.Draw(selo).text((-caixa[0] + 2, -caixa[1] + 2), letra, font=fonte, fill=fill)
+            girado = selo.rotate(-math.degrees(meio) * sentido, resample=Image.Resampling.BICUBIC, expand=True)
+            x = cx + radius * math.sin(meio)
+            y = cy - sentido * radius * math.cos(meio)
+            image.paste(girado, (round(x - girado.width / 2), round(y - girado.height / 2)), girado)
+        angulo += largura / radius
+
+
+def compose_cover_page(
+    artwork_path: Path,
+    output_path: Path,
+    *,
+    family_title: str,
+    trip_date: str,
+) -> Path:
+    """Imprime o brasao da capa sobre a arte, no lugar de deixar a IA escrever.
+
+    A tipografia desenhada pelo modelo saia numa familia diferente a cada
+    geracao, entao capa e paginas de atividade falavam com vozes distintas no
+    mesmo livro. Aqui ela vem da mesma fonte que o resto do caderno.
+
+    O arco de cima e o de baixo sao circunferencias DISTINTAS, cada uma com o
+    proprio centro: o apice de uma e o fundo da outra precisam cair onde a
+    linha deve ser lida. Derivar os dois de um centro so amontoava as tres
+    linhas no mesmo ponto.
+    """
+
+    image = _load_artwork(artwork_path)
+    titulo = _bounded(family_title, "family_title", 60)
+    data = _bounded(trip_date, "trip_date", 60)
+
+    centro_x = PAGE_IMAGE_SIZE[0] // 2
+    LINHA_SUPERIOR = 604   # onde o arco de cima e lido
+    TOPO_DO_TITULO = 648
+    LINHA_INFERIOR = 812   # onde o arco de baixo e lido
+    RAIO_SUPERIOR = 430
+    RAIO_INFERIOR = 400
+
+    # Apice do circulo em LINHA_SUPERIOR: centro fica um raio abaixo.
+    _arc_text(
+        image,
+        "GUIA DE MEMÓRIAS",
+        center=(centro_x, LINHA_SUPERIOR + RAIO_SUPERIOR),
+        radius=RAIO_SUPERIOR,
+        size=30,
+        fill=INK,
+    )
+    draw = ImageDraw.Draw(image)
+    _draw_centered_fit(draw, titulo, TOPO_DO_TITULO, 96, 44, 880, bold=True)
+    # Fundo do circulo em LINHA_INFERIOR: centro fica um raio acima.
+    _arc_text(
+        image,
+        data.upper(),
+        center=(centro_x, LINHA_INFERIOR - RAIO_INFERIOR),
+        radius=RAIO_INFERIOR,
+        size=26,
+        fill=INK,
+        below=True,
+    )
+    return _atomic_save(image, output_path)

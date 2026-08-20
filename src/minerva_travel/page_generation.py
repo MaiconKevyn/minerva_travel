@@ -27,6 +27,7 @@ from minerva_travel.activity_page_compositor import (
     compose_anagram_page,
     compose_best_memory_page,
     compose_coloring_page,
+    compose_cover_page,
     compose_crossword_page,
     compose_cryptogram_page,
     compose_detail_hunt_page,
@@ -476,7 +477,22 @@ class OpenAIGuidePageGenerator:
         )
         references = [path for path in (family_photo, reference_page) if path is not None]
         response = self._generate_activity_artwork(prompt, references)
-        return _persist_page_image(response, output_path)
+        artwork = _provider_artwork_path(output_path)
+        try:
+            _persist_page_image(response, artwork)
+            # O brasao vem do codigo, na fonte do caderno. Deixar o modelo
+            # escrever fazia a capa falar numa familia tipografica diferente
+            # das paginas de atividade dentro do mesmo livro.
+            return compose_cover_page(
+                artwork,
+                output_path,
+                family_title=family_title,
+                trip_date=trip_date,
+            )
+        except (ActivityPageCompositionError, OSError, ValueError) as error:
+            raise PageGenerationError("Não foi possível finalizar a capa.") from error
+        finally:
+            artwork.unlink(missing_ok=True)
 
     def generate_summary_page(
         self,
@@ -1779,15 +1795,14 @@ Create a complete vertical cover for a premium children's illustrated family tra
 Add subtle scenery inspired only by these confirmed places: {landmarks}.
 Do not invent a specific real family or portrait-like faces; no photographic likeness of anyone.
 
-TEXT CONTRACT — render exactly these two lines, verbatim, once each:
-"{family_title}"
-"{trip_date}"
+TEXT-FREE CONTRACT — do not render any letter, word, number, title, date, monogram, label or
+signature anywhere on this page. Trusted code prints the family name and the trip date on top
+afterwards, in the book's own typeface.
 
-Typography: large, elegant, highly legible Portuguese title; clean spacing; strong contrast;
-correct accents; no broken or invented letters. The title belongs near the upper third and the
-date near the lower third.
+Leave the middle of the page calm and uncluttered so that lockup has room to sit: no motif may
+cross the central band between 38 and 62 percent of the page height.
 
-Do not include any other readable text. No logos, watermark, signature, mockup border or UI.
+No logos, watermark, signature, mockup border or UI.
 Output the finished flat cover artwork, not a book photographed in a scene.
 {revision}
 """.strip()

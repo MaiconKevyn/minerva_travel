@@ -185,9 +185,12 @@ def test_the_cover_comes_from_the_written_brief_when_there_is_no_photo():
     assert "Um balão de ar quente sobre os campos" in prompt
     assert "original family photo" not in prompt
     assert "Do not invent a specific real family" in prompt
-    # O contrato de texto impresso continua igual.
-    assert '"Família Lima"' in prompt
-    assert '"Julho de 2026"' in prompt
+    # O texto saiu do prompt: quem imprime o nome e a data e o compositor, na
+    # fonte do caderno. Deixar o modelo escrever fazia a capa falar numa
+    # familia tipografica diferente das paginas de atividade.
+    assert "TEXT-FREE CONTRACT" in prompt
+    assert '"Família Lima"' not in prompt
+    assert '"Julho de 2026"' not in prompt
 
 
 def test_without_a_brief_the_cover_falls_back_to_the_places_and_no_people():
