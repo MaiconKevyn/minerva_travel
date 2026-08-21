@@ -48,7 +48,7 @@ const DraftStatusNotice = ({
   const isError = status === 'error';
   return (
     <div
-      className={`mt-3 flex items-start gap-2 rounded-2xl border px-4 py-3 font-ui text-sm font-bold ${config.className}`}
+      className={`mt-3 flex items-start gap-2 rounded-lg border px-4 py-3 font-ui text-sm font-semibold ${config.className}`}
       role={isError ? 'alert' : 'status'}
       aria-live={isError ? 'assertive' : 'polite'}
     >

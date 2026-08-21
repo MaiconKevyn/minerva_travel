@@ -356,7 +356,7 @@ const SampleGuideReader = () => {
         variant="outline"
         onClick={goPrevious}
         disabled={activePage === 0}
-        className="rounded-full border-2 px-5"
+        className="rounded-lg border px-5"
       >
         <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
         Anterior
@@ -368,7 +368,7 @@ const SampleGuideReader = () => {
         type="button"
         onClick={goNext}
         disabled={!canGoNext}
-        className="rounded-full px-5"
+        className="rounded-lg px-5"
       >
         Próxima
         <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
@@ -379,7 +379,7 @@ const SampleGuideReader = () => {
   return (
     <section
       id="guia-exemplo"
-      className="travel-page storybook-paper scroll-mt-20 border-t border-secondary/10 py-20 sm:py-24"
+      className="travel-page editorial-section scroll-mt-20 py-16 sm:py-20"
       aria-labelledby="guia-exemplo-title"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -403,7 +403,7 @@ const SampleGuideReader = () => {
         </motion.div>
 
         <div
-          className="travel-card travel-card-blue mt-10 p-4 sm:p-6 lg:p-8"
+          className="clean-surface mt-10 p-4 sm:p-6 lg:p-8"
           {...(readerOpen
             ? {
                 tabIndex: 0,
@@ -414,12 +414,12 @@ const SampleGuideReader = () => {
         >
           <div className={`flex items-center justify-between gap-3 ${readerOpen ? 'mb-5' : 'mb-6'}`}>
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 -rotate-2 items-center justify-center rounded-[0.7rem_1rem_0.8rem_1.1rem] bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <BookOpen className="h-5 w-5" aria-hidden="true" />
               </span>
               <div>
                 <p className="font-serif text-lg font-bold text-foreground">Família Knopp em Paris</p>
-                <p className="font-ui text-xs font-bold uppercase tracking-wider text-muted-foreground">Guia demonstrativo</p>
+                <p className="font-ui text-xs font-semibold text-muted-foreground">19 páginas · guia demonstrativo</p>
               </div>
             </div>
 
@@ -429,14 +429,14 @@ const SampleGuideReader = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="font-ui min-h-11 rounded-full border-2 font-bold"
+                    className="font-ui min-h-11 rounded-lg border font-semibold"
                     aria-label="Ampliar o guia"
                   >
                     <Expand className="h-4 w-4 sm:mr-2" aria-hidden="true" />
                     <span className="hidden sm:inline">Ampliar</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="h-[94vh] max-w-[min(96vw,1180px)] overflow-y-auto rounded-[1.75rem] border-2 p-4 sm:p-6">
+                <DialogContent className="h-[94vh] max-w-[min(96vw,1180px)] overflow-y-auto rounded-xl border p-4 sm:p-6">
                   <DialogHeader className="pr-10 text-left">
                     <DialogTitle className="font-serif text-2xl">Guia demonstrativo completo</DialogTitle>
                     <DialogDescription>{pageRangeLabel(visibleIndexes)}</DialogDescription>
@@ -466,7 +466,7 @@ const SampleGuideReader = () => {
                       key={page.image}
                       type="button"
                       onClick={() => openReaderAt(pageIndex)}
-                      className="group w-36 shrink-0 snap-start rounded-xl border-2 border-secondary/15 bg-background/65 p-2 text-left transition hover:-translate-y-1 hover:border-primary/45 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/35 sm:w-auto"
+                      className="group w-36 shrink-0 snap-start rounded-lg border border-secondary/15 bg-background/65 p-2 text-left transition-colors hover:border-primary/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto"
                       aria-label={`Abrir o guia na página ${page.number}: ${page.title}`}
                     >
                       <img
@@ -478,7 +478,7 @@ const SampleGuideReader = () => {
                         decoding="async"
                         className="aspect-[2/3] w-full rounded-lg object-cover shadow-sm"
                       />
-                      <span className="font-ui mt-2 block text-xs font-bold uppercase tracking-wide text-primary">
+                      <span className="font-ui mt-2 block text-xs font-semibold text-primary">
                         Página {page.number}
                       </span>
                       <span className="mt-1 block text-sm font-bold leading-tight text-foreground group-hover:text-secondary">
@@ -494,7 +494,7 @@ const SampleGuideReader = () => {
                 onClick={() => openReaderAt(0)}
                 aria-expanded="false"
                 aria-controls="sample-guide-full-reader"
-                className="font-ui mx-auto mt-5 flex min-h-11 rounded-full border-2 px-6 font-bold"
+                className="font-ui mx-auto mt-5 flex min-h-11 rounded-lg border px-6 font-semibold"
               >
                 <BookOpen className="mr-2 h-4 w-4" aria-hidden="true" />
                 Abrir as 19 páginas
@@ -560,7 +560,7 @@ const SampleGuideReader = () => {
                 disabled={Boolean(turn)}
                 aria-expanded="true"
                 aria-controls="sample-guide-full-reader"
-                className="font-ui mx-auto mt-6 flex min-h-11 rounded-full px-6 font-bold"
+                className="font-ui mx-auto mt-6 flex min-h-11 rounded-lg px-6 font-semibold"
               >
                 Recolher guia
                 <ChevronUp className="ml-2 h-4 w-4" aria-hidden="true" />

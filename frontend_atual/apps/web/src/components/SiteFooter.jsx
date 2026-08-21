@@ -16,20 +16,20 @@ const SiteFooter = () => (
           <GuideStar className="h-6 w-6" />
           <span className="flex flex-col leading-tight">
             <span className="font-serif text-xl font-bold text-secondary">Guia de Memórias</span>
-            <span className="font-ui text-[0.62rem] font-bold uppercase tracking-[0.18em] text-primary">
+            <span className="font-ui text-xs font-semibold text-primary">
               por Minerva Travel
             </span>
           </span>
         </Link>
 
-        <nav aria-label="Informações legais" className="font-ui flex flex-wrap justify-center gap-x-7 gap-y-3 text-sm font-bold">
-          <Link className="travel-paper-link text-muted-foreground transition-colors hover:text-foreground" to="/privacy">
+        <nav aria-label="Informações legais" className="font-ui flex flex-wrap justify-center gap-x-7 gap-y-3 text-sm font-semibold">
+          <Link className="text-muted-foreground transition-colors hover:text-foreground" to="/privacy">
             Privacidade
           </Link>
-          <Link className="travel-paper-link text-muted-foreground transition-colors hover:text-foreground" to="/terms">
+          <Link className="text-muted-foreground transition-colors hover:text-foreground" to="/terms">
             Termos de uso
           </Link>
-          <Link className="travel-paper-link text-muted-foreground transition-colors hover:text-foreground" to="/pricing">
+          <Link className="text-muted-foreground transition-colors hover:text-foreground" to="/pricing">
             Preço
           </Link>
         </nav>

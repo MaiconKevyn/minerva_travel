@@ -24,7 +24,7 @@ const PrivacyPage = () => (
       <Header />
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 space-y-10 px-5 py-12 sm:px-8">
         <div className="space-y-4">
-          <p className="text-sm font-bold uppercase tracking-widest text-primary">
+          <p className="text-sm font-semibold text-primary">
             Versão 2026-07-10 · piloto controlado
           </p>
           <h1 className="text-4xl font-serif font-bold sm:text-5xl">
@@ -86,7 +86,7 @@ const PrivacyPage = () => (
           </p>
         </Section>
 
-        <p className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
           Consulte também os <Link className="font-bold text-primary underline" to="/terms">Termos de Uso</Link>.
           Esta política deverá passar por revisão jurídica antes de cobrança ou tráfego público.
         </p>

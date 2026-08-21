@@ -361,7 +361,7 @@ const Step3Destination = () => {
                 role="radio"
                 aria-checked={selected}
                 onClick={() => changeItineraryMode(option.id)}
-                className={`rounded-2xl border p-4 text-left transition ${
+                className={`rounded-xl border p-4 text-left transition ${
                   selected
                     ? 'border-secondary bg-secondary/10 text-foreground shadow-sm'
                     : 'border-border/70 bg-background text-muted-foreground hover:border-secondary/50'
@@ -378,7 +378,7 @@ const Step3Destination = () => {
         </div>
 
         {itineraryMode === 'freeform' && (
-          <div className="rounded-[2rem] border border-border/70 bg-background p-5">
+          <div className="rounded-xl border border-border/70 bg-background p-5">
             <div className="space-y-2">
               <Label htmlFor="freeform-itinerary" className="font-bold">
                 Conte seu roteiro do seu jeito
@@ -411,7 +411,7 @@ const Step3Destination = () => {
               )}
             </div>
             {freeformResult?.followUpQuestions?.length > 0 && (
-              <div className="mt-4 rounded-2xl bg-muted/60 p-4">
+              <div className="mt-4 rounded-xl bg-muted/60 p-4">
                 <p className="text-sm font-bold text-foreground">Perguntas para completar:</p>
                 <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                   {freeformResult.followUpQuestions.map((question, index) => (
@@ -426,7 +426,7 @@ const Step3Destination = () => {
         )}
 
         {itineraryMode === 'suggested' && (
-          <div className="rounded-[2rem] border border-border/70 bg-background p-5">
+          <div className="rounded-xl border border-border/70 bg-background p-5">
             <div className="space-y-2">
               <Label htmlFor="route-suggestion" className="font-bold">
                 O que vocês imaginam para essa viagem?
@@ -467,7 +467,7 @@ const Step3Destination = () => {
             {suggestedRoutes.length > 0 && (
               <div className="mt-5 space-y-3">
                 {suggestedRoutes.map((route) => (
-                  <div key={route.id} className="rounded-2xl border border-border/70 bg-card p-4">
+                  <div key={route.id} className="rounded-xl border border-border/70 bg-card p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="font-bold text-foreground">{route.title}</p>
@@ -491,11 +491,11 @@ const Step3Destination = () => {
         {localDestinations.map((destination, index) => (
           <div
             key={destination.id}
-            className="rounded-[2rem] border-2 border-border/70 bg-card p-5 shadow-sm dark:bg-slate-800/50 sm:p-6"
+            className="rounded-xl border border-border/70 bg-card p-5 shadow-sm dark:bg-slate-800/50 sm:p-6"
           >
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                <p className="text-sm font-semibold text-muted-foreground">
                   Destino {index + 1}
                 </p>
                 <h3 className="text-xl font-serif font-bold text-foreground">
@@ -604,7 +604,7 @@ const Step3Destination = () => {
             </div>
 
             {itineraryMode === 'known' && (
-              <div className="mt-6 rounded-2xl border border-border/60 bg-background/60 p-4 sm:p-5">
+              <div className="mt-6 rounded-xl border border-border/60 bg-background/60 p-4 sm:p-5">
                 <Label className="mb-3 flex items-center gap-2 font-bold">
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Landmark className="h-4 w-4" />
@@ -681,7 +681,7 @@ const Step3Destination = () => {
             id="destination-error"
             role="alert"
             tabIndex={-1}
-            className="rounded-2xl bg-destructive/10 px-4 py-3 text-center text-sm font-bold text-destructive"
+            className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-sm font-bold text-destructive"
           >
             {error}
           </p>

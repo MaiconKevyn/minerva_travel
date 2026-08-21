@@ -310,7 +310,7 @@ const GuideAssembly = ({ session: initialSession }) => {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-8 text-center">
-        <p className="text-sm font-black uppercase tracking-[0.18em] text-primary">Última etapa</p>
+        <p className="text-sm font-semibold text-primary">Última etapa</p>
         <h1 className="mt-2 font-serif text-4xl font-bold text-foreground sm:text-5xl">
           Aprove a capa do seu guia
         </h1>
@@ -321,10 +321,10 @@ const GuideAssembly = ({ session: initialSession }) => {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
-        <section className="overflow-hidden rounded-[2rem] border-2 border-primary/15 bg-card shadow-sm">
+        <section className="overflow-hidden rounded-xl border border-primary/15 bg-card shadow-sm">
           <div className="flex min-h-[560px] items-center justify-center bg-muted/35 p-4 sm:p-8">
             {coverUrl ? (
-              <img src={coverUrl} alt="Preview da capa do guia" className="max-h-[720px] w-auto rounded-xl object-contain shadow-xl" />
+              <img src={coverUrl} alt="Preview da capa do guia" className="max-h-[720px] w-auto rounded-xl object-contain shadow-sm" />
             ) : coverBusy === 'generate' ? (
               <div className="max-w-sm text-center" role="status" aria-live="polite">
                 <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" aria-hidden="true" />
@@ -343,7 +343,7 @@ const GuideAssembly = ({ session: initialSession }) => {
 
         <aside className="space-y-5">
           {paymentRequired && payment?.status === 'paid' && (
-            <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-950">
+            <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-950">
               <div className="flex items-center gap-3">
                 <CircleCheck className="h-6 w-6 shrink-0 text-emerald-700" aria-hidden="true" />
                 <div>
@@ -357,7 +357,7 @@ const GuideAssembly = ({ session: initialSession }) => {
           )}
 
           {paymentRequired && payment?.status !== 'paid' && (
-            <div className="rounded-[2rem] border-2 border-primary/25 bg-primary/5 p-6 shadow-sm">
+            <div className="rounded-xl border border-primary/25 bg-primary/5 p-6 shadow-sm">
               <CreditCard className="h-10 w-10 text-primary" aria-hidden="true" />
               <h2 className="mt-4 font-serif text-2xl font-bold text-foreground">
                 {payment?.status === 'pending' ? 'Aguardando confirmação' : 'Pagamento necessário'}
@@ -397,7 +397,7 @@ const GuideAssembly = ({ session: initialSession }) => {
           )}
 
           {!guideProduct && (
-            <div className="rounded-2xl border border-border bg-card p-4" role="status">
+            <div className="rounded-xl border border-border bg-card p-4" role="status">
               <div className="flex items-center gap-3">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
                 <p className="text-sm font-bold text-foreground">Conferindo a liberação do guia…</p>
@@ -407,7 +407,7 @@ const GuideAssembly = ({ session: initialSession }) => {
           )}
 
           {!cover?.approved_at && (
-            <div className="rounded-[2rem] border-2 border-border bg-card p-6 shadow-sm">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
               <h2 className="font-serif text-2xl font-bold text-foreground">{selectedAttempt ? 'Quer mudar alguma coisa?' : 'Gerar a capa'}</h2>
               <p className="mt-2 text-sm font-medium text-muted-foreground">
                 {selectedAttempt
@@ -419,7 +419,7 @@ const GuideAssembly = ({ session: initialSession }) => {
                   value={revisionInstruction}
                   onChange={(event) => setRevisionInstruction(event.target.value.slice(0, MAX_REVISION_LENGTH))}
                   placeholder="Ex.: use um estilo de livro infantil, deixe o fundo mais claro e mantenha as mesmas pessoas."
-                  className="mt-4 min-h-28 resize-y rounded-2xl"
+                  className="mt-4 min-h-28 resize-y rounded-xl"
                   disabled={Boolean(coverBusy)}
                 />
               )}
@@ -452,14 +452,14 @@ const GuideAssembly = ({ session: initialSession }) => {
           )}
 
           {cover?.approved_at && !jobSucceeded && (
-            <div className="rounded-[2rem] border-2 border-secondary/25 bg-secondary/5 p-6 shadow-sm">
+            <div className="rounded-xl border border-secondary/25 bg-secondary/5 p-6 shadow-sm">
               <CircleCheck className="h-10 w-10 text-secondary" aria-hidden="true" />
               <h2 className="mt-4 font-serif text-2xl font-bold text-foreground">Capa aprovada</h2>
               <p className="mt-2 text-sm font-medium text-muted-foreground">
                 Com um clique, criaremos as páginas restantes na ordem certa, montaremos o PDF e enviaremos o link para o e-mail da sua conta.
               </p>
               {jobActive ? (
-                <div className="mt-5 rounded-2xl bg-card p-4" role="status" aria-live="polite">
+                <div className="mt-5 rounded-xl bg-card p-4" role="status" aria-live="polite">
                   <div className="flex items-center gap-3">
                     <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
                     <div>
@@ -480,7 +480,7 @@ const GuideAssembly = ({ session: initialSession }) => {
                   )}
                 </Button>
               )}
-              <div className="mt-4 flex items-start gap-3 rounded-2xl border border-secondary/20 bg-card p-4">
+              <div className="mt-4 flex items-start gap-3 rounded-xl border border-secondary/20 bg-card p-4">
                 <Mail className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
                 <p className="text-sm font-medium text-muted-foreground">Não é preciso aguardar no site. O processamento continua mesmo que você saia.</p>
               </div>
@@ -490,7 +490,7 @@ const GuideAssembly = ({ session: initialSession }) => {
           )}
 
           {jobSucceeded && (
-            <div className="rounded-[2rem] border-2 border-emerald-300 bg-emerald-50 p-6 shadow-sm">
+            <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-6 shadow-sm">
               <CircleCheck className="h-11 w-11 text-emerald-700" aria-hidden="true" />
               <h2 className="mt-4 font-serif text-2xl font-bold text-emerald-950">Guia pronto e enviado</h2>
               <p className="mt-2 text-sm font-medium text-emerald-900">Enviamos por e-mail o link do PDF com {job.result?.page_count || session.pages.length} páginas.</p>

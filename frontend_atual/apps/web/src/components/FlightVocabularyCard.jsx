@@ -24,7 +24,7 @@ const FlightVocabularyCard = ({ landmarks, enabled, onChange }) => {
 
   return (
     <section
-      className="rounded-[2rem] border-2 border-primary/25 bg-primary/5 p-5 sm:p-6"
+      className="rounded-xl border border-primary/25 bg-primary/5 p-5 sm:p-6"
       aria-labelledby="flight-vocabulary-title"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">

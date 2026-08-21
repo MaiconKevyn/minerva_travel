@@ -68,15 +68,15 @@ const QUESTIONS = [
 ];
 
 const HomeFaq = () => (
-  <section className="travel-page storybook-sky border-t border-secondary/10 py-20 sm:py-24" aria-labelledby="faq-title">
+  <section className="travel-page editorial-section py-16 sm:py-20" aria-labelledby="faq-title">
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
       <GuideLockup id="faq-title" overline="Antes de começar" title="Perguntas que todo pai faz" />
 
-      <div className="mt-10 space-y-3">
+      <div className="mt-10 overflow-hidden rounded-xl border border-secondary/15 bg-[hsl(var(--paper))]">
         {QUESTIONS.map((item) => (
           <details
             key={item.question}
-            className="group travel-card overflow-hidden px-6 py-1 transition-colors open:border-primary/40"
+            className="group border-b border-secondary/15 px-5 py-1 transition-colors last:border-b-0 open:bg-[hsl(var(--mint)/0.45)] sm:px-6"
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-serif text-lg font-bold text-foreground marker:content-none">
               {item.question}

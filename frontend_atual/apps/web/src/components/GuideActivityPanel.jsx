@@ -131,7 +131,7 @@ const GuideActivityPanel = ({
           <Button
             type="button"
             variant="outline"
-            className="mb-5 w-full rounded-2xl border-primary/30 py-6 font-bold text-primary"
+            className="mb-5 w-full rounded-xl border-primary/30 py-6 font-bold text-primary"
           >
             <ImagePlus className="mr-2 h-5 w-5" aria-hidden="true" />
             Adicionar atividades
@@ -149,7 +149,7 @@ const GuideActivityPanel = ({
           </SheetHeader>
 
           <div className="space-y-6 p-5 sm:p-6">
-            <div className="grid grid-cols-2 rounded-2xl bg-muted p-1" aria-label="Seções do painel">
+            <div className="grid grid-cols-2 rounded-xl bg-muted p-1" aria-label="Seções do painel">
               <button
                 type="button"
                 onClick={() => setMode('catalog')}
@@ -173,7 +173,7 @@ const GuideActivityPanel = ({
             </div>
 
             {errorMessage && (
-              <p className="rounded-2xl bg-destructive/10 p-4 text-sm font-bold text-destructive" role="alert">
+              <p className="rounded-xl bg-destructive/10 p-4 text-sm font-bold text-destructive" role="alert">
                 {errorMessage}
               </p>
             )}
@@ -220,7 +220,7 @@ const GuideActivityPanel = ({
                       || Boolean(busyAction)
                     );
                     return (
-                      <article key={activity.type} className="overflow-hidden rounded-3xl border bg-card shadow-sm">
+                      <article key={activity.type} className="overflow-hidden rounded-xl border bg-card shadow-sm">
                         <button
                           type="button"
                           onClick={() => setPreviewActivity(activity)}
@@ -232,7 +232,7 @@ const GuideActivityPanel = ({
                             alt={`Página real de exemplo: ${activity.label}`}
                             className="h-full w-full object-cover object-top transition duration-300 group-hover:scale-[1.02]"
                           />
-                          <span className="absolute left-3 top-3 rounded-full bg-foreground/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-background">
+                          <span className="absolute left-3 top-3 rounded-full bg-foreground/90 px-3 py-1 text-[11px] font-semibold text-background">
                             Exemplo real
                           </span>
                           <span className="absolute bottom-3 right-3 inline-flex items-center rounded-full bg-background/95 px-3 py-2 text-xs font-bold text-foreground shadow">
@@ -281,7 +281,7 @@ const GuideActivityPanel = ({
                     );
                   })}
                 </div>
-                <p className="rounded-2xl bg-primary/5 p-4 text-sm font-medium text-muted-foreground">
+                <p className="rounded-xl bg-primary/5 p-4 text-sm font-medium text-muted-foreground">
                   Adicionar cria apenas o bloco da página. A imagem só será produzida quando você
                   abrir essa página e clicar em “Gerar página”.
                 </p>
@@ -325,7 +325,7 @@ const GuideActivityPanel = ({
                           if (isDropAnchor) event.preventDefault();
                         }}
                         onDrop={() => handleDropAfter(page)}
-                        className={`rounded-2xl border p-3 transition ${
+                        className={`rounded-xl border p-3 transition ${
                           isDropAnchor ? 'border-primary/50 hover:bg-primary/10' : 'border-border/70'
                         }`}
                       >
@@ -419,7 +419,7 @@ const GuideActivityPanel = ({
                 </ol>
 
                 {activities.length === 0 && (
-                  <div className="rounded-3xl border-2 border-dashed p-8 text-center">
+                  <div className="rounded-xl border border-dashed p-8 text-center">
                     <Puzzle className="mx-auto h-10 w-10 text-muted-foreground" />
                     <p className="mt-3 font-bold text-foreground">Nenhuma atividade opcional</p>
                     <Button type="button" variant="link" onClick={() => setMode('catalog')}>
@@ -445,7 +445,7 @@ const GuideActivityPanel = ({
             <img
               src={previewActivity.preview}
               alt={`Exemplo completo da atividade ${previewActivity.label}`}
-              className="mx-auto max-h-[76vh] w-auto rounded-2xl border bg-white object-contain shadow-sm"
+              className="mx-auto max-h-[76vh] w-auto rounded-xl border bg-white object-contain shadow-sm"
             />
           )}
         </DialogContent>

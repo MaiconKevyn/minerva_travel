@@ -5,12 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Check, Heart, ShieldCheck, Sparkles, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
-import {
-  CompassRose,
-  LeafSprig,
-  PassportStamp,
-  RouteDoodle,
-} from '@/components/DecorativeElements.jsx';
+import { CompassRose, LeafSprig, PassportStamp } from '@/components/DecorativeElements.jsx';
 import SiteFooter from '@/components/SiteFooter.jsx';
 import { formatPrice, getGuideProduct } from '@/utils/minerva-api.js';
 
@@ -84,7 +79,7 @@ const PricingPage = () => {
                   {checkoutEnabled ? 'Compra única' : 'Piloto controlado'}
                 </span>
                 <h1 className="mt-5 text-4xl font-serif font-bold leading-[1] tracking-[-0.03em] text-secondary md:text-6xl">
-                  Um livro inteiro para esta viagem
+                  Um livro completo. Uma única compra.
                 </h1>
                 <p className="editorial-copy mx-auto mt-5 max-w-2xl text-foreground/70">
                   Não é assinatura nem pacote de créditos. Você paga uma vez e recebe o guia de
@@ -116,28 +111,26 @@ const PricingPage = () => {
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.58, delay: 0.12 }}
-                  className="travel-card travel-card-pink overflow-hidden p-7 sm:p-9"
+                  className="clean-surface overflow-hidden border-secondary/25 p-7 sm:p-9"
                   aria-labelledby="produto-guia-title"
                 >
-                  <RouteDoodle className="pointer-events-none absolute -right-5 top-1 h-20 w-44 rotate-6 text-secondary/20" />
-
                   <div className="relative z-10 flex flex-col gap-7">
                     <div className="flex items-start justify-between gap-5">
                       <div>
-                        <p className="font-ui text-xs font-extrabold uppercase tracking-[0.2em] text-primary">
-                          Bilhete da aventura
+                        <p className="font-ui text-xs font-semibold text-primary">
+                          PDF A4 · compra única
                         </p>
                         <h2 id="produto-guia-title" className="mt-2 text-3xl font-serif font-bold text-secondary sm:text-4xl">
                           Guia de Memórias personalizado
                         </h2>
                       </div>
-                      <span className="flex h-12 w-12 shrink-0 rotate-3 items-center justify-center rounded-[0.7rem_1rem_0.75rem_1.15rem] bg-primary/10 text-primary">
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                         <Sparkles className="h-6 w-6" aria-hidden="true" />
                       </span>
                     </div>
 
-                    <div className="border-y-2 border-dashed border-secondary/20 py-6">
-                      <p className="font-ui text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Valor do guia completo</p>
+                    <div className="border-y border-secondary/15 py-6">
+                      <p className="font-ui text-xs font-semibold text-muted-foreground">Valor do guia completo</p>
                       <p className="mt-1 text-4xl font-serif font-bold text-secondary">
                         {checkoutEnabled ? price : 'Sem cobrança ativa'}
                       </p>
@@ -171,7 +164,7 @@ const PricingPage = () => {
             </div>
           </section>
 
-          <section className="travel-page storybook-paper py-16 sm:py-20" aria-labelledby="compra-segura-title">
+          <section className="travel-page editorial-section py-16 sm:py-20" aria-labelledby="compra-segura-title">
             <div className="guide-shell">
               <div className="mx-auto max-w-2xl text-center">
                 <span className="travel-label">Antes de embarcar</span>
@@ -182,8 +175,8 @@ const PricingPage = () => {
 
               <div className="mt-10 grid gap-5 md:grid-cols-3">
                 {TRUST_NOTES.map(({ icon: Icon, title, description }, index) => (
-                  <article key={title} className={`travel-card p-6 ${index === 1 ? 'travel-card-blue md:-translate-y-3' : 'travel-card-pink'}`}>
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary/10 text-secondary">
+                  <article key={title} className={`clean-surface p-6 ${index === 1 ? 'border-secondary/30' : ''}`}>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
                       <Icon className="h-5 w-5" aria-hidden="true" />
                     </div>
                     <h3 className="mt-4 text-xl font-serif font-bold text-secondary">{title}</h3>

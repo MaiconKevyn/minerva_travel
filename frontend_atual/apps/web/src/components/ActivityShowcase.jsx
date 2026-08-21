@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp, Clock3 } from 'lucide-react';
+import { Clock3, MapPin, NotebookPen, Palette, Puzzle } from 'lucide-react';
 import { GuideLockup } from '@/components/GuideLockup.jsx';
 import { activityOptionsByCategory } from '@/utils/landmark-activities.js';
 
@@ -12,22 +12,21 @@ import { activityOptionsByCategory } from '@/utils/landmark-activities.js';
  * vitrine não tem como divergir do que a família vai encontrar.
  */
 const CATEGORIES = activityOptionsByCategory();
+const CATEGORY_ICONS = {
+  onsite: MapPin,
+  puzzle: Puzzle,
+  art: Palette,
+  writing: NotebookPen,
+};
 
 const ActivityShowcase = () => {
-  const [expandedCategories, setExpandedCategories] = useState(() => new Set());
-
-  const toggleCategory = (categoryId) => {
-    setExpandedCategories((current) => {
-      const next = new Set(current);
-      if (next.has(categoryId)) next.delete(categoryId);
-      else next.add(categoryId);
-      return next;
-    });
-  };
+  const [activeCategoryId, setActiveCategoryId] = useState(CATEGORIES[0]?.id);
+  const activeCategory = CATEGORIES.find((category) => category.id === activeCategoryId)
+    || CATEGORIES[0];
 
   return (
     <section
-      className="travel-page storybook-paper relative overflow-hidden border-t border-secondary/10 py-16 sm:py-24"
+      className="travel-page editorial-section relative overflow-hidden py-16 sm:py-20"
       aria-labelledby="atividades-title"
     >
       <div className="guide-shell">
@@ -44,74 +43,84 @@ const ActivityShowcase = () => {
         </p>
       </div>
 
-        <div className="mt-10 grid gap-6 md:grid-cols-2 sm:mt-14">
-          {CATEGORIES.map((category, index) => {
-            const expanded = expandedCategories.has(category.id);
-            const visibleOptions = expanded ? category.options : category.options.slice(0, 2);
-            const hiddenCount = category.options.length - visibleOptions.length;
+        <div
+          className="font-ui mx-auto mt-10 flex max-w-4xl gap-2 overflow-x-auto rounded-xl bg-muted p-1.5 sm:mt-12"
+          role="tablist"
+          aria-label="Filtrar atividades por momento"
+        >
+          {CATEGORIES.map((category) => {
+            const Icon = CATEGORY_ICONS[category.id] || Puzzle;
+            const selected = category.id === activeCategory.id;
             return (
-          <motion.section
-            key={category.id}
-            initial={{ opacity: 0, y: 18 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{ duration: 0.5, delay: (index % 2) * 0.08 }}
-            className={`travel-card p-6 sm:p-7 ${index % 2 === 0 ? 'travel-card-pink' : 'travel-card-blue'}`}
-            aria-labelledby={`categoria-${category.id}`}
-          >
-            <h3
-              id={`categoria-${category.id}`}
-              className="font-serif text-xl font-bold text-foreground"
-            >
-              {category.label}
-            </h3>
-            <p className="font-ui mt-1 text-sm font-medium text-muted-foreground">{category.hint}</p>
-
-                <ul id={`atividades-${category.id}`} className="mt-5 space-y-2.5">
-                  {visibleOptions.map((activity) => (
-                <li
-                  key={activity.type}
-                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-dashed border-secondary/20 pb-2.5 last:border-0 last:pb-0"
-                >
-                  <span className="font-bold text-foreground">{activity.label}</span>
-                  <span className="font-ui flex items-center gap-3 text-sm font-medium text-muted-foreground">
-                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-bold text-foreground">
-                      {activity.ageLabel}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                      {activity.durationLabel}
-                    </span>
-                  </span>
-                </li>
-                  ))}
-                </ul>
-
-                {category.options.length > 2 ? (
-                  <button
-                    type="button"
-                    onClick={() => toggleCategory(category.id)}
-                    aria-expanded={expanded}
-                    aria-controls={`atividades-${category.id}`}
-                    className="font-ui mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl border-2 border-dashed border-secondary/25 px-4 text-sm font-bold text-secondary transition hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/35"
-                  >
-                    {expanded ? (
-                      <>
-                        Mostrar menos
-                        <ChevronUp className="ml-2 h-4 w-4" aria-hidden="true" />
-                      </>
-                    ) : (
-                      <>
-                        Ver mais {hiddenCount} {hiddenCount === 1 ? 'atividade' : 'atividades'}
-                        <ChevronDown className="ml-2 h-4 w-4" aria-hidden="true" />
-                      </>
-                    )}
-                  </button>
-                ) : null}
-          </motion.section>
+              <button
+                key={category.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-controls="activity-category-panel"
+                onClick={() => setActiveCategoryId(category.id)}
+                className={`flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'bg-secondary text-secondary-foreground shadow-sm' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}`}
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                {category.label}
+                <span className={selected ? 'text-secondary-foreground/70' : 'text-muted-foreground/70'}>
+                  {category.options.length}
+                </span>
+              </button>
             );
           })}
         </div>
+
+        <motion.section
+          key={activeCategory.id}
+          id="activity-category-panel"
+          role="tabpanel"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="clean-surface mx-auto mt-5 max-w-5xl overflow-hidden"
+          aria-labelledby={`categoria-${activeCategory.id}`}
+        >
+          <div className="border-b border-secondary/15 bg-[hsl(var(--mint)/0.55)] px-5 py-4 sm:px-7">
+            <h3 id={`categoria-${activeCategory.id}`} className="font-serif text-xl font-semibold text-foreground">
+              {activeCategory.label}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">{activeCategory.hint}</p>
+          </div>
+
+          <ul>
+            {activeCategory.options.map((activity) => (
+              <li
+                key={activity.type}
+                className="grid grid-cols-[4rem_1fr] gap-4 border-b border-secondary/15 p-5 last:border-b-0 sm:grid-cols-[5rem_1fr] sm:p-6"
+              >
+                <img
+                  src={activity.preview}
+                  alt=""
+                  width="128"
+                  height="192"
+                  loading="lazy"
+                  decoding="async"
+                  className="aspect-[2/3] w-16 rounded-lg border border-border object-cover sm:w-20"
+                />
+                <div className="min-w-0">
+                  <h4 className="font-serif text-lg font-semibold text-foreground">{activity.label}</h4>
+                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-foreground/65">
+                    {activity.description}
+                  </p>
+                  <div className="metadata-row mt-3">
+                    <span>{activity.ageLabel}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                      {activity.durationLabel}
+                    </span>
+                    <span>{activity.materialLabel}</span>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </motion.section>
       </div>
     </section>
   );

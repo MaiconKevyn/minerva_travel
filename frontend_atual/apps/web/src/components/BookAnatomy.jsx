@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { GuideLockup, GuideStar } from '@/components/GuideLockup.jsx';
+import { GuideLockup } from '@/components/GuideLockup.jsx';
 
 /**
  * A ordem real das páginas que o montador gera, na mesma sequência.
@@ -43,7 +43,7 @@ const PAGES = [
 
 const BookAnatomy = () => (
   <section
-    className="travel-page storybook-blush relative overflow-hidden border-t border-primary/10 py-20 sm:py-24"
+    className="travel-page editorial-section relative overflow-hidden py-16 sm:py-20"
     aria-labelledby="anatomia-title"
   >
     <div className="guide-shell">
@@ -57,7 +57,7 @@ const BookAnatomy = () => (
         Todo guia sai com esta espinha dorsal. O miolo muda conforme o roteiro e as idades.
       </p>
 
-      <ol className="mx-auto mt-14 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <ol className="mx-auto mt-12 grid max-w-5xl border-y border-secondary/15 sm:grid-cols-2">
         {PAGES.map((page, index) => (
           <motion.li
             key={page.title}
@@ -65,11 +65,13 @@ const BookAnatomy = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-60px' }}
             transition={{ duration: 0.45, delay: (index % 3) * 0.07 }}
-            className={`travel-card flex gap-3 p-5 sm:p-6 ${index % 3 === 1 ? 'travel-card-blue sm:translate-y-5' : 'travel-card-pink'}`}
+            className={`grid grid-cols-[2.5rem_1fr] gap-4 py-6 sm:px-6 ${index % 2 === 0 ? 'sm:border-r sm:border-secondary/15' : ''} ${index < 4 ? 'border-b border-secondary/15' : index === 4 ? 'border-b border-secondary/15 sm:border-b-0' : ''}`}
           >
-            <GuideStar className="mt-0.5 h-6 w-6" />
+            <span className="font-ui pt-0.5 text-sm font-semibold text-primary" aria-hidden="true">
+              {String(index + 1).padStart(2, '0')}
+            </span>
             <div>
-              <h3 className="font-serif text-lg font-bold text-foreground">{page.title}</h3>
+              <h3 className="font-serif text-lg font-semibold text-foreground">{page.title}</h3>
               <p className="mt-1.5 leading-relaxed text-foreground/70">
                 {page.description}
               </p>

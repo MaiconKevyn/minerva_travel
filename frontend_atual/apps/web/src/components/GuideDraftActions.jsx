@@ -33,7 +33,7 @@ const GuideDraftActions = ({ hasDraft, busy, onContinueLater, onDiscard }) => {
         variant="outline"
         onClick={onContinueLater}
         disabled={busy || discarding}
-        className="font-ui h-11 rounded-full border-secondary/25 bg-[hsl(var(--paper)/0.86)] px-3 text-xs font-bold text-secondary sm:px-4 sm:text-sm"
+        className="font-ui h-11 rounded-lg border-secondary/25 bg-[hsl(var(--paper)/0.86)] px-3 text-xs font-semibold text-secondary sm:px-4 sm:text-sm"
       >
         {busy ? (
           <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -48,14 +48,14 @@ const GuideDraftActions = ({ hasDraft, busy, onContinueLater, onDiscard }) => {
         variant="ghost"
         onClick={() => setDiscardOpen(true)}
         disabled={busy || discarding}
-        className="font-ui h-11 rounded-full px-3 text-xs font-bold text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:text-sm"
+        className="font-ui h-11 rounded-lg px-3 text-xs font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:text-sm"
       >
         <Trash2 className="h-4 w-4" aria-hidden="true" />
         Descartar
       </Button>
 
       <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
-        <AlertDialogContent className="travel-card storybook-paper max-w-lg rounded-[2rem] border-2 border-destructive/20">
+        <AlertDialogContent className="clean-surface max-w-lg border-destructive/20">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-serif text-2xl text-secondary">
               Descartar este rascunho?
@@ -66,13 +66,13 @@ const GuideDraftActions = ({ hasDraft, busy, onContinueLater, onDiscard }) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={discarding} className="rounded-full">
+            <AlertDialogCancel disabled={discarding} className="rounded-lg">
               Manter rascunho
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDiscard}
               disabled={discarding}
-              className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {discarding && (
                 <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />

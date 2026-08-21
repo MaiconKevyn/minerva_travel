@@ -73,17 +73,17 @@ const SignupPage = () => {
       </Helmet>
 
       <AuthTravelShell
-        eyebrow="Seu primeiro carimbo"
-        title="Comece o diário da família"
+        eyebrow="Criação de conta"
+        title="Crie sua conta"
         description="Crie sua conta para montar o guia, guardar cada viagem e voltar às histórias quando quiser."
-        note="Uma conta, muitas aventuras — cada guia ganha seu próprio lugar na estante."
+        note="Cada guia fica salvo na sua biblioteca e pode ser baixado com segurança."
       >
-            <div className="mb-7 flex items-center gap-3 border-b-2 border-dashed border-primary/20 pb-5">
-              <div className="flex h-12 w-12 rotate-2 items-center justify-center rounded-[1rem_0.75rem_1.1rem_0.8rem] bg-primary/10">
+            <div className="mb-7 flex items-center gap-3 border-b border-primary/15 pb-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                 <Sparkles className="h-6 w-6 text-primary" aria-hidden="true" />
               </div>
               <div>
-                <p className="font-hand text-xl font-bold text-primary">Prepare a bagagem</p>
+                <p className="font-serif text-xl font-semibold text-primary">Dados da conta</p>
                 <p className="font-ui text-sm text-muted-foreground">Leva menos de um minuto.</p>
               </div>
             </div>
@@ -98,13 +98,13 @@ const SignupPage = () => {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="font-ui w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/20"
+                  className="font-ui w-full rounded-lg border border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Ex: Família Silva"
                 />
               </div>
 
               <div>
-                <label htmlFor="signup-email" className="block text-sm font-bold text-foreground mb-1">Email Mágico</label>
+                <label htmlFor="signup-email" className="mb-1 block text-sm font-semibold text-foreground">E-mail</label>
                 <input
                   id="signup-email"
                   type="email"
@@ -112,13 +112,13 @@ const SignupPage = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="font-ui w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/20"
+                  className="font-ui w-full rounded-lg border border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="seu@email.com"
                 />
               </div>
 
               <div>
-                <label htmlFor="signup-password" className="block text-sm font-bold text-foreground mb-1">Senha Secreta</label>
+                <label htmlFor="signup-password" className="mb-1 block text-sm font-semibold text-foreground">Senha</label>
                 <div className="relative">
                   <input
                     id="signup-password"
@@ -128,7 +128,7 @@ const SignupPage = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     aria-describedby="signup-password-help signup-password-strength"
-                    className="font-ui w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/20"
+                    className="font-ui w-full rounded-lg border border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                     placeholder="Mínimo 8 caracteres"
                   />
                   <button
@@ -160,12 +160,12 @@ const SignupPage = () => {
                 )}
                 <p id="signup-password-help" className="text-xs text-muted-foreground mt-1 font-medium">
                   {strength < 3 && password ? 'A senha deve ter 8+ letras, 1 maiúscula e 1 número.' : ''}
-                  {strength === 3 && 'Senha forte! 🌟'}
+                  {strength === 3 && 'Senha forte.'}
                 </p>
               </div>
 
               <div>
-                <label htmlFor="signup-confirm-password" className="block text-sm font-bold text-foreground mb-1">Confirme a Senha</label>
+                <label htmlFor="signup-confirm-password" className="mb-1 block text-sm font-semibold text-foreground">Confirmar senha</label>
                 <div className="relative">
                   <input
                     id="signup-confirm-password"
@@ -174,8 +174,8 @@ const SignupPage = () => {
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="font-ui w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/20"
-                    placeholder="Repita sua senha secreta"
+                    className="font-ui w-full rounded-lg border border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    placeholder="Repita sua senha"
                   />
                   <button
                     type="button"
@@ -206,7 +206,7 @@ const SignupPage = () => {
 
             <div className="mt-8 text-center">
               <p className="text-muted-foreground font-medium">
-                Já tem um passaporte conosco?{' '}
+                Já tem uma conta?{' '}
                 <Link to="/login" className="text-primary hover:underline font-bold">
                   Entrar
                 </Link>

@@ -430,7 +430,7 @@ const Step4Attractions = () => {
           <section key={day.day} className="space-y-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-primary">
+                <p className="text-sm font-semibold text-primary">
                   Dia {day.day}
                 </p>
                 <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
@@ -464,7 +464,7 @@ const Step4Attractions = () => {
       {alternatives.length > 0 && (
         <section className="pt-6 space-y-5 border-t border-border/60">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
+            <p className="text-sm font-semibold text-secondary">
               Outras opcoes
             </p>
             <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
@@ -494,7 +494,7 @@ const Step4Attractions = () => {
         <section className="space-y-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-primary">
+              <p className="text-sm font-semibold text-primary">
                 Locais citados por você
               </p>
               <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
@@ -525,7 +525,7 @@ const Step4Attractions = () => {
       {filterAttractionsByCategory(quickSections.suggested, activeCategory).length > 0 && (
         <section className="pt-6 space-y-5 border-t border-border/60">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-secondary">
+            <p className="text-sm font-semibold text-secondary">
               Sugestões para a família
             </p>
             <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
@@ -621,7 +621,7 @@ const Step4Attractions = () => {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col items-center justify-center py-20 space-y-8 text-center max-w-lg mx-auto bg-card dark:bg-slate-800 p-10 rounded-3xl shadow-sm border border-border"
+            className="mx-auto flex max-w-lg flex-col items-center justify-center space-y-8 rounded-xl border border-border bg-card p-10 py-20 text-center shadow-sm dark:bg-slate-800"
           >
             <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center text-destructive">
               <AlertCircle className="w-10 h-10" />
@@ -724,7 +724,7 @@ const Step4Attractions = () => {
                 )}
               </div>
               {selectedCount > 0 && (
-                <div className="mx-auto mt-5 max-w-2xl rounded-2xl border border-border/70 bg-card/80 px-4 py-3 text-left shadow-sm">
+                <div className="mx-auto mt-5 max-w-2xl rounded-xl border border-border/70 bg-card/80 px-4 py-3 text-left shadow-sm">
                   {!hasMissingMapLocations ? (
                     <div className="flex items-center gap-3 text-sm font-bold text-secondary">
                       <MapIcon className="h-4 w-4 shrink-0" />

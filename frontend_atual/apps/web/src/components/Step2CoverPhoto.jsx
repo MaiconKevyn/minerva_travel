@@ -141,7 +141,7 @@ const Step2CoverPhoto = () => {
               tabIndex="0"
               aria-busy={isValidatingPhoto}
               aria-describedby="family-photo-help family-photo-error"
-              className={`relative cursor-pointer overflow-hidden rounded-3xl border-4 border-dashed transition-all duration-300 aspect-[16/9] md:aspect-[21/9] flex flex-col items-center justify-center group ${
+              className={`group relative flex aspect-[16/9] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors duration-200 md:aspect-[21/9] ${
                 isDragging ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-border/60 hover:border-primary/50 hover:bg-muted/30'
               }`}
             >
@@ -184,7 +184,7 @@ const Step2CoverPhoto = () => {
             )}
 
             {!coverPhoto ? (
-              <div className="mx-auto flex max-w-xl items-start gap-3 rounded-2xl bg-secondary/10 px-4 py-3 text-left text-sm text-muted-foreground">
+              <div className="mx-auto flex max-w-xl items-start gap-3 rounded-xl bg-secondary/10 px-4 py-3 text-left text-sm text-muted-foreground">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
                 <p>
                   A foto é opcional. Só pediremos autorização e quantidade de pessoas depois que
@@ -193,7 +193,7 @@ const Step2CoverPhoto = () => {
               </div>
             ) : (
               <>
-                <div className="mx-auto max-w-xl rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm">
+                <div className="mx-auto max-w-xl rounded-xl border border-border/70 bg-card p-4 text-left shadow-sm">
                   <label htmlFor="expected-cover-family-count" className="text-sm font-bold text-foreground">
                     Quantas pessoas aparecem na foto?
                   </label>
@@ -214,7 +214,7 @@ const Step2CoverPhoto = () => {
                   </div>
                 </div>
 
-                <div className="mx-auto max-w-xl rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm">
+                <div className="mx-auto max-w-xl rounded-xl border border-border/70 bg-card p-4 text-left shadow-sm">
                   <label className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground">
                     <input
                       type="checkbox"
@@ -244,7 +244,7 @@ const Step2CoverPhoto = () => {
 
             {/* A descrição vale com ou sem foto: sem ela, é a capa inteira;
                 com ela, dirige só o cenário, nunca quem aparece. */}
-            <div className="rounded-[2rem] border-2 border-secondary/20 bg-secondary/5 p-6 text-left">
+            <div className="rounded-xl border border-secondary/20 bg-secondary/5 p-6 text-left">
               <label
                 htmlFor="cover-brief"
                 className="flex items-center gap-3 text-lg font-bold text-foreground"
@@ -291,9 +291,9 @@ const Step2CoverPhoto = () => {
           >
             <div className="relative w-32 h-32 mx-auto">
               {coverPhotoUrl ? (
-                <img src={coverPhotoUrl} alt="Capa confirmada" className="w-full h-full object-cover rounded-full shadow-xl" />
+                <img src={coverPhotoUrl} alt="Capa confirmada" className="h-full w-full rounded-full object-cover shadow-sm" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center rounded-full bg-secondary/10 shadow-xl">
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-secondary/10 shadow-sm">
                   <Wand2 className="h-12 w-12 text-secondary" aria-hidden="true" />
                 </div>
               )}

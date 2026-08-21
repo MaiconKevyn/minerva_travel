@@ -65,32 +65,32 @@ const LoginPage = () => {
     <>
       <Helmet>
         <title>Entrar - Minerva Travel</title>
-        <meta name="description" content="Faça login para acessar seus guias de viagem mágicos." />
+        <meta name="description" content="Faça login para acessar seus guias de viagem personalizados." />
       </Helmet>
 
       <AuthTravelShell
-        eyebrow="Passaporte da família"
+        eyebrow="Acesso à sua conta"
         title={signupReason ? 'Sua conta está pronta!' : 'Bem-vindo de volta!'}
         description={signupReason === 'confirm-email'
           ? 'Confirme o e-mail que enviamos e entre para começar.'
           : signupReason === 'signed-up'
             ? 'Entre com a senha que você acabou de criar.'
             : 'Abra sua estante de viagens e continue de onde parou.'}
-        note="As próximas páginas da aventura já estão esperando por vocês."
+        note="Seus guias e rascunhos continuam guardados na sua biblioteca."
       >
-            <div className="mb-7 flex items-center gap-3 border-b-2 border-dashed border-secondary/20 pb-5">
-              <div className="flex h-12 w-12 -rotate-2 items-center justify-center rounded-[0.8rem_1.1rem_0.8rem_1.2rem] bg-secondary/10">
+            <div className="mb-7 flex items-center gap-3 border-b border-secondary/15 pb-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
                 <Key className="h-6 w-6 text-secondary" aria-hidden="true" />
               </div>
               <div>
-                <p className="font-hand text-xl font-bold text-secondary">Carimbe sua entrada</p>
+                <p className="font-serif text-xl font-semibold text-secondary">Acesse sua conta</p>
                 <p className="font-ui text-sm text-muted-foreground">Seus guias ficam guardados com segurança.</p>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label htmlFor="login-email" className="block text-sm font-bold text-foreground mb-1">Email Mágico</label>
+                <label htmlFor="login-email" className="mb-1 block text-sm font-semibold text-foreground">E-mail</label>
                 <input
                   id="login-email"
                   type="email"
@@ -98,14 +98,14 @@ const LoginPage = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="font-ui w-full rounded-xl border-2 border-secondary/20 bg-background px-4 py-3 text-foreground outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/20"
+                  className="font-ui w-full rounded-lg border border-secondary/20 bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
                   placeholder="seu@email.com"
                 />
               </div>
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label htmlFor="login-password" className="block text-sm font-bold text-foreground">Senha Secreta</label>
+                  <label htmlFor="login-password" className="block text-sm font-semibold text-foreground">Senha</label>
                   <button
                     type="button"
                     onClick={handlePasswordReset}
@@ -123,7 +123,7 @@ const LoginPage = () => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="font-ui w-full rounded-xl border-2 border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/20"
+                    className="font-ui w-full rounded-lg border border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
                     placeholder="••••••••"
                   />
                   <button
@@ -146,7 +146,7 @@ const LoginPage = () => {
                 {isSubmitting ? (
                   <Loader2 className="w-6 h-6 animate-spin" />
                 ) : (
-                  'Entrar na Aventura'
+                  'Entrar'
                 )}
               </Button>
             </form>

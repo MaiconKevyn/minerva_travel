@@ -60,19 +60,19 @@ const StepTripPreferences = () => {
         </p>
       </div>
 
-      <div className="bg-card dark:bg-slate-800 rounded-[32px] p-6 md:p-8 border border-border/60 shadow-sm space-y-8">
+      <div className="space-y-8 rounded-xl border border-border/60 bg-card p-6 shadow-sm dark:bg-slate-800 md:p-8">
         <div className="grid grid-cols-1 md:grid-cols-[0.8fr_1.2fr] gap-6">
           <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
               <CalendarDays className="w-4 h-4" /> Dias
             </label>
-            <div className="rounded-2xl bg-muted px-5 py-4 text-lg font-bold text-foreground">
+            <div className="rounded-xl bg-muted px-5 py-4 text-lg font-bold text-foreground">
               {days} {days === 1 ? 'dia' : 'dias'} no total
             </div>
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
               <SlidersHorizontal className="w-4 h-4" /> Ritmo
             </label>
             <div className="flex flex-wrap gap-3">
@@ -95,7 +95,7 @@ const StepTripPreferences = () => {
         </div>
 
         <div className="space-y-3">
-          <label className="text-sm font-bold uppercase tracking-[0.18em] text-muted-foreground">
+          <label className="text-sm font-semibold text-muted-foreground">
             Programas que combinam
           </label>
           <div className="flex flex-wrap gap-3">

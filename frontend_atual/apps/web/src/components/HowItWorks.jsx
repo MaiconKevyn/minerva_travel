@@ -27,7 +27,7 @@ const STEPS = [
 
 const HowItWorks = () => (
   <section
-    className="travel-page storybook-mint relative overflow-hidden border-t border-secondary/10 py-20 sm:py-24"
+    className="travel-page editorial-section relative overflow-hidden py-16 sm:py-20"
     aria-labelledby="como-funciona-title"
   >
     <div className="guide-shell">
@@ -38,7 +38,7 @@ const HowItWorks = () => (
         arched="Do roteiro ao PDF"
       />
 
-      <ol className="mx-auto mt-14 flex max-w-md flex-col gap-0 md:max-w-none md:flex-row md:items-start md:gap-0">
+      <ol className="mx-auto mt-12 flex max-w-md flex-col gap-0 rounded-xl bg-[hsl(var(--mint)/0.65)] p-6 md:max-w-none md:flex-row md:items-start md:gap-0 md:p-8">
         {STEPS.map((step, index) => (
           <React.Fragment key={step.title}>
             {index > 0 ? (
@@ -66,7 +66,7 @@ const HowItWorks = () => (
                 {index + 1}
               </span>
               <div>
-                <h3 className="pt-1.5 text-xl font-serif font-bold text-foreground">
+                <h3 className="pt-1.5 text-xl font-serif font-semibold text-foreground">
                   {step.title}
                 </h3>
                 <p className="mt-2 leading-relaxed text-foreground/70">

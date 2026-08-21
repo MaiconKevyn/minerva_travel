@@ -11,12 +11,12 @@ const GuideCreationProgress = ({ visibleSteps, currentStep, stepNames }) => {
 
   return (
     <section
-      className="travel-card storybook-mint relative overflow-hidden px-5 py-5 sm:px-7 sm:py-6"
+      className="clean-surface relative overflow-hidden px-5 py-5 sm:px-7 sm:py-6"
       aria-labelledby="guide-creation-progress-title"
     >
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end sm:gap-5">
         <div>
-          <p className="font-ui text-xs font-black uppercase tracking-[0.16em] text-primary">
+          <p className="font-ui text-xs font-semibold text-primary">
             Passo {progressValue} de {visibleSteps.length}
           </p>
           <h1
@@ -38,7 +38,7 @@ const GuideCreationProgress = ({ visibleSteps, currentStep, stepNames }) => {
       </div>
 
       <div
-        className="mt-4 h-2.5 overflow-hidden rounded-full bg-[hsl(var(--paper)/0.85)] shadow-inner"
+        className="mt-4 h-2 overflow-hidden rounded-full bg-muted"
         role="progressbar"
         aria-label="Progresso da criação do guia"
         aria-valuemin={1}
@@ -64,7 +64,7 @@ const GuideCreationProgress = ({ visibleSteps, currentStep, stepNames }) => {
             <li
               key={step}
               aria-current={isCurrent ? 'step' : undefined}
-              className={`flex min-w-0 items-center gap-2 rounded-xl px-2 py-2 text-xs font-bold ${
+              className={`flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold ${
                 isCurrent
                   ? 'bg-primary/10 text-primary'
                   : isComplete

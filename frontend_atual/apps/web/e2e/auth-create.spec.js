@@ -14,15 +14,15 @@ test('a family can sign up, log in and reach the accessible create wizard', asyn
 
   await page.goto('/signup');
   await page.getByLabel('Nome da Família ou Responsável').fill('Família Teste');
-  await page.getByLabel('Email Mágico').fill(email);
-  await page.getByLabel('Senha Secreta', { exact: true }).fill(password);
-  await page.getByLabel('Confirme a Senha').fill(password);
+  await page.getByLabel('E-mail').fill(email);
+  await page.getByLabel('Senha', { exact: true }).fill(password);
+  await page.getByLabel('Confirmar senha').fill(password);
   await page.getByRole('button', { name: 'Criar Minha Conta' }).click();
 
   await expect(page).toHaveURL(/\/login$/);
-  await page.getByLabel('Email Mágico').fill(email);
-  await page.getByLabel('Senha Secreta').fill(password);
-  await page.getByRole('button', { name: 'Entrar na Aventura' }).click();
+  await page.getByLabel('E-mail').fill(email);
+  await page.getByLabel('Senha', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Entrar' }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto('/create');

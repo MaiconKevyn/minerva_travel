@@ -57,7 +57,7 @@ export function ArchedText({ children, direction = 'down', className = '' }) {
         fill="currentColor"
         fontSize={fontSize}
         fontWeight="600"
-        letterSpacing="0.22em"
+        letterSpacing="0.05em"
       >
         <textPath href={`#${pathId}`} startOffset="50%" textAnchor="middle">
           {children.toUpperCase()}
@@ -101,9 +101,9 @@ export function GuideLockup({ overline, title, arched, id, className = '' }) {
         {title}
       </h2>
       {arched ? (
-        <div className="mt-2 text-primary">
-          <ArchedText direction="down">{arched}</ArchedText>
-        </div>
+        <p className="font-hand mx-auto mt-3 max-w-lg text-base text-primary sm:text-lg">
+          {arched}
+        </p>
       ) : null}
     </div>
   );

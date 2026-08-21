@@ -261,16 +261,14 @@ const DashboardPage = () => {
 
           <div className="guide-shell relative z-10">
             <section
-              className="travel-card storybook-sky relative overflow-hidden p-6 sm:p-8 lg:p-10"
+              className="clean-surface relative overflow-hidden p-6 sm:p-8 lg:p-10"
               aria-labelledby="dashboard-welcome-title"
             >
               <Suitcase className="pointer-events-none absolute -bottom-7 -right-5 h-32 w-32 rotate-6 text-accent opacity-20 sm:h-40 sm:w-40" />
               <div className="relative flex flex-col items-start justify-between gap-7 lg:flex-row lg:items-center">
                 <div className="flex min-w-0 items-center gap-3 sm:gap-5">
-                  <div className="flex h-14 w-14 shrink-0 -rotate-2 items-center justify-center rounded-[1rem_1.35rem_0.9rem_1.2rem] border-2 border-primary/20 bg-[hsl(var(--blush))] shadow-sm sm:h-20 sm:w-20">
-                    <span className="font-serif text-2xl text-primary sm:text-4xl" aria-hidden="true">
-                      {user?.name?.charAt(0)?.toUpperCase() || 'F'}
-                    </span>
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-[hsl(var(--blush))] text-primary sm:h-20 sm:w-20">
+                    <Suitcase className="h-7 w-7 sm:h-9 sm:w-9" aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
                     <span className="travel-label mb-2 -rotate-1">Diário da família</span>
@@ -292,36 +290,36 @@ const DashboardPage = () => {
             </section>
 
             <section className="mt-5 grid gap-4 sm:grid-cols-3" aria-label="Resumo da biblioteca">
-              <article className="travel-card flex items-center gap-4 p-5">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700">
+              <article className="clean-surface flex items-center gap-4 p-5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-700">
                   <CircleCheck className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div>
-                  <p className="text-2xl font-black text-secondary">{loading ? '—' : readyGuideCount}</p>
-                  <p className="text-sm font-bold text-muted-foreground">Na estante</p>
+                  <p className="text-2xl font-bold text-secondary">{loading ? '—' : readyGuideCount}</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Na estante</p>
                 </div>
               </article>
-              <article className="travel-card flex items-center gap-4 p-5">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary/15 text-secondary">
+              <article className="clean-surface flex items-center gap-4 p-5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
                   <Clock3 className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div>
-                  <p className="text-2xl font-black text-secondary">{loading ? '—' : activeJobCount}</p>
-                  <p className="text-sm font-bold text-muted-foreground">Em criação</p>
+                  <p className="text-2xl font-bold text-secondary">{loading ? '—' : activeJobCount}</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Em criação</p>
                 </div>
               </article>
-              <article className="travel-card storybook-blush flex items-center gap-4 p-5">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <article className="clean-surface flex items-center gap-4 border-primary/20 p-5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
                   <ArrowRight className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">Próximo passo</p>
+                  <p className="text-xs font-semibold text-primary">Próximo passo</p>
                   <p className="mt-1 font-serif text-base font-bold text-foreground">{nextAction}</p>
                 </div>
               </article>
             </section>
 
-            <details className="travel-card storybook-mint group mt-5 overflow-hidden px-5 py-1">
+            <details className="clean-surface group mt-5 overflow-hidden px-5 py-1">
               <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 py-3 font-bold text-secondary marker:content-none">
                 <span className="flex items-center gap-2">
                   <Settings className="h-4 w-4" aria-hidden="true" />
@@ -331,11 +329,11 @@ const DashboardPage = () => {
               </summary>
               <dl className="space-y-4">
                 <div className="grid gap-1 border-t border-secondary/10 pt-4 sm:grid-cols-[7rem_1fr]">
-                  <dt className="text-xs font-bold uppercase text-muted-foreground">Nome</dt>
+                  <dt className="text-xs font-semibold text-muted-foreground">Nome</dt>
                   <dd className="font-medium text-foreground">{user?.name || 'Não informado'}</dd>
                 </div>
                 <div className="grid gap-1 pb-4 sm:grid-cols-[7rem_1fr]">
-                  <dt className="text-xs font-bold uppercase text-muted-foreground">Email</dt>
+                  <dt className="text-xs font-semibold text-muted-foreground">E-mail</dt>
                   <dd className="break-words font-medium text-foreground">{user?.email || 'Não informado'}</dd>
                 </div>
               </dl>
@@ -368,7 +366,7 @@ const DashboardPage = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  <div className={`grid grid-cols-1 gap-5 ${generationJobs.length > 1 ? 'md:grid-cols-2' : 'max-w-3xl'}`}>
                     {generationJobs.map((job) => {
                       const preview = job.guide_preview;
                       const status = statusForGuide(job.status);
@@ -379,13 +377,13 @@ const DashboardPage = () => {
                       return (
                         <article
                           key={job.id}
-                          className="travel-card storybook-sky p-5"
+                          className="clean-surface p-5"
                         >
                           <div className="flex gap-4">
                             <GuideCover coverUrl={preview.cover_url} title={preview.title} />
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start justify-between gap-2">
-                                <p className="text-xs font-black uppercase tracking-[0.14em] text-secondary">
+                                <p className="text-xs font-semibold text-secondary">
                                   Preview aprovado
                                 </p>
                                 <span className={`rounded-full px-3 py-1 text-xs font-bold ${status.className}`}>
@@ -427,7 +425,7 @@ const DashboardPage = () => {
                             </span>
                           </div>
                           {job.status === 'failed' && (
-                            <p className="mt-4 rounded-2xl bg-destructive/10 p-3 text-sm font-bold text-destructive" role="alert">
+                            <p className="mt-4 rounded-lg bg-destructive/10 p-3 text-sm font-semibold text-destructive" role="alert">
                               {job.error?.message || 'A criação foi interrompida. Abra o guia para tentar novamente.'}
                             </p>
                           )}
@@ -445,7 +443,7 @@ const DashboardPage = () => {
                   className="grid grid-cols-1 gap-6 md:grid-cols-2"
                 >
                   <span className="sr-only">Buscando suas histórias...</span>
-                  <div className="travel-card animate-pulse p-5" aria-hidden="true">
+                  <div className="clean-surface animate-pulse p-5" aria-hidden="true">
                     <div className="flex gap-4">
                       <div className="aspect-[3/4] w-20 rounded-xl bg-secondary/10" />
                       <div className="flex-1 space-y-3 pt-2">
@@ -456,7 +454,7 @@ const DashboardPage = () => {
                     </div>
                     <div className="mt-5 h-11 rounded-full bg-secondary/10" />
                   </div>
-                  <div className="travel-card hidden animate-pulse p-5 md:block" aria-hidden="true">
+                  <div className="clean-surface hidden animate-pulse p-5 md:block" aria-hidden="true">
                     <div className="flex gap-4">
                       <div className="aspect-[3/4] w-20 rounded-xl bg-secondary/10" />
                       <div className="flex-1 space-y-3 pt-2">
@@ -471,21 +469,21 @@ const DashboardPage = () => {
               ) : loadError ? (
                 <div
                   role="alert"
-                  className="travel-card flex flex-col items-center gap-4 border-destructive/30 p-10 text-center"
+                  className="clean-surface flex flex-col items-center gap-4 border-destructive/30 p-10 text-center"
                 >
                   <AlertCircle className="w-10 h-10 text-destructive" aria-hidden="true" />
                   <div>
                     <h3 className="text-xl font-bold font-serif text-foreground">Não foi possível abrir sua biblioteca</h3>
                     <p className="mt-2 text-muted-foreground font-medium">{loadError}</p>
                   </div>
-                  <Button type="button" variant="outline" onClick={() => requestGuideList()} className="rounded-full">
+                  <Button type="button" variant="outline" onClick={() => requestGuideList()} className="rounded-lg">
                     <RefreshCw className="w-4 h-4" aria-hidden="true" />
                     Tentar novamente
                   </Button>
                 </div>
               ) : guides.length === 0 ? (
-                <div className="travel-card storybook-blush flex flex-col items-center justify-center space-y-4 border-2 border-dashed border-primary/25 px-5 py-10 text-center sm:p-12">
-                  <div className="mb-2 flex h-20 w-20 -rotate-3 items-center justify-center rounded-[1.2rem_1.6rem_1rem_1.5rem] bg-[hsl(var(--paper))]">
+                <div className="clean-surface flex flex-col items-center justify-center space-y-4 border-dashed border-primary/25 px-5 py-10 text-center sm:p-12">
+                  <div className="mb-2 flex h-20 w-20 items-center justify-center rounded-lg bg-[hsl(var(--blush)/0.55)]">
                     <BookOpen className="w-10 h-10 text-muted-foreground/50" aria-hidden="true" />
                   </div>
                   <h3 className="text-xl font-bold font-serif text-foreground">O livro está em branco!</h3>
@@ -504,7 +502,7 @@ const DashboardPage = () => {
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={`grid grid-cols-1 gap-6 ${guides.length > 1 ? 'md:grid-cols-2' : 'max-w-3xl'}`}>
                   {guides.map((guide) => {
                     const status = statusForGuide(guide.status);
                     const destinations = destinationNames(guide.destinations);
@@ -518,7 +516,7 @@ const DashboardPage = () => {
                     return (
                       <article
                         key={guide.id}
-                        className="travel-card group flex h-full flex-col p-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg sm:p-6"
+                        className="clean-surface group flex h-full flex-col p-4 transition-colors duration-200 hover:border-primary/30 sm:p-6"
                       >
                         {/* A capa é o produto: cada item da lista é um livro,
                             não um registro de texto. */}
@@ -529,7 +527,7 @@ const DashboardPage = () => {
                             <div className="mb-3 flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2">
                                 <MapPin className="h-4 w-4 text-primary" aria-hidden="true" />
-                                <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                                <span className="text-xs font-semibold text-primary">
                                   Viagem em família
                                 </span>
                               </div>
@@ -549,7 +547,7 @@ const DashboardPage = () => {
                           </div>
                         </div>
 
-                        <div className="mt-6 space-y-4 border-t-2 border-dashed border-secondary/20 pt-4">
+                        <div className="mt-6 space-y-4 border-t border-secondary/15 pt-4">
                           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                             <CalendarDays className="w-4 h-4" aria-hidden="true" />
                             Criado em {formatDate(guide.created_at)}
@@ -562,7 +560,7 @@ const DashboardPage = () => {
                                 size="sm"
                                 onClick={() => handleDownload(guide)}
                                 disabled={isDownloading}
-                                className="rounded-full bg-secondary text-white hover:bg-secondary/90"
+                                className="rounded-lg bg-secondary text-white hover:bg-secondary/90"
                               >
                                 {isDownloading ? (
                                   <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -580,7 +578,7 @@ const DashboardPage = () => {
                               onClick={() => toggleGuideDetails(guide.id)}
                               aria-expanded={detailsOpen}
                               aria-controls={detailsId}
-                              className="rounded-full"
+                              className="rounded-lg"
                             >
                               {detailsOpen ? 'Ocultar detalhes' : 'Ver detalhes'}
                               <ChevronDown
@@ -599,7 +597,7 @@ const DashboardPage = () => {
                               )}
                               aria-expanded={isConfirmingDelete}
                               aria-controls={deleteConfirmationId}
-                              className="rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
                             >
                               {isDeleting ? (
                                 <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -615,7 +613,7 @@ const DashboardPage = () => {
                               id={deleteConfirmationId}
                               role="group"
                               aria-label={`Confirmar exclusão de ${guide.title || 'guia sem título'}`}
-                              className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4"
+                              className="rounded-lg border border-destructive/30 bg-destructive/5 p-4"
                             >
                               <p className="text-sm font-bold text-foreground">Excluir definitivamente?</p>
                               <p className="mt-1 text-sm text-muted-foreground">
@@ -628,7 +626,7 @@ const DashboardPage = () => {
                                   size="sm"
                                   disabled={isDeleting}
                                   onClick={() => setConfirmDeleteGuideId(null)}
-                                  className="rounded-full"
+                                  className="rounded-lg"
                                 >
                                   Cancelar
                                 </Button>
@@ -637,7 +635,7 @@ const DashboardPage = () => {
                                   size="sm"
                                   disabled={isDeleting}
                                   onClick={() => handleDelete(guide)}
-                                  className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
                                   {isDeleting && (
                                     <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -659,7 +657,7 @@ const DashboardPage = () => {
                           <div
                             id={detailsId}
                             aria-live="polite"
-                            className="storybook-mint mt-5 rounded-2xl border border-secondary/15 p-4 text-sm"
+                            className="mt-5 rounded-lg border border-secondary/15 bg-[hsl(var(--mint)/0.45)] p-4 text-sm"
                           >
                             {detailLoading ? (
                               <div role="status" className="flex items-center gap-2 text-muted-foreground">
@@ -674,7 +672,7 @@ const DashboardPage = () => {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => loadGuideDetails(guide.id)}
-                                  className="rounded-full"
+                                  className="rounded-lg"
                                 >
                                   <RefreshCw className="w-4 h-4" aria-hidden="true" />
                                   Tentar novamente

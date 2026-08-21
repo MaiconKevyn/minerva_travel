@@ -134,12 +134,12 @@ const PlaceMapModal = ({
         role="dialog"
         aria-modal="true"
         aria-label={`Mapa de ${landmark?.name || 'local'}`}
-        className="max-h-[94vh] w-full overflow-hidden rounded-t-[28px] border border-border bg-background text-foreground shadow-2xl sm:max-w-3xl sm:rounded-[28px]"
+        className="max-h-[94vh] w-full overflow-hidden rounded-t-xl border border-border bg-background text-foreground shadow-sm sm:max-w-3xl sm:rounded-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6">
           <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
+            <p className="text-xs font-semibold text-primary">
               Localizacao
             </p>
             <h2 className="truncate text-2xl font-serif font-bold">
@@ -162,7 +162,7 @@ const PlaceMapModal = ({
 
             {!apiKey && (
               <div className="flex h-full min-h-[340px] items-center justify-center p-6 text-center">
-                <div className="max-w-sm rounded-2xl border border-border bg-background p-5 shadow-sm">
+                <div className="max-w-sm rounded-xl border border-border bg-background p-5 shadow-sm">
                   <MapPin className="mx-auto mb-3 h-9 w-9 text-primary" />
                   <h3 className="mb-2 font-serif text-xl font-bold">Mapa nao configurado</h3>
                   <p className="text-sm text-muted-foreground">
@@ -174,7 +174,7 @@ const PlaceMapModal = ({
 
             {apiKey && !mapLandmark && (
               <div className="flex h-full min-h-[340px] items-center justify-center p-6 text-center">
-                <div className="max-w-sm rounded-2xl border border-border bg-background p-5 shadow-sm">
+                <div className="max-w-sm rounded-xl border border-border bg-background p-5 shadow-sm">
                   <MapPin className="mx-auto mb-3 h-9 w-9 text-secondary" />
                   <h3 className="mb-2 font-serif text-xl font-bold">Coordenadas indisponiveis</h3>
                   <p className="text-sm text-muted-foreground">
@@ -186,7 +186,7 @@ const PlaceMapModal = ({
 
             {loadError && (
               <div className="flex h-full min-h-[340px] items-center justify-center p-6 text-center">
-                <div className="max-w-sm rounded-2xl border border-border bg-background p-5 shadow-sm">
+                <div className="max-w-sm rounded-xl border border-border bg-background p-5 shadow-sm">
                   <MapPin className="mx-auto mb-3 h-9 w-9 text-destructive" />
                   <h3 className="mb-2 font-serif text-xl font-bold">Erro ao carregar</h3>
                   <p className="text-sm text-muted-foreground">{loadError}</p>
@@ -197,7 +197,7 @@ const PlaceMapModal = ({
 
           <aside className="space-y-4 border-t border-border p-5 sm:border-l sm:border-t-0">
             {landmark?.image && (
-              <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
+              <div className="aspect-[4/3] overflow-hidden rounded-xl bg-muted">
                 <img src={landmark.image} alt={landmark.name} className="h-full w-full object-cover" />
               </div>
             )}

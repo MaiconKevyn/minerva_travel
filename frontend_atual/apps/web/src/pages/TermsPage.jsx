@@ -13,7 +13,7 @@ const TermsPage = () => (
       <Header />
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-5 py-12 sm:px-8">
         <div className="space-y-4">
-          <p className="text-sm font-bold uppercase tracking-widest text-primary">
+          <p className="text-sm font-semibold text-primary">
             Versão 2026-08-19
           </p>
           <h1 className="text-4xl font-serif font-bold sm:text-5xl">Termos de Uso</h1>
@@ -61,7 +61,7 @@ const TermsPage = () => (
           </p>
         </section>
 
-        <p className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
           Leia a <Link className="font-bold text-primary underline" to="/privacy">Política de Privacidade</Link>.
           Estes termos devem ser revisados novamente antes da ativação das credenciais de produção.
         </p>

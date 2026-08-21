@@ -78,7 +78,7 @@ const ActivityPreviewDialog = ({ activity, landmarks, chosenIds, onToggle, open,
           <img
             src={shown.src}
             alt={`${activity.label} — ${shown.label}`}
-            className="w-full rounded-2xl border-2 border-border bg-muted"
+            className="w-full rounded-xl border-2 border-border bg-muted"
           />
           <figcaption className="text-center text-sm font-medium text-muted-foreground">
             {shown.caption}

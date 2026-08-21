@@ -94,7 +94,7 @@ const CreateGuidePageContent = () => {
             className="travel-page storybook-mint mx-auto flex min-h-[70vh] max-w-none flex-col items-center justify-center overflow-hidden px-6 text-center"
           >
             <CompassRose className="page-corner -right-5 top-10 rotate-12" />
-            <div className="travel-card relative max-w-xl px-8 py-10">
+            <div className="clean-surface relative max-w-xl px-8 py-10">
               <Loader2 className="mx-auto mb-5 h-12 w-12 animate-spin text-primary" aria-hidden="true" />
               <h1 className="text-3xl font-serif font-bold text-secondary">Retomando seu guia…</h1>
               <p className="mt-3 font-medium text-muted-foreground">
@@ -129,7 +129,7 @@ const CreateGuidePageContent = () => {
                     variant="ghost"
                     onClick={goBack}
                     aria-label="Voltar para a etapa anterior"
-                    className="font-ui h-11 min-w-11 rounded-full border border-secondary/20 bg-[hsl(var(--paper)/0.82)] px-3 font-bold text-secondary hover:bg-muted sm:px-4"
+                    className="font-ui h-11 min-w-11 rounded-lg border border-secondary/20 bg-[hsl(var(--paper)/0.82)] px-3 font-semibold text-secondary hover:bg-muted sm:px-4"
                   >
                     <ArrowLeft className="h-5 w-5 sm:mr-2" />
                     <span className="hidden sm:inline">Voltar</span>

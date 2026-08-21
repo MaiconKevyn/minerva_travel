@@ -78,7 +78,7 @@ const StepActivities = () => {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 py-4">
       <div className="mx-auto max-w-3xl space-y-4 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Palette className="h-7 w-7" aria-hidden="true" />
         </div>
         <h2 className="text-3xl font-serif font-bold text-foreground sm:text-4xl md:text-5xl">
@@ -110,7 +110,7 @@ const StepActivities = () => {
         onChange={setFlightVocabularyPages}
       />
 
-      <section className="rounded-[2rem] border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6" aria-labelledby="mandatory-pages-title">
+      <section className="rounded-xl border border-secondary/25 bg-secondary/5 p-5 sm:p-6" aria-labelledby="mandatory-pages-title">
         <h3 id="mandatory-pages-title" className="sr-only">Páginas finais obrigatórias</h3>
         <div className="flex items-start gap-4">
           <BookHeart className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
@@ -144,7 +144,7 @@ const StepActivities = () => {
             <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
               <h3
                 id={`activity-category-${category.id}`}
-                className="text-sm font-bold uppercase tracking-[0.14em] text-foreground"
+                className="text-sm font-semibold text-foreground"
               >
                 {category.label}
               </h3>
@@ -160,7 +160,7 @@ const StepActivities = () => {
                 return (
                   <article
                     key={activity.type}
-                    className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border-2 bg-background transition ${
+                    className={`group relative flex h-full flex-col overflow-hidden rounded-xl border-2 bg-background transition ${
                       chosen
                         ? 'border-primary shadow-md ring-2 ring-primary/20'
                         : 'border-border/70 hover:border-primary/45 hover:shadow-md'
@@ -264,7 +264,7 @@ const StepActivities = () => {
         ))}
       </div>
 
-      <div className="sticky bottom-4 z-10 rounded-3xl border-2 border-border/70 bg-card/95 p-4 shadow-xl backdrop-blur sm:flex sm:items-center sm:justify-between sm:gap-6">
+      <div className="sticky bottom-4 z-10 rounded-xl border border-border/70 bg-card/95 p-4 shadow-sm backdrop-blur sm:flex sm:items-center sm:justify-between sm:gap-6">
         <div className="mb-4 sm:mb-0">
           <p className="font-bold text-foreground" aria-live="polite">
             {landmarkActivitySelections.length} de {MAX_OPTIONAL_ACTIVITIES_PER_GUIDE} páginas opcionais

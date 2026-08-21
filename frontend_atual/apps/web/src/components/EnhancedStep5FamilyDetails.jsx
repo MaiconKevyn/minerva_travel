@@ -212,7 +212,7 @@ const EnhancedStep5FamilyDetails = () => {
         />
 
         {/* Family Name Section */}
-        <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-accent/10">
+        <div className="rounded-xl border border-accent/10 bg-card p-6 shadow-sm dark:bg-slate-800/50 md:p-8">
           <Label htmlFor="familyName" className="mb-6 flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
             <div className="p-2 bg-accent/10 rounded-xl text-accent">
               <Home className="w-6 h-6" />
@@ -248,7 +248,7 @@ const EnhancedStep5FamilyDetails = () => {
         </div>
 
         {/* Children Section */}
-        <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-primary/10">
+        <div className="rounded-xl border border-primary/10 bg-card p-6 shadow-sm dark:bg-slate-800/50 md:p-8">
           <div className="flex items-center justify-between mb-6">
             <Label className="flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
               <div className="p-2 bg-primary/10 rounded-xl text-primary">
@@ -355,7 +355,7 @@ const EnhancedStep5FamilyDetails = () => {
         </div>
 
         {/* Parents Section */}
-        <div className="bg-card dark:bg-slate-800/50 p-6 md:p-8 rounded-[2rem] shadow-sm border-2 border-secondary/10">
+        <div className="rounded-xl border border-secondary/10 bg-card p-6 shadow-sm dark:bg-slate-800/50 md:p-8">
           <div className="flex items-center justify-between mb-6">
             <Label className="flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
               <div className="p-2 bg-secondary/10 rounded-xl text-secondary">
@@ -437,7 +437,7 @@ const EnhancedStep5FamilyDetails = () => {
 
         {/* O ano vem do "Quando?" de cada destino: pedir de novo aqui só criava
             a chance de a capa dizer um ano e o roteiro dizer outro. */}
-        <div className="flex items-center gap-3 rounded-[2rem] border-2 border-accent/10 bg-card p-6 dark:bg-slate-800/50">
+        <div className="flex items-center gap-3 rounded-xl border border-accent/10 bg-card p-6 dark:bg-slate-800/50">
           <div className="rounded-xl bg-accent/10 p-2 text-accent">
             <Calendar className="h-6 w-6" />
           </div>
@@ -451,7 +451,7 @@ const EnhancedStep5FamilyDetails = () => {
         <div className="pt-8 flex justify-center">
           <Button
             type="submit"
-            className="w-full max-w-md rounded-full bg-primary px-6 py-6 text-base font-bold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-primary/90 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
+            className="w-full max-w-md rounded-lg bg-primary px-6 py-6 text-base font-bold text-white shadow-sm transition-colors hover:bg-primary/90 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
           >
             Continuar <ArrowRight className="ml-3 w-6 h-6" />
           </Button>

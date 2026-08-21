@@ -350,7 +350,7 @@ const MapOverviewModal = ({
     <div
       className={cn(
         'shrink-0 overflow-hidden bg-muted',
-        size === 'small' ? 'h-20 w-20 rounded-xl' : 'aspect-[4/3] rounded-2xl'
+        size === 'small' ? 'h-20 w-20 rounded-xl' : 'aspect-[4/3] rounded-xl'
       )}
     >
       {landmark.image ? (
@@ -368,7 +368,7 @@ const MapOverviewModal = ({
       <div className="flex h-full flex-col">
         <header className="flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:px-6">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
+            <p className="text-xs font-semibold text-primary">
               Mapa da viagem
             </p>
             <h2 className="text-lg font-serif font-bold sm:text-xl md:text-2xl">
@@ -423,7 +423,7 @@ const MapOverviewModal = ({
                 type="button"
                 onClick={() => setShowSuggestedOnMap((current) => !current)}
                 className={cn(
-                  'flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition-colors',
+                  'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors',
                   showSuggestedOnMap
                     ? 'border-secondary/40 bg-secondary/10 text-secondary'
                     : 'border-border bg-card text-muted-foreground hover:border-secondary/40 hover:text-foreground'
@@ -470,7 +470,7 @@ const MapOverviewModal = ({
               {(exploreError || exploreNotice) && (
                 <p
                   className={cn(
-                    'rounded-2xl px-4 py-3 text-sm font-medium',
+                    'rounded-xl px-4 py-3 text-sm font-medium',
                     exploreError
                       ? 'bg-destructive/10 text-destructive'
                       : 'bg-primary/10 text-primary'
@@ -493,7 +493,7 @@ const MapOverviewModal = ({
                     onMouseEnter={() => setHoveredLandmarkId(landmark.id)}
                     onMouseLeave={() => setHoveredLandmarkId('')}
                     className={cn(
-                      'rounded-2xl border bg-card p-3 shadow-sm transition-all',
+                      'rounded-xl border bg-card p-3 shadow-sm transition-all',
                       itemActive || itemHighlighted
                         ? 'border-primary bg-primary/5 shadow-md'
                         : 'border-border hover:border-primary/40 hover:bg-muted/30'
@@ -584,7 +584,7 @@ const MapOverviewModal = ({
               })}
 
               {filteredLandmarks.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-border p-6 text-center">
+                <div className="rounded-xl border border-dashed border-border p-6 text-center">
                   <MapPin className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
                   <p className="font-bold">Nenhum ponto neste filtro.</p>
                   <p className="text-sm text-muted-foreground">
@@ -604,7 +604,7 @@ const MapOverviewModal = ({
 
             {!apiKey && (
               <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center lg:min-h-[420px] lg:p-8">
-                <div className="max-w-md rounded-2xl border border-border bg-background p-6 shadow-sm">
+                <div className="max-w-md rounded-xl border border-border bg-background p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-primary" />
                   <h3 className="mb-2 text-xl font-serif font-bold">Mapa nao configurado</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
@@ -616,7 +616,7 @@ const MapOverviewModal = ({
 
             {apiKey && visibleMapLandmarks.length === 0 && (
               <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center lg:min-h-[420px] lg:p-8">
-                <div className="max-w-md rounded-2xl border border-border bg-background p-6 shadow-sm">
+                <div className="max-w-md rounded-xl border border-border bg-background p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-secondary" />
                   <h3 className="mb-2 text-xl font-serif font-bold">Sem locais confirmados no mapa</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
@@ -628,7 +628,7 @@ const MapOverviewModal = ({
 
             {loadError && (
               <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center lg:min-h-[420px] lg:p-8">
-                <div className="max-w-md rounded-2xl border border-border bg-background p-6 shadow-sm">
+                <div className="max-w-md rounded-xl border border-border bg-background p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-destructive" />
                   <h3 className="mb-2 text-xl font-serif font-bold">Erro ao carregar mapa</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">{loadError}</p>
@@ -641,11 +641,11 @@ const MapOverviewModal = ({
             </div>
 
             {activeLandmark && (
-              <div className="absolute bottom-4 left-4 right-4 max-w-xl rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur md:right-auto md:w-[420px]">
+              <div className="absolute bottom-4 left-4 right-4 max-w-xl rounded-lg border border-border bg-background/95 p-4 shadow-sm backdrop-blur md:right-auto md:w-[420px]">
                 <div className="flex gap-3">
                   {renderPlaceMedia(activeLandmark, 'small')}
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">
+                    <p className="text-xs font-semibold text-primary">
                       {activeLandmark.city}
                     </p>
                     <h3 className="truncate text-lg font-serif font-bold">{activeLandmark.name}</h3>

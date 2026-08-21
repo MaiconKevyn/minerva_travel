@@ -16,7 +16,7 @@ const DestinationGroup = ({ destination, children, index = 0 }) => {
           <PlaneTakeoff className="w-5 h-5" />
         </div>
         <div>
-          <h3 className="text-2xl font-serif font-bold text-foreground tracking-tight uppercase">
+          <h3 className="font-serif text-2xl font-semibold tracking-tight text-foreground">
             {destination.country} <span className="text-muted-foreground/40 mx-2">—</span> {destination.city}
           </h3>
         </div>

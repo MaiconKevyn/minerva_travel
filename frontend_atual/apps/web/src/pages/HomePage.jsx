@@ -3,7 +3,6 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { ArchedText } from '@/components/GuideLockup.jsx';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import HomeHero from '@/components/HomeHero.jsx';
@@ -13,7 +12,6 @@ import HowItWorks from '@/components/HowItWorks.jsx';
 import ActivityShowcase from '@/components/ActivityShowcase.jsx';
 import HomeFaq from '@/components/HomeFaq.jsx';
 import SiteFooter from '@/components/SiteFooter.jsx';
-import { MapPinDoodle, RouteDoodle } from '@/components/DecorativeElements.jsx';
 
 const HomePage = () => (
   <>
@@ -39,11 +37,9 @@ const HomePage = () => (
         {/* Fechamento: quem rolou a página inteira não pode precisar subir
             de volta até o topo para achar o botão. */}
         <section
-          className="travel-page storybook-blush relative overflow-hidden border-t border-primary/10 py-20 sm:py-24"
+          className="travel-page editorial-section relative overflow-hidden py-16 sm:py-20"
           aria-labelledby="comecar-title"
         >
-          <MapPinDoodle className="pointer-events-none absolute -bottom-6 -left-4 h-36 w-36 -rotate-12 text-primary/10" />
-          <RouteDoodle className="pointer-events-none absolute -right-5 top-8 hidden h-36 w-72 rotate-6 text-secondary/20 sm:block" />
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -51,14 +47,10 @@ const HomePage = () => (
             transition={{ duration: 0.5 }}
             className="mx-auto max-w-2xl px-4 text-center sm:px-6 lg:px-8"
           >
-            {/* O fechamento fala como a capa: o nome do produto em arco por
-                cima do título. */}
-            <div className="mx-auto max-w-sm text-secondary">
-              <ArchedText direction="up">Guia de Memórias</ArchedText>
-            </div>
+            <span className="travel-label">Primeira página em poucos minutos</span>
             <h2
               id="comecar-title"
-              className="!mt-1 text-3xl font-serif font-bold leading-tight text-secondary sm:text-5xl"
+              className="mt-4 text-3xl font-serif font-bold leading-tight text-secondary sm:text-5xl"
             >
               A viagem já está marcada. Falta o livro.
             </h2>

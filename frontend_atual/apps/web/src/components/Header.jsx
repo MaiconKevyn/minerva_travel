@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Airplane, RouteDoodle } from './DecorativeElements.jsx';
+import { Airplane } from './DecorativeElements.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import ThemeToggle from '@/components/ThemeToggle.jsx';
 
@@ -30,7 +30,7 @@ const Header = () => {
   };
 
   return (
-    <header className="travel-page storybook-paper sticky top-0 z-50 border-b border-foreground/10 bg-background/95 shadow-[0_8px_28px_-26px_hsl(var(--foreground))] backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/90 backdrop-blur-md">
       <div className="guide-shell relative">
         <div className="flex h-[4.5rem] items-center justify-between sm:h-[5.35rem]">
 
@@ -42,21 +42,19 @@ const Header = () => {
           >
             <div
               aria-hidden="true"
-              className="relative flex h-11 w-11 rotate-[-2deg] items-center justify-center rounded-[0.8rem_1.2rem_0.9rem_1.35rem] border-2 border-secondary/25 bg-[hsl(var(--mint))] shadow-[0_3px_0_hsl(var(--secondary)/0.16)] transition-transform duration-300 group-hover:-rotate-6 sm:h-12 sm:w-12"
+              className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-secondary/20 bg-[hsl(var(--mint))] transition-colors duration-200 group-hover:border-secondary/40 sm:h-11 sm:w-11"
             >
-              <Airplane className="h-8 w-8 text-secondary" />
+              <Airplane className="h-7 w-7 text-secondary" />
             </div>
             <span className="flex flex-col leading-none">
               <span className="text-lg font-serif font-bold tracking-[-0.02em] text-secondary sm:text-[1.35rem]">
                 Guia de Memórias
               </span>
-              <span className="font-ui mt-1 text-[0.58rem] font-bold uppercase tracking-[0.2em] text-primary sm:text-[0.62rem]">
+              <span className="font-ui mt-1 text-[0.65rem] font-semibold text-primary sm:text-xs">
                 por Minerva Travel
               </span>
             </span>
           </Link>
-
-          <RouteDoodle className="pointer-events-none absolute left-[15.5rem] top-2 hidden h-12 w-28 text-secondary/20 xl:block" />
 
           {/* Desktop Navigation */}
           <nav aria-label="Navegação principal" className="font-ui hidden items-center gap-3 md:flex">
@@ -66,7 +64,7 @@ const Header = () => {
                   key={link.path}
                   to={link.path}
                   aria-current={isActive(link.path) ? 'page' : undefined}
-                  className={`relative px-4 py-2 text-sm font-bold transition-colors duration-200 lg:px-5 ${
+                  className={`relative px-4 py-2 text-sm font-semibold transition-colors duration-200 lg:px-5 ${
                     isActive(link.path)
                       ? 'text-primary after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[3px] after:-rotate-1 after:rounded-full after:bg-[hsl(var(--star))]'
                       : 'text-foreground/75 hover:text-secondary'
@@ -77,7 +75,7 @@ const Header = () => {
               ))}
             </div>
 
-            <div className="mx-1 h-8 border-l-2 border-dotted border-secondary/25 lg:mx-2"></div>
+            <div className="mx-1 h-7 border-l border-secondary/15 lg:mx-2"></div>
 
             <ThemeToggle />
 
@@ -86,20 +84,20 @@ const Header = () => {
                 <Link
                   to="/dashboard"
                   aria-current={isActive('/dashboard') ? 'page' : undefined}
-                  className="flex items-center gap-2 text-sm font-bold text-secondary transition-colors hover:text-primary"
+                  className="flex items-center gap-2 text-sm font-semibold text-secondary transition-colors hover:text-primary"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full border border-secondary/20 bg-accent/20 text-accent-foreground">
                     <User className="w-4 h-4" />
                   </div>
                   {user?.name || user?.email?.split('@')[0]}
                 </Link>
-                <Button variant="ghost" onClick={handleLogout} className="rounded-full font-bold hover:bg-destructive/10 hover:text-destructive">
+                <Button variant="ghost" onClick={handleLogout} className="rounded-lg font-semibold hover:bg-destructive/10 hover:text-destructive">
                   Sair
                 </Button>
               </div>
             ) : (
               <div className="ml-1 flex items-center gap-2">
-                <Button variant="ghost" asChild className="rounded-full font-bold">
+                <Button variant="ghost" asChild className="rounded-lg font-semibold">
                   <Link to="/login">Entrar</Link>
                 </Button>
                 <Button asChild className="travel-cta px-5 font-bold">
@@ -115,7 +113,7 @@ const Header = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full text-foreground/80 hover:bg-muted"
+              className="rounded-lg text-foreground/80 hover:bg-muted"
               onClick={() => setMobileMenuOpen((isOpen) => !isOpen)}
               aria-label={mobileMenuOpen ? 'Fechar menu principal' : 'Abrir menu principal'}
               aria-expanded={mobileMenuOpen}
@@ -135,7 +133,7 @@ const Header = () => {
           <nav
             id={mobileMenuId}
             aria-label="Navegação principal móvel"
-            className="travel-page storybook-paper absolute left-0 top-[4.5rem] w-full space-y-4 border-b border-foreground/10 bg-background px-4 py-5 pb-7 shadow-xl sm:top-[5.35rem] md:hidden"
+            className="absolute left-0 top-[4.5rem] w-full space-y-4 border-b border-foreground/10 bg-background px-4 py-5 pb-7 shadow-sm sm:top-[5.35rem] md:hidden"
           >
             <div className="space-y-2">
               {navLinks.map((link) => (
@@ -144,7 +142,7 @@ const Header = () => {
                   to={link.path}
                   onClick={() => setMobileMenuOpen(false)}
                   aria-current={isActive(link.path) ? 'page' : undefined}
-                  className={`font-ui block rounded-xl px-5 py-3 text-base font-bold transition-all duration-200 ${
+                  className={`font-ui block rounded-lg px-5 py-3 text-base font-semibold transition-colors duration-200 ${
                     isActive(link.path)
                       ? 'bg-primary/10 text-primary'
                       : 'text-foreground/80 hover:bg-muted'
@@ -155,7 +153,7 @@ const Header = () => {
               ))}
             </div>
 
-            <div className="w-full border-t-2 border-dotted border-secondary/20"></div>
+            <div className="w-full border-t border-secondary/15"></div>
 
             {isAuthenticated ? (
               <div className="space-y-2">
@@ -163,14 +161,14 @@ const Header = () => {
                   to="/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-current={isActive('/dashboard') ? 'page' : undefined}
-                  className="font-ui block rounded-xl bg-accent/10 px-5 py-3 text-base font-bold text-accent-foreground"
+                  className="font-ui block rounded-lg bg-accent/10 px-5 py-3 text-base font-semibold text-accent-foreground"
                 >
                   Meu Painel
                 </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="font-ui w-full rounded-xl px-5 py-3 text-left text-base font-bold text-destructive transition-colors hover:bg-destructive/10"
+                  className="font-ui w-full rounded-lg px-5 py-3 text-left text-base font-semibold text-destructive transition-colors hover:bg-destructive/10"
                 >
                   Sair da Conta
                 </button>
@@ -181,7 +179,7 @@ const Header = () => {
                   to="/login"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-current={isActive('/login') ? 'page' : undefined}
-                  className="font-ui block rounded-xl border-2 border-secondary/20 px-5 py-3 text-center text-base font-bold"
+                  className="font-ui block rounded-lg border border-secondary/20 px-5 py-3 text-center text-base font-semibold"
                 >
                   Entrar
                 </Link>

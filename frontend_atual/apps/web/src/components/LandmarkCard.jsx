@@ -47,17 +47,17 @@ const LandmarkCard = ({
         viewport={{ once: true, margin: "-50px" }}
         transition={{ duration: 0.4, delay: index * 0.1 }}
         className={cn(
-          "group relative rounded-3xl overflow-hidden transition-all duration-300 border bg-card dark:bg-slate-800 flex flex-col h-full",
+          "group relative flex h-full flex-col overflow-hidden rounded-xl border bg-card transition-colors duration-200 dark:bg-slate-800",
           isSelectionMode ? "cursor-pointer" : "cursor-default",
           isSelectionMode && isMentionedPlace && !isSelected
-            ? "border-primary/35 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/70"
+            ? "border-primary/35 shadow-sm hover:border-primary/70"
             : isSelectionMode && !isMentionedPlace && !isSelected
-              ? "border-secondary/35 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-secondary/70"
+              ? "border-secondary/35 shadow-sm hover:border-secondary/70"
               : isSelected && isMentionedPlace
                 ? "border-primary shadow-[0_8px_30px_rgb(241,97,59,0.15)] scale-[1.02]"
                 : isSelected
                   ? "border-secondary shadow-[0_8px_30px_rgb(72,156,200,0.15)] scale-[1.02]"
-                  : "border-border/60 dark:border-slate-700 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/30"
+                  : "border-border/60 dark:border-slate-700 shadow-sm hover:border-primary/30"
         )}
       >
         {isSelectionMode ? (
@@ -162,7 +162,7 @@ const LandmarkCard = ({
           {/* City & Location */}
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className={cn(
-              "text-xs font-bold tracking-widest uppercase flex items-center gap-1.5",
+              "flex items-center gap-1.5 text-xs font-semibold",
               sourceTone === 'primary' ? "text-primary" : "text-secondary"
             )}>
               <MapPin className="w-3.5 h-3.5" />

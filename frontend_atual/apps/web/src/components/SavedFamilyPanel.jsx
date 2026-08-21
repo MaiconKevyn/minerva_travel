@@ -145,7 +145,7 @@ const SavedFamilyPanel = ({ tripYear, collectFamilyData, onLoad }) => {
   return (
     <section
       aria-labelledby="saved-family-title"
-      className="rounded-[2rem] border-2 border-dashed border-primary/25 bg-primary/5 p-6 md:p-8"
+      className="rounded-xl border border-dashed border-primary/25 bg-primary/5 p-6 md:p-8"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">

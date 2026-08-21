@@ -20,9 +20,9 @@ const AuthTravelShell = ({ children, eyebrow, title, description, note }) => (
       <LeafSprig className="page-corner -bottom-10 -left-7 -rotate-12 text-secondary" />
 
       <div className="guide-shell relative z-10 grid items-center gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-16">
-        <section className="relative mx-auto hidden w-full max-w-md lg:block" aria-label="Apresentação do Guia de Memórias">
-          <RouteDoodle className="absolute -right-14 -top-6 z-20 h-24 w-48 rotate-6 text-secondary/50" />
-          <Airplane className="absolute -left-10 top-[43%] z-20 h-14 w-14 -rotate-12 text-primary/70" />
+        <section className="clean-surface relative mx-auto hidden w-full max-w-md overflow-hidden bg-[hsl(var(--mint)/0.55)] p-8 lg:block" aria-label="Apresentação do Guia de Memórias">
+          <RouteDoodle className="absolute -right-10 top-3 z-20 h-20 w-40 rotate-6 text-secondary/30" />
+          <Airplane className="absolute left-7 top-[43%] z-20 h-12 w-12 -rotate-12 text-primary/55" />
 
           <div className="page-frame mx-auto w-[62%] -rotate-3">
             <img
@@ -34,8 +34,8 @@ const AuthTravelShell = ({ children, eyebrow, title, description, note }) => (
             />
           </div>
 
-          <div className="travel-card absolute -bottom-5 right-0 w-52 rotate-3 px-5 py-4">
-            <p className="font-hand text-lg leading-snug text-secondary">{note}</p>
+          <div className="mt-7 border-t border-secondary/15 pt-5">
+            <p className="font-hand text-center text-lg leading-snug text-secondary">{note}</p>
           </div>
         </section>
 
@@ -48,8 +48,7 @@ const AuthTravelShell = ({ children, eyebrow, title, description, note }) => (
             <p className="editorial-copy mt-3 text-foreground/70">{description}</p>
           </div>
 
-          <div className="travel-card relative px-6 py-7 sm:px-9 sm:py-9">
-            <span aria-hidden="true" className="absolute -top-2 left-10 h-5 w-20 -rotate-2 bg-[hsl(var(--star)/0.48)]" />
+          <div className="clean-surface relative px-6 py-7 sm:px-9 sm:py-9">
             {children}
           </div>
         </section>

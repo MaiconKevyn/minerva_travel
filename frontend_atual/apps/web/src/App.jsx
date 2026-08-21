@@ -77,7 +77,7 @@ function App() {
               <div className="min-h-screen flex flex-col items-center justify-center bg-background text-center p-4 transition-colors duration-200">
                 <h1 className="text-6xl font-serif font-bold text-primary mb-4">404</h1>
                 <p className="text-xl text-muted-foreground mb-8 font-medium">Ops! Parece que você se perdeu nesta aventura.</p>
-                <a href="/" className="px-8 py-4 bg-secondary text-white rounded-full font-medium hover:bg-secondary/90 transition-colors">
+                <a href="/" className="rounded-lg bg-secondary px-8 py-4 font-medium text-white transition-colors hover:bg-secondary/90">
                   Voltar ao Início
                 </a>
               </div>
@@ -86,7 +86,7 @@ function App() {
           </Suspense>
           <Toaster
             toastOptions={{
-              className: 'bg-card font-medium border-2 border-primary/20 text-foreground rounded-2xl shadow-xl',
+              className: 'bg-card font-medium border border-primary/20 text-foreground rounded-lg shadow-sm',
             }}
           />
         </Router>

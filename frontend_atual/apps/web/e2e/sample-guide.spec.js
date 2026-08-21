@@ -56,6 +56,21 @@ test('sample guide supports keyboard paging and links to creation', async ({ pag
   await expect(page.getByRole('link', { name: 'Criar o guia da minha família' }).last()).toHaveAttribute('href', '/create');
 });
 
+test('activity catalogue filters real examples with age time and material metadata', async ({ page }) => {
+  await page.goto('/');
+
+  const catalogue = page.getByRole('heading', { name: '18 atividades diferentes' }).locator('..').locator('..');
+  const puzzleTab = page.getByRole('tab', { name: /Quebra-cabeças 7/ });
+  await puzzleTab.scrollIntoViewIfNeeded();
+  await puzzleTab.click();
+
+  await expect(puzzleTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tabpanel').getByRole('heading', { name: 'Quebra-cabeças' })).toBeVisible();
+  await expect(page.getByRole('tabpanel').getByText('Caça-palavras', { exact: true })).toBeVisible();
+  await expect(page.getByRole('tabpanel').getByText('10–15 min', { exact: true }).first()).toBeVisible();
+  await expect(catalogue).toBeVisible();
+});
+
 test('a virada gira uma folha só, sem o livro sumir nem pular', async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
