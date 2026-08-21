@@ -112,7 +112,7 @@ test('restored creation explains progress and safely continues later', async ({ 
   await mockContinuityApis(page);
   await page.goto('/create', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByRole('heading', { name: 'Quem vai viajar' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Quem embarca?' })).toBeVisible();
   await expect(page.getByText(/Próximo:/)).toContainText('Atividades');
   await expect(page.getByRole('progressbar', { name: 'Progresso da criação do guia' }))
     .toHaveAttribute('aria-valuenow', '3');
@@ -162,7 +162,7 @@ test.describe('creation continuity at the 390 px narrow boundary', () => {
     await mockContinuityApis(page);
     await page.goto('/create', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: 'Quem vai viajar' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Quem embarca?' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continuar depois' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Descartar', exact: true })).toBeVisible();
     await assertNoHorizontalOverflow(page);

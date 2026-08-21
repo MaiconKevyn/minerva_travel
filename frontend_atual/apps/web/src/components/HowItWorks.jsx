@@ -9,17 +9,17 @@ import { GuideLockup } from '@/components/GuideLockup.jsx';
  */
 const STEPS = [
   {
-    title: 'Conte a viagem',
+    title: 'Contem a viagem',
     description:
-      'Diga os destinos, os pontos turísticos que já estão no roteiro e quem vai viajar. As idades das crianças ajustam as atividades.',
+      'Digam os destinos, os pontos turísticos que já estão no roteiro e quem embarca. As idades das crianças ajustam as atividades.',
   },
   {
-    title: 'Aprove a sua capa',
+    title: 'Aprovem a capa',
     description:
-      'Veja a capa ilustrada, peça mudanças de estilo e aprove quando ela representar bem a família e a viagem.',
+      'Vejam a capa ilustrada, peçam mudanças de estilo e aprovem quando ela tiver a cara da família e da viagem.',
   },
   {
-    title: 'Receba o livro por e-mail',
+    title: 'Recebam o livro por e-mail',
     description:
       'Com um clique, criamos todas as páginas em segundo plano e enviamos o PDF A4 pronto para imprimir e encadernar.',
   },
@@ -34,7 +34,7 @@ const HowItWorks = () => (
       <GuideLockup
         id="como-funciona-title"
         overline="Como funciona"
-        title="Três passos até o livro da sua família"
+        title="Três passos até o livro de vocês"
         arched="Do roteiro ao PDF"
       />
 

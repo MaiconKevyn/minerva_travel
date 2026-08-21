@@ -24,7 +24,7 @@ const STEP_NAMES = {
   1: 'Destinos da viagem',
   2: 'Ritmo da família',
   3: 'Pontos turísticos',
-  4: 'Quem vai viajar',
+  4: 'Quem embarca?',
   5: 'Atividades',
   6: 'Capa do guia',
   7: 'Revisão',
@@ -98,7 +98,7 @@ const CreateGuidePageContent = () => {
               <Loader2 className="mx-auto mb-5 h-12 w-12 animate-spin text-primary" aria-hidden="true" />
               <h1 className="font-display text-3xl font-bold text-secondary">Retomando seu guia…</h1>
               <p className="editorial-copy mt-3 text-muted-foreground">
-                Estamos recuperando a etapa, as escolhas e as páginas que você já gerou.
+                Estamos reabrindo a etapa, as escolhas e as páginas que você já criou.
               </p>
             </div>
           </main>
@@ -111,7 +111,7 @@ const CreateGuidePageContent = () => {
     <>
       <Helmet>
         <title>Criar Guia - Minerva Travel</title>
-        <meta name="description" content="Crie seu guia de viagem conversando com nosso assistente." />
+        <meta name="description" content="Monte o guia de atividades da viagem da sua família: um PDF ilustrado para a criança preencher pelo caminho." />
       </Helmet>
 
       <div className="min-h-screen bg-background flex flex-col transition-colors duration-200">

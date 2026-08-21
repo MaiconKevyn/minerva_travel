@@ -62,7 +62,7 @@ const itineraryModeOptions = [
   {
     id: 'suggested',
     label: 'Quero sugestões',
-    description: 'Gerar uma rota editável antes das atrações.',
+    description: 'Receber uma rota pronta para ajustar antes das atrações.',
     icon: Route,
   },
 ];
@@ -303,7 +303,7 @@ const Step3Destination = () => {
       const data = await suggestItineraryRoutes(payload);
       setSuggestedRoutes(data.options || []);
     } catch (nextError) {
-      setError(nextError.message || 'Não foi possível gerar sugestões de roteiro.');
+      setError(nextError.message || 'Não conseguimos sugerir rotas agora. Tente de novo em instantes.');
     } finally {
       setIsLoadingSuggestions(false);
     }
@@ -402,7 +402,7 @@ const Step3Destination = () => {
                 onClick={applyFreeformItinerary}
                 className="rounded-full px-6 py-5 font-bold"
               >
-                Converter em destinos
+                Transformar em destinos
               </Button>
               {freeformResult?.followUpQuestions?.some((question) => question.field === 'order') && (
                 <Button
@@ -455,7 +455,7 @@ const Step3Destination = () => {
                 ) : (
                   <Route className="mr-2 h-4 w-4" />
                 )}
-                Gerar opções
+                Buscar sugestões
               </Button>
               {suggestedRoutes.length > 0 && (
                 <Button
@@ -464,7 +464,7 @@ const Step3Destination = () => {
                   onClick={rejectSuggestedRoutes}
                   className="rounded-full px-6 py-5 font-bold"
                 >
-                  Inserir manualmente
+                  Preencher à mão
                 </Button>
               )}
             </div>
@@ -522,7 +522,7 @@ const Step3Destination = () => {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.4fr_1fr_0.7fr]">
               <div className="space-y-2">
                 <Label htmlFor={`${destination.id}-place`} className="font-bold">
-                  Pra onde você vai?
+                  Pra onde vocês vão?
                 </Label>
                 <PlaceAutocomplete
                   id={`${destination.id}-place`}

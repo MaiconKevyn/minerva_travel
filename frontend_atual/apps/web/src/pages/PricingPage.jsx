@@ -12,8 +12,8 @@ import { formatPrice, getGuideProduct } from '@/utils/minerva-api.js';
 const FEATURES = [
   'Livro infantil personalizado em PDF A4',
   'Roteiro ilustrado na ordem da viagem',
-  'Atividades calibradas para cada idade',
-  'Foto familiar transformada em capa ilustrada',
+  'Atividades na medida certa de cada idade',
+  'A foto da família vira capa ilustrada',
   'Download privado do guia completo',
 ];
 
@@ -21,17 +21,17 @@ const TRUST_NOTES = [
   {
     icon: ShieldCheck,
     title: 'Pagamento fora do nosso site',
-    description: 'Os dados financeiros são informados no ambiente seguro do Mercado Pago.',
+    description: 'Os dados financeiros ficam no ambiente seguro do Mercado Pago. Aqui, só a viagem de vocês.',
   },
   {
     icon: BadgeCheck,
     title: 'Uma compra, um livro completo',
-    description: 'Sem mensalidade: o valor corresponde ao guia personalizado desta viagem.',
+    description: 'Sem mensalidade: o valor é o do guia desta viagem, que fica com vocês para sempre.',
   },
   {
     icon: Heart,
     title: 'A foto continua sendo da família',
-    description: 'Uso consentido para criar a capa, com exclusão e privacidade explícitas.',
+    description: 'Usamos a foto só para criar a capa, com consentimento — e ela pode ser excluída quando vocês pedirem.',
   },
 ];
 
@@ -80,8 +80,8 @@ const PricingPage = () => {
                   Um livro completo. Uma única compra.
                 </h1>
                 <p className="editorial-copy mx-auto mt-5 max-w-2xl text-foreground/70">
-                  Não é assinatura nem pacote de créditos. Você paga uma vez e recebe o guia de
-                  memórias personalizado da sua família, pronto para imprimir.
+                  Não é assinatura nem pacote de créditos. Vocês pagam uma vez e recebem o guia de
+                  memórias personalizado da família, pronto para imprimir, folhear e preencher pelo caminho.
                 </p>
               </motion.div>
 

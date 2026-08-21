@@ -285,9 +285,9 @@ const Step5Review = () => {
     <div className="w-full max-w-4xl mx-auto space-y-12">
       <div className="text-center space-y-4">
         <h2 className="text-3xl md:text-4xl font-display font-bold text-secondary">
-          Perfeito! Aqui está o resumo do seu roteiro
+          Tudo pronto! Aqui está o resumo da viagem
         </h2>
-        <p className="editorial-copy text-lg text-muted-foreground">Revise as informações antes de gerarmos o guia ilustrado da família.</p>
+        <p className="editorial-copy text-lg text-muted-foreground">Revise as informações antes de criarmos o guia ilustrado da família.</p>
       </div>
 
       <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm sm:p-8 md:p-12">
@@ -375,7 +375,7 @@ const Step5Review = () => {
 
         <div className="mt-12 pt-8 border-t border-border/50">
           <h3 className="mb-8 flex items-center gap-2 text-xl font-display font-bold text-primary sm:text-2xl">
-            <MapPin className="w-6 h-6 text-[hsl(var(--star))]" /> O Roteiro Mágico
+            <MapPin className="w-6 h-6 text-[hsl(var(--star))]" /> O roteiro da aventura
             <span className="font-data text-sm font-bold text-muted-foreground">
               {pluralize(finalLandmarks.length, 'local selecionado', 'locais selecionados')}
             </span>
@@ -546,7 +546,7 @@ const Step5Review = () => {
             </h3>
             <p className="mt-1 text-sm font-medium text-muted-foreground">
               Estes textos são copiados letra por letra para as páginas do livro.
-              Depois de gerar, corrigir um nome exige refazer as páginas.
+              Depois de criado o guia, corrigir um nome exige refazer as páginas.
             </p>
           </div>
         </div>
@@ -684,7 +684,7 @@ const Step5Review = () => {
       )}
       {isGenerating && (
         <p className="mt-4 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
-          Salvando seu roteiro antes de abrir o Mercado Pago. Nenhuma imagem será gerada sem sua confirmação nem antes da liberação do pagamento.
+          Salvando seu roteiro antes de abrir o Mercado Pago. Nenhuma imagem será criada sem sua confirmação nem antes da liberação do pagamento.
         </p>
       )}
     </div>

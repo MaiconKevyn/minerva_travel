@@ -31,10 +31,10 @@ const LoginPage = () => {
     const result = await login(email, password);
 
     if (result.success) {
-      toast.success('Bem-vindo de volta às aventuras!');
+      toast.success('Que bom ter vocês de volta.');
       navigate(from, { replace: true });
     } else {
-      toast.error(result.error || 'Email ou senha incorretos. Tente novamente!');
+      toast.error(result.error || 'E-mail ou senha incorretos. Tente novamente.');
     }
 
     setIsSubmitting(false);
@@ -44,7 +44,7 @@ const LoginPage = () => {
     const cleanEmail = email.trim();
 
     if (!cleanEmail) {
-      toast.error('Digite seu email primeiro para recuperar a senha.');
+      toast.error('Digite seu e-mail primeiro para recuperar a senha.');
       return;
     }
 
@@ -53,9 +53,9 @@ const LoginPage = () => {
     const result = await requestPasswordReset(cleanEmail, redirectTo);
 
     if (result.success) {
-      toast.success('Enviamos um link de recuperação para o seu email.');
+      toast.success('Enviamos um link de recuperação para o seu e-mail.');
     } else {
-      toast.error(result.error || 'Não foi possível enviar o email de recuperação.');
+      toast.error(result.error || 'Não foi possível enviar o e-mail de recuperação.');
     }
 
     setIsResetting(false);
@@ -65,25 +65,25 @@ const LoginPage = () => {
     <>
       <Helmet>
         <title>Entrar - Minerva Travel</title>
-        <meta name="description" content="Faça login para acessar seus guias de viagem personalizados." />
+        <meta name="description" content="Entre para abrir a estante de guias de viagem da família." />
       </Helmet>
 
       <AuthTravelShell
         eyebrow="Acesso à sua conta"
-        title={signupReason ? 'Sua conta está pronta!' : 'Bem-vindo de volta!'}
+        title={signupReason ? 'Sua conta está pronta!' : 'Bem-vindos de volta!'}
         description={signupReason === 'confirm-email'
           ? 'Confirme o e-mail que enviamos e entre para começar.'
           : signupReason === 'signed-up'
             ? 'Entre com a senha que você acabou de criar.'
             : 'Abra sua estante de viagens e continue de onde parou.'}
-        note="Seus guias e rascunhos continuam guardados na sua biblioteca."
+        note="Seus guias e rascunhos continuam guardados na estante de viagens."
       >
             <div className="mb-7 flex items-center gap-3 border-b border-secondary/15 pb-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary/10">
                 <Key className="h-6 w-6 text-secondary" aria-hidden="true" />
               </div>
               <div>
-                <p className="font-display text-xl font-bold text-secondary">Acesse sua conta</p>
+                <p className="font-display text-xl font-bold text-secondary">Entre na sua conta</p>
                 <p className="font-ui text-sm text-muted-foreground">Seus guias ficam guardados com segurança.</p>
               </div>
             </div>

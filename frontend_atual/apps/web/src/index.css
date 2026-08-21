@@ -734,7 +734,6 @@
     box-shadow:
       inset 0 0 24px rgba(111, 82, 43, 0.08),
       0 18px 26px -14px rgba(74, 55, 30, 0.45);
-    transition: transform 280ms ease, filter 280ms ease;
     backface-visibility: hidden;
   }
 
@@ -750,6 +749,35 @@
 
   .sample-guide-single .sample-guide-page--right {
     border-radius: 0.8rem;
+  }
+
+  /* Sombra que a folha em movimento projeta sobre a pagina de baixo. Fica
+     fora da folha para continuar visivel enquanto ela cruza os 90 graus. */
+  .sample-guide-cast-shadow {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 5;
+    width: 50%;
+    pointer-events: none;
+    will-change: opacity, transform;
+  }
+
+  .sample-guide-cast-shadow--right {
+    left: 50%;
+    transform-origin: left center;
+    background: linear-gradient(90deg, rgba(61, 43, 24, 0.3), rgba(61, 43, 24, 0.08) 18%, transparent 58%);
+  }
+
+  .sample-guide-cast-shadow--left {
+    left: 0;
+    transform-origin: right center;
+    background: linear-gradient(270deg, rgba(61, 43, 24, 0.3), rgba(61, 43, 24, 0.08) 18%, transparent 58%);
+  }
+
+  .sample-guide-book--single .sample-guide-cast-shadow {
+    left: 0;
+    width: 100%;
   }
 
   /* A folha que gira. Uma so, presa na lombada: e o unico jeito de parecer
@@ -833,17 +861,8 @@
     transform: scaleX(-1);
   }
 
-  .sample-guide-page--turnable:hover::after,
   .sample-guide-page--turnable:focus-visible::after {
     opacity: 1;
-  }
-
-  .sample-guide-page--right.sample-guide-page--turnable:hover {
-    transform: rotateY(-2.5deg) translateX(2px);
-  }
-
-  .sample-guide-page--left.sample-guide-page--turnable:hover {
-    transform: rotateY(2.5deg) translateX(-2px);
   }
 
   .sample-guide-page--turnable:focus-visible {

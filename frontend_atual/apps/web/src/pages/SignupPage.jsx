@@ -34,7 +34,7 @@ const SignupPage = () => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      toast.error('As senhas não coincidem!');
+      toast.error('As senhas não coincidem.');
       return;
     }
 
@@ -75,8 +75,8 @@ const SignupPage = () => {
       <AuthTravelShell
         eyebrow="Criação de conta"
         title="Crie sua conta"
-        description="Crie sua conta para montar o guia, guardar cada viagem e voltar às histórias quando quiser."
-        note="Cada guia fica salvo na sua biblioteca e pode ser baixado com segurança."
+        description="Com ela vocês montam o guia, guardam cada viagem e voltam às histórias quando bater saudade."
+        note="Cada guia ganha um lugar na estante de viagens da família e pode ser baixado com segurança."
       >
             <div className="mb-7 flex items-center gap-3 border-b border-primary/15 pb-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">

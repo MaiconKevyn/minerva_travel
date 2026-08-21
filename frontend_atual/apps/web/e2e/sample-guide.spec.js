@@ -9,10 +9,10 @@ test('visitor can browse every page of the sample guide', async ({ page }, testI
   // O livro já chega aberto: a vitrine é o folhear, sem clique de cortina.
   await expect(guide.getByLabel('Leitor do guia de exemplo. Use as setas esquerda e direita para folhear.')).toBeVisible();
   await expect(guide.getByText('Capa · página 1 de 19', { exact: true })).toBeVisible();
-  // Recolher continua possível e volta ao leque de páginas-chave.
-  await guide.getByRole('button', { name: 'Recolher guia' }).click();
+  // Fechar o livro continua possível e volta ao leque de páginas-chave.
+  await guide.getByRole('button', { name: 'Fechar o livro' }).click();
   await expect(guide.getByRole('button', { name: /Abrir o guia na página/ })).toHaveCount(5);
-  await guide.getByRole('button', { name: 'Abrir as 19 páginas' }).click();
+  await guide.getByRole('button', { name: 'Folhear as 19 páginas' }).click();
   await expect(guide.getByText('Capa · página 1 de 19', { exact: true })).toBeVisible();
   await expect(guide.getByAltText(/Página 1 do guia de exemplo: Capa da Família Knopp/)).toBeVisible();
 
@@ -152,4 +152,65 @@ test('a virada gira uma folha só, sem o livro sumir nem pular', async ({ page }
     ? 'Página 2 de 19'
     : 'Páginas 2 e 3 de 19';
   await expect(guide.getByText(expectedLabel, { exact: true })).toBeVisible();
+});
+
+test('a folha clicada assenta sem abrir vão nem acender uma sombra lateral', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+
+  const guide = page.locator('#guia-exemplo');
+  const bookSurface = guide.locator('.sample-guide-spread, .sample-guide-single');
+  const leaf = guide.locator('.sample-guide-leaf');
+  const castShadow = guide.locator('.sample-guide-cast-shadow');
+  const rightPage = bookSurface.locator(
+    ':scope > .sample-guide-page--right.sample-guide-page--turnable',
+  );
+
+  const measureSettlement = () =>
+    bookSurface.evaluate((element) => {
+      const left = element.querySelector(':scope > .sample-guide-page--left');
+      const right = element.querySelector(':scope > .sample-guide-page--right');
+      const leftRect = left?.getBoundingClientRect();
+      const rightRect = right.getBoundingClientRect();
+      return {
+        gap: leftRect ? rightRect.left - leftRect.right : 0,
+        leftTransform: left ? getComputedStyle(left).transform : 'none',
+        rightTransform: getComputedStyle(right).transform,
+      };
+    });
+
+  const expectGradualCastShadow = async (side) => {
+    await expect(leaf).toHaveCount(1);
+    await expect(castShadow).toHaveClass(new RegExp(`sample-guide-cast-shadow--${side}`));
+    await expect.poll(
+      async () => Number(await castShadow.evaluate((element) => getComputedStyle(element).opacity)),
+      { timeout: 600 },
+    ).toBeGreaterThan(0.04);
+    await expect(leaf).toHaveCount(0, { timeout: 4000 });
+    await expect(castShadow).toHaveCount(0);
+  };
+
+  await rightPage.scrollIntoViewIfNeeded();
+  await rightPage.click();
+  await expectGradualCastShadow('right');
+
+  const settled = await measureSettlement();
+  expect(Math.abs(settled.gap)).toBeLessThan(0.5);
+  expect(settled.leftTransform).toBe('none');
+  expect(settled.rightTransform).toBe('none');
+
+  // No livro aberto, a volta usa a outra lombada e precisa assentar com a
+  // mesma continuidade. No celular a pagina unica volta pelo controle.
+  if (!testInfo.project.name.includes('mobile')) {
+    const leftPage = bookSurface.locator(
+      ':scope > .sample-guide-page--left.sample-guide-page--turnable',
+    );
+    await leftPage.click();
+    await expectGradualCastShadow('left');
+
+    const settledBack = await measureSettlement();
+    expect(Math.abs(settledBack.gap)).toBeLessThan(0.5);
+    expect(settledBack.leftTransform).toBe('none');
+    expect(settledBack.rightTransform).toBe('none');
+  }
 });

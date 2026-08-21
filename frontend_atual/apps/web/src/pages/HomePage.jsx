@@ -16,10 +16,10 @@ import SiteFooter from '@/components/SiteFooter.jsx';
 const HomePage = () => (
   <>
     <Helmet>
-      <title>Minerva Travel - Livro de atividades da viagem da sua família</title>
+      <title>Minerva Travel — A viagem da família vira um livro de atividades</title>
       <meta
         name="description"
-        content="Transforme o roteiro que a sua família já marcou em um livro de atividades ilustrado, no nível de cada criança, em PDF A4 para imprimir."
+        content="Transforme o roteiro que vocês já marcaram em um livro de atividades ilustrado, no nível de cada criança, em PDF A4 pronto para imprimir."
       />
     </Helmet>
 
@@ -55,8 +55,8 @@ const HomePage = () => (
               A viagem já está marcada. Falta o livro.
             </h2>
             <p className="editorial-copy mt-4 text-foreground/70">
-              Comece pelo roteiro que vocês já têm — em poucos minutos você vê a primeira página
-              ilustrada na tela.
+              Comecem pelo roteiro que vocês já têm — a primeira página ilustrada aparece na
+              tela, pronta para embarcar com vocês.
             </p>
             <Button
               asChild

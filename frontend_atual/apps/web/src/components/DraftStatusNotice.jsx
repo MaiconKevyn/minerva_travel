@@ -36,7 +36,7 @@ const DraftStatusNotice = ({
   if (!config) return null;
 
   const restoredMessage = restoredProgress && builderSessionId
-    ? 'Progresso recuperado. Suas páginas geradas continuam salvas com segurança.'
+    ? 'Progresso recuperado. As páginas já criadas continuam guardadas em segurança.'
     : restoredProgress
       ? 'Seu rascunho foi recuperado e está salvo.'
       : '';

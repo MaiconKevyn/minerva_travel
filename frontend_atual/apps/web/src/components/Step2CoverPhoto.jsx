@@ -119,7 +119,7 @@ const Step2CoverPhoto = () => {
             className="w-full text-center space-y-8"
           >
             <h2 className="text-3xl md:text-4xl font-display font-bold text-secondary leading-tight">
-              Seu roteiro está pronto. Como você quer a capa?
+              O roteiro está pronto. Como vocês querem a capa?
             </h2>
             <p className="editorial-copy text-lg text-muted-foreground">
               Envie uma foto para virar ilustração, descreva a cena que imaginou, ou siga sem
@@ -171,7 +171,7 @@ const Step2CoverPhoto = () => {
                     PNG, JPG ou WEBP até 10 MB
                   </p>
                   {isValidatingPhoto && (
-                    <p className="mt-2 text-sm font-semibold text-primary">Validando foto...</p>
+                    <p className="mt-2 text-sm font-semibold text-primary">Conferindo a foto...</p>
                   )}
                 </div>
               )}
@@ -250,7 +250,7 @@ const Step2CoverPhoto = () => {
                 className="flex items-center gap-3 text-lg font-bold text-foreground"
               >
                 <Palette className="h-6 w-6 text-secondary" aria-hidden="true" />
-                Como você imagina a capa?
+                Como vocês imaginam a capa?
               </label>
               <p className="mt-1 text-sm font-medium text-muted-foreground">
                 {coverPhoto

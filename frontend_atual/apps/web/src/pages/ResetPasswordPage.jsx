@@ -89,14 +89,14 @@ const ResetPasswordPage = () => {
     <>
       <Helmet>
         <title>Redefinir Senha - Minerva Travel</title>
-        <meta name="description" content="Crie uma nova senha para acessar sua conta." />
+        <meta name="description" content="Crie uma nova senha para voltar à sua conta." />
       </Helmet>
 
       <AuthTravelShell
         eyebrow="Recuperação de acesso"
         title="Crie uma nova senha"
         description="Escolha uma senha forte para voltar à sua estante de viagens com segurança."
-        note="A troca de senha não altera seus guias nem os rascunhos salvos."
+        note="Trocar a senha não mexe na estante: guias e rascunhos ficam onde estão."
       >
             <div className="mb-7 flex items-center gap-3 border-b border-secondary/15 pb-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary/10">
@@ -128,7 +128,7 @@ const ResetPasswordPage = () => {
                   asChild
                   className="travel-cta w-full py-6 text-lg font-bold"
                 >
-                  <Link to="/login">Solicitar novo link</Link>
+                  <Link to="/login">Pedir um novo link</Link>
                 </Button>
               </div>
             )}

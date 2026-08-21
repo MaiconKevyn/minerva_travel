@@ -301,7 +301,7 @@ const Step4Attractions = () => {
       setMapLocationNotice(
         resolvedCount > 0
           ? `${resolvedCount} ${resolvedCount === 1 ? 'local confirmado foi localizado' : 'locais confirmados foram localizados'} no mapa.`
-          : 'Tentamos novamente, mas alguns locais ainda não retornaram coordenadas.'
+          : 'Tentamos de novo, mas alguns locais ainda ficaram sem posição no mapa.'
       );
     } catch (err) {
       console.error('Error resolving confirmed map locations:', err);
@@ -465,7 +465,7 @@ const Step4Attractions = () => {
         <section className="pt-6 space-y-5 border-t border-border/60">
           <div>
             <p className="travel-label">
-              Outras opcoes
+              Outras opções
             </p>
             <h3 className="font-display text-2xl font-bold text-secondary md:text-3xl">
               Trocas e extras para o roteiro
@@ -627,7 +627,7 @@ const Step4Attractions = () => {
               <AlertCircle className="w-10 h-10" />
             </div>
             <div>
-              <h2 className="font-display text-2xl font-bold text-secondary mb-3">Ops! Tivemos um imprevisto</h2>
+              <h2 className="font-display text-2xl font-bold text-secondary mb-3">Tivemos um imprevisto no caminho</h2>
               <p className="editorial-copy text-muted-foreground">{error}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full pt-4">
@@ -665,7 +665,7 @@ const Step4Attractions = () => {
               <Loader2 className="w-8 h-8 animate-spin" />
             </div>
             <h2 className="font-display text-3xl font-bold text-secondary">
-              Preparando os cards...
+              Preparando os lugares da viagem...
             </h2>
           </motion.div>
         ) : hasSearchedLandmarks && parsedData.landmarks.length > 0 ? (
@@ -680,7 +680,7 @@ const Step4Attractions = () => {
                 {itineraryMode
                   ? 'Roteiro sugerido para a sua família'
                   : manualMode
-                    ? 'Seu roteiro informado'
+                    ? 'O roteiro que vocês montaram'
                     : 'Locais encontrados para sua viagem'}
               </h2>
               <p className="editorial-copy mx-auto max-w-2xl text-muted-foreground">
@@ -742,11 +742,11 @@ const Step4Attractions = () => {
                           <p className="font-bold text-foreground">
                             {missingMapLandmarks.length}{' '}
                             {missingMapLandmarks.length === 1
-                              ? 'local confirmado ainda esta sem mapa'
-                              : 'locais confirmados ainda estao sem mapa'}
+                              ? 'local confirmado ainda está sem mapa'
+                              : 'locais confirmados ainda estão sem mapa'}
                           </p>
                           <p className="text-xs font-medium text-muted-foreground">
-                            Vou tentar resolver novamente pelo Google Places antes de fechar o roteiro.
+                            Vamos tentar localizar de novo pelo Google Places antes de fechar o roteiro.
                           </p>
                         </div>
                       </div>
@@ -810,9 +810,9 @@ const Step4Attractions = () => {
             animate={{ opacity: 1 }}
             className="flex flex-col items-center justify-center py-20 text-center"
           >
-            <h2 className="font-display text-3xl font-bold text-secondary mb-4">Nenhum ponto especifico encontrado</h2>
+            <h2 className="font-display text-3xl font-bold text-secondary mb-4">Nenhum ponto específico encontrado</h2>
             <p className="editorial-copy text-muted-foreground mb-8 max-w-md mx-auto">
-              Não conseguimos extrair monumentos exatos do seu texto. Deseja adicionar mais detalhes?
+              Não achamos pontos turísticos claros no seu texto. Quer detalhar um pouco mais o roteiro?
             </p>
             <Button onClick={goBack} variant="outline" className="rounded-full px-8 py-6 text-lg">
               <ArrowLeft className="w-5 h-5 mr-2" /> Editar destino

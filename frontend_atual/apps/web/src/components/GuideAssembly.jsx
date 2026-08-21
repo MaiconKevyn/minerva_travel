@@ -329,7 +329,7 @@ const GuideAssembly = ({ session: initialSession }) => {
               <div className="max-w-sm text-center" role="status" aria-live="polite">
                 <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" aria-hidden="true" />
                 <p className="mt-5 text-xl font-bold text-foreground">Criando o preview da capa…</p>
-                <p className="mt-2 text-sm text-muted-foreground">A ilustração, o nome da família e a data são produzidos juntos.</p>
+                <p className="mt-2 text-sm text-muted-foreground">A ilustração, o nome da família e a data nascem juntos.</p>
               </div>
             ) : (
               <div className="max-w-sm text-center text-muted-foreground">
@@ -482,7 +482,7 @@ const GuideAssembly = ({ session: initialSession }) => {
               )}
               <div className="mt-4 flex items-start gap-3 rounded-xl border border-secondary/20 bg-card p-4">
                 <Mail className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
-                <p className="text-sm font-medium text-muted-foreground">Não é preciso aguardar no site. O processamento continua mesmo que você saia.</p>
+                <p className="text-sm font-medium text-muted-foreground">Não é preciso esperar no site. A criação continua mesmo que você saia.</p>
               </div>
               {jobFailed && <p className="mt-4 text-sm font-bold text-destructive" role="alert">{job.error?.message || 'A criação foi interrompida. Você pode tentar novamente.'}</p>}
               {jobError && <p className="mt-4 text-sm font-bold text-destructive" role="alert">{jobError}</p>}
@@ -493,7 +493,7 @@ const GuideAssembly = ({ session: initialSession }) => {
             <div className="rounded-2xl border border-secondary/30 bg-[hsl(var(--mint))] p-6 shadow-sm">
               <CircleCheck className="h-11 w-11 text-secondary" aria-hidden="true" />
               <h2 className="mt-4 font-display text-2xl font-bold text-secondary">Guia pronto e enviado</h2>
-              <p className="mt-2 text-sm font-medium text-muted-foreground">Enviamos por e-mail o link do PDF com {job.result?.page_count || session.pages.length} páginas.</p>
+              <p className="mt-2 text-sm font-medium text-muted-foreground">Enviamos por e-mail o link do PDF com {job.result?.page_count || session.pages.length} páginas. Agora é imprimir, pôr na mochila e partir.</p>
               <Button type="button" onClick={handleDownload} className="mt-5 w-full rounded-full py-6 font-bold">
                 <Download className="mr-2 h-5 w-5" /> Baixar PDF agora
               </Button>

@@ -57,7 +57,7 @@ const jobStageLabel = (stage) => ({
   preparing_assets: 'Preparando as ilustrações',
   generating_content: 'Criando as páginas do livro',
   rendering_pdf: 'Montando o PDF',
-  persisting: 'Salvando na sua biblioteca',
+  persisting: 'Guardando na sua estante',
   finalizing: 'Finalizando a entrega',
 }[stage] || 'Criando o guia');
 
@@ -386,7 +386,7 @@ const DashboardPage = () => {
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-xs font-semibold text-secondary">
-                                  Preview aprovado
+                                  Prévia aprovada
                                 </p>
                                 <span className={`rounded-full px-3 py-1 text-xs font-bold ${status.className}`}>
                                   {status.label}
@@ -475,7 +475,7 @@ const DashboardPage = () => {
                 >
                   <AlertCircle className="w-10 h-10 text-destructive" aria-hidden="true" />
                   <div>
-                    <h3 className="text-xl font-bold font-display text-foreground">Não foi possível abrir sua biblioteca</h3>
+                    <h3 className="text-xl font-bold font-display text-foreground">Não foi possível abrir sua estante de viagens</h3>
                     <p className="mt-2 text-muted-foreground font-medium">{loadError}</p>
                   </div>
                   <Button type="button" variant="outline" onClick={() => requestGuideList()} className="rounded-lg">
@@ -488,11 +488,11 @@ const DashboardPage = () => {
                   <div className="mb-2 flex h-20 w-20 items-center justify-center rounded-lg bg-[hsl(var(--blush)/0.55)]">
                     <BookOpen className="w-10 h-10 text-muted-foreground/50" aria-hidden="true" />
                   </div>
-                  <h3 className="text-xl font-bold font-display text-foreground">O livro está em branco!</h3>
+                  <h3 className="text-xl font-bold font-display text-foreground">A estante ainda está vazia</h3>
                   <p className="text-muted-foreground font-medium max-w-sm">
                     {generationJobs.length > 0
                       ? 'Seu primeiro livro ainda está sendo criado e aparecerá aqui quando estiver pronto.'
-                      : 'Você ainda não criou nenhum guia. Que tal planejar a próxima aventura?'}
+                      : 'Vocês ainda não criaram nenhum guia. Que tal abrir o mapa da próxima aventura?'}
                   </p>
                   {generationJobs.length === 0 && (
                     <Button asChild className="travel-cta mt-2 px-6 font-bold">

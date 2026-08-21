@@ -7,6 +7,10 @@ const CURRENT_YEAR = new Date().getFullYear();
 const SiteFooter = () => (
   <footer className="travel-page storybook-paper mt-auto border-t border-secondary/15 py-10 transition-colors duration-200 sm:py-12">
     <div className="guide-shell">
+      {/* O fecho da página: o adeus de quem despacha a família para a viagem. */}
+      <p className="editorial-copy mb-8 text-center text-foreground/70">
+        O guia vai na mochila. As memórias voltam com vocês.
+      </p>
       <div className="grid items-center gap-7 text-center md:grid-cols-[1fr_auto_1fr] md:text-left">
         <Link
           to="/"

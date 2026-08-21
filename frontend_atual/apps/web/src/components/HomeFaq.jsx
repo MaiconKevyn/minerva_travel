@@ -46,10 +46,10 @@ const QUESTIONS = [
   {
     question: 'E se eu não gostar da capa?',
     answer:
-      'Você pode gerar outra versão da capa antes de aprová-la. Depois da aprovação, as demais páginas são criadas em segundo plano e o guia pronto aparece na sua biblioteca e chega por e-mail.',
+      'Você pode pedir outra versão da capa antes de aprová-la. Depois da aprovação, as demais páginas são criadas em segundo plano e o guia pronto aparece na sua biblioteca e chega por e-mail.',
   },
   {
-    question: 'O guia fala sobre o idioma do país?',
+    question: 'A criança aprende frases do idioma?',
     answer: `Quando a atividade "Sobrevivência no idioma" é escolhida, sim: a criança leva cinco frases para pedir sozinha, no idioma do destino. Hoje cobrimos ${PHRASEBOOK_COUNTRIES.size} países.`,
   },
   {
@@ -69,7 +69,7 @@ const QUESTIONS = [
 const HomeFaq = () => (
   <section className="travel-page editorial-section py-16 sm:py-20" aria-labelledby="faq-title">
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-      <GuideLockup id="faq-title" overline="Antes de começar" title="Perguntas que todo pai faz" />
+      <GuideLockup id="faq-title" overline="Antes de embarcar" title="Perguntas que todo pai faz" />
 
       <div className="mt-10 overflow-hidden rounded-2xl border border-secondary/15 bg-[hsl(var(--paper))]">
         {QUESTIONS.map((item) => (

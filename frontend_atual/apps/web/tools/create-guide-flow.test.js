@@ -162,7 +162,7 @@ test('review starts a page session without triggering legacy PDF generation', ()
   const review = readProjectFile('src/components/Step5Review.jsx');
 
   assert.match(review, /Criar e revisar a capa/);
-  assert.match(review, /Nenhuma imagem será gerada sem sua confirmação/);
+  assert.match(review, /Nenhuma imagem será criada sem sua confirmação/);
   assert.match(review, /createGuideBuilder/);
   assert.match(review, /<GuideAssembly session=\{builderSession\}/);
   assert.doesNotMatch(review, /generatePDF|downloadGuidePdf|fetchGuidePreviewHtml|legacyGenerate/);
@@ -196,7 +196,7 @@ test('final assembly reviews only the cover and queues the complete guide', () =
   assert.match(assembly, /Aprovar esta capa/);
   assert.match(assembly, /Criar guia completo/);
   assert.match(assembly, /Você pode fechar esta página com segurança/);
-  assert.match(assembly, /Não é preciso aguardar no site/);
+  assert.match(assembly, /Não é preciso esperar no site/);
   assert.match(assembly, /Guia pronto e enviado/);
   assert.doesNotMatch(assembly, /GuideActivityPanel|selectedPageId|Gerar página/);
 });
@@ -277,11 +277,11 @@ test('home explains the flow and shows real product pages from our own domain', 
   assert.match(home, /HomeHero/);
   assert.match(home, /HowItWorks/);
   assert.match(home, /SampleGuideReader/);
-  assert.match(howItWorks, /Aprove a sua capa/);
-  assert.match(howItWorks, /Conte a viagem/);
-  assert.match(howItWorks, /Receba o livro por e-mail/);
+  assert.match(howItWorks, /Aprovem a capa/);
+  assert.match(howItWorks, /Contem a viagem/);
+  assert.match(howItWorks, /Recebam o livro por e-mail/);
   assert.match(sampleGuide, /sample-guide\/page-/);
-  assert.match(sampleGuide, /19 páginas reais/);
+  assert.match(sampleGuide, /19 páginas de verdade/);
   assert.match(sampleGuide, /Ir para a página/);
   // O herói mostra o livro, não uma capa solta: quem chega precisa ver que há
   // atividades dentro antes de decidir criar uma conta. O leque do mockup usa

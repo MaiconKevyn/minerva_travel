@@ -106,7 +106,7 @@ const HomeHero = () => {
 
           <p className="editorial-copy mx-auto mt-6 max-w-lg text-[1.12rem] leading-[1.75] text-foreground/80 lg:mx-0 lg:text-[1.26rem]">
             O roteiro que vocês já marcaram volta ilustrado, com os lugares da viagem e uma
-            atividade em cada parada.
+            missão para a criança em cada parada.
           </p>
 
           <div className="mt-9 flex flex-col items-center gap-5 sm:flex-row sm:gap-7 lg:justify-start">

@@ -97,7 +97,7 @@ test('empty dashboard explains the first step and offers a direct creation actio
 
   await page.goto('/dashboard');
 
-  await expect(page.getByRole('heading', { name: 'O livro está em branco!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'A estante ainda está vazia' })).toBeVisible();
   await expect(page.getByText('Crie o primeiro guia')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Criar meu primeiro guia' })).toBeVisible();
   await expect(page.getByText('Na estante').locator('..')).toContainText('0');

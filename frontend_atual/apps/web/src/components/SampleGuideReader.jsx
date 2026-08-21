@@ -25,13 +25,13 @@ import { useIsMobile } from '@/hooks/use-mobile.jsx';
 
 const SAMPLE_PAGES = [
   ['Capa da Família Knopp', 'A capa personalizada com os destinos e o mês da viagem'],
-  ['Nosso roteiro', 'A sequência ilustrada das paradas da família'],
-  ['Descubra Paris', 'Uma apresentação da cidade e curiosidades para as crianças'],
+  ['Nosso roteiro', 'O caminho da viagem desenhado, parada por parada'],
+  ['Descubra Paris', 'O primeiro olá da cidade, com curiosidades para as crianças'],
   ['Torre Eiffel', 'O ponto turístico com curiosidade, missão e campo Já visitei'],
   ['Investigador da Torre Eiffel', 'Uma missão diferente para cada criança durante o passeio'],
   ['Caça aos detalhes da Torre Eiffel', 'Uma lista de descobertas para observar no local'],
   ['Torre Eiffel para colorir', 'O monumento em traço limpo, pronto para ganhar novas cores'],
-  ['Cartão-postal da Torre Eiffel', 'Espaço para registrar e enviar uma lembrança da viagem'],
+  ['Cartão-postal da Torre Eiffel', 'Espaço para escrever e enviar uma lembrança da viagem'],
   ['Passaporte de Paris', 'Lugar para guardar ingressos, carimbos e o que mais encantou'],
   ['Diário da Torre Eiffel', 'Perguntas e linhas para escrever sobre o dia'],
   ['Museu do Louvre', 'Curiosidades, missão e o campo Já visitei'],
@@ -39,10 +39,10 @@ const SAMPLE_PAGES = [
   ['Caça aos detalhes do Museu do Louvre', 'Um convite para olhar a arquitetura com atenção'],
   ['Museu do Louvre para colorir', 'O museu e sua pirâmide em uma página para pintar'],
   ['Cartão-postal do Museu do Louvre', 'Uma lembrança que a criança escreve durante a viagem'],
-  ['Passaporte de Paris', 'Mais espaço para colar bilhetes e registrar descobertas'],
+  ['Passaporte de Paris', 'Mais espaço para colar bilhetes e guardar descobertas'],
   ['Diário do Museu do Louvre', 'Memórias e palavras novas aprendidas no passeio'],
-  ['Minha melhor memória', 'A página obrigatória para desenhar, escrever e assinar'],
-  ['Hora de voltar para casa', 'O encerramento da aventura e uma lembrança para contar'],
+  ['Minha melhor memória', 'A página para a criança desenhar, escrever e assinar'],
+  ['Hora de voltar para casa', 'O fim da aventura e uma história para contar em casa'],
 ].map(([title, description], index) => ({
   number: index + 1,
   title,
@@ -231,40 +231,60 @@ const BookViewport = ({
         </div>
 
         {leaf ? (
-          <motion.div
-            className={`sample-guide-leaf ${LEAF_SIDE_CLASS[leaf.side]}`}
-            // O `z` nao e enfeite. Num contexto preserve-3d o z-index NAO
-            // ordena: quem ordena e a posicao em Z. Folha e base estavam ambas
-            // em Z=0, coplanares, e o navegador pintava metade da folha atras
-            // da pagina de baixo — era a metade que "sumia" ao girar.
-            initial={{ rotateY: 0, z: 2 }}
-            animate={{ rotateY: leaf.side === 'right' ? -180 : 180, z: 2 }}
-            // Papel tem peso: sai devagar, ganha velocidade e assenta sem
-            // repique. Duracao alta o bastante para o olho ler o giro.
-            transition={{ duration: turnSeconds, ease: [0.36, 0, 0.16, 1] }}
-            onAnimationComplete={onTurnEnd}
-          >
-            <div className="sample-guide-leaf-face sample-guide-leaf-face--front">
-              <BookPage pageIndex={leaf.front} side={leaf.side} canTurn={false} onTurn={() => {}} />
-            </div>
-            <div className="sample-guide-leaf-face sample-guide-leaf-face--back">
-              <BookPage
-                pageIndex={leaf.back}
-                side={leaf.side === 'right' ? 'left' : 'right'}
-                canTurn={false}
-                onTurn={() => {}}
-              />
-            </div>
-            {/* A sombra some nas pontas e enche no meio do giro: e ela que da
-                a impressao de volume, porque a folha em si e plana. */}
+          <>
+            {/* A folha projeta esta sombra na pagina que esta sendo revelada.
+                Ela nasce e morre com o giro, portanto nunca aparece apenas no
+                quadro em que a folha assenta. */}
             <motion.div
-              className="sample-guide-leaf-shade"
+              className={`sample-guide-cast-shadow sample-guide-cast-shadow--${leaf.side}`}
               aria-hidden="true"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.38, 0] }}
-              transition={{ duration: turnSeconds, times: [0, 0.5, 1], ease: 'easeInOut' }}
+              initial={{ opacity: 0, scaleX: 0.12, z: 1 }}
+              animate={{ opacity: [0, 0.26, 0.08, 0], scaleX: [0.12, 1, 0.5, 0.18], z: 1 }}
+              transition={{
+                duration: turnSeconds,
+                times: [0, 0.46, 0.84, 1],
+                ease: 'easeInOut',
+              }}
             />
-          </motion.div>
+
+            <motion.div
+              className={`sample-guide-leaf ${LEAF_SIDE_CLASS[leaf.side]}`}
+              // A folha fica acima da base durante o giro, mas volta ao plano
+              // do livro nos ultimos 16%. Remover uma folha ainda 2px a frente
+              // era o micro-salto percebido no assentamento.
+              initial={{ rotateY: 0, z: 2 }}
+              animate={{
+                rotateY: leaf.side === 'right' ? -180 : 180,
+                z: [2, 2, 0.05],
+              }}
+              transition={{
+                rotateY: { duration: turnSeconds, ease: [0.36, 0, 0.16, 1] },
+                z: { duration: turnSeconds, times: [0, 0.84, 1], ease: 'easeInOut' },
+              }}
+              onAnimationComplete={onTurnEnd}
+            >
+              <div className="sample-guide-leaf-face sample-guide-leaf-face--front">
+                <BookPage pageIndex={leaf.front} side={leaf.side} canTurn={false} onTurn={() => {}} />
+              </div>
+              <div className="sample-guide-leaf-face sample-guide-leaf-face--back">
+                <BookPage
+                  pageIndex={leaf.back}
+                  side={leaf.side === 'right' ? 'left' : 'right'}
+                  canTurn={false}
+                  onTurn={() => {}}
+                />
+              </div>
+              {/* A sombra da propria dobra some nas duas pontas e enche no
+                  meio do giro; a sombra projetada acima cuida da base. */}
+              <motion.div
+                className="sample-guide-leaf-shade"
+                aria-hidden="true"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 0.34, 0] }}
+                transition={{ duration: turnSeconds, times: [0, 0.5, 1], ease: 'easeInOut' }}
+              />
+            </motion.div>
+          </>
         ) : null}
       </div>
     </div>
@@ -399,8 +419,7 @@ const SampleGuideReader = () => {
             arched="Família Knopp em Paris"
           />
           <p className="editorial-copy mt-4 text-foreground/70">
-            Veja cinco páginas-chave agora. O livro tem 19 páginas reais, da capa à volta para
-            casa, e você pode abrir tudo quando quiser.
+            São 19 páginas de verdade, da capa à volta para casa — folheiem à vontade.
           </p>
         </motion.div>
 
@@ -499,7 +518,7 @@ const SampleGuideReader = () => {
                 className="mx-auto mt-5 flex min-h-11 px-6"
               >
                 <BookOpen className="mr-2 h-4 w-4" aria-hidden="true" />
-                Abrir as 19 páginas
+                Folhear as 19 páginas
                 <ChevronDown className="ml-2 h-4 w-4" aria-hidden="true" />
               </Button>
             </>
@@ -564,7 +583,7 @@ const SampleGuideReader = () => {
                 aria-controls="sample-guide-full-reader"
                 className="mx-auto mt-6 flex min-h-11 px-6"
               >
-                Recolher guia
+                Fechar o livro
                 <ChevronUp className="ml-2 h-4 w-4" aria-hidden="true" />
               </Button>
             </div>

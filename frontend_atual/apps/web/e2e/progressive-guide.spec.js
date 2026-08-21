@@ -114,7 +114,7 @@ test('restored activity step keeps the no-optional path and mandatory memory vis
   await expect(page.getByRole('heading', { name: 'Minha melhor memória' })).toBeVisible();
   await expect(page.getByText('0 de 30 páginas opcionais')).toBeVisible();
   await page.getByRole('button', { name: 'Continuar sem atividades opcionais' }).click();
-  await expect(page.getByRole('heading', { name: /Seu roteiro está pronto. Como você quer a capa?/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /O roteiro está pronto\. Como vocês querem a capa\?/ })).toBeVisible();
 });
 
 test('reload restores the saved builder session and its generated pages', async ({ page }) => {
@@ -218,7 +218,7 @@ test('reload restores the saved builder session and its generated pages', async 
   await page.goto('/create', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/create\?builder=resumesession123$/);
   await expect(page.getByAltText('Preview da capa do guia')).toBeVisible();
-  await expect(page.getByText('Progresso recuperado. Suas páginas geradas continuam salvas com segurança.')).toBeVisible();
+  await expect(page.getByText('Progresso recuperado. As páginas já criadas continuam guardadas em segurança.')).toBeVisible();
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Recuperando suas páginas…' })).toBeVisible();
@@ -287,7 +287,7 @@ test('expired builder returns to the photo step without erasing the saved itiner
   const email = `expirada-${test.info().project.name}@example.test`;
   await authenticateLocalTestUser(page, email, 'Família Silva');
   await page.goto('/create', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: /Seu roteiro está pronto. Como você quer a capa?/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /O roteiro está pronto\. Como vocês querem a capa\?/ })).toBeVisible();
   await expect(page).toHaveURL(/\/create$/);
   await expect.poll(() => updatedPayload).not.toBeNull();
   expect(updatedPayload).toMatchObject({
@@ -511,7 +511,7 @@ test('family reviews the cover and queues the complete guide', async ({ page }) 
   await authenticateLocalTestUser(page, email, 'Família Aurora');
   await page.goto('/create', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByRole('heading', { name: 'Perfeito! Aqui está o resumo do seu roteiro' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tudo pronto! Aqui está o resumo da viagem' })).toBeVisible();
   await page.getByLabel('Confere: é assim que os nomes devem aparecer no livro.').check();
   await page.getByRole('button', { name: 'Criar e revisar a capa' }).click();
 

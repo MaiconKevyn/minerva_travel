@@ -56,7 +56,7 @@ const StepTripPreferences = () => {
           Qual ritmo combina com a família?
         </h2>
         <p className="editorial-copy mx-auto max-w-2xl text-muted-foreground">
-          Use estas preferências para calibrar as sugestões antes de escolher os pontos do guia.
+          Conte como a família gosta de viajar — usamos isso para sugerir os pontos do guia.
         </p>
       </div>
 

@@ -197,10 +197,10 @@ const EnhancedStep5FamilyDetails = () => {
     <div className="w-full max-w-3xl mx-auto flex flex-col min-h-[60vh] justify-center py-4">
       <div className="text-center space-y-4 mb-12">
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-secondary">
-          Detalhes da Família
+          Os protagonistas do guia
         </h2>
         <p className="editorial-copy text-lg sm:text-xl text-muted-foreground">
-          Para deixar o guia ainda mais especial, conte-nos quem vai aparecer nessa aventura.
+          Conte quem vai na viagem — estes nomes saem impressos nas páginas do guia.
         </p>
       </div>
 

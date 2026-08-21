@@ -90,7 +90,7 @@ const StepActivities = () => {
           Nenhuma vem marcada automaticamente.
         </p>
         <p className="text-sm font-medium text-muted-foreground">
-          Toque na lupa de cada card para ver a página inteira antes de decidir.
+          Toque na lupa de cada atividade para ver a página inteira antes de decidir.
         </p>
         <p className="pill-flag pill-flag--mint text-sm">{ageSummary}</p>
       </div>
