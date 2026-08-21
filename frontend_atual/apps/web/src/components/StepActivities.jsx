@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BookHeart, Check, Clock3, Eye, Palette, Pencil, Plane, Plus, Sparkles } from 'lucide-react';
+import { BookHeart, Check, Clock3, Eye, Palette, Pencil, Plane, Plus } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import ActivityLandmarkPicker from '@/components/ActivityLandmarkPicker.jsx';
@@ -92,10 +92,7 @@ const StepActivities = () => {
         <p className="text-sm font-medium text-muted-foreground">
           Toque na lupa de cada card para ver a página inteira antes de decidir.
         </p>
-        <p className="pill-flag pill-flag--mint text-sm">
-          <Sparkles className="h-4 w-4" aria-hidden="true" />
-          {ageSummary}
-        </p>
+        <p className="pill-flag pill-flag--mint text-sm">{ageSummary}</p>
       </div>
 
       <ActivityPlanSummary

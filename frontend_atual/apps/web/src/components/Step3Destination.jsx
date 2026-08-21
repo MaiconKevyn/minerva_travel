@@ -10,7 +10,7 @@ import {
   MapPin,
   MessageSquareText,
   Plus,
-  Sparkles,
+  Route,
   Trash2,
   X,
 } from 'lucide-react';
@@ -63,7 +63,7 @@ const itineraryModeOptions = [
     id: 'suggested',
     label: 'Quero sugestões',
     description: 'Gerar uma rota editável antes das atrações.',
-    icon: Sparkles,
+    icon: Route,
   },
 ];
 
@@ -453,7 +453,7 @@ const Step3Destination = () => {
                 {isLoadingSuggestions ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
+                  <Route className="mr-2 h-4 w-4" />
                 )}
                 Gerar opções
               </Button>

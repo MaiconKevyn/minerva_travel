@@ -8,7 +8,7 @@ import {
   Loader2,
   Mail,
   RefreshCcw,
-  Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -476,7 +476,7 @@ const GuideAssembly = ({ session: initialSession }) => {
                   {jobBusy ? (
                     <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Iniciando…</>
                   ) : (
-                    <><Sparkles className="mr-2 h-5 w-5" /> {jobFailed ? 'Tentar criar novamente' : 'Criar guia completo'}</>
+                    <><BookOpen className="mr-2 h-5 w-5" /> {jobFailed ? 'Tentar criar novamente' : 'Criar guia completo'}</>
                   )}
                 </Button>
               )}

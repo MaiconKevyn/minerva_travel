@@ -8,8 +8,7 @@ import {
   Loader2,
   MapPin,
   Navigation,
-  Sparkles,
-  Star,
+  Palette,
   Users,
   BookHeart,
   AlertCircle,
@@ -376,7 +375,7 @@ const Step5Review = () => {
 
         <div className="mt-12 pt-8 border-t border-border/50">
           <h3 className="mb-8 flex items-center gap-2 text-xl font-display font-bold text-primary sm:text-2xl">
-            <Star className="w-6 h-6 text-[hsl(var(--star))]" /> O Roteiro Mágico
+            <MapPin className="w-6 h-6 text-[hsl(var(--star))]" /> O Roteiro Mágico
             <span className="font-data text-sm font-bold text-muted-foreground">
               {pluralize(finalLandmarks.length, 'local selecionado', 'locais selecionados')}
             </span>
@@ -674,7 +673,7 @@ const Step5Review = () => {
               {formatPrice(guideProduct.amount_minor, guideProduct.currency)}
             </>
           ) : (
-            <><Sparkles className="w-6 h-6 mr-3 inline-block" /> Criar e revisar a capa</>
+            <><Palette className="w-6 h-6 mr-3 inline-block" /> Criar e revisar a capa</>
           )}
         </Button>
       </div>

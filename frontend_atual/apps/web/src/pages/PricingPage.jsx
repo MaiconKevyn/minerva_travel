@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Check, Heart, ShieldCheck, Sparkles, Star } from 'lucide-react';
+import { ArrowRight, BadgeCheck, BookOpen, Check, Heart, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import { CompassRose, LeafSprig, PassportStamp } from '@/components/DecorativeElements.jsx';
@@ -24,7 +24,7 @@ const TRUST_NOTES = [
     description: 'Os dados financeiros são informados no ambiente seguro do Mercado Pago.',
   },
   {
-    icon: Star,
+    icon: BadgeCheck,
     title: 'Uma compra, um livro completo',
     description: 'Sem mensalidade: o valor corresponde ao guia personalizado desta viagem.',
   },
@@ -124,7 +124,7 @@ const PricingPage = () => {
                         </h2>
                       </div>
                       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <Sparkles className="h-6 w-6" aria-hidden="true" />
+                        <BookOpen className="h-6 w-6" aria-hidden="true" />
                       </span>
                     </div>
 

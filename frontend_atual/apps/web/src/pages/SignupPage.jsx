@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import AuthTravelShell from '@/components/AuthTravelShell.jsx';
-import { Sparkles, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Loader2, UserRound } from 'lucide-react';
 
 const SignupPage = () => {
   const [name, setName] = useState('');
@@ -80,7 +80,7 @@ const SignupPage = () => {
       >
             <div className="mb-7 flex items-center gap-3 border-b border-primary/15 pb-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <Sparkles className="h-6 w-6 text-primary" aria-hidden="true" />
+                <UserRound className="h-6 w-6 text-primary" aria-hidden="true" />
               </div>
               <div>
                 <p className="font-display text-xl font-bold text-primary">Dados da conta</p>

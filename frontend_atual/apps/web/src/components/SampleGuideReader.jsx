@@ -11,7 +11,6 @@ import {
   Expand,
   MoveHorizontal,
   MousePointer2,
-  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -578,7 +577,6 @@ const SampleGuideReader = () => {
           </p>
           <Button asChild size="lg" className="travel-cta group h-auto px-7 py-4 font-bold">
             <Link to="/create">
-              <Sparkles className="mr-2 h-5 w-5" aria-hidden="true" />
               Criar o guia da minha família
               <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
             </Link>

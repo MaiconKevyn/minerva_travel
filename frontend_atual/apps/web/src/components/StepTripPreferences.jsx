@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, CalendarDays, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarDays, Compass, SlidersHorizontal } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
 import { totalTripDays } from '@/utils/guide-form.js';
@@ -50,7 +50,7 @@ const StepTripPreferences = () => {
     <div className="w-full max-w-4xl mx-auto flex flex-col min-h-[60vh] justify-center py-4">
       <div className="text-center space-y-4 mb-10">
         <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
-          <Sparkles className="w-8 h-8" />
+          <Compass className="w-8 h-8" />
         </div>
         <h2 className="font-display text-3xl font-bold text-secondary md:text-4xl">
           Qual ritmo combina com a família?

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, UploadCloud, CheckCircle2, ShieldCheck, Wand2 } from 'lucide-react';
+import { ArrowRight, UploadCloud, CheckCircle2, Palette, ShieldCheck } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -249,7 +249,7 @@ const Step2CoverPhoto = () => {
                 htmlFor="cover-brief"
                 className="flex items-center gap-3 text-lg font-bold text-foreground"
               >
-                <Wand2 className="h-6 w-6 text-secondary" aria-hidden="true" />
+                <Palette className="h-6 w-6 text-secondary" aria-hidden="true" />
                 Como você imagina a capa?
               </label>
               <p className="mt-1 text-sm font-medium text-muted-foreground">
@@ -294,7 +294,7 @@ const Step2CoverPhoto = () => {
                 <img src={coverPhotoUrl} alt="Capa confirmada" className="h-full w-full rounded-full object-cover shadow-sm" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center rounded-full bg-secondary/10 shadow-sm">
-                  <Wand2 className="h-12 w-12 text-secondary" aria-hidden="true" />
+                  <Palette className="h-12 w-12 text-secondary" aria-hidden="true" />
                 </div>
               )}
               <div className="absolute -bottom-2 -right-2 bg-background rounded-full p-1 shadow-sm">

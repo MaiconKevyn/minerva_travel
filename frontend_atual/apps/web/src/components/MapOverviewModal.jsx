@@ -8,7 +8,6 @@ import {
   MapPin,
   Plus,
   Route,
-  Sparkles,
   X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -461,7 +460,7 @@ const MapOverviewModal = ({
                   {isExploringMore ? (
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   ) : (
-                    <Sparkles className="mr-2 h-5 w-5" />
+                    <MapPin className="mr-2 h-5 w-5" />
                   )}
                   {isExploringMore ? 'Buscando mais pontos...' : 'Mostrar mais pontos turisticos'}
                 </Button>
