@@ -101,7 +101,7 @@ export function GuideLockup({ overline, title, arched, id, className = '' }) {
         {title}
       </h2>
       {arched ? (
-        <p className="font-hand mx-auto mt-3 max-w-lg text-base text-primary sm:text-lg">
+        <p className="font-accent mx-auto mt-3 max-w-lg text-base text-primary sm:text-lg">
           {arched}
         </p>
       ) : null}

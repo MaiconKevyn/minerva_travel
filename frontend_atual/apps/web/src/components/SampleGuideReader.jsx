@@ -275,7 +275,9 @@ const BookViewport = ({
 const SampleGuideReader = () => {
   const isMobile = useIsMobile();
   const [activePage, setActivePage] = useState(0);
-  const [readerOpen, setReaderOpen] = useState(false);
+  // O livro chega aberto, pronto para folhear: a vitrine É o folhear, e
+  // pedir um clique antes escondia exatamente o que a seção promete.
+  const [readerOpen, setReaderOpen] = useState(true);
   // A pagina so muda quando a folha termina de girar. Trocar antes era o que
   // fazia o livro piscar no meio da virada.
   const [turn, setTurn] = useState(null);
@@ -394,7 +396,6 @@ const SampleGuideReader = () => {
         >
           <GuideLockup
             id="guia-exemplo-title"
-            overline="Um guia completo de verdade"
             title="Folheie a aventura antes de criar a sua"
             arched="Família Knopp em Paris"
           />

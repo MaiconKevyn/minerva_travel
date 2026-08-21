@@ -180,8 +180,13 @@
     font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   }
 
-  .font-hand {
-    font-family: "Kalam", "Comic Sans MS", cursive;
+  /* O acento editorial das linhas curtas sob os títulos: a própria Zilla
+     Slab em itálico. A manuscrita (Kalam) saiu do site — infantilizava a
+     interface, que não é a página impressa do guia. */
+  .font-accent {
+    font-family: "Zilla Slab", Georgia, serif;
+    font-style: italic;
+    font-weight: 500;
   }
 
   .guide-shell {
@@ -378,7 +383,9 @@
 
   .travel-note {
     color: hsl(var(--secondary) / 0.82);
-    font-family: "Kalam", "Comic Sans MS", cursive;
+    font-family: "Zilla Slab", Georgia, serif;
+    font-style: italic;
+    font-weight: 500;
     font-size: 1.15rem;
     line-height: 1.2;
     transform: rotate(-2deg);

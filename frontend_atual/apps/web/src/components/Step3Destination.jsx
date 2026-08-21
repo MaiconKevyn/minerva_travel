@@ -711,7 +711,7 @@ const Step3Destination = () => {
           </Button>
         </div>
 
-        <div className="font-hand flex items-center justify-center gap-2 text-center text-[1.05rem] text-secondary/80">
+        <div className="font-accent flex items-center justify-center gap-2 text-center text-[1.05rem] text-secondary/80">
           <CalendarDays className="h-4 w-4 shrink-0" />
           {itineraryMode === 'known'
             ? 'Escolha os lugares na lista que aparece: é o nome oficial deles que vai impresso no livro.'

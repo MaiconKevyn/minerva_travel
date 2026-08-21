@@ -35,7 +35,7 @@ const AuthTravelShell = ({ children, eyebrow, title, description, note }) => (
           </div>
 
           <div className="mt-7 border-t border-secondary/15 pt-5">
-            <p className="font-hand text-center text-lg leading-snug text-secondary">{note}</p>
+            <p className="font-accent text-center text-lg leading-snug text-secondary">{note}</p>
           </div>
         </section>
 
