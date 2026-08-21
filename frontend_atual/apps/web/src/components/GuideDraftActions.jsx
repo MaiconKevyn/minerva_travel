@@ -57,7 +57,7 @@ const GuideDraftActions = ({ hasDraft, busy, onContinueLater, onDiscard }) => {
       <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <AlertDialogContent className="clean-surface max-w-lg border-destructive/20">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-serif text-2xl text-secondary">
+            <AlertDialogTitle className="font-display text-2xl font-bold text-secondary">
               Descartar este rascunho?
             </AlertDialogTitle>
             <AlertDialogDescription className="font-ui leading-relaxed text-muted-foreground">

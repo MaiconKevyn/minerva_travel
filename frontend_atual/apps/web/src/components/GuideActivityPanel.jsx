@@ -142,7 +142,7 @@ const GuideActivityPanel = ({
           className="w-full overflow-y-auto p-0 [&>button]:z-20 sm:max-w-2xl"
         >
           <SheetHeader className="sticky top-0 z-10 border-b bg-background/95 px-6 py-5 pr-14 backdrop-blur">
-            <SheetTitle className="font-serif text-2xl">Atividades do guia</SheetTitle>
+            <SheetTitle className="font-display text-2xl font-bold">Atividades do guia</SheetTitle>
             <SheetDescription>
               Veja uma página real de exemplo, adicione sem gerar e escolha onde ela ficará no PDF.
             </SheetDescription>
@@ -220,7 +220,7 @@ const GuideActivityPanel = ({
                       || Boolean(busyAction)
                     );
                     return (
-                      <article key={activity.type} className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                      <article key={activity.type} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                         <button
                           type="button"
                           onClick={() => setPreviewActivity(activity)}
@@ -241,7 +241,7 @@ const GuideActivityPanel = ({
                         </button>
                         <div className="space-y-3 p-4">
                           <div>
-                            <h3 className="font-serif text-lg font-bold text-foreground">{activity.label}</h3>
+                            <h3 className="font-display text-lg font-bold text-foreground">{activity.label}</h3>
                             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                               {activity.description}
                             </p>
@@ -289,7 +289,7 @@ const GuideActivityPanel = ({
             ) : (
               <div className="space-y-4">
                 <div>
-                  <h3 className="font-serif text-xl font-bold text-foreground">Ordem do guia</h3>
+                  <h3 className="font-display text-xl font-bold text-foreground">Ordem do guia</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Arraste uma atividade ou escolha “Inserir depois de”. As páginas com cadeado
                     mantêm a ordem narrativa; a numeração abaixo será a ordem exata do PDF.
@@ -436,7 +436,7 @@ const GuideActivityPanel = ({
       <Dialog open={Boolean(previewActivity)} onOpenChange={(value) => !value && setPreviewActivity(null)}>
         <DialogContent className="max-h-[94vh] max-w-3xl overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="font-serif text-2xl">{previewActivity?.label}</DialogTitle>
+            <DialogTitle className="font-display text-2xl font-bold">{previewActivity?.label}</DialogTitle>
             <DialogDescription>
               Exemplo sintético de página completa. O guia final será adaptado ao ponto escolhido.
             </DialogDescription>
@@ -445,7 +445,7 @@ const GuideActivityPanel = ({
             <img
               src={previewActivity.preview}
               alt={`Exemplo completo da atividade ${previewActivity.label}`}
-              className="mx-auto max-h-[76vh] w-auto rounded-xl border bg-white object-contain shadow-sm"
+              className="mx-auto max-h-[76vh] w-auto rounded-xl border bg-[hsl(var(--paper))] object-contain shadow-sm"
             />
           )}
         </DialogContent>

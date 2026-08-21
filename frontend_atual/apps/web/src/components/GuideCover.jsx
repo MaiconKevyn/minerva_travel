@@ -46,7 +46,7 @@ const GuideCover = ({ coverUrl, title }) => {
 
   return (
     <div className="w-20 shrink-0 xl:w-24">
-      <div className="aspect-[3/4] overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm">
+      <div className="aspect-[3/4] overflow-hidden rounded-xl border border-border/60 bg-[hsl(var(--paper))] shadow-[0_8px_20px_-14px_hsl(30_27%_13%/0.45)]">
         {objectUrl ? (
           <img
             src={objectUrl}

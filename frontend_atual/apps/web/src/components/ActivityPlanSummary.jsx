@@ -15,11 +15,11 @@ const ActivityPlanSummary = ({ landmarks, selections, onRemove }) => {
 
   return (
     <section
-      className="rounded-xl border border-primary/25 bg-primary/[0.04] p-5 sm:p-6"
+      className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-5 sm:p-6"
       aria-labelledby="activity-plan-title"
     >
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 id="activity-plan-title" className="text-xl font-serif font-bold text-foreground">
+        <h3 id="activity-plan-title" className="text-xl font-display font-bold text-foreground">
           O plano de cada parada
         </h3>
         <p className="text-sm font-medium text-muted-foreground" aria-live="polite">
@@ -33,7 +33,7 @@ const ActivityPlanSummary = ({ landmarks, selections, onRemove }) => {
         {plan.map(({ landmark, selectionId, activities }) => (
           <li
             key={selectionId}
-            className="flex flex-col gap-2 rounded-xl bg-card p-3 sm:flex-row sm:items-start sm:gap-4"
+            className="clean-surface flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:gap-4"
           >
             <p className="flex min-w-0 items-center gap-1.5 text-sm font-bold text-foreground sm:w-52 sm:shrink-0">
               <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />

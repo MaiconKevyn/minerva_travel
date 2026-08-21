@@ -43,7 +43,7 @@ const ActivityLandmarkPicker = ({
         <button
           type="button"
           aria-label={`Escolher em quais pontos incluir ${activity.label}`}
-          className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border-2 px-3 py-2 text-xs font-bold transition ${
+          className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-full border-2 px-3 py-2 text-xs font-bold transition ${
             chosenIds.length > 0
               ? 'border-primary bg-primary/10 text-primary'
               : 'border-border/70 bg-background text-muted-foreground hover:border-primary/45 hover:text-foreground'
@@ -56,7 +56,7 @@ const ActivityLandmarkPicker = ({
           <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-2">
+      <PopoverContent align="start" className="w-72 rounded-2xl p-2">
         <p className="px-2 pb-2 pt-1 text-xs font-semibold text-muted-foreground">
           Incluir em
         </p>
@@ -89,7 +89,7 @@ const ActivityLandmarkPicker = ({
                 >
                   <span
                     className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
-                      chosen ? 'border-primary bg-primary text-white' : 'border-border bg-background'
+                      chosen ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'
                     }`}
                     aria-hidden="true"
                   >

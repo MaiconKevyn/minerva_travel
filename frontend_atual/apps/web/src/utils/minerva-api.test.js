@@ -859,10 +859,10 @@ test('appendGuideMetadata sends normalized optional activities linked to canonic
   ]);
 });
 
-test('restaurant recommendations extra is explicit about the no-charge pilot contract', () => {
+test('restaurant recommendations extra is explicit about the no-charge contract', () => {
   assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.id, 'restaurant_recommendations_extra');
   assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.price_cents, 0);
-  assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.price_label, 'Incluído no piloto');
+  assert.equal(minervaApi.RESTAURANT_RECOMMENDATIONS_EXTRA.price_label, 'Incluído no guia');
 });
 
 test('generatePDF sends the same caller-owned idempotency key with the authenticated request', async () => {

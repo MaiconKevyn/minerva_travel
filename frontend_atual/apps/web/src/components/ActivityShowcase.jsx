@@ -45,7 +45,7 @@ const ActivityShowcase = () => {
       </div>
 
         <div
-          className="font-ui mx-auto mt-10 flex max-w-4xl gap-2 overflow-x-auto rounded-xl bg-muted p-1.5 sm:mt-12"
+          className="font-ui mx-auto mt-10 flex max-w-4xl gap-2.5 overflow-x-auto p-1.5 sm:mt-12 sm:flex-wrap sm:justify-center"
           role="tablist"
           aria-label="Filtrar atividades por momento"
         >
@@ -60,7 +60,7 @@ const ActivityShowcase = () => {
                 aria-selected={selected}
                 aria-controls="activity-category-panel"
                 onClick={() => setActiveCategoryId(category.id)}
-                className={`flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'bg-secondary text-secondary-foreground shadow-sm' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}`}
+                className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full px-5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'bg-secondary text-secondary-foreground shadow-sm' : 'bg-muted text-muted-foreground hover:bg-[hsl(var(--mint)/0.6)] hover:text-secondary'}`}
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
                 {category.label}
@@ -79,11 +79,11 @@ const ActivityShowcase = () => {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25 }}
-          className="clean-surface mx-auto mt-5 max-w-5xl overflow-hidden"
+          className="clean-surface mx-auto mt-5 max-w-5xl overflow-hidden rounded-2xl"
           aria-labelledby={`categoria-${activeCategory.id}`}
         >
           <div className="border-b border-secondary/15 bg-[hsl(var(--mint)/0.55)] px-5 py-4 sm:px-7">
-            <h3 id={`categoria-${activeCategory.id}`} className="font-serif text-xl font-semibold text-foreground">
+            <h3 id={`categoria-${activeCategory.id}`} className="font-display text-xl font-bold text-foreground">
               {activeCategory.label}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">{activeCategory.hint}</p>
@@ -105,7 +105,7 @@ const ActivityShowcase = () => {
                   className="aspect-[2/3] w-16 rounded-lg border border-border object-cover sm:w-20"
                 />
                 <div className="min-w-0">
-                  <h4 className="font-serif text-lg font-semibold text-foreground">{activity.label}</h4>
+                  <h4 className="font-display text-lg font-bold text-foreground">{activity.label}</h4>
                   <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-foreground/65">
                     {activity.description}
                   </p>

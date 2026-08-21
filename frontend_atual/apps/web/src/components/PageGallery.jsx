@@ -16,23 +16,25 @@ const PAGES = [
 ];
 
 const PageGallery = () => (
+  // A galeria assenta na areia do site: os cartões de papel (.page-frame)
+  // é que flutuam por cima, como as folhas sobre a mesa do mockup.
   <section
     id="paginas"
-    className="parchment-wash scroll-mt-20 border-t border-border/50 bg-card py-20 sm:py-24"
+    className="scroll-mt-20 border-t border-border/50 py-20 sm:py-24"
     aria-labelledby="paginas-title"
   >
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-2xl text-center">
-        <p className="text-sm font-semibold text-secondary">
+        <p className="travel-label">
           Por dentro do guia
         </p>
         <h2
           id="paginas-title"
-          className="mt-3 text-3xl font-serif font-bold text-foreground sm:text-4xl"
+          className="mt-3 font-display text-3xl font-bold text-secondary sm:text-4xl"
         >
           Páginas de verdade, feitas para a sua viagem
         </h2>
-        <p className="mt-4 text-lg font-medium text-muted-foreground">
+        <p className="editorial-copy mt-4 text-foreground/70">
           Cada página é ilustrada com os lugares que vocês escolheram e as idades das crianças.
         </p>
       </div>
@@ -47,7 +49,7 @@ const PageGallery = () => (
             transition={{ duration: 0.5, delay: (index % 3) * 0.08 }}
           >
             <figure className="group">
-              {/* A mesma moldura de filete duplo das páginas impressas. */}
+              {/* O chrome de papel-creme da identidade em volta da folha. */}
               <div className="page-frame transition-transform duration-300 group-hover:-translate-y-1">
                 <img
                   src={page.image}
@@ -59,10 +61,10 @@ const PageGallery = () => (
                 />
               </div>
               <figcaption className="mt-3 text-center">
-                <p className="font-serif text-base font-bold text-foreground sm:text-lg">
+                <p className="font-display text-base font-bold text-secondary sm:text-lg">
                   {page.title}
                 </p>
-                <p className="text-sm font-medium text-muted-foreground">{page.caption}</p>
+                <p className="font-serif text-sm font-medium text-muted-foreground">{page.caption}</p>
               </figcaption>
             </figure>
           </motion.li>

@@ -16,12 +16,12 @@ const GuideCreationProgress = ({ visibleSteps, currentStep, stepNames }) => {
     >
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end sm:gap-5">
         <div>
-          <p className="font-ui text-xs font-semibold text-primary">
+          <p className="travel-label">
             Passo {progressValue} de {visibleSteps.length}
           </p>
           <h1
             id="guide-creation-progress-title"
-            className="mt-1 font-serif text-2xl font-bold text-secondary sm:text-3xl"
+            className="mt-1 font-display text-2xl font-bold text-secondary sm:text-3xl"
           >
             {currentName}
           </h1>

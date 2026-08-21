@@ -153,7 +153,7 @@ const PlaceAutocomplete = ({
       {/* Confirma o lugar reconhecido: a família vê que o nome impresso
           será o oficial, não o que ela digitou. */}
       {confirmedLabel && !isOpen && (
-        <p className="mt-1 flex items-center gap-1 text-xs font-medium text-secondary">
+        <p className="font-data mt-1 flex items-center gap-1 text-xs font-medium text-secondary">
           <MapPin className="h-3 w-3" aria-hidden="true" />
           {confirmedLabel}
         </p>
@@ -163,7 +163,7 @@ const PlaceAutocomplete = ({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-card py-1 shadow-sm"
+          className="font-data absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-border bg-card py-1 shadow-lg"
         >
           {suggestions.map((suggestion, index) => (
             <li

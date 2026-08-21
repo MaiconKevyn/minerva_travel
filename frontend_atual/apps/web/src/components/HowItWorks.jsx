@@ -66,10 +66,10 @@ const HowItWorks = () => (
                 {index + 1}
               </span>
               <div>
-                <h3 className="pt-1.5 text-xl font-serif font-semibold text-foreground">
+                <h3 className="pt-1.5 text-xl font-display font-bold text-foreground">
                   {step.title}
                 </h3>
-                <p className="mt-2 leading-relaxed text-foreground/70">
+                <p className="mt-2 font-serif leading-relaxed text-foreground/70">
                   {step.description}
                 </p>
               </div>

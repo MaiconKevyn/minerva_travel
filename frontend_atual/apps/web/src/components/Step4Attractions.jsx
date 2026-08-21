@@ -390,7 +390,7 @@ const Step4Attractions = () => {
           onClick={() => setActiveCategory('all')}
           className={`min-h-11 rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
             activeCategory === 'all'
-              ? 'border-primary bg-primary text-white'
+              ? 'border-primary bg-primary text-primary-foreground'
               : 'border-border bg-card text-muted-foreground hover:border-primary/60 hover:text-primary'
           }`}
         >
@@ -403,7 +403,7 @@ const Step4Attractions = () => {
             onClick={() => setActiveCategory(category)}
             className={`min-h-11 rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
               activeCategory === category
-                ? 'border-secondary bg-secondary text-white'
+                ? 'border-secondary bg-secondary text-secondary-foreground'
                 : 'border-border bg-card text-muted-foreground hover:border-secondary/60 hover:text-secondary'
             }`}
           >
@@ -430,17 +430,17 @@ const Step4Attractions = () => {
           <section key={day.day} className="space-y-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-primary">
+                <p className="travel-label">
                   Dia {day.day}
                 </p>
-                <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
+                <h3 className="font-display text-2xl font-bold text-secondary md:text-3xl">
                   {day.title}
                 </h3>
-                <p className="text-muted-foreground font-medium max-w-2xl">
+                <p className="font-serif text-muted-foreground max-w-2xl">
                   {day.theme}
                 </p>
               </div>
-              <div className="rounded-full bg-muted px-4 py-2 text-sm font-bold text-muted-foreground w-fit">
+              <div className="pill-flag pill-flag--paper w-fit">
                 {dayLandmarks.filter((landmark) => selectedLandmarks.includes(landmark.id)).length} selecionados
               </div>
             </div>
@@ -464,10 +464,10 @@ const Step4Attractions = () => {
       {alternatives.length > 0 && (
         <section className="pt-6 space-y-5 border-t border-border/60">
           <div>
-            <p className="text-sm font-semibold text-secondary">
+            <p className="travel-label">
               Outras opcoes
             </p>
-            <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
+            <h3 className="font-display text-2xl font-bold text-secondary md:text-3xl">
               Trocas e extras para o roteiro
             </h3>
           </div>
@@ -494,14 +494,14 @@ const Step4Attractions = () => {
         <section className="space-y-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-primary">
+              <p className="travel-label">
                 Locais citados por você
               </p>
-              <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
+              <h3 className="font-display text-2xl font-bold text-secondary md:text-3xl">
                 Pontos que já estavam no seu roteiro
               </h3>
             </div>
-            <div className="rounded-full bg-muted px-4 py-2 text-sm font-bold text-muted-foreground w-fit">
+            <div className="pill-flag pill-flag--paper w-fit">
               {filterAttractionsByCategory(quickSections.mentioned, activeCategory)
                 .filter((landmark) => selectedLandmarks.includes(landmark.id)).length} selecionados
             </div>
@@ -525,10 +525,10 @@ const Step4Attractions = () => {
       {filterAttractionsByCategory(quickSections.suggested, activeCategory).length > 0 && (
         <section className="pt-6 space-y-5 border-t border-border/60">
           <div>
-            <p className="text-sm font-semibold text-secondary">
+            <p className="travel-label">
               Sugestões para a família
             </p>
-            <h3 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
+            <h3 className="font-display text-2xl font-bold text-secondary md:text-3xl">
               Locais que podem combinar com a viagem
             </h3>
           </div>
@@ -599,14 +599,14 @@ const Step4Attractions = () => {
               />
             </div>
             <div className="space-y-3">
-              <h2 className="text-3xl font-serif font-bold text-foreground">
+              <h2 className="font-display text-3xl font-bold text-secondary">
                 {loadingMode === 'manual'
                   ? 'Organizando seu roteiro...'
                   : loadingMode === 'quick'
                     ? 'Buscando locais para sua viagem...'
                     : 'Montando seu roteiro...'}
               </h2>
-              <p className="text-lg text-muted-foreground font-medium animate-pulse">
+              <p className="editorial-copy text-muted-foreground animate-pulse">
                 {loadingMode === 'manual'
                   ? 'Separando os locais que você já informou.'
                   : loadingMode === 'quick'
@@ -621,14 +621,14 @@ const Step4Attractions = () => {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            className="mx-auto flex max-w-lg flex-col items-center justify-center space-y-8 rounded-xl border border-border bg-card p-10 py-20 text-center shadow-sm dark:bg-slate-800"
+            className="clean-surface mx-auto flex max-w-lg flex-col items-center justify-center space-y-8 rounded-2xl p-10 py-20 text-center"
           >
             <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center text-destructive">
               <AlertCircle className="w-10 h-10" />
             </div>
             <div>
-              <h2 className="text-2xl font-serif font-bold text-foreground mb-3">Ops! Tivemos um imprevisto</h2>
-              <p className="text-muted-foreground font-medium text-lg leading-relaxed">{error}</p>
+              <h2 className="font-display text-2xl font-bold text-secondary mb-3">Ops! Tivemos um imprevisto</h2>
+              <p className="editorial-copy text-muted-foreground">{error}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full pt-4">
               <Button onClick={goBack} variant="outline" className="flex-1 rounded-full py-6 text-lg">
@@ -647,7 +647,7 @@ const Step4Attractions = () => {
                     });
                   }
                 }}
-                className="flex-1 rounded-full py-6 text-lg bg-primary hover:bg-primary/90 text-white"
+                className="flex-1 rounded-full py-6 text-lg"
               >
                 <RefreshCcw className="w-5 h-5 mr-2" /> Tentar novamente
               </Button>
@@ -664,7 +664,7 @@ const Step4Attractions = () => {
             <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center">
               <Loader2 className="w-8 h-8 animate-spin" />
             </div>
-            <h2 className="text-3xl font-serif font-bold text-foreground">
+            <h2 className="font-display text-3xl font-bold text-secondary">
               Preparando os cards...
             </h2>
           </motion.div>
@@ -676,14 +676,14 @@ const Step4Attractions = () => {
             className="w-full space-y-8 md:space-y-10"
           >
             <div className="mb-8 space-y-3 text-center md:mb-12">
-              <h2 className="text-2xl font-serif font-bold text-foreground md:text-4xl">
+              <h2 className="font-display text-2xl font-bold text-secondary md:text-4xl">
                 {itineraryMode
                   ? 'Roteiro sugerido para a sua família'
                   : manualMode
                     ? 'Seu roteiro informado'
                     : 'Locais encontrados para sua viagem'}
               </h2>
-              <p className="mx-auto max-w-2xl text-base font-medium leading-relaxed text-muted-foreground md:text-xl">
+              <p className="editorial-copy mx-auto max-w-2xl text-muted-foreground">
                 {itineraryMode
                   ? recommendedItinerary.summary
                   : manualMode
@@ -717,14 +717,15 @@ const Step4Attractions = () => {
                       setError(null);
                       processAttractions({ mode: 'itinerary' });
                     }}
-                    className="min-h-11 rounded-full bg-secondary px-6 py-3 text-white hover:bg-secondary/90"
+                    variant="outline"
+                    className="min-h-11 rounded-full px-6 py-3 font-bold"
                   >
                     Atualizar sugestões
                   </Button>
                 )}
               </div>
               {selectedCount > 0 && (
-                <div className="mx-auto mt-5 max-w-2xl rounded-xl border border-border/70 bg-card/80 px-4 py-3 text-left shadow-sm">
+                <div className="clean-surface mx-auto mt-5 max-w-2xl rounded-2xl px-4 py-3 text-left">
                   {!hasMissingMapLocations ? (
                     <div className="flex items-center gap-3 text-sm font-bold text-secondary">
                       <MapIcon className="h-4 w-4 shrink-0" />
@@ -781,8 +782,8 @@ const Step4Attractions = () => {
                 ? renderManualGroups()
                 : renderQuickSuggestionCards()}
 
-            <div className="relative z-10 flex flex-col items-center justify-center bg-gradient-to-t from-background via-background to-transparent px-2 pb-4 pt-7 md:sticky md:bottom-0 md:px-4 md:pb-8 md:pt-16">
-              <p className="font-ui mb-3 text-center text-xs font-bold text-muted-foreground">
+            <div className="relative z-10 flex flex-col items-center justify-center bg-gradient-to-t from-[hsl(var(--paper))] via-[hsl(var(--paper))] to-transparent px-2 pb-4 pt-7 md:sticky md:bottom-0 md:px-4 md:pb-8 md:pt-16">
+              <p className="travel-note mb-3 text-center">
                 Você poderá revisar tudo antes do pagamento.
               </p>
               <Button
@@ -809,8 +810,8 @@ const Step4Attractions = () => {
             animate={{ opacity: 1 }}
             className="flex flex-col items-center justify-center py-20 text-center"
           >
-            <h2 className="text-3xl font-serif font-bold text-foreground mb-4">Nenhum ponto especifico encontrado</h2>
-            <p className="text-lg text-muted-foreground font-medium mb-8 max-w-md mx-auto">
+            <h2 className="font-display text-3xl font-bold text-secondary mb-4">Nenhum ponto especifico encontrado</h2>
+            <p className="editorial-copy text-muted-foreground mb-8 max-w-md mx-auto">
               Não conseguimos extrair monumentos exatos do seu texto. Deseja adicionar mais detalhes?
             </p>
             <Button onClick={goBack} variant="outline" className="rounded-full px-8 py-6 text-lg">

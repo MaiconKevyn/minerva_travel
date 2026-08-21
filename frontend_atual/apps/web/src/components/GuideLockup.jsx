@@ -87,7 +87,7 @@ export function GuideStar({ className = 'h-5 w-5' }) {
 
 /**
  * O cabeçalho de seção no brasão do guia: sobrelinha reta em caixa alta
- * espaçada, título em Zilla Slab e, quando faz sentido, a linha em arco.
+ * espaçada, título em Baloo 2 e, quando faz sentido, a linha em arco.
  */
 export function GuideLockup({ overline, title, arched, id, className = '' }) {
   return (
@@ -97,7 +97,7 @@ export function GuideLockup({ overline, title, arched, id, className = '' }) {
           <p className="travel-label rotate-[-0.7deg]">{overline}</p>
         </div>
       ) : null}
-      <h2 id={id} className="mt-4 text-3xl font-serif font-bold leading-[1.05] tracking-[-0.025em] text-secondary sm:text-5xl">
+      <h2 id={id} className="mt-4 text-3xl font-display font-bold leading-[1.05] tracking-[-0.025em] text-secondary sm:text-5xl">
         {title}
       </h2>
       {arched ? (

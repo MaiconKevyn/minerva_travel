@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { GuideStar } from '@/components/GuideLockup.jsx';
+import { Airplane } from './DecorativeElements.jsx';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -11,12 +11,17 @@ const SiteFooter = () => (
         <Link
           to="/"
           aria-label="Guia de Memórias — página inicial"
-          className="mx-auto flex w-fit items-center gap-2.5 md:mx-0"
+          className="group mx-auto flex w-fit items-center gap-2.5 md:mx-0"
         >
-          <GuideStar className="h-6 w-6" />
+          <span
+            aria-hidden="true"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-primary transition-transform duration-200 group-hover:-rotate-6"
+          >
+            <Airplane className="h-6 w-6 text-[hsl(var(--paper))]" />
+          </span>
           <span className="flex flex-col leading-tight">
-            <span className="font-serif text-xl font-bold text-secondary">Guia de Memórias</span>
-            <span className="font-ui text-xs font-semibold text-primary">
+            <span className="font-display text-xl font-bold text-primary">Guia de Memórias</span>
+            <span className="font-ui text-xs font-semibold text-muted-foreground">
               por Minerva Travel
             </span>
           </span>
@@ -35,7 +40,7 @@ const SiteFooter = () => (
         </nav>
 
         <p className="font-ui text-sm font-medium text-muted-foreground md:text-right">
-          © {CURRENT_YEAR} Minerva Travel · Projeto em piloto
+          © {CURRENT_YEAR} Minerva Travel
         </p>
       </div>
     </div>

@@ -8,14 +8,16 @@ const statusConfig = {
     iconClassName: 'animate-spin motion-reduce:animate-none',
     message: 'Salvando as escolhas mais recentes…',
   },
+  // Estados na paleta do guia, sempre via tokens: verde-abeto para o que está
+  // salvo, mostarda para o que ainda mora só neste navegador.
   saved: {
     Icon: CheckCircle2,
-    className: 'border-emerald-700/15 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200',
+    className: 'border-secondary/20 bg-secondary/10 text-secondary',
     message: 'Tudo salvo. Você pode continuar depois.',
   },
   local: {
     Icon: Cloud,
-    className: 'border-amber-700/15 bg-amber-500/10 text-amber-900 dark:text-amber-100',
+    className: 'border-[hsl(var(--star)/0.35)] bg-[hsl(var(--star)/0.16)] text-foreground',
   },
   error: {
     Icon: AlertCircle,

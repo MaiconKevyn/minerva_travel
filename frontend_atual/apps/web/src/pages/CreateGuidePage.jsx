@@ -96,8 +96,8 @@ const CreateGuidePageContent = () => {
             <CompassRose className="page-corner -right-5 top-10 rotate-12" />
             <div className="clean-surface relative max-w-xl px-8 py-10">
               <Loader2 className="mx-auto mb-5 h-12 w-12 animate-spin text-primary" aria-hidden="true" />
-              <h1 className="text-3xl font-serif font-bold text-secondary">Retomando seu guia…</h1>
-              <p className="mt-3 font-medium text-muted-foreground">
+              <h1 className="font-display text-3xl font-bold text-secondary">Retomando seu guia…</h1>
+              <p className="editorial-copy mt-3 text-muted-foreground">
                 Estamos recuperando a etapa, as escolhas e as páginas que você já gerou.
               </p>
             </div>

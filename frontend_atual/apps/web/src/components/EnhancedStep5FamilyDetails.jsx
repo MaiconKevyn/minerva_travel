@@ -196,10 +196,10 @@ const EnhancedStep5FamilyDetails = () => {
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col min-h-[60vh] justify-center py-4">
       <div className="text-center space-y-4 mb-12">
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-foreground">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-secondary">
           Detalhes da Família
         </h2>
-        <p className="text-lg sm:text-xl text-muted-foreground font-medium">
+        <p className="editorial-copy text-lg sm:text-xl text-muted-foreground">
           Para deixar o guia ainda mais especial, conte-nos quem vai aparecer nessa aventura.
         </p>
       </div>
@@ -212,7 +212,7 @@ const EnhancedStep5FamilyDetails = () => {
         />
 
         {/* Family Name Section */}
-        <div className="rounded-xl border border-accent/10 bg-card p-6 shadow-sm dark:bg-slate-800/50 md:p-8">
+        <div className="rounded-2xl border border-accent/10 bg-card p-6 shadow-sm md:p-8">
           <Label htmlFor="familyName" className="mb-6 flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
             <div className="p-2 bg-accent/10 rounded-xl text-accent">
               <Home className="w-6 h-6" />
@@ -248,7 +248,7 @@ const EnhancedStep5FamilyDetails = () => {
         </div>
 
         {/* Children Section */}
-        <div className="rounded-xl border border-primary/10 bg-card p-6 shadow-sm dark:bg-slate-800/50 md:p-8">
+        <div className="rounded-2xl border border-primary/10 bg-card p-6 shadow-sm md:p-8">
           <div className="flex items-center justify-between mb-6">
             <Label className="flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
               <div className="p-2 bg-primary/10 rounded-xl text-primary">
@@ -256,7 +256,7 @@ const EnhancedStep5FamilyDetails = () => {
               </div>
               Crianças
             </Label>
-            <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
+            <span className="pill-flag pill-flag--paper text-sm">
               {children.length} de {MAX_GUIDE_CHILDREN}
             </span>
           </div>
@@ -355,7 +355,7 @@ const EnhancedStep5FamilyDetails = () => {
         </div>
 
         {/* Parents Section */}
-        <div className="rounded-xl border border-secondary/10 bg-card p-6 shadow-sm dark:bg-slate-800/50 md:p-8">
+        <div className="rounded-2xl border border-secondary/10 bg-card p-6 shadow-sm md:p-8">
           <div className="flex items-center justify-between mb-6">
             <Label className="flex items-center gap-3 text-lg font-bold text-foreground sm:text-xl">
               <div className="p-2 bg-secondary/10 rounded-xl text-secondary">
@@ -363,7 +363,7 @@ const EnhancedStep5FamilyDetails = () => {
               </div>
               Responsáveis
             </Label>
-            <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
+            <span className="pill-flag pill-flag--paper text-sm">
               {parents.length} de {MAX_GUIDE_PARENTS}
             </span>
           </div>
@@ -437,7 +437,7 @@ const EnhancedStep5FamilyDetails = () => {
 
         {/* O ano vem do "Quando?" de cada destino: pedir de novo aqui só criava
             a chance de a capa dizer um ano e o roteiro dizer outro. */}
-        <div className="flex items-center gap-3 rounded-xl border border-accent/10 bg-card p-6 dark:bg-slate-800/50">
+        <div className="flex items-center gap-3 rounded-2xl border border-accent/10 bg-card p-6">
           <div className="rounded-xl bg-accent/10 p-2 text-accent">
             <Calendar className="h-6 w-6" />
           </div>
@@ -451,7 +451,7 @@ const EnhancedStep5FamilyDetails = () => {
         <div className="pt-8 flex justify-center">
           <Button
             type="submit"
-            className="w-full max-w-md rounded-lg bg-primary px-6 py-6 text-base font-bold text-white shadow-sm transition-colors hover:bg-primary/90 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
+            className="w-full max-w-md rounded-full px-6 py-6 text-base font-bold shadow-[0_10px_22px_-12px_hsl(217_56%_30%/0.55)] transition-colors sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
           >
             Continuar <ArrowRight className="ml-3 w-6 h-6" />
           </Button>

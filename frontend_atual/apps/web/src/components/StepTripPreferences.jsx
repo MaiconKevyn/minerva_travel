@@ -52,27 +52,27 @@ const StepTripPreferences = () => {
         <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
           <Sparkles className="w-8 h-8" />
         </div>
-        <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+        <h2 className="font-display text-3xl font-bold text-secondary md:text-4xl">
           Qual ritmo combina com a família?
         </h2>
-        <p className="text-lg text-muted-foreground font-medium max-w-2xl mx-auto">
+        <p className="editorial-copy mx-auto max-w-2xl text-muted-foreground">
           Use estas preferências para calibrar as sugestões antes de escolher os pontos do guia.
         </p>
       </div>
 
-      <div className="space-y-8 rounded-xl border border-border/60 bg-card p-6 shadow-sm dark:bg-slate-800 md:p-8">
+      <div className="clean-surface space-y-8 rounded-2xl p-6 md:p-8">
         <div className="grid grid-cols-1 md:grid-cols-[0.8fr_1.2fr] gap-6">
           <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+            <label className="travel-label">
               <CalendarDays className="w-4 h-4" /> Dias
             </label>
-            <div className="rounded-xl bg-muted px-5 py-4 text-lg font-bold text-foreground">
+            <div className="rounded-xl bg-muted px-5 py-4 font-data text-lg font-bold text-foreground">
               {days} {days === 1 ? 'dia' : 'dias'} no total
             </div>
           </div>
 
           <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+            <label className="travel-label">
               <SlidersHorizontal className="w-4 h-4" /> Ritmo
             </label>
             <div className="flex flex-wrap gap-3">
@@ -83,7 +83,7 @@ const StepTripPreferences = () => {
                   onClick={() => updatePreference('pace', option.value)}
                   className={`rounded-full px-5 py-3 font-bold transition-all ${
                     itineraryPreferences.pace === option.value
-                      ? 'bg-secondary text-white shadow-md'
+                      ? 'bg-secondary text-secondary-foreground shadow-md'
                       : 'bg-muted text-muted-foreground hover:bg-secondary/10 hover:text-secondary'
                   }`}
                 >
@@ -95,7 +95,7 @@ const StepTripPreferences = () => {
         </div>
 
         <div className="space-y-3">
-          <label className="text-sm font-semibold text-muted-foreground">
+          <label className="travel-label">
             Programas que combinam
           </label>
           <div className="flex flex-wrap gap-3">
@@ -108,7 +108,7 @@ const StepTripPreferences = () => {
                   onClick={() => toggleInterest(interest.value)}
                   className={`rounded-full px-5 py-3 font-bold transition-all ${
                     selected
-                      ? 'bg-primary text-white shadow-md'
+                      ? 'bg-primary text-primary-foreground shadow-md'
                       : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
                   }`}
                 >
@@ -125,7 +125,7 @@ const StepTripPreferences = () => {
           </Button>
           <Button
             onClick={nextStep}
-            className="rounded-full bg-primary px-6 py-6 text-base font-bold text-white hover:bg-primary/90 sm:px-8 sm:text-lg"
+            className="rounded-full px-6 py-6 text-base font-bold sm:px-8 sm:text-lg"
           >
             Ver atrações <ArrowRight className="ml-2 w-5 h-5" />
           </Button>

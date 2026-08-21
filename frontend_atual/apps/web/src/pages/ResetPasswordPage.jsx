@@ -99,14 +99,14 @@ const ResetPasswordPage = () => {
         note="A troca de senha não altera seus guias nem os rascunhos salvos."
       >
             <div className="mb-7 flex items-center gap-3 border-b border-secondary/15 pb-5">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary/10">
                 <KeyRound className="h-6 w-6 text-secondary" aria-hidden="true" />
               </div>
-              <p className="font-serif text-xl font-semibold text-secondary">Defina uma senha segura</p>
+              <p className="font-display text-xl font-bold text-secondary">Defina uma senha segura</p>
             </div>
 
             {recoveryStatus === 'checking' && (
-              <div className="rounded-xl border border-border bg-background/70 p-6 text-center" role="status" aria-live="polite">
+              <div className="rounded-2xl border border-border bg-background/70 p-6 text-center" role="status" aria-live="polite">
                 <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-secondary" />
                 <p className="font-bold text-foreground">Validando seu link de recuperação...</p>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -117,7 +117,7 @@ const ResetPasswordPage = () => {
 
             {recoveryStatus === 'invalid' && (
               <div className="space-y-5">
-                <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-5 text-center" role="alert">
+                <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-5 text-center" role="alert">
                   <AlertCircle className="mx-auto mb-3 h-9 w-9 text-destructive" />
                   <p className="font-bold text-foreground">Link inválido ou expirado</p>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -126,7 +126,7 @@ const ResetPasswordPage = () => {
                 </div>
                 <Button
                   asChild
-                  className="w-full rounded-xl py-6 bg-secondary hover:bg-secondary/90 text-white font-bold text-lg shadow-lg"
+                  className="travel-cta w-full py-6 text-lg font-bold"
                 >
                   <Link to="/login">Solicitar novo link</Link>
                 </Button>
@@ -146,7 +146,7 @@ const ResetPasswordPage = () => {
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       aria-describedby="reset-password-help reset-password-strength"
-                      className="font-ui w-full rounded-lg border border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
+                      className="font-ui w-full rounded-xl border border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
                       placeholder="Mínimo 8 caracteres"
                     />
                     <button
@@ -191,7 +191,7 @@ const ResetPasswordPage = () => {
                       required
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
-                      className="font-ui w-full rounded-lg border border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
+                      className="font-ui w-full rounded-xl border border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
                       placeholder="Repita sua nova senha"
                     />
                     <button

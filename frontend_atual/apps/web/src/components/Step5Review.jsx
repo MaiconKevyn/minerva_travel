@@ -218,7 +218,7 @@ const Step5Review = () => {
     return (
       <div className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col items-center justify-center px-6 text-center">
         <Loader2 className="mb-5 h-12 w-12 animate-spin text-primary" aria-hidden="true" />
-        <h2 className="text-3xl font-serif font-bold text-foreground">Recuperando suas páginas…</h2>
+        <h2 className="text-3xl font-display font-bold text-secondary">Recuperando suas páginas…</h2>
         <p className="mt-3 font-medium text-muted-foreground">
           As imagens, versões escolhidas e aprovações estão sendo carregadas do seu guia.
         </p>
@@ -228,9 +228,9 @@ const Step5Review = () => {
 
   if (sessionRestoreError) {
     return (
-      <div className="mx-auto w-full max-w-2xl rounded-xl border border-destructive/30 bg-card p-8 text-center shadow-sm">
+      <div className="mx-auto w-full max-w-2xl rounded-2xl border border-destructive/30 bg-card p-8 text-center shadow-sm">
         <AlertCircle className="mx-auto h-12 w-12 text-destructive" aria-hidden="true" />
-        <h2 className="mt-4 text-3xl font-serif font-bold text-foreground">
+        <h2 className="mt-4 text-3xl font-display font-bold text-secondary">
           Não conseguimos carregar as páginas
         </h2>
         <p className="mt-3 font-medium text-muted-foreground" role="alert">
@@ -285,17 +285,17 @@ const Step5Review = () => {
   return (
     <div className="w-full max-w-4xl mx-auto space-y-12">
       <div className="text-center space-y-4">
-        <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+        <h2 className="text-3xl md:text-4xl font-display font-bold text-secondary">
           Perfeito! Aqui está o resumo do seu roteiro
         </h2>
-        <p className="text-lg text-muted-foreground font-medium">Revise as informações antes de gerarmos o guia ilustrado da família.</p>
+        <p className="editorial-copy text-lg text-muted-foreground">Revise as informações antes de gerarmos o guia ilustrado da família.</p>
       </div>
 
-      <div className="rounded-xl border border-border/50 bg-card p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8 md:p-12">
+      <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm sm:p-8 md:p-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
 
           <div className="space-y-4">
-            <h3 className="text-xl font-serif font-bold flex items-center gap-2 text-primary">
+            <h3 className="text-xl font-display font-bold flex items-center gap-2 text-primary">
               <Camera className="w-5 h-5" /> A Capa
             </h3>
             {coverPhotoUrl ? (
@@ -318,7 +318,7 @@ const Step5Review = () => {
 
           <div className="space-y-8">
             <div>
-              <h3 className="text-xl font-serif font-bold flex items-center gap-2 text-secondary mb-3">
+              <h3 className="text-xl font-display font-bold flex items-center gap-2 text-secondary mb-3">
                 <Users className="w-5 h-5" /> Protagonistas
               </h3>
               <p className="font-medium text-lg text-foreground">Família {familyName}</p>
@@ -337,7 +337,7 @@ const Step5Review = () => {
             </div>
 
             <div>
-              <h3 className="text-xl font-serif font-bold flex items-center gap-2 text-accent mb-3">
+              <h3 className="text-xl font-display font-bold flex items-center gap-2 text-secondary mb-3">
                 <MapPin className="w-5 h-5" /> Roteiro da viagem
               </h3>
               {destinationSummaryItems.length > 0 ? (
@@ -375,16 +375,16 @@ const Step5Review = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-border/50">
-          <h3 className="mb-8 flex items-center gap-2 text-xl font-serif font-bold text-primary sm:text-2xl">
-            <Star className="w-6 h-6" /> O Roteiro Mágico
-            <span className="font-sans text-sm font-bold text-muted-foreground">
+          <h3 className="mb-8 flex items-center gap-2 text-xl font-display font-bold text-primary sm:text-2xl">
+            <Star className="w-6 h-6 text-[hsl(var(--star))]" /> O Roteiro Mágico
+            <span className="font-data text-sm font-bold text-muted-foreground">
               {pluralize(finalLandmarks.length, 'local selecionado', 'locais selecionados')}
             </span>
           </h3>
 
           <div className="space-y-8">
             {recommendedDays.length > 0 ? recommendedDays.map(day => (
-              <div key={day.day} className="rounded-xl border border-border/60 bg-background p-6">
+              <div key={day.day} className="rounded-2xl border border-border/60 bg-background p-6">
                 <h4 className="text-lg font-bold text-foreground mb-2 flex items-center gap-2">
                   <Navigation className="w-4 h-4 text-secondary" />
                   {day.title}
@@ -413,7 +413,7 @@ const Step5Review = () => {
               if (!destObj) return null;
 
               return (
-                <div key={destId} className="rounded-xl border border-border/60 bg-background p-6">
+                <div key={destId} className="rounded-2xl border border-border/60 bg-background p-6">
                   <h4 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
                     <Navigation className="w-4 h-4 text-secondary" />
                     {destObj.city}, {destObj.country}
@@ -438,7 +438,7 @@ const Step5Review = () => {
               );
             })}
             {recommendedDays.length > 0 && extraLandmarks.length > 0 && (
-              <div className="rounded-xl border border-border/60 bg-background p-6">
+              <div className="rounded-2xl border border-border/60 bg-background p-6">
                 <h4 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
                   <Navigation className="w-4 h-4 text-secondary" />
                   Outras escolhas
@@ -467,11 +467,11 @@ const Step5Review = () => {
         {/* "O primeiro olá" é a única página que entra ligada por padrão: quem
             não a revê aqui só descobre que existe quando o guia já está pronto. */}
         {flightVocabularyPages && flightVocabularyCountries.length > 0 && (
-          <div className="mt-8 rounded-xl border border-primary/25 bg-primary/5 p-5 sm:p-6">
+          <div className="mt-8 rounded-2xl border border-primary/25 bg-[hsl(var(--blush))] p-5 sm:p-6">
             <div className="flex items-start gap-4">
               <MessageCircleHeart className="mt-1 h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
               <div>
-                <h3 className="text-xl font-serif font-bold text-foreground">
+                <h3 className="text-xl font-display font-bold text-foreground">
                   O primeiro olá, no idioma de cada país
                 </h3>
                 <p className="mt-1 text-sm font-medium text-muted-foreground">
@@ -486,11 +486,11 @@ const Step5Review = () => {
           </div>
         )}
 
-        <div className="mt-8 rounded-xl border border-secondary/25 bg-secondary/5 p-5 sm:p-6">
+        <div className="mt-8 rounded-2xl border border-secondary/25 bg-[hsl(var(--mint))] p-5 sm:p-6">
           <div className="flex items-start gap-4">
             <BookHeart className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
             <div>
-              <h3 className="text-xl font-serif font-bold text-foreground">Minha melhor memória</h3>
+              <h3 className="text-xl font-display font-bold text-foreground">Minha melhor memória</h3>
               <p className="mt-1 text-sm font-medium text-muted-foreground">
                 Página obrigatória depois dos passeios, com espaço para registrar a descoberta
                 favorita, fazer um desenho, assinar e datar.
@@ -500,7 +500,7 @@ const Step5Review = () => {
           <div className="mt-5 flex items-start gap-4 border-t border-secondary/20 pt-5">
             <Plane className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
             <div>
-              <h3 className="text-xl font-serif font-bold text-foreground">
+              <h3 className="text-xl font-display font-bold text-foreground">
                 Hora de voltar para casa
               </h3>
               <p className="mt-1 text-sm font-medium text-muted-foreground">
@@ -512,7 +512,7 @@ const Step5Review = () => {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border/50 bg-card p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-8">
+      <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm sm:p-8">
         <label className="flex cursor-pointer flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
             <input
@@ -522,7 +522,7 @@ const Step5Review = () => {
               className="mt-1 h-5 w-5 accent-primary"
             />
             <div>
-              <h3 className="text-xl font-serif font-bold text-secondary">
+              <h3 className="text-xl font-display font-bold text-secondary">
                 {RESTAURANT_RECOMMENDATIONS_EXTRA.label}
               </h3>
               <p className="mt-1 text-sm font-medium text-muted-foreground">
@@ -530,7 +530,7 @@ const Step5Review = () => {
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-secondary/10 px-4 py-2 text-sm font-bold text-secondary">
+          <span className="pill-flag pill-flag--mint text-sm">
             {RESTAURANT_RECOMMENDATIONS_EXTRA.price_label}
           </span>
         </label>
@@ -538,11 +538,11 @@ const Step5Review = () => {
 
       {/* Última barreira antes da gráfica: o guia é impresso com estes textos
           exatos, então a família confere a grafia uma vez e assume o "confere". */}
-      <div className="rounded-xl border border-primary/25 bg-primary/[0.04] p-5 shadow-sm sm:p-8">
+      <div className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-5 shadow-sm sm:p-8">
         <div className="flex items-start gap-4">
           <PenLine className="mt-1 h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
           <div>
-            <h3 className="text-xl font-serif font-bold text-foreground sm:text-2xl">
+            <h3 className="text-xl font-display font-bold text-foreground sm:text-2xl">
               Assim vai impresso
             </h3>
             <p className="mt-1 text-sm font-medium text-muted-foreground">
@@ -633,8 +633,8 @@ const Step5Review = () => {
 
       {/* Confiança no ponto da decisão: preço, ordem da geração e entrega
           aparecem juntos, imediatamente antes da ação de compra. */}
-      <div className="mt-8 rounded-xl border border-secondary/25 bg-secondary/5 p-5 sm:p-6">
-        <h3 className="text-xl font-serif font-bold text-foreground">O que acontece depois</h3>
+      <div className="mt-8 rounded-2xl border border-secondary/25 bg-[hsl(var(--mint))] p-5 sm:p-6">
+        <h3 className="text-xl font-display font-bold text-foreground">O que acontece depois</h3>
         <ul className="mt-4 grid gap-4 text-left sm:grid-cols-3">
           <li className="flex items-start gap-3">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
@@ -664,7 +664,7 @@ const Step5Review = () => {
           onClick={handleGenerate}
           disabled={isGenerating || !printConfirmed}
           aria-describedby={printConfirmed ? undefined : 'print-confirmation-hint'}
-          className="w-full max-w-md rounded-full bg-primary px-6 py-6 text-base font-bold text-white shadow-[0_8px_30px_rgb(241,97,59,0.3)] transition-all hover:-translate-y-1 hover:bg-primary/90 disabled:opacity-70 disabled:hover:translate-y-0 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
+          className="w-full max-w-md rounded-full px-6 py-6 text-base font-bold shadow-[0_10px_22px_-12px_hsl(217_56%_30%/0.55)] transition-all hover:-translate-y-1 disabled:opacity-70 disabled:hover:translate-y-0 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
         >
           {isGenerating ? (
             <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Preparando o checkout...</>

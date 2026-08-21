@@ -61,7 +61,6 @@ const QUESTIONS = [
           página de preço
         </Link>
         . É uma compra única por guia e os dados financeiros são processados pelo Mercado Pago.
-        Em ambientes de piloto, o checkout pode permanecer desativado.
       </>
     ),
   },
@@ -72,13 +71,13 @@ const HomeFaq = () => (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
       <GuideLockup id="faq-title" overline="Antes de começar" title="Perguntas que todo pai faz" />
 
-      <div className="mt-10 overflow-hidden rounded-xl border border-secondary/15 bg-[hsl(var(--paper))]">
+      <div className="mt-10 overflow-hidden rounded-2xl border border-secondary/15 bg-[hsl(var(--paper))]">
         {QUESTIONS.map((item) => (
           <details
             key={item.question}
             className="group border-b border-secondary/15 px-5 py-1 transition-colors last:border-b-0 open:bg-[hsl(var(--mint)/0.45)] sm:px-6"
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-serif text-lg font-bold text-foreground marker:content-none">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-display text-lg font-bold text-foreground marker:content-none">
               {item.question}
               <ChevronDown
                 className="h-5 w-5 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180"

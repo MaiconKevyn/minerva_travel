@@ -71,8 +71,8 @@ const BookAnatomy = () => (
               {String(index + 1).padStart(2, '0')}
             </span>
             <div>
-              <h3 className="font-serif text-lg font-semibold text-foreground">{page.title}</h3>
-              <p className="mt-1.5 leading-relaxed text-foreground/70">
+              <h3 className="font-display text-lg font-bold text-foreground">{page.title}</h3>
+              <p className="mt-1.5 font-serif leading-relaxed text-foreground/70">
                 {page.description}
               </p>
             </div>

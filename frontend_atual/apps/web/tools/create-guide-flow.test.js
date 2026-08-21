@@ -144,14 +144,14 @@ test('attraction selection exposes category labels filters and review context', 
   assert.match(review, /categoryLabelForAttraction/);
 });
 
-test('review step offers restaurant recommendations under the explicit pilot contract', () => {
+test('review step offers restaurant recommendations under the explicit no-charge contract', () => {
   const api = readProjectFile('src/utils/minerva-api.js');
   const context = readProjectFile('src/contexts/ConversationalGuideContext.jsx');
   const review = readProjectFile('src/components/Step5Review.jsx');
 
   assert.match(api, /RESTAURANT_RECOMMENDATIONS_EXTRA/);
   assert.match(api, /price_cents:\s*0/);
-  assert.match(api, /Incluído no piloto/);
+  assert.match(api, /Incluído no guia/);
   assert.match(context, /restaurantRecommendationsExtra/);
   assert.match(review, /RESTAURANT_RECOMMENDATIONS_EXTRA/);
   assert.match(review, /setRestaurantRecommendationsExtra/);
@@ -307,8 +307,10 @@ test('home promises exactly the activity catalogue the product ships', () => {
   assert.doesNotMatch(showcase, /\b1[0-9] atividades\b/);
   assert.match(faq, /PHRASEBOOK_COUNTRIES/);
   // O preço numérico vem do backend; a home estática não pode congelá-lo.
-  assert.match(faq, /piloto/i);
+  assert.match(faq, /compra única/i);
   assert.doesNotMatch(faq, /R\$|€\s*\d/);
+  // Com a cobrança ativa, nenhuma promessa de piloto gratuito pode sobrar.
+  assert.doesNotMatch(faq, /piloto/i);
 });
 
 test('the catalogue is listed once and each card says where it was assigned', () => {

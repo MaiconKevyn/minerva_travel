@@ -356,19 +356,19 @@ const SampleGuideReader = () => {
         variant="outline"
         onClick={goPrevious}
         disabled={activePage === 0}
-        className="rounded-lg border px-5"
+        className="border px-5"
       >
         <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
         Anterior
       </Button>
-      <p className="min-w-44 text-center text-sm font-bold text-foreground" role="status" aria-live="polite">
+      <p className="font-data min-w-44 text-center text-sm font-bold text-foreground" role="status" aria-live="polite">
         {pageRangeLabel(visibleIndexes)}
       </p>
       <Button
         type="button"
         onClick={goNext}
         disabled={!canGoNext}
-        className="rounded-lg px-5"
+        className="px-5"
       >
         Próxima
         <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
@@ -377,9 +377,11 @@ const SampleGuideReader = () => {
   );
 
   return (
+    // A vitrine assenta direto na areia do site; quem é de papel é o cartão
+    // do leitor (.clean-surface), como no mockup.
     <section
       id="guia-exemplo"
-      className="travel-page editorial-section scroll-mt-20 py-16 sm:py-20"
+      className="scroll-mt-20 py-16 sm:py-20"
       aria-labelledby="guia-exemplo-title"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -418,8 +420,8 @@ const SampleGuideReader = () => {
                 <BookOpen className="h-5 w-5" aria-hidden="true" />
               </span>
               <div>
-                <p className="font-serif text-lg font-bold text-foreground">Família Knopp em Paris</p>
-                <p className="font-ui text-xs font-semibold text-muted-foreground">19 páginas · guia demonstrativo</p>
+                <p className="font-display text-lg font-bold text-secondary">Família Knopp em Paris</p>
+                <p className="font-data text-xs font-semibold text-muted-foreground">19 páginas · guia demonstrativo</p>
               </div>
             </div>
 
@@ -429,7 +431,7 @@ const SampleGuideReader = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="font-ui min-h-11 rounded-lg border font-semibold"
+                    className="min-h-11 border"
                     aria-label="Ampliar o guia"
                   >
                     <Expand className="h-4 w-4 sm:mr-2" aria-hidden="true" />
@@ -438,7 +440,7 @@ const SampleGuideReader = () => {
                 </DialogTrigger>
                 <DialogContent className="h-[94vh] max-w-[min(96vw,1180px)] overflow-y-auto rounded-xl border p-4 sm:p-6">
                   <DialogHeader className="pr-10 text-left">
-                    <DialogTitle className="font-serif text-2xl">Guia demonstrativo completo</DialogTitle>
+                    <DialogTitle className="font-display text-2xl font-bold">Guia demonstrativo completo</DialogTitle>
                     <DialogDescription>{pageRangeLabel(visibleIndexes)}</DialogDescription>
                   </DialogHeader>
                   <BookViewport
@@ -466,7 +468,7 @@ const SampleGuideReader = () => {
                       key={page.image}
                       type="button"
                       onClick={() => openReaderAt(pageIndex)}
-                      className="group w-36 shrink-0 snap-start rounded-lg border border-secondary/15 bg-background/65 p-2 text-left transition-colors hover:border-primary/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto"
+                      className="group w-36 shrink-0 snap-start rounded-xl border border-secondary/15 bg-background/65 p-2 text-left transition-colors hover:border-primary/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto"
                       aria-label={`Abrir o guia na página ${page.number}: ${page.title}`}
                     >
                       <img
@@ -488,13 +490,13 @@ const SampleGuideReader = () => {
                   );
                 })}
               </div>
+              {/* A ação principal da vitrine fala cobalto, como todo CTA. */}
               <Button
                 type="button"
-                variant="outline"
                 onClick={() => openReaderAt(0)}
                 aria-expanded="false"
                 aria-controls="sample-guide-full-reader"
-                className="font-ui mx-auto mt-5 flex min-h-11 rounded-lg border px-6 font-semibold"
+                className="mx-auto mt-5 flex min-h-11 px-6"
               >
                 <BookOpen className="mr-2 h-4 w-4" aria-hidden="true" />
                 Abrir as 19 páginas
@@ -560,7 +562,7 @@ const SampleGuideReader = () => {
                 disabled={Boolean(turn)}
                 aria-expanded="true"
                 aria-controls="sample-guide-full-reader"
-                className="font-ui mx-auto mt-6 flex min-h-11 rounded-lg px-6 font-semibold"
+                className="mx-auto mt-6 flex min-h-11 px-6"
               >
                 Recolher guia
                 <ChevronUp className="ml-2 h-4 w-4" aria-hidden="true" />

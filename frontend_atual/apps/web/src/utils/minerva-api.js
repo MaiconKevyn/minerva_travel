@@ -17,10 +17,10 @@ export const apiBaseUrl = () => import.meta.env?.VITE_API_BASE_URL || DEFAULT_AP
 export const RESTAURANT_RECOMMENDATIONS_EXTRA = {
   id: 'restaurant_recommendations_extra',
   label: 'Recomendações de restaurantes para a família',
-  description: 'Sugestões de restaurantes próximos aos locais selecionados, incluídas no piloto.',
+  description: 'Sugestões de restaurantes próximos aos locais selecionados, incluídas sem custo extra.',
   price_cents: 0,
   currency: 'BRL',
-  price_label: 'Incluído no piloto',
+  price_label: 'Incluído no guia',
 };
 
 export const createIdempotencyKey = () => {

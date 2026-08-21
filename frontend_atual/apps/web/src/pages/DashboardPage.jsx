@@ -36,10 +36,12 @@ import {
 } from '@/utils/minerva-api.js';
 import { toast } from 'sonner';
 
+// Estados na paleta do guia: mostarda para o que anda, verde-abeto para o
+// que chegou, terracota (destructive) para o que falhou — sempre via tokens.
 const guideStatusConfig = {
   queued: { label: 'Na fila', className: 'bg-muted text-muted-foreground' },
-  running: { label: 'Em andamento', className: 'bg-secondary/15 text-secondary' },
-  succeeded: { label: 'Pronto', className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' },
+  running: { label: 'Em andamento', className: 'bg-[hsl(var(--star)/0.22)] text-foreground' },
+  succeeded: { label: 'Pronto', className: 'bg-secondary/15 text-secondary' },
   failed: { label: 'Falhou', className: 'bg-destructive/10 text-destructive' },
   cancelled: { label: 'Cancelado', className: 'bg-muted text-muted-foreground' },
 };
@@ -271,8 +273,8 @@ const DashboardPage = () => {
                     <Suitcase className="h-7 w-7 sm:h-9 sm:w-9" aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
-                    <span className="travel-label mb-2 -rotate-1">Diário da família</span>
-                    <h1 id="dashboard-welcome-title" className="font-serif text-2xl font-bold text-secondary sm:text-4xl md:text-5xl">
+                    <span className="travel-label mb-2">Diário da família</span>
+                    <h1 id="dashboard-welcome-title" className="font-display text-2xl font-bold text-secondary sm:text-4xl md:text-5xl">
                       Olá, {user?.name || 'Viajante'}!
                     </h1>
                     <p className="editorial-copy mt-2 max-w-xl text-sm text-foreground/70 sm:text-base">
@@ -291,7 +293,7 @@ const DashboardPage = () => {
 
             <section className="mt-5 grid gap-4 sm:grid-cols-3" aria-label="Resumo da biblioteca">
               <article className="clean-surface flex items-center gap-4 p-5">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-700">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
                   <CircleCheck className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div>
@@ -300,7 +302,7 @@ const DashboardPage = () => {
                 </div>
               </article>
               <article className="clean-surface flex items-center gap-4 p-5">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--star)/0.25)] text-[hsl(var(--star))]">
                   <Clock3 className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div>
@@ -314,7 +316,7 @@ const DashboardPage = () => {
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-primary">Próximo passo</p>
-                  <p className="mt-1 font-serif text-base font-bold text-foreground">{nextAction}</p>
+                  <p className="mt-1 font-display text-base font-bold text-foreground">{nextAction}</p>
                 </div>
               </article>
             </section>
@@ -343,8 +345,8 @@ const DashboardPage = () => {
               <div className="relative mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
                 <RouteDoodle className="pointer-events-none absolute -top-12 right-20 hidden h-16 w-36 text-secondary/25 sm:block" />
                 <div>
-                  <span className="travel-label mb-2 -rotate-1">Livros da família</span>
-                  <h2 id="dashboard-guides-title" className="font-serif text-2xl font-bold text-secondary sm:text-3xl">
+                  <span className="travel-label mb-2">Livros da família</span>
+                  <h2 id="dashboard-guides-title" className="font-display text-2xl font-bold text-secondary sm:text-3xl">
                     Sua estante de viagens
                   </h2>
                 </div>
@@ -358,7 +360,7 @@ const DashboardPage = () => {
                 <section className="mb-8" aria-labelledby="dashboard-generating-title">
                   <div className="mb-4 flex items-end justify-between gap-4">
                     <div>
-                      <h3 id="dashboard-generating-title" className="text-xl font-serif font-bold text-foreground">
+                      <h3 id="dashboard-generating-title" className="text-xl font-display font-bold text-secondary">
                         Guias em criação
                       </h3>
                       <p className="mt-1 text-sm font-medium text-muted-foreground">
@@ -390,7 +392,7 @@ const DashboardPage = () => {
                                   {status.label}
                                 </span>
                               </div>
-                              <h4 className="mt-2 font-serif text-lg font-bold text-foreground">
+                              <h4 className="mt-2 font-display text-lg font-bold text-foreground">
                                 {preview.title || 'Guia de viagem'}
                               </h4>
                               {destinations.length > 0 && (
@@ -404,7 +406,7 @@ const DashboardPage = () => {
                             </div>
                           </div>
                           <div
-                            className="mt-5 h-2 overflow-hidden rounded-full bg-background/80"
+                            className="mt-5 h-2 overflow-hidden rounded-full bg-muted"
                             role="progressbar"
                             aria-label={`Progresso de ${preview.title || 'guia de viagem'}`}
                             aria-valuemin={0}
@@ -473,7 +475,7 @@ const DashboardPage = () => {
                 >
                   <AlertCircle className="w-10 h-10 text-destructive" aria-hidden="true" />
                   <div>
-                    <h3 className="text-xl font-bold font-serif text-foreground">Não foi possível abrir sua biblioteca</h3>
+                    <h3 className="text-xl font-bold font-display text-foreground">Não foi possível abrir sua biblioteca</h3>
                     <p className="mt-2 text-muted-foreground font-medium">{loadError}</p>
                   </div>
                   <Button type="button" variant="outline" onClick={() => requestGuideList()} className="rounded-lg">
@@ -486,7 +488,7 @@ const DashboardPage = () => {
                   <div className="mb-2 flex h-20 w-20 items-center justify-center rounded-lg bg-[hsl(var(--blush)/0.55)]">
                     <BookOpen className="w-10 h-10 text-muted-foreground/50" aria-hidden="true" />
                   </div>
-                  <h3 className="text-xl font-bold font-serif text-foreground">O livro está em branco!</h3>
+                  <h3 className="text-xl font-bold font-display text-foreground">O livro está em branco!</h3>
                   <p className="text-muted-foreground font-medium max-w-sm">
                     {generationJobs.length > 0
                       ? 'Seu primeiro livro ainda está sendo criado e aparecerá aqui quando estiver pronto.'
@@ -536,7 +538,7 @@ const DashboardPage = () => {
                               </span>
                             </div>
 
-                            <h3 className="mb-2 text-lg font-serif font-bold text-foreground transition-colors group-hover:text-primary xl:text-xl">
+                            <h3 className="mb-2 text-lg font-display font-bold text-foreground transition-colors group-hover:text-primary xl:text-xl">
                               {guide.title || 'Guia sem título'}
                             </h3>
                             {destinations.length > 0 && (
@@ -560,7 +562,7 @@ const DashboardPage = () => {
                                 size="sm"
                                 onClick={() => handleDownload(guide)}
                                 disabled={isDownloading}
-                                className="rounded-lg bg-secondary text-white hover:bg-secondary/90"
+                                className="rounded-lg"
                               >
                                 {isDownloading ? (
                                   <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />

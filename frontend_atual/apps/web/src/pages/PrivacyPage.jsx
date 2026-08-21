@@ -6,8 +6,8 @@ import SiteFooter from '@/components/SiteFooter.jsx';
 
 const Section = ({ title, children }) => (
   <section className="space-y-3">
-    <h2 className="text-2xl font-serif font-bold text-foreground">{title}</h2>
-    <div className="space-y-3 leading-7 text-muted-foreground">{children}</div>
+    <h2 className="font-display text-2xl font-bold text-secondary">{title}</h2>
+    <div className="editorial-copy space-y-3 text-muted-foreground">{children}</div>
   </section>
 );
 
@@ -24,13 +24,13 @@ const PrivacyPage = () => (
       <Header />
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 space-y-10 px-5 py-12 sm:px-8">
         <div className="space-y-4">
-          <p className="text-sm font-semibold text-primary">
+          <p className="travel-label">
             Versão 2026-07-10 · piloto controlado
           </p>
-          <h1 className="text-4xl font-serif font-bold sm:text-5xl">
+          <h1 className="font-display text-4xl font-bold text-secondary sm:text-5xl">
             Política de Privacidade
           </h1>
-          <p className="text-lg leading-8 text-muted-foreground">
+          <p className="editorial-copy text-muted-foreground">
             Esta página descreve o tratamento técnico já implementado. O produto não deve
             receber fotos reais de crianças fora de um piloto autorizado enquanto retenção,
             limpeza automática e revisão jurídica do mercado não estiverem concluídas.
@@ -86,7 +86,7 @@ const PrivacyPage = () => (
           </p>
         </Section>
 
-        <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <p className="clean-surface rounded-2xl p-5 text-sm text-muted-foreground">
           Consulte também os <Link className="font-bold text-primary underline" to="/terms">Termos de Uso</Link>.
           Esta política deverá passar por revisão jurídica antes de cobrança ou tráfego público.
         </p>

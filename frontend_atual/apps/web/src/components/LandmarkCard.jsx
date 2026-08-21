@@ -47,17 +47,17 @@ const LandmarkCard = ({
         viewport={{ once: true, margin: "-50px" }}
         transition={{ duration: 0.4, delay: index * 0.1 }}
         className={cn(
-          "group relative flex h-full flex-col overflow-hidden rounded-xl border bg-card transition-colors duration-200 dark:bg-slate-800",
+          "group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-card transition-colors duration-200",
           isSelectionMode ? "cursor-pointer" : "cursor-default",
           isSelectionMode && isMentionedPlace && !isSelected
             ? "border-primary/35 shadow-sm hover:border-primary/70"
             : isSelectionMode && !isMentionedPlace && !isSelected
               ? "border-secondary/35 shadow-sm hover:border-secondary/70"
               : isSelected && isMentionedPlace
-                ? "border-primary shadow-[0_8px_30px_rgb(241,97,59,0.15)] scale-[1.02]"
+                ? "border-primary shadow-[0_8px_30px_hsl(var(--primary)/0.18)] scale-[1.02]"
                 : isSelected
-                  ? "border-secondary shadow-[0_8px_30px_rgb(72,156,200,0.15)] scale-[1.02]"
-                  : "border-border/60 dark:border-slate-700 shadow-sm hover:border-primary/30"
+                  ? "border-secondary shadow-[0_8px_30px_hsl(var(--secondary)/0.18)] scale-[1.02]"
+                  : "border-border/60 shadow-sm hover:border-primary/30"
         )}
       >
         {isSelectionMode ? (
@@ -134,7 +134,7 @@ const LandmarkCard = ({
 
         {/* Number Badge (Showcase Mode) */}
         {!isSelectionMode && data.number && (
-          <div className="absolute top-4 right-4 w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg shadow-lg z-10">
+          <div className="guide-bullet absolute top-4 right-4 z-10 shadow-lg">
             {data.number}
           </div>
         )}
@@ -146,8 +146,8 @@ const LandmarkCard = ({
               "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm border-2",
               isSelected
                 ? sourceTone === 'primary'
-                  ? "bg-primary border-primary text-white scale-110"
-                  : "bg-secondary border-secondary text-white scale-110"
+                  ? "bg-primary border-primary text-primary-foreground scale-110"
+                  : "bg-secondary border-secondary text-secondary-foreground scale-110"
                 : sourceTone === 'primary'
                   ? "bg-background/80 backdrop-blur-sm border-primary/30 text-transparent group-hover:border-primary/70"
                   : "bg-background/80 backdrop-blur-sm border-secondary/30 text-transparent group-hover:border-secondary/70"
@@ -162,35 +162,35 @@ const LandmarkCard = ({
           {/* City & Location */}
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className={cn(
-              "flex items-center gap-1.5 text-xs font-semibold",
+              "font-data flex items-center gap-1.5 text-xs font-bold",
               sourceTone === 'primary' ? "text-primary" : "text-secondary"
             )}>
               <MapPin className="w-3.5 h-3.5" />
               {displayCity}
             </span>
             {categoryLabel && (
-              <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground">
+              <span className="font-data rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground">
                 {categoryLabel}
               </span>
             )}
           </div>
 
           {/* Title */}
-          <h4 className="text-2xl font-serif font-bold text-secondary dark:text-secondary-foreground mb-4 leading-tight group-hover:text-primary transition-colors">
+          <h4 className="font-display text-2xl font-bold text-secondary mb-4 leading-tight group-hover:text-primary transition-colors">
             {data.name}
           </h4>
 
           {/* Curiosity / Fun Fact (Showcase Mode) */}
           {data.curiosity && (
-            <div className="mb-4 p-3 bg-muted/50 dark:bg-slate-900/50 rounded-xl border-l-4 border-accent">
-              <p className="text-sm italic text-muted-foreground font-medium">
+            <div className="guide-card-rosa mb-4 p-3">
+              <p className="font-serif text-sm italic text-foreground/80">
                 "{data.curiosity}"
               </p>
             </div>
           )}
 
           {/* Description */}
-          <p className="text-foreground/80 dark:text-gray-300 text-sm leading-relaxed flex-1">
+          <p className="font-serif text-foreground/80 text-sm leading-relaxed flex-1">
             {data.description || 'Um ponto turístico imperdível para sua viagem em família.'}
           </p>
         </div>

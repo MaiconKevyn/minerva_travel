@@ -78,13 +78,13 @@ const StepActivities = () => {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 py-4">
       <div className="mx-auto max-w-3xl space-y-4 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Palette className="h-7 w-7" aria-hidden="true" />
         </div>
-        <h2 className="text-3xl font-serif font-bold text-foreground sm:text-4xl md:text-5xl">
+        <h2 className="text-3xl font-display font-bold text-secondary sm:text-4xl md:text-5xl">
           Atividades da aventura
         </h2>
-        <p className="text-lg font-medium text-muted-foreground">
+        <p className="editorial-copy text-lg text-muted-foreground">
           Escolha uma brincadeira e diga em quais paradas ela entra.
           <br />
           Nenhuma vem marcada automaticamente.
@@ -92,8 +92,8 @@ const StepActivities = () => {
         <p className="text-sm font-medium text-muted-foreground">
           Toque na lupa de cada card para ver a página inteira antes de decidir.
         </p>
-        <p className="inline-flex items-center gap-2 rounded-full bg-accent/15 px-4 py-1.5 text-sm font-bold text-foreground">
-          <Sparkles className="h-4 w-4 text-accent-foreground" aria-hidden="true" />
+        <p className="pill-flag pill-flag--mint text-sm">
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
           {ageSummary}
         </p>
       </div>
@@ -110,12 +110,12 @@ const StepActivities = () => {
         onChange={setFlightVocabularyPages}
       />
 
-      <section className="rounded-xl border border-secondary/25 bg-secondary/5 p-5 sm:p-6" aria-labelledby="mandatory-pages-title">
+      <section className="rounded-2xl border border-secondary/25 bg-[hsl(var(--mint))] p-5 sm:p-6" aria-labelledby="mandatory-pages-title">
         <h3 id="mandatory-pages-title" className="sr-only">Páginas finais obrigatórias</h3>
         <div className="flex items-start gap-4">
           <BookHeart className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
           <div>
-            <h4 className="text-xl font-serif font-bold text-foreground">
+            <h4 className="text-xl font-display font-bold text-foreground">
               Minha melhor memória
             </h4>
             <p className="mt-1 font-medium text-muted-foreground">
@@ -127,7 +127,7 @@ const StepActivities = () => {
         <div className="mt-5 flex items-start gap-4 border-t border-secondary/20 pt-5">
           <Plane className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
           <div>
-            <h4 className="text-xl font-serif font-bold text-foreground">
+            <h4 className="text-xl font-display font-bold text-foreground">
               Hora de voltar para casa
             </h4>
             <p className="mt-1 font-medium text-muted-foreground">
@@ -144,7 +144,7 @@ const StepActivities = () => {
             <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
               <h3
                 id={`activity-category-${category.id}`}
-                className="text-sm font-semibold text-foreground"
+                className="travel-label"
               >
                 {category.label}
               </h3>
@@ -160,7 +160,7 @@ const StepActivities = () => {
                 return (
                   <article
                     key={activity.type}
-                    className={`group relative flex h-full flex-col overflow-hidden rounded-xl border-2 bg-background transition ${
+                    className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border-2 bg-card transition ${
                       chosen
                         ? 'border-primary shadow-md ring-2 ring-primary/20'
                         : 'border-border/70 hover:border-primary/45 hover:shadow-md'
@@ -187,7 +187,7 @@ const StepActivities = () => {
                         <Eye className="h-4 w-4" aria-hidden="true" />
                       </button>
                       {chosen && (
-                        <span className="absolute right-2 top-2 flex h-7 items-center gap-1 rounded-full border-2 border-primary bg-primary px-2 text-[11px] font-bold text-white shadow-sm">
+                        <span className="absolute right-2 top-2 flex h-7 items-center gap-1 rounded-full border-2 border-primary bg-primary px-2 text-[11px] font-bold text-primary-foreground shadow-sm">
                           <Check className="h-3.5 w-3.5" aria-hidden="true" />
                           {chosenIds.length}
                         </span>
@@ -203,7 +203,7 @@ const StepActivities = () => {
                       >
                         {activity.description}
                       </p>
-                      <div className="flex flex-wrap gap-1.5 pt-1 text-[10px] font-bold text-muted-foreground">
+                      <div className="font-data flex flex-wrap gap-1.5 pt-1 text-[10px] font-bold text-muted-foreground">
                         <span className="rounded-full bg-muted px-2 py-0.5">{activity.ageLabel}</span>
                         <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
                           <Clock3 className="h-2.5 w-2.5" aria-hidden="true" />
@@ -222,7 +222,7 @@ const StepActivities = () => {
                             type="button"
                             onClick={() => toggleActivity(onlyLandmark, activity.type)}
                             aria-describedby={`${inputId}-description`}
-                            className={`flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-2 text-xs font-bold transition ${
+                            className={`flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border-2 px-3 py-2 text-xs font-bold transition ${
                               chosen
                                 ? 'border-primary bg-primary/10 text-primary'
                                 : 'border-border/70 bg-background text-muted-foreground hover:border-primary/45 hover:text-foreground'
@@ -264,7 +264,7 @@ const StepActivities = () => {
         ))}
       </div>
 
-      <div className="sticky bottom-4 z-10 rounded-xl border border-border/70 bg-card/95 p-4 shadow-sm backdrop-blur sm:flex sm:items-center sm:justify-between sm:gap-6">
+      <div className="sticky bottom-4 z-10 rounded-2xl border border-border/70 bg-card/95 p-4 shadow-[0_12px_32px_-14px_hsl(30_27%_13%/0.35)] backdrop-blur sm:flex sm:items-center sm:justify-between sm:gap-6">
         <div className="mb-4 sm:mb-0">
           <p className="font-bold text-foreground" aria-live="polite">
             {landmarkActivitySelections.length} de {MAX_OPTIONAL_ACTIVITIES_PER_GUIDE} páginas opcionais

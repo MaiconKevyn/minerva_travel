@@ -330,16 +330,16 @@ const Step3Destination = () => {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-secondary">
           <MapPin className="h-8 w-8" />
         </div>
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-foreground">
+        <h2 className="font-display text-3xl font-bold text-secondary sm:text-4xl md:text-5xl">
           Para onde vai ser a aventura?
         </h2>
-        <p className="mx-auto max-w-2xl text-lg text-muted-foreground font-medium">
+        <p className="editorial-copy mx-auto max-w-2xl text-muted-foreground">
           Adicione cada destino separadamente para montarmos o guia na ordem da viagem.
         </p>
         {/* Dito logo na entrada: quem começa precisa saber onde o guia
             termina, senão só descobre no fim que existe um e-mail. */}
-        <p className="mx-auto inline-flex max-w-2xl items-center gap-2 rounded-full bg-secondary/10 px-5 py-2 text-sm font-bold text-foreground">
-          <Mail className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
+        <p className="pill-flag pill-flag--mint mx-auto max-w-2xl text-sm">
+          <Mail className="h-4 w-4 shrink-0" aria-hidden="true" />
           Ao final, montamos o guia e enviamos o PDF completo para o seu e-mail em alguns minutos.
         </p>
       </div>
@@ -361,13 +361,17 @@ const Step3Destination = () => {
                 role="radio"
                 aria-checked={selected}
                 onClick={() => changeItineraryMode(option.id)}
-                className={`rounded-xl border p-4 text-left transition ${
+                className={`rounded-2xl border p-4 text-left transition ${
                   selected
-                    ? 'border-secondary bg-secondary/10 text-foreground shadow-sm'
-                    : 'border-border/70 bg-background text-muted-foreground hover:border-secondary/50'
+                    ? 'border-primary bg-[hsl(var(--blush))] text-foreground shadow-sm'
+                    : 'border-border/70 bg-background text-muted-foreground hover:border-primary/50'
                 }`}
               >
-                <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-card text-secondary">
+                <span
+                  className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-card ${
+                    selected ? 'text-primary' : 'text-secondary'
+                  }`}
+                >
                   <Icon className="h-5 w-5" />
                 </span>
                 <span className="block text-sm font-bold">{option.label}</span>
@@ -378,7 +382,7 @@ const Step3Destination = () => {
         </div>
 
         {itineraryMode === 'freeform' && (
-          <div className="rounded-xl border border-border/70 bg-background p-5">
+          <div className="clean-surface rounded-2xl p-5">
             <div className="space-y-2">
               <Label htmlFor="freeform-itinerary" className="font-bold">
                 Conte seu roteiro do seu jeito
@@ -404,7 +408,7 @@ const Step3Destination = () => {
                 <Button
                   type="button"
                   onClick={confirmCurrentOrder}
-                  className="rounded-full bg-secondary px-6 py-5 font-bold text-white hover:bg-secondary/90"
+                  className="rounded-full px-6 py-5 font-bold"
                 >
                   Usar esta ordem
                 </Button>
@@ -426,7 +430,7 @@ const Step3Destination = () => {
         )}
 
         {itineraryMode === 'suggested' && (
-          <div className="rounded-xl border border-border/70 bg-background p-5">
+          <div className="clean-surface rounded-2xl p-5">
             <div className="space-y-2">
               <Label htmlFor="route-suggestion" className="font-bold">
                 O que vocês imaginam para essa viagem?
@@ -444,7 +448,7 @@ const Step3Destination = () => {
                 type="button"
                 onClick={loadSuggestedRoutes}
                 disabled={isLoadingSuggestions}
-                className="rounded-full bg-secondary px-6 py-5 font-bold text-white hover:bg-secondary/90"
+                className="rounded-full px-6 py-5 font-bold"
               >
                 {isLoadingSuggestions ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -467,16 +471,16 @@ const Step3Destination = () => {
             {suggestedRoutes.length > 0 && (
               <div className="mt-5 space-y-3">
                 {suggestedRoutes.map((route) => (
-                  <div key={route.id} className="rounded-xl border border-border/70 bg-card p-4">
+                  <div key={route.id} className="rounded-2xl border border-border/70 bg-card p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <p className="font-bold text-foreground">{route.title}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">{route.summary}</p>
+                        <p className="font-display font-bold text-secondary">{route.title}</p>
+                        <p className="mt-1 font-serif text-sm text-muted-foreground">{route.summary}</p>
                       </div>
                       <Button
                         type="button"
                         onClick={() => acceptSuggestedRoute(route)}
-                        className="rounded-full bg-primary px-5 py-4 text-white hover:bg-primary/90"
+                        className="rounded-full px-5 py-4"
                       >
                         Usar rota
                       </Button>
@@ -491,14 +495,14 @@ const Step3Destination = () => {
         {localDestinations.map((destination, index) => (
           <div
             key={destination.id}
-            className="rounded-xl border border-border/70 bg-card p-5 shadow-sm dark:bg-slate-800/50 sm:p-6"
+            className="travel-card rounded-2xl p-5 sm:p-6"
           >
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
+                <p className="travel-label">
                   Destino {index + 1}
                 </p>
-                <h3 className="text-xl font-serif font-bold text-foreground">
+                <h3 className="font-display text-xl font-bold text-secondary">
                   Parada da viagem
                 </h3>
               </div>
@@ -604,7 +608,7 @@ const Step3Destination = () => {
             </div>
 
             {itineraryMode === 'known' && (
-              <div className="mt-6 rounded-xl border border-border/60 bg-background/60 p-4 sm:p-5">
+              <div className="mt-6 rounded-2xl border border-border/60 bg-background/60 p-4 sm:p-5">
                 <Label className="mb-3 flex items-center gap-2 font-bold">
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Landmark className="h-4 w-4" />
@@ -700,14 +704,14 @@ const Step3Destination = () => {
 
           <Button
             type="submit"
-            className="rounded-full bg-secondary px-8 py-6 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-secondary/90"
+            className="travel-cta px-8 py-6 text-lg font-bold"
           >
             Próximo
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </div>
 
-        <div className="flex items-center justify-center gap-2 text-center text-sm font-medium text-muted-foreground">
+        <div className="font-hand flex items-center justify-center gap-2 text-center text-[1.05rem] text-secondary/80">
           <CalendarDays className="h-4 w-4 shrink-0" />
           {itineraryMode === 'known'
             ? 'Escolha os lugares na lista que aparece: é o nome oficial deles que vai impresso no livro.'

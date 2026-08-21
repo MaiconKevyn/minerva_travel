@@ -30,15 +30,15 @@ const ActivityPreviewDialog = ({ activity, landmarks, chosenIds, onToggle, open,
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto rounded-2xl">
         <DialogHeader>
-          <DialogTitle className="font-serif text-2xl">{activity.label}</DialogTitle>
-          <DialogDescription className="text-base">
+          <DialogTitle className="font-display text-2xl font-bold">{activity.label}</DialogTitle>
+          <DialogDescription className="editorial-copy text-base">
             {activity.about || activity.description}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
+        <div className="font-data flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
           <span className="flex items-center gap-1 rounded-full bg-muted px-3 py-1">
             <Users className="h-3.5 w-3.5" aria-hidden="true" />
             {activity.ageLabel}
@@ -64,7 +64,7 @@ const ActivityPreviewDialog = ({ activity, landmarks, chosenIds, onToggle, open,
                 onClick={() => setShownIndex(index)}
                 className={`rounded-full px-4 py-1.5 text-sm font-bold transition ${
                   index === shownIndex
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -78,7 +78,7 @@ const ActivityPreviewDialog = ({ activity, landmarks, chosenIds, onToggle, open,
           <img
             src={shown.src}
             alt={`${activity.label} — ${shown.label}`}
-            className="w-full rounded-xl border-2 border-border bg-muted"
+            className="w-full rounded-2xl border-2 border-border bg-muted"
           />
           <figcaption className="text-center text-sm font-medium text-muted-foreground">
             {shown.caption}
@@ -111,7 +111,7 @@ const ActivityPreviewDialog = ({ activity, landmarks, chosenIds, onToggle, open,
                   }
                   className={`flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${
                     chosen
-                      ? 'border-primary bg-primary text-white'
+                      ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border/70 bg-background text-muted-foreground hover:border-primary/45 hover:text-foreground'
                   }`}
                 >

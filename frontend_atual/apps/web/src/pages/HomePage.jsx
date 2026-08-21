@@ -50,7 +50,7 @@ const HomePage = () => (
             <span className="travel-label">Primeira página em poucos minutos</span>
             <h2
               id="comecar-title"
-              className="mt-4 text-3xl font-serif font-bold leading-tight text-secondary sm:text-5xl"
+              className="mt-4 font-display text-3xl font-bold leading-tight text-secondary sm:text-5xl"
             >
               A viagem já está marcada. Falta o livro.
             </h2>

@@ -145,7 +145,7 @@ const SavedFamilyPanel = ({ tripYear, collectFamilyData, onLoad }) => {
   return (
     <section
       aria-labelledby="saved-family-title"
-      className="rounded-xl border border-dashed border-primary/25 bg-primary/5 p-6 md:p-8"
+      className="clean-surface border-dashed border-primary/25 p-6 md:p-8"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -153,7 +153,7 @@ const SavedFamilyPanel = ({ tripYear, collectFamilyData, onLoad }) => {
             <UsersRound className="h-6 w-6" aria-hidden="true" />
           </div>
           <div>
-            <h3 id="saved-family-title" className="text-lg font-bold text-foreground sm:text-xl">
+            <h3 id="saved-family-title" className="font-display text-lg font-bold text-secondary sm:text-xl">
               Dados da família
             </h3>
             {status === 'loading' ? (
@@ -182,7 +182,7 @@ const SavedFamilyPanel = ({ tripYear, collectFamilyData, onLoad }) => {
               type="button"
               onClick={handleLoad}
               disabled={busy}
-              className="rounded-full bg-primary px-5 font-bold text-white hover:bg-primary/90"
+              className="rounded-full px-5 font-bold"
             >
               <FolderOpen className="mr-2 h-4 w-4" aria-hidden="true" />
               Carregar dados salvos
@@ -243,17 +243,24 @@ const SavedFamilyPanel = ({ tripYear, collectFamilyData, onLoad }) => {
       )}
 
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
-        <AlertDialogContent>
+        <AlertDialogContent className="clean-surface border-destructive/20">
           <AlertDialogHeader>
-            <AlertDialogTitle>Apagar os dados salvos da família?</AlertDialogTitle>
+            <AlertDialogTitle className="font-display text-xl font-bold text-secondary">
+              Apagar os dados salvos da família?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               O guia em andamento e os guias já criados continuam como estão. Só deixamos de
               guardar os nomes para preencher o próximo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Apagar</AlertDialogAction>
+            <AlertDialogCancel className="rounded-lg">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Apagar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

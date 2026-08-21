@@ -118,10 +118,10 @@ const Step2CoverPhoto = () => {
             exit={{ opacity: 0, y: -20 }}
             className="w-full text-center space-y-8"
           >
-            <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground leading-tight">
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-secondary leading-tight">
               Seu roteiro está pronto. Como você quer a capa?
             </h2>
-            <p className="text-lg text-muted-foreground">
+            <p className="editorial-copy text-lg text-muted-foreground">
               Envie uma foto para virar ilustração, descreva a cena que imaginou, ou siga sem
               nenhuma das duas — nesse caso a capa nasce dos lugares da viagem.
             </p>
@@ -141,7 +141,7 @@ const Step2CoverPhoto = () => {
               tabIndex="0"
               aria-busy={isValidatingPhoto}
               aria-describedby="family-photo-help family-photo-error"
-              className={`group relative flex aspect-[16/9] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors duration-200 md:aspect-[21/9] ${
+              className={`group relative flex aspect-[16/9] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed transition-colors duration-200 md:aspect-[21/9] ${
                 isDragging ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-border/60 hover:border-primary/50 hover:bg-muted/30'
               }`}
             >
@@ -184,7 +184,7 @@ const Step2CoverPhoto = () => {
             )}
 
             {!coverPhoto ? (
-              <div className="mx-auto flex max-w-xl items-start gap-3 rounded-xl bg-secondary/10 px-4 py-3 text-left text-sm text-muted-foreground">
+              <div className="mx-auto flex max-w-xl items-start gap-3 rounded-2xl bg-[hsl(var(--mint))] px-4 py-3 text-left text-sm text-muted-foreground">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
                 <p>
                   A foto é opcional. Só pediremos autorização e quantidade de pessoas depois que
@@ -193,7 +193,7 @@ const Step2CoverPhoto = () => {
               </div>
             ) : (
               <>
-                <div className="mx-auto max-w-xl rounded-xl border border-border/70 bg-card p-4 text-left shadow-sm">
+                <div className="clean-surface mx-auto max-w-xl rounded-2xl p-4 text-left">
                   <label htmlFor="expected-cover-family-count" className="text-sm font-bold text-foreground">
                     Quantas pessoas aparecem na foto?
                   </label>
@@ -214,7 +214,7 @@ const Step2CoverPhoto = () => {
                   </div>
                 </div>
 
-                <div className="mx-auto max-w-xl rounded-xl border border-border/70 bg-card p-4 text-left shadow-sm">
+                <div className="clean-surface mx-auto max-w-xl rounded-2xl p-4 text-left">
                   <label className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground">
                     <input
                       type="checkbox"
@@ -244,7 +244,7 @@ const Step2CoverPhoto = () => {
 
             {/* A descrição vale com ou sem foto: sem ela, é a capa inteira;
                 com ela, dirige só o cenário, nunca quem aparece. */}
-            <div className="rounded-xl border border-secondary/20 bg-secondary/5 p-6 text-left">
+            <div className="rounded-2xl border border-secondary/20 bg-[hsl(var(--mint))] p-6 text-left">
               <label
                 htmlFor="cover-brief"
                 className="flex items-center gap-3 text-lg font-bold text-foreground"
@@ -276,7 +276,7 @@ const Step2CoverPhoto = () => {
               <Button
                 onClick={handleConfirm}
                 disabled={!canContinue}
-              className="w-full rounded-full bg-primary px-8 py-6 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-1 hover:bg-primary/90 sm:w-auto"
+              className="w-full rounded-full px-8 py-6 text-lg font-bold shadow-[0_10px_22px_-12px_hsl(217_56%_30%/0.55)] transition-all hover:-translate-y-1 sm:w-auto"
             >
                 Continuar para revisão <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
@@ -301,7 +301,7 @@ const Step2CoverPhoto = () => {
                 <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>
             </div>
-            <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-secondary">
               Capa escolhida!
             </h2>
             {confirmedFamilyMemberCount > 0 && (

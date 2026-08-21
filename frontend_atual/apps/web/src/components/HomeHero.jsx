@@ -122,11 +122,11 @@ const HomeHero = () => {
             </a>
           </div>
 
-          <p className="travel-note mt-9 inline-block">
-            {guideProduct?.enabled
-              ? `compra única de ${formatPrice(guideProduct.amount_minor, guideProduct.currency)} — sem assinatura`
-              : 'piloto aberto — sem cobrança'}
-          </p>
+          {guideProduct?.enabled ? (
+            <p className="travel-note mt-9 inline-block">
+              {`compra única de ${formatPrice(guideProduct.amount_minor, guideProduct.currency)} — sem assinatura`}
+            </p>
+          ) : null}
         </motion.div>
 
         {/* O leque: quatro páginas de verdade espalhadas como sobre a mesa.

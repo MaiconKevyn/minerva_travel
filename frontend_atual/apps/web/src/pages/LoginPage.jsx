@@ -79,11 +79,11 @@ const LoginPage = () => {
         note="Seus guias e rascunhos continuam guardados na sua biblioteca."
       >
             <div className="mb-7 flex items-center gap-3 border-b border-secondary/15 pb-5">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary/10">
                 <Key className="h-6 w-6 text-secondary" aria-hidden="true" />
               </div>
               <div>
-                <p className="font-serif text-xl font-semibold text-secondary">Acesse sua conta</p>
+                <p className="font-display text-xl font-bold text-secondary">Acesse sua conta</p>
                 <p className="font-ui text-sm text-muted-foreground">Seus guias ficam guardados com segurança.</p>
               </div>
             </div>
@@ -98,7 +98,7 @@ const LoginPage = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="font-ui w-full rounded-lg border border-secondary/20 bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
+                  className="font-ui w-full rounded-xl border border-secondary/20 bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
                   placeholder="seu@email.com"
                 />
               </div>
@@ -123,7 +123,7 @@ const LoginPage = () => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="font-ui w-full rounded-lg border border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
+                    className="font-ui w-full rounded-xl border border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-secondary focus:ring-2 focus:ring-secondary/20"
                     placeholder="••••••••"
                   />
                   <button

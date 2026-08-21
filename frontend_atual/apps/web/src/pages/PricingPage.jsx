@@ -64,7 +64,7 @@ const PricingPage = () => {
         <Header />
 
         <main id="main-content" tabIndex={-1} className="flex-1">
-          <section className="travel-page storybook-sky storybook-grid relative overflow-hidden border-b border-secondary/10 py-16 lg:py-24">
+          <section className="relative overflow-hidden py-16 lg:py-24">
             <CompassRose className="page-corner -right-5 top-8 rotate-12" />
             <LeafSprig className="page-corner -bottom-8 -left-5 -rotate-12 text-secondary" />
 
@@ -75,10 +75,8 @@ const PricingPage = () => {
                 transition={{ duration: 0.5 }}
                 className="mx-auto max-w-3xl text-center"
               >
-                <span className="travel-label -rotate-1">
-                  {checkoutEnabled ? 'Compra única' : 'Piloto controlado'}
-                </span>
-                <h1 className="mt-5 text-4xl font-serif font-bold leading-[1] tracking-[-0.03em] text-secondary md:text-6xl">
+                <span className="travel-label -rotate-1">Compra única</span>
+                <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-[-0.01em] text-secondary md:text-6xl">
                   Um livro completo. Uma única compra.
                 </h1>
                 <p className="editorial-copy mx-auto mt-5 max-w-2xl text-foreground/70">
@@ -111,27 +109,28 @@ const PricingPage = () => {
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.58, delay: 0.12 }}
-                  className="clean-surface overflow-hidden border-secondary/25 p-7 sm:p-9"
+                  className="clean-surface overflow-hidden rounded-3xl border-secondary/25 p-7 sm:p-9"
                   aria-labelledby="produto-guia-title"
                 >
                   <div className="relative z-10 flex flex-col gap-7">
                     <div className="flex items-start justify-between gap-5">
                       <div>
-                        <p className="font-ui text-xs font-semibold text-primary">
-                          PDF A4 · compra única
-                        </p>
-                        <h2 id="produto-guia-title" className="mt-2 text-3xl font-serif font-bold text-secondary sm:text-4xl">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="pill-flag pill-flag--paper">PDF A4</span>
+                          <span className="pill-flag pill-flag--blush">compra única</span>
+                        </div>
+                        <h2 id="produto-guia-title" className="mt-3 font-display text-3xl font-bold text-secondary sm:text-4xl">
                           Guia de Memórias personalizado
                         </h2>
                       </div>
-                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                         <Sparkles className="h-6 w-6" aria-hidden="true" />
                       </span>
                     </div>
 
                     <div className="border-y border-secondary/15 py-6">
                       <p className="font-ui text-xs font-semibold text-muted-foreground">Valor do guia completo</p>
-                      <p className="mt-1 text-4xl font-serif font-bold text-secondary">
+                      <p className="mt-1 font-display text-4xl font-bold text-secondary">
                         {checkoutEnabled ? price : 'Sem cobrança ativa'}
                       </p>
                       <p className="font-ui mt-2 text-sm font-medium text-muted-foreground">
@@ -168,19 +167,19 @@ const PricingPage = () => {
             <div className="guide-shell">
               <div className="mx-auto max-w-2xl text-center">
                 <span className="travel-label">Antes de embarcar</span>
-                <h2 id="compra-segura-title" className="mt-4 text-3xl font-serif font-bold text-secondary sm:text-4xl">
+                <h2 id="compra-segura-title" className="mt-4 font-display text-3xl font-bold text-secondary sm:text-4xl">
                   Simples para comprar. Especial para guardar.
                 </h2>
               </div>
 
               <div className="mt-10 grid gap-5 md:grid-cols-3">
                 {TRUST_NOTES.map(({ icon: Icon, title, description }, index) => (
-                  <article key={title} className={`clean-surface p-6 ${index === 1 ? 'border-secondary/30' : ''}`}>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
+                  <article key={title} className={`clean-surface rounded-2xl p-6 ${index === 1 ? 'border-secondary/30' : ''}`}>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary/10 text-secondary">
                       <Icon className="h-5 w-5" aria-hidden="true" />
                     </div>
-                    <h3 className="mt-4 text-xl font-serif font-bold text-secondary">{title}</h3>
-                    <p className="mt-2 leading-relaxed text-foreground/70">{description}</p>
+                    <h3 className="mt-4 font-display text-xl font-bold text-secondary">{title}</h3>
+                    <p className="editorial-copy mt-2 text-foreground/70">{description}</p>
                   </article>
                 ))}
               </div>

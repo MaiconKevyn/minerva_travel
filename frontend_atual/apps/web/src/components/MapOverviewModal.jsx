@@ -368,10 +368,10 @@ const MapOverviewModal = ({
       <div className="flex h-full flex-col">
         <header className="flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:px-6">
           <div>
-            <p className="text-xs font-semibold text-primary">
+            <p className="travel-label">
               Mapa da viagem
             </p>
-            <h2 className="text-lg font-serif font-bold sm:text-xl md:text-2xl">
+            <h2 className="text-lg font-display font-bold text-secondary sm:text-xl md:text-2xl">
               Explore os pontos e a distancia entre eles
             </h2>
           </div>
@@ -385,7 +385,7 @@ const MapOverviewModal = ({
             <div className="sticky top-0 z-10 space-y-4 border-b border-border bg-background/95 p-4 backdrop-blur">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-serif text-2xl font-bold">Pontos da regiao</h3>
+                  <h3 className="font-display text-2xl font-bold text-secondary">Pontos da regiao</h3>
                   <p className="text-sm font-medium text-muted-foreground">
                     Passe o mouse para localizar no mapa.
                   </p>
@@ -456,7 +456,7 @@ const MapOverviewModal = ({
                 <Button
                   onClick={onExploreMore}
                   disabled={isExploringMore}
-                  className="w-full rounded-full bg-secondary py-6 font-bold text-white hover:bg-secondary/90"
+                  className="w-full rounded-full py-6 font-bold"
                 >
                   {isExploringMore ? (
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -493,7 +493,7 @@ const MapOverviewModal = ({
                     onMouseEnter={() => setHoveredLandmarkId(landmark.id)}
                     onMouseLeave={() => setHoveredLandmarkId('')}
                     className={cn(
-                      'rounded-xl border bg-card p-3 shadow-sm transition-all',
+                      'rounded-2xl border bg-card p-3 shadow-sm transition-all',
                       itemActive || itemHighlighted
                         ? 'border-primary bg-primary/5 shadow-md'
                         : 'border-border hover:border-primary/40 hover:bg-muted/30'
@@ -550,10 +550,7 @@ const MapOverviewModal = ({
                       <Button
                         onClick={() => onToggleLandmark(landmark.id)}
                         variant={itemSelected ? 'outline' : 'default'}
-                        className={cn(
-                          'h-11 flex-1 rounded-full text-xs font-bold',
-                          itemSelected ? '' : 'bg-primary text-white hover:bg-primary/90'
-                        )}
+                        className="h-11 flex-1 rounded-full text-xs font-bold"
                       >
                         {itemSelected ? (
                           <>
@@ -584,7 +581,7 @@ const MapOverviewModal = ({
               })}
 
               {filteredLandmarks.length === 0 && (
-                <div className="rounded-xl border border-dashed border-border p-6 text-center">
+                <div className="rounded-2xl border border-dashed border-border p-6 text-center">
                   <MapPin className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
                   <p className="font-bold">Nenhum ponto neste filtro.</p>
                   <p className="text-sm text-muted-foreground">
@@ -604,9 +601,9 @@ const MapOverviewModal = ({
 
             {!apiKey && (
               <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center lg:min-h-[420px] lg:p-8">
-                <div className="max-w-md rounded-xl border border-border bg-background p-6 shadow-sm">
+                <div className="max-w-md rounded-2xl border border-border bg-card p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-primary" />
-                  <h3 className="mb-2 text-xl font-serif font-bold">Mapa nao configurado</h3>
+                  <h3 className="mb-2 text-xl font-display font-bold">Mapa nao configurado</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     Configure `VITE_GOOGLE_MAPS_BROWSER_KEY` no frontend para ativar o mapa embutido.
                   </p>
@@ -616,9 +613,9 @@ const MapOverviewModal = ({
 
             {apiKey && visibleMapLandmarks.length === 0 && (
               <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center lg:min-h-[420px] lg:p-8">
-                <div className="max-w-md rounded-xl border border-border bg-background p-6 shadow-sm">
+                <div className="max-w-md rounded-2xl border border-border bg-card p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-secondary" />
-                  <h3 className="mb-2 text-xl font-serif font-bold">Sem locais confirmados no mapa</h3>
+                  <h3 className="mb-2 text-xl font-display font-bold">Sem locais confirmados no mapa</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     Confirme um local com coordenadas ou ative as sugestoes para ampliar a visao.
                   </p>
@@ -628,9 +625,9 @@ const MapOverviewModal = ({
 
             {loadError && (
               <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center lg:min-h-[420px] lg:p-8">
-                <div className="max-w-md rounded-xl border border-border bg-background p-6 shadow-sm">
+                <div className="max-w-md rounded-2xl border border-border bg-card p-6 shadow-sm">
                   <MapPin className="mx-auto mb-4 h-10 w-10 text-destructive" />
-                  <h3 className="mb-2 text-xl font-serif font-bold">Erro ao carregar mapa</h3>
+                  <h3 className="mb-2 text-xl font-display font-bold">Erro ao carregar mapa</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">{loadError}</p>
                 </div>
               </div>
@@ -641,14 +638,14 @@ const MapOverviewModal = ({
             </div>
 
             {activeLandmark && (
-              <div className="absolute bottom-4 left-4 right-4 max-w-xl rounded-lg border border-border bg-background/95 p-4 shadow-sm backdrop-blur md:right-auto md:w-[420px]">
+              <div className="absolute bottom-4 left-4 right-4 max-w-xl rounded-2xl border border-border bg-[hsl(var(--paper))]/95 p-4 shadow-sm backdrop-blur md:right-auto md:w-[420px]">
                 <div className="flex gap-3">
                   {renderPlaceMedia(activeLandmark, 'small')}
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-primary">
+                    <p className="travel-label">
                       {activeLandmark.city}
                     </p>
-                    <h3 className="truncate text-lg font-serif font-bold">{activeLandmark.name}</h3>
+                    <h3 className="truncate text-lg font-display font-bold">{activeLandmark.name}</h3>
                     {activeLandmark.description && (
                       <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
                         {activeLandmark.description}

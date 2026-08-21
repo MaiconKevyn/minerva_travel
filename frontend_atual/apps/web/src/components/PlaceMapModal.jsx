@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ExternalLink, MapPin, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import {
   clearGoogleMarkers,
   googleMapsLibraries,
@@ -134,15 +133,15 @@ const PlaceMapModal = ({
         role="dialog"
         aria-modal="true"
         aria-label={`Mapa de ${landmark?.name || 'local'}`}
-        className="max-h-[94vh] w-full overflow-hidden rounded-t-xl border border-border bg-background text-foreground shadow-sm sm:max-w-3xl sm:rounded-xl"
+        className="max-h-[94vh] w-full overflow-hidden rounded-t-2xl border border-border bg-card text-foreground shadow-sm sm:max-w-3xl sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-primary">
+            <p className="travel-label">
               Localizacao
             </p>
-            <h2 className="truncate text-2xl font-serif font-bold">
+            <h2 className="truncate text-2xl font-display font-bold text-secondary">
               {landmark?.name}
             </h2>
             <p className="truncate text-sm font-medium text-muted-foreground">
@@ -162,9 +161,9 @@ const PlaceMapModal = ({
 
             {!apiKey && (
               <div className="flex h-full min-h-[340px] items-center justify-center p-6 text-center">
-                <div className="max-w-sm rounded-xl border border-border bg-background p-5 shadow-sm">
+                <div className="max-w-sm rounded-2xl border border-border bg-card p-5 shadow-sm">
                   <MapPin className="mx-auto mb-3 h-9 w-9 text-primary" />
-                  <h3 className="mb-2 font-serif text-xl font-bold">Mapa nao configurado</h3>
+                  <h3 className="mb-2 font-display text-xl font-bold">Mapa nao configurado</h3>
                   <p className="text-sm text-muted-foreground">
                     Configure `VITE_GOOGLE_MAPS_BROWSER_KEY` para abrir o mapa dentro do site.
                   </p>
@@ -174,9 +173,9 @@ const PlaceMapModal = ({
 
             {apiKey && !mapLandmark && (
               <div className="flex h-full min-h-[340px] items-center justify-center p-6 text-center">
-                <div className="max-w-sm rounded-xl border border-border bg-background p-5 shadow-sm">
+                <div className="max-w-sm rounded-2xl border border-border bg-card p-5 shadow-sm">
                   <MapPin className="mx-auto mb-3 h-9 w-9 text-secondary" />
-                  <h3 className="mb-2 font-serif text-xl font-bold">Coordenadas indisponiveis</h3>
+                  <h3 className="mb-2 font-display text-xl font-bold">Coordenadas indisponiveis</h3>
                   <p className="text-sm text-muted-foreground">
                     Este local ainda nao tem latitude e longitude para mapa embutido.
                   </p>
@@ -186,9 +185,9 @@ const PlaceMapModal = ({
 
             {loadError && (
               <div className="flex h-full min-h-[340px] items-center justify-center p-6 text-center">
-                <div className="max-w-sm rounded-xl border border-border bg-background p-5 shadow-sm">
+                <div className="max-w-sm rounded-2xl border border-border bg-card p-5 shadow-sm">
                   <MapPin className="mx-auto mb-3 h-9 w-9 text-destructive" />
-                  <h3 className="mb-2 font-serif text-xl font-bold">Erro ao carregar</h3>
+                  <h3 className="mb-2 font-display text-xl font-bold">Erro ao carregar</h3>
                   <p className="text-sm text-muted-foreground">{loadError}</p>
                 </div>
               </div>
@@ -210,12 +209,8 @@ const PlaceMapModal = ({
               {onToggle && (
                 <Button
                   onClick={() => onToggle(landmark.id)}
-                  className={cn(
-                    'rounded-full py-6 font-bold',
-                    isSelected
-                      ? 'bg-muted text-foreground hover:bg-muted/80'
-                      : 'bg-primary text-white hover:bg-primary/90'
-                  )}
+                  variant={isSelected ? 'outline' : 'default'}
+                  className="rounded-full py-6 font-bold"
                 >
                   {isSelected ? (
                     <>

@@ -79,11 +79,11 @@ const SignupPage = () => {
         note="Cada guia fica salvo na sua biblioteca e pode ser baixado com segurança."
       >
             <div className="mb-7 flex items-center gap-3 border-b border-primary/15 pb-5">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                 <Sparkles className="h-6 w-6 text-primary" aria-hidden="true" />
               </div>
               <div>
-                <p className="font-serif text-xl font-semibold text-primary">Dados da conta</p>
+                <p className="font-display text-xl font-bold text-primary">Dados da conta</p>
                 <p className="font-ui text-sm text-muted-foreground">Leva menos de um minuto.</p>
               </div>
             </div>
@@ -98,7 +98,7 @@ const SignupPage = () => {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="font-ui w-full rounded-lg border border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="font-ui w-full rounded-xl border border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Ex: Família Silva"
                 />
               </div>
@@ -112,7 +112,7 @@ const SignupPage = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="font-ui w-full rounded-lg border border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="font-ui w-full rounded-xl border border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="seu@email.com"
                 />
               </div>
@@ -128,7 +128,7 @@ const SignupPage = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     aria-describedby="signup-password-help signup-password-strength"
-                    className="font-ui w-full rounded-lg border border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="font-ui w-full rounded-xl border border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                     placeholder="Mínimo 8 caracteres"
                   />
                   <button
@@ -174,7 +174,7 @@ const SignupPage = () => {
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="font-ui w-full rounded-lg border border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="font-ui w-full rounded-xl border border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                     placeholder="Repita sua senha"
                   />
                   <button

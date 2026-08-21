@@ -24,14 +24,14 @@ const FlightVocabularyCard = ({ landmarks, enabled, onChange }) => {
 
   return (
     <section
-      className="rounded-xl border border-primary/25 bg-primary/5 p-5 sm:p-6"
+      className="rounded-2xl border border-primary/25 bg-[hsl(var(--blush))] p-5 sm:p-6"
       aria-labelledby="flight-vocabulary-title"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-start gap-4">
           <MessageCircleHeart className="mt-1 h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
           <div>
-            <h3 id="flight-vocabulary-title" className="text-xl font-serif font-bold text-foreground">
+            <h3 id="flight-vocabulary-title" className="text-xl font-display font-bold text-foreground">
               O primeiro olá, no idioma de cada país
             </h3>
             <p className="mt-1 font-medium text-muted-foreground">
@@ -60,7 +60,7 @@ const FlightVocabularyCard = ({ landmarks, enabled, onChange }) => {
             {covered.map((item) => (
               <li
                 key={item.country}
-                className="inline-flex items-center gap-1.5 rounded-full bg-background px-3 py-1 text-sm font-bold text-foreground"
+                className="pill-flag pill-flag--paper text-sm"
               >
                 <Check className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                 {item.country} · {item.language}
