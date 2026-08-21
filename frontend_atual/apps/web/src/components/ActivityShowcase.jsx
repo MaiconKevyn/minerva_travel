@@ -26,6 +26,7 @@ const ActivityShowcase = () => {
 
   return (
     <section
+      id="atividades"
       className="travel-page editorial-section relative overflow-hidden py-16 sm:py-20"
       aria-labelledby="atividades-title"
     >

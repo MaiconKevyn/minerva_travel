@@ -14,7 +14,7 @@ test('header exposes an accessible logo and mobile navigation state', () => {
   const header = readProjectFile('src/components/Header.jsx');
   const themeToggle = readProjectFile('src/components/ThemeToggle.jsx');
 
-  assert.match(header, /aria-label="Minerva Travel — página inicial"/);
+  assert.match(header, /aria-label="Guia de Memórias — página inicial"/);
   assert.match(header, /aria-label=\{mobileMenuOpen \? 'Fechar menu principal' : 'Abrir menu principal'\}/);
   assert.match(header, /aria-expanded=\{mobileMenuOpen\}/);
   assert.match(header, /aria-controls=\{mobileMenuId\}/);

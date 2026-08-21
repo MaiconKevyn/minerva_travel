@@ -284,10 +284,12 @@ test('home explains the flow and shows real product pages from our own domain', 
   assert.match(sampleGuide, /19 páginas reais/);
   assert.match(sampleGuide, /Ir para a página/);
   // O herói mostra o livro, não uma capa solta: quem chega precisa ver que há
-  // atividades dentro antes de decidir criar uma conta.
+  // atividades dentro antes de decidir criar uma conta. O leque do mockup usa
+  // labirinto, diário, capa e colorir.
   assert.match(hero, /activity-examples\/cover-sample\.webp/);
-  assert.match(hero, /activity-examples\/route-sample\.webp/);
-  assert.match(hero, /activity-examples\/word-search-real\.webp/);
+  assert.match(hero, /activity-examples\/maze-real\.webp/);
+  assert.match(hero, /activity-examples\/travel-diary-real\.webp/);
+  assert.match(hero, /activity-examples\/coloring-real\.webp/);
 
   // Nenhuma imagem da vitrine pode depender de CDN de terceiros.
   for (const source of [home, hero, sampleGuide]) {

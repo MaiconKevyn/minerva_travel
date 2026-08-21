@@ -20,8 +20,12 @@ module.exports = {
       // pilha padrao e a identidade nao chega aos titulos, por mais que o CSS
       // base declare a familia.
       fontFamily: {
+        // Baloo 2 é a voz do mockup: títulos, navegação, botões e selos. A
+        // Zilla Slab segue como a serifa do corpo — a mesma das páginas
+        // impressas — e a DM Sans vira utilitária para dados densos.
+        display: ['"Baloo 2"', '"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         serif: ['"Zilla Slab"', 'Georgia', 'serif'],
-        sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['"Baloo 2"', '"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -56,6 +60,11 @@ module.exports = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        // O azul-royal dos botões de ação do mockup (#2E5CA3).
+        cobalt: {
+          DEFAULT: "hsl(var(--cobalt))",
+          foreground: "hsl(var(--cobalt-foreground))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

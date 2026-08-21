@@ -4,15 +4,16 @@
 
 @layer base {
   :root {
-    /* Papel da identidade Destinations — o mesmo tom das páginas impressas. */
-    --background: 42 56% 96%;
+    /* A areia quente do mockup (docs/minerva-home-3a.png, #EFDCC0): o site
+       inteiro assenta nela, e os cartões flutuam em papel-creme por cima. */
+    --background: 37 59% 85%;
     --foreground: 30 27% 13%;
 
-    /* Soft white for cards, slightly tinted */
-    --card: 0 0% 100%;
+    /* Papel-creme dos cartões e da navbar do mockup (#FCFAF3). */
+    --card: 47 60% 97%;
     --card-foreground: 24 15% 20%;
 
-    --popover: 0 0% 100%;
+    --popover: 47 60% 97%;
     --popover-foreground: 24 15% 20%;
 
     /* Terracota: o acento da referência. */
@@ -27,16 +28,16 @@
     --accent: 100 18% 52%;
     --accent-foreground: 30 27% 13%;
 
-    /* Creme e a sombra quente da paleta */
-    --muted: 41 42% 93%;
-    --muted-foreground: 37 16% 40%;
+    /* Areia lavada e o cinza-morno dos links inativos do mockup (#696259). */
+    --muted: 40 45% 91%;
+    --muted-foreground: 34 8% 38%;
 
     --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 35 25% 85%;
-    --input: 35 25% 85%;
-    --ring: 15 65% 40%;
+    --border: 38 26% 76%;
+    --input: 38 26% 76%;
+    --ring: 217 56% 41%;
 
     /* CleanUI: três raios coerentes em toda a interface. O guia continua
        macio, mas deixa de parecer uma coleção de balões e cartões. */
@@ -48,11 +49,12 @@
 
     /* Capítulos do caderno. São derivados da paleta do guia, mas claros o
        bastante para receber texto e preservar a sensação de papel. */
-    --paper: 42 43% 98%;
+    --paper: 47 60% 97%;
     --sky: 188 37% 84%;
-    --mint: 151 24% 88%;
-    --blush: 350 52% 90%;
+    --mint: 148 26% 89%;
+    --blush: 349 57% 91%;
     --cobalt: 217 56% 41%;
+    --cobalt-foreground: 47 60% 97%;
     --sand: 38 49% 84%;
   }
 
@@ -94,7 +96,8 @@
     --sky: 188 18% 22%;
     --mint: 151 14% 21%;
     --blush: 350 18% 22%;
-    --cobalt: 217 56% 68%;
+    --cobalt: 217 60% 66%;
+    --cobalt-foreground: 30 27% 12%;
     --sand: 38 20% 25%;
   }
 
@@ -114,26 +117,42 @@
   }
 
   body {
-    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Baloo 2", "DM Sans", ui-sans-serif, system-ui, sans-serif;
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     overflow-x: clip;
     font-variant-numeric: tabular-nums;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+    /* A areia do mockup clareia no topo e aprofunda no rodapé, com o grão
+       por cima. `fixed` mantém a luz estável enquanto a página rola. */
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, hsl(37 62% 87%), hsl(40 40% 79%));
+    background-attachment: fixed;
     transition: background-color 200ms ease, color 200ms ease;
   }
 
+  .dark body {
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, hsl(30 18% 13%), hsl(30 16% 10%));
+  }
+
   h1, h2, h3, h4, h5, h6 {
-    font-family: "Zilla Slab", Georgia, serif;
+    font-family: "Baloo 2", "DM Sans", ui-sans-serif, system-ui, sans-serif;
     text-wrap: balance;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   button,
+  [role='button'] {
+    font-family: "Baloo 2", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* Campos de dados continuam em DM Sans: o que a família digita é
+     informação, não letreiro de capa. */
   input,
   select,
-  textarea,
-  [role='button'] {
+  textarea {
     font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   }
 
@@ -153,6 +172,11 @@
   }
 
   .font-ui {
+    font-family: "Baloo 2", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* Dados densos (tabelas, códigos, metadados numéricos) ficam na DM Sans. */
+  .font-data {
     font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   }
 
@@ -263,18 +287,22 @@
     background: hsl(var(--cobalt) / 0.18);
   }
 
+  /* No mockup toda ação principal é azul-royal; a terracota fica para a
+     marca, os acentos e os selos. */
   .travel-cta {
-    border: 1px solid hsl(var(--primary));
-    border-radius: calc(var(--radius) - 0.125rem);
-    background: hsl(var(--primary));
-    color: hsl(var(--primary-foreground));
-    box-shadow: none;
+    border: none;
+    border-radius: 0.9rem;
+    background: hsl(var(--cobalt));
+    color: hsl(var(--cobalt-foreground));
+    font-family: "Baloo 2", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    box-shadow: 0 10px 22px -12px hsl(217 56% 30% / 0.55);
     transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
   }
 
   .travel-cta:hover {
-    background: hsl(var(--primary) / 0.92);
-    box-shadow: 0 1px 2px hsl(var(--foreground) / 0.10);
+    background: hsl(var(--cobalt) / 0.92);
+    box-shadow: 0 14px 26px -12px hsl(217 56% 30% / 0.6);
     transform: translateY(-1px);
   }
 
@@ -292,7 +320,7 @@
   .travel-paper-link {
     position: relative;
     color: hsl(var(--secondary));
-    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Baloo 2", "DM Sans", ui-sans-serif, system-ui, sans-serif;
     font-weight: 700;
     text-decoration: none;
   }
@@ -349,11 +377,89 @@
   }
 
   .travel-note {
-    color: hsl(var(--secondary) / 0.78);
+    color: hsl(var(--secondary) / 0.82);
     font-family: "Kalam", "Comic Sans MS", cursive;
-    font-size: 1rem;
+    font-size: 1.15rem;
     line-height: 1.2;
-    transform: rotate(-3deg);
+    transform: rotate(-2deg);
+  }
+
+  /* As bandeirinhas do topo do hero: pílulas macias com sombra de papel. */
+  .pill-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.42rem 1.05rem;
+    border-radius: 999px;
+    font-family: "Baloo 2", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.2;
+    box-shadow: 0 3px 10px -4px hsl(30 27% 13% / 0.18);
+  }
+
+  .pill-flag--blush {
+    background: hsl(var(--blush));
+    color: hsl(var(--primary));
+  }
+
+  .pill-flag--mint {
+    background: hsl(var(--mint));
+    color: hsl(var(--secondary));
+  }
+
+  .pill-flag--paper {
+    background: hsl(var(--paper));
+    color: hsl(var(--foreground) / 0.72);
+  }
+
+  /* O rabisco de marca-texto mostarda atrás de uma palavra do título. */
+  .highlight-blob {
+    position: relative;
+    display: inline-block;
+    z-index: 0;
+    padding: 0 0.14em;
+  }
+
+  .highlight-blob::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 0.04em -0.16em 0.02em -0.1em;
+    border-radius: 0.45em 0.6em 0.5em 0.65em / 0.6em 0.5em 0.65em 0.45em;
+    background: hsl(var(--star));
+    transform: rotate(-1.6deg);
+  }
+
+  /* O carimbo redondo "Feito para imprimir" do mockup. */
+  .stamp-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    color: hsl(var(--paper));
+    font-family: "Baloo 2", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.25;
+    transform: rotate(-6deg);
+    box-shadow: 0 14px 28px -16px hsl(11 60% 25% / 0.55);
+  }
+
+  /* A navbar-pílula flutuante. */
+  .nav-pill {
+    display: flex;
+    align-items: center;
+    border-radius: 999px;
+    background: hsl(var(--paper));
+    box-shadow: 0 12px 32px -14px hsl(30 27% 13% / 0.35);
+  }
+
+  .dark .nav-pill {
+    background: hsl(var(--card));
+    box-shadow: 0 12px 32px -14px hsl(0 0% 0% / 0.6);
   }
 
   .route-dots {
