@@ -6,6 +6,7 @@ const readProjectFile = (path) => readFileSync(new URL(`../${path}`, import.meta
 
 test('create guide wizard asks for structured destination first and uses seven steps', () => {
   const page = readProjectFile('src/pages/CreateGuidePage.jsx');
+  const progress = readProjectFile('src/components/GuideCreationProgress.jsx');
   const context = readProjectFile('src/contexts/ConversationalGuideContext.jsx');
 
   assert.doesNotMatch(page, /Step1FamilyName/);
@@ -17,7 +18,8 @@ test('create guide wizard asks for structured destination first and uses seven s
   assert.match(page, /case 6: return <Step2CoverPhoto \/>;/);
   assert.match(page, /case 7: return <Step5Review \/>;/);
   assert.match(page, /\[1, 2, 3, 4, 5, 6, 7\]/);
-  assert.match(page, /Passo \{currentStepPosition \+ 1\} de \{visibleSteps\.length\}/);
+  assert.match(progress, /Passo \{progressValue\} de \{visibleSteps\.length\}/);
+  assert.match(progress, /role="progressbar"/);
 });
 
 test('known itinerary mode skips the preferences step and collects landmarks upfront', () => {

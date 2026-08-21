@@ -551,7 +551,7 @@ const MapOverviewModal = ({
                         onClick={() => onToggleLandmark(landmark.id)}
                         variant={itemSelected ? 'outline' : 'default'}
                         className={cn(
-                          'h-9 flex-1 rounded-full text-xs font-bold',
+                          'h-11 flex-1 rounded-full text-xs font-bold',
                           itemSelected ? '' : 'bg-primary text-white hover:bg-primary/90'
                         )}
                       >
@@ -571,7 +571,7 @@ const MapOverviewModal = ({
                         <Button
                           asChild
                           variant="outline"
-                          className="h-9 w-9 rounded-full p-0"
+                          className="h-11 w-11 rounded-full p-0"
                         >
                           <a href={landmark.maps_url} target="_blank" rel="noreferrer" aria-label={`Abrir ${landmark.name} no Google Maps`}>
                             <ExternalLink className="h-4 w-4" />

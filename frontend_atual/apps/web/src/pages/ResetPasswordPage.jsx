@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import Header from '@/components/Header.jsx';
-import { Airplane, Flower } from '@/components/DecorativeElements.jsx';
+import AuthTravelShell from '@/components/AuthTravelShell.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { AlertCircle, Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
 
@@ -93,20 +92,17 @@ const ResetPasswordPage = () => {
         <meta name="description" content="Crie uma nova senha para acessar sua conta." />
       </Helmet>
 
-      <div className="min-h-screen bg-background flex flex-col transition-colors duration-200">
-        <Header />
-
-        <main id="main-content" tabIndex={-1} className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
-          <Flower className="absolute bottom-20 left-10 w-32 h-32 text-secondary opacity-10" />
-          <Airplane className="absolute top-20 right-20 w-24 h-24 text-primary opacity-10" />
-
-          <div className="w-full max-w-md bg-card dark:bg-slate-800 rounded-[40px] p-8 md:p-10 shadow-xl border-4 border-secondary/10 dark:border-slate-700 relative z-10 transition-colors duration-200">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary/10 mb-4">
-                <KeyRound className="w-8 h-8 text-secondary" />
+      <AuthTravelShell
+        eyebrow="Uma nova chave"
+        title="Crie uma nova senha"
+        description="Escolha uma senha forte para voltar à sua estante de viagens com segurança."
+        note="Trocar a chave não muda suas histórias: seus guias continuam guardados."
+      >
+            <div className="mb-7 flex items-center gap-3 border-b-2 border-dashed border-secondary/20 pb-5">
+              <div className="flex h-12 w-12 -rotate-2 items-center justify-center rounded-[0.8rem_1.1rem_0.8rem_1.2rem] bg-secondary/10">
+                <KeyRound className="h-6 w-6 text-secondary" aria-hidden="true" />
               </div>
-              <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Crie uma Nova Senha</h1>
-              <p className="text-muted-foreground font-medium">Use uma senha forte para proteger sua conta.</p>
+              <p className="font-hand text-xl font-bold text-secondary">Proteja o diário da família</p>
             </div>
 
             {recoveryStatus === 'checking' && (
@@ -150,7 +146,7 @@ const ResetPasswordPage = () => {
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       aria-describedby="reset-password-help reset-password-strength"
-                      className="w-full px-4 py-3 pr-14 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
+                      className="font-ui w-full rounded-xl border-2 border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/20"
                       placeholder="Mínimo 8 caracteres"
                     />
                     <button
@@ -195,7 +191,7 @@ const ResetPasswordPage = () => {
                       required
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
-                      className="w-full px-4 py-3 pr-14 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
+                      className="font-ui w-full rounded-xl border-2 border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/20"
                       placeholder="Repita sua nova senha"
                     />
                     <button
@@ -213,7 +209,7 @@ const ResetPasswordPage = () => {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full rounded-2xl py-6 bg-secondary hover:bg-secondary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all mt-4"
+                  className="travel-cta mt-4 w-full py-6 text-lg font-bold"
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-6 h-6 animate-spin" />
@@ -229,9 +225,7 @@ const ResetPasswordPage = () => {
                 Voltar para o login
               </Link>
             </div>
-          </div>
-        </main>
-      </div>
+      </AuthTravelShell>
     </>
   );
 };

@@ -4,6 +4,12 @@ import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ArchedText, GuideStar } from '@/components/GuideLockup.jsx';
+import {
+  Airplane,
+  CompassRose,
+  LeafSprig,
+  RouteDoodle,
+} from '@/components/DecorativeElements.jsx';
 import { OPTIONAL_LANDMARK_ACTIVITY_TYPES } from '@/utils/landmark-activities.js';
 import { formatPrice, getGuideProduct } from '@/utils/minerva-api.js';
 
@@ -22,11 +28,13 @@ const PAGES = [
     image: '/activity-examples/word-search-real.webp',
     // A rotação estufa a caixa: encostadas na borda, as páginas de trás
     // saíam cortadas pela metade no celular.
-    className: 'left-[5%] top-10 w-[42%] -rotate-[10deg]',
+    className: 'left-[1%] top-16 w-[42%] -rotate-[9deg] sm:left-[4%]',
+    label: 'brincadeiras',
   },
   {
     image: '/activity-examples/route-sample.webp',
-    className: 'right-[5%] top-6 w-[42%] rotate-[9deg]',
+    className: 'right-[1%] top-10 w-[42%] rotate-[8deg] sm:right-[4%]',
+    label: 'nosso roteiro',
   },
 ];
 
@@ -52,98 +60,123 @@ const HomeHero = () => {
   }, []);
 
   return (
-    <section className="relative overflow-hidden parchment-wash pt-10 pb-20 lg:pt-16 lg:pb-28">
-    <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 items-center gap-14 px-4 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:px-8">
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="space-y-7 text-center lg:text-left"
-      >
-        {/* O brasão da capa: o nome do produto corre em arco por cima do
-            título, exatamente como "GUIA DE MEMÓRIAS" na capa do livro. */}
-        <div className="mx-auto max-w-md text-secondary lg:mx-0">
-          <ArchedText direction="up">Guia de Memórias</ArchedText>
-        </div>
+    <section className="travel-page storybook-sky storybook-grid relative overflow-hidden border-b border-secondary/10 py-14 sm:py-20 lg:py-24">
+      <CompassRose className="page-corner -right-5 top-10 rotate-12" />
+      <LeafSprig className="page-corner -bottom-8 -left-5 -rotate-12 text-secondary" />
+      <Airplane className="pointer-events-none absolute left-[46%] top-12 hidden h-14 w-14 -rotate-12 text-primary/20 lg:block" />
 
-        <h1 className="!mt-1 text-4xl font-serif font-bold leading-[1.1] text-foreground sm:text-5xl">
-          O livro de atividades da viagem que a sua família já marcou
-        </h1>
+      <div className="guide-shell relative z-10 grid grid-cols-1 items-center gap-x-12 gap-y-7 lg:grid-cols-[0.98fr_1.08fr] lg:grid-rows-[auto_1fr] lg:gap-y-5">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          className="text-center lg:col-start-1 lg:row-start-1 lg:text-left"
+        >
+          <span className="travel-label -rotate-1">A viagem começa no papel</span>
 
-        <p className="mx-auto max-w-xl text-lg font-medium leading-relaxed text-muted-foreground lg:mx-0 lg:text-xl">
-          Você diz os destinos e os pontos turísticos. Nós ilustramos cada parada e montamos as
-          brincadeiras no nível de cada criança — para a fila do museu, o avião e a noite no hotel.
-        </p>
+          <div className="mx-auto mt-5 max-w-md text-secondary lg:mx-0">
+            <ArchedText direction="up">Guia de Memórias</ArchedText>
+          </div>
 
-        <ul className="flex flex-col items-center gap-2.5 lg:items-start">
-          {PROOF.map((item) => (
-            <li key={item} className="flex items-center gap-2.5 font-bold text-secondary">
-              <GuideStar className="h-5 w-5" />
-              {item}
-            </li>
-          ))}
-        </ul>
+          <h1 className="!mt-0 text-[2.65rem] font-serif font-bold leading-[0.98] tracking-[-0.035em] text-secondary sm:text-6xl lg:text-[4rem]">
+            O livro que transforma o roteiro da família em aventura
+          </h1>
 
-        <div className="flex flex-col items-center gap-3 pt-1 sm:flex-row lg:justify-start">
-          <Button
-            asChild
-            size="lg"
-            className="group w-full rounded-full bg-primary px-8 py-6 text-base font-bold text-white shadow-[0_8px_30px_hsl(var(--primary)/0.30)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary/90 sm:w-auto sm:text-lg"
-          >
-            <Link to="/create">
-              Criar o guia da minha família
-              <ArrowRight className="ml-2.5 h-5 w-5 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </Button>
-          <a
-            href="#guia-exemplo"
-            className="whitespace-nowrap rounded-full px-6 py-3 text-base font-bold text-foreground underline underline-offset-4 transition-colors hover:text-primary"
-          >
-            Folhear um guia completo
-          </a>
-        </div>
+          <p className="font-ui mt-5 text-sm font-bold text-foreground/70 sm:text-base">
+            {guideProduct?.enabled
+              ? `Compra única de ${formatPrice(guideProduct.amount_minor, guideProduct.currency)}`
+              : 'Piloto aberto e sem cobrança'}
+            <span className="mx-2 text-primary" aria-hidden="true">·</span>
+            PDF A4 pronto para imprimir
+          </p>
+        </motion.div>
 
-        <p className="text-sm font-medium text-muted-foreground">
-          {guideProduct?.enabled
-            ? `Compra única de ${formatPrice(guideProduct.amount_minor, guideProduct.currency)} com checkout Mercado Pago.`
-            : 'Piloto aberto e sem cobrança enquanto validamos o produto.'}
-        </p>
-      </motion.div>
+        {/* Um pequeno mapa editorial: as páginas são as paradas e a rota as
+            conecta. No celular ele vem logo após o título: a família vê o
+            produto antes de precisar ler toda a explicação. */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, rotate: 1 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          transition={{ duration: 0.72, delay: 0.12, ease: 'easeOut' }}
+          className="relative mx-auto w-full max-w-xl lg:col-start-2 lg:row-span-2 lg:row-start-1"
+        >
+          <RouteDoodle className="pointer-events-none absolute -right-4 top-0 z-20 h-24 w-48 rotate-6 text-secondary/55" />
+          <p className="travel-note absolute -right-1 top-20 z-20 hidden sm:block">cada parada vira uma descoberta</p>
 
-      {/* O leque: capa na frente, roteiro e atividade atrás. */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
-        className="relative mx-auto w-full max-w-lg"
-      >
-        <div className="relative aspect-[4/3.5]">
-          {PAGES.map((page) => (
-            <div key={page.image} className={`page-frame absolute ${page.className}`}>
+          <div className="relative mx-auto aspect-[4/3.25] w-full max-w-[25rem] rounded-[43%_57%_54%_46%/42%_38%_62%_58%] bg-[hsl(var(--paper)/0.34)] p-4 sm:aspect-[4/3.55] sm:max-w-none">
+            {PAGES.map((page) => (
+              <div key={page.image} className={`page-frame absolute ${page.className}`}>
+                <span className="travel-label absolute -top-4 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap">
+                  {page.label}
+                </span>
+                <img
+                  src={page.image}
+                  alt=""
+                  width="1024"
+                  height="1536"
+                  sizes="(min-width: 1024px) 22vw, 42vw"
+                  decoding="async"
+                  className="aspect-[2/3] w-full object-cover"
+                />
+              </div>
+            ))}
+
+            <div className="page-frame absolute left-1/2 top-0 z-10 w-[50%] -translate-x-1/2">
+              <span className="travel-label absolute -top-4 left-1/2 z-10 -translate-x-1/2">a capa</span>
               <img
-                src={page.image}
-                alt=""
+                src="/activity-examples/cover-sample.webp"
+                alt="Três páginas do guia lado a lado: a capa ilustrada com a família, a página do roteiro e um caça-palavras"
                 width="1024"
                 height="1536"
+                sizes="(min-width: 1024px) 27vw, 50vw"
+                decoding="async"
                 className="aspect-[2/3] w-full object-cover"
               />
             </div>
-          ))}
-
-          <div className="page-frame absolute left-1/2 top-0 w-[50%] -translate-x-1/2">
-            {/* Uma descrição só para o conjunto: as duas páginas atrás
-                repetiriam a mesma ideia em um leitor de tela. */}
-            <img
-              src="/activity-examples/cover-sample.webp"
-              alt="Três páginas do guia lado a lado: a capa ilustrada com a família, a página do roteiro e um caça-palavras"
-              width="1024"
-              height="1536"
-              className="aspect-[2/3] w-full object-cover"
-            />
           </div>
-        </div>
-      </motion.div>
-    </div>
+
+          <div className="travel-stamp absolute bottom-0 left-1 rotate-[-7deg] bg-[hsl(var(--paper)/0.82)] text-secondary sm:bottom-4">
+            feito para imprimir
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.08, ease: 'easeOut' }}
+          className="flex flex-col text-center lg:col-start-1 lg:row-start-2 lg:text-left"
+        >
+          <div className="order-1 flex flex-col items-center gap-5 sm:flex-row lg:order-3 lg:mt-8 lg:justify-start">
+            <Button
+              asChild
+              size="lg"
+              className="travel-cta group h-auto w-full px-7 py-4 text-base font-bold sm:w-auto sm:text-lg"
+            >
+              <Link to="/create">
+                Criar o guia da minha família
+                <ArrowRight className="ml-2.5 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </Link>
+            </Button>
+            <a href="#guia-exemplo" className="travel-paper-link whitespace-nowrap px-1 py-2 text-base">
+              Folhear um guia completo
+            </a>
+          </div>
+
+          <p className="editorial-copy order-2 mx-auto mt-7 max-w-xl text-foreground/75 lg:order-1 lg:mx-0 lg:mt-0">
+            Você escolhe os destinos e os pontos turísticos. Nós ilustramos cada parada e criamos
+            brincadeiras no nível de cada criança — para o avião, a fila do museu e a noite no hotel.
+          </p>
+
+          <ul className="order-3 mx-auto mt-6 grid max-w-lg gap-2.5 text-left sm:grid-cols-3 lg:order-2 lg:mx-0 lg:max-w-xl">
+            {PROOF.map((item) => (
+              <li key={item} className="flex items-start gap-2 font-ui text-sm font-bold leading-snug text-secondary">
+                <GuideStar className="mt-0.5 h-4 w-4" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      </div>
     </section>
   );
 };

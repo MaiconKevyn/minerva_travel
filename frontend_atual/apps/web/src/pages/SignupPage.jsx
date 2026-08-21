@@ -5,8 +5,7 @@ import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import Header from '@/components/Header.jsx';
-import { Flower, Airplane, Suitcase } from '@/components/DecorativeElements.jsx';
+import AuthTravelShell from '@/components/AuthTravelShell.jsx';
 import { Sparkles, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const SignupPage = () => {
@@ -73,21 +72,20 @@ const SignupPage = () => {
         <meta name="description" content="Crie sua conta para começar a escrever o livro de viagens da sua família." />
       </Helmet>
 
-      <div className="min-h-screen bg-background flex flex-col transition-colors duration-200">
-        <Header />
-
-        <main id="main-content" tabIndex={-1} className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
-          <Flower className="absolute top-20 left-10 w-24 h-24 text-primary opacity-10" />
-          <Airplane className="absolute bottom-20 right-10 w-32 h-32 text-secondary opacity-10" />
-          <Suitcase className="absolute top-40 right-20 w-16 h-16 text-accent opacity-10" />
-
-          <div className="w-full max-w-md bg-card dark:bg-slate-800 rounded-[40px] p-8 md:p-10 shadow-xl border-4 border-primary/10 dark:border-slate-700 relative z-10 transition-colors duration-200">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                <Sparkles className="w-8 h-8 text-primary" />
+      <AuthTravelShell
+        eyebrow="Seu primeiro carimbo"
+        title="Comece o diário da família"
+        description="Crie sua conta para montar o guia, guardar cada viagem e voltar às histórias quando quiser."
+        note="Uma conta, muitas aventuras — cada guia ganha seu próprio lugar na estante."
+      >
+            <div className="mb-7 flex items-center gap-3 border-b-2 border-dashed border-primary/20 pb-5">
+              <div className="flex h-12 w-12 rotate-2 items-center justify-center rounded-[1rem_0.75rem_1.1rem_0.8rem] bg-primary/10">
+                <Sparkles className="h-6 w-6 text-primary" aria-hidden="true" />
               </div>
-              <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Junte-se a Nós!</h1>
-              <p className="text-muted-foreground font-medium">Crie sua conta para guardar suas histórias.</p>
+              <div>
+                <p className="font-hand text-xl font-bold text-primary">Prepare a bagagem</p>
+                <p className="font-ui text-sm text-muted-foreground">Leva menos de um minuto.</p>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -100,7 +98,7 @@ const SignupPage = () => {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all text-foreground"
+                  className="font-ui w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/20"
                   placeholder="Ex: Família Silva"
                 />
               </div>
@@ -114,7 +112,7 @@ const SignupPage = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all text-foreground"
+                  className="font-ui w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-3 text-foreground outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/20"
                   placeholder="seu@email.com"
                 />
               </div>
@@ -130,7 +128,7 @@ const SignupPage = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     aria-describedby="signup-password-help signup-password-strength"
-                    className="w-full px-4 py-3 pr-14 rounded-2xl border-2 border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all text-foreground"
+                    className="font-ui w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/20"
                     placeholder="Mínimo 8 caracteres"
                   />
                   <button
@@ -176,7 +174,7 @@ const SignupPage = () => {
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-4 py-3 pr-14 rounded-2xl border-2 border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all text-foreground"
+                    className="font-ui w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/20"
                     placeholder="Repita sua senha secreta"
                   />
                   <button
@@ -194,7 +192,7 @@ const SignupPage = () => {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full rounded-2xl py-6 bg-primary hover:bg-primary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all mt-4"
+                className="travel-cta mt-4 w-full py-6 text-lg font-bold"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-6 h-6 animate-spin" />
@@ -214,9 +212,7 @@ const SignupPage = () => {
                 </Link>
               </p>
             </div>
-          </div>
-        </main>
-      </div>
+      </AuthTravelShell>
     </>
   );
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import Header from '@/components/Header.jsx';
+import SiteFooter from '@/components/SiteFooter.jsx';
 
 const Section = ({ title, children }) => (
   <section className="space-y-3">
@@ -19,9 +20,9 @@ const PrivacyPage = () => (
         content="Como a Minerva Travel trata dados de conta, roteiro e foto familiar no piloto."
       />
     </Helmet>
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <Header />
-      <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl space-y-10 px-5 py-12 sm:px-8">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 space-y-10 px-5 py-12 sm:px-8">
         <div className="space-y-4">
           <p className="text-sm font-bold uppercase tracking-widest text-primary">
             Versão 2026-07-10 · piloto controlado
@@ -90,6 +91,7 @@ const PrivacyPage = () => (
           Esta política deverá passar por revisão jurídica antes de cobrança ou tráfego público.
         </p>
       </main>
+      <SiteFooter />
     </div>
   </>
 );

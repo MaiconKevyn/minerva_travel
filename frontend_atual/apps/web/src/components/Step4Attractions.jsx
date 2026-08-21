@@ -350,6 +350,10 @@ const Step4Attractions = () => {
   ]);
 
   const selectedCount = selectedLandmarks.length;
+  const selectedLandmarkNames = parsedData.landmarks
+    .filter((landmark) => selectedLandmarks.includes(landmark.id))
+    .map((landmark) => landmark.name)
+    .filter(Boolean);
   const missingMapLandmarks = missingSelectedMapLandmarks(parsedData.landmarks, selectedLandmarks);
   const hasMissingMapLocations = missingMapLandmarks.length > 0;
   const confirmedWithMapCount = Math.max(0, selectedCount - missingMapLandmarks.length);
@@ -384,7 +388,7 @@ const Step4Attractions = () => {
         <button
           type="button"
           onClick={() => setActiveCategory('all')}
-          className={`rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
+          className={`min-h-11 rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
             activeCategory === 'all'
               ? 'border-primary bg-primary text-white'
               : 'border-border bg-card text-muted-foreground hover:border-primary/60 hover:text-primary'
@@ -397,7 +401,7 @@ const Step4Attractions = () => {
             key={category}
             type="button"
             onClick={() => setActiveCategory(category)}
-            className={`rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
+            className={`min-h-11 rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
               activeCategory === category
                 ? 'border-secondary bg-secondary text-white'
                 : 'border-border bg-card text-muted-foreground hover:border-secondary/60 hover:text-secondary'
@@ -669,17 +673,17 @@ const Step4Attractions = () => {
             key="results"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full space-y-10"
+            className="w-full space-y-8 md:space-y-10"
           >
-            <div className="text-center space-y-3 mb-12">
-              <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+            <div className="mb-8 space-y-3 text-center md:mb-12">
+              <h2 className="text-2xl font-serif font-bold text-foreground md:text-4xl">
                 {itineraryMode
                   ? 'Roteiro sugerido para a sua família'
                   : manualMode
                     ? 'Seu roteiro informado'
                     : 'Locais encontrados para sua viagem'}
               </h2>
-              <p className="text-xl text-muted-foreground font-medium max-w-2xl mx-auto">
+              <p className="mx-auto max-w-2xl text-base font-medium leading-relaxed text-muted-foreground md:text-xl">
                 {itineraryMode
                   ? recommendedItinerary.summary
                   : manualMode
@@ -689,15 +693,15 @@ const Step4Attractions = () => {
                     : 'Inclui pontos que você citou e sugestões baseadas no seu texto. Selecione o que entra no guia.'}
               </p>
               {renderCategoryFilters()}
-              <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
-                <Button onClick={goBack} variant="outline" className="rounded-full px-6 py-3">
+              <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row">
+                <Button onClick={goBack} variant="outline" className="min-h-11 rounded-full px-6 py-3">
                   Editar destino
                 </Button>
                 <Button
                   onClick={() => setIsMapOpen(true)}
                   disabled={hasMissingMapLocations || isResolvingMapLocations}
                   variant="outline"
-                  className="rounded-full px-6 py-3 font-bold"
+                  className="min-h-11 rounded-full px-6 py-3 font-bold"
                   title={
                     hasMissingMapLocations
                       ? 'Resolva os locais confirmados sem coordenadas antes de abrir o mapa.'
@@ -713,7 +717,7 @@ const Step4Attractions = () => {
                       setError(null);
                       processAttractions({ mode: 'itinerary' });
                     }}
-                    className="rounded-full px-6 py-3 bg-secondary hover:bg-secondary/90 text-white"
+                    className="min-h-11 rounded-full bg-secondary px-6 py-3 text-white hover:bg-secondary/90"
                   >
                     Atualizar sugestões
                   </Button>
@@ -750,7 +754,7 @@ const Step4Attractions = () => {
                         onClick={retryResolveMapLocations}
                         disabled={isResolvingMapLocations}
                         variant="outline"
-                        className="rounded-full px-4 py-2 text-sm font-bold"
+                        className="min-h-11 rounded-full px-4 py-2 text-sm font-bold"
                       >
                         {isResolvingMapLocations ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -777,13 +781,24 @@ const Step4Attractions = () => {
                 ? renderManualGroups()
                 : renderQuickSuggestionCards()}
 
-            <div className="sticky bottom-0 z-10 flex justify-center bg-gradient-to-t from-background via-background to-transparent px-4 pb-8 pt-16">
+            <div className="relative z-10 flex flex-col items-center justify-center bg-gradient-to-t from-background via-background to-transparent px-2 pb-4 pt-7 md:sticky md:bottom-0 md:px-4 md:pb-8 md:pt-16">
+              <p className="font-ui mb-3 text-center text-xs font-bold text-muted-foreground">
+                Você poderá revisar tudo antes do pagamento.
+              </p>
               <Button
                 onClick={nextStep}
                 disabled={selectedLandmarks.length === 0}
-                className="w-full max-w-md rounded-full bg-primary px-6 py-6 text-base font-bold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-primary/90 disabled:opacity-50 disabled:hover:translate-y-0 sm:w-auto sm:px-12 sm:py-8 sm:text-xl"
+                className="travel-cta h-auto min-h-14 w-full max-w-md px-6 py-3 text-base font-bold sm:w-auto sm:px-12 sm:text-xl"
               >
-                Confirmar {selectedCount} {selectedCount === 1 ? 'local' : 'locais'} <ArrowRight className="ml-3 w-6 h-6" />
+                <span className="flex flex-col items-start text-left leading-tight">
+                  <span>Confirmar {selectedCount} {selectedCount === 1 ? 'local' : 'locais'}</span>
+                  {selectedCount === 1 && selectedLandmarkNames[0] ? (
+                    <span className="mt-1 max-w-[15rem] truncate text-xs font-medium opacity-85 sm:max-w-xs">
+                      {selectedLandmarkNames[0]}
+                    </span>
+                  ) : null}
+                </span>
+                <ArrowRight className="ml-3 h-6 w-6 shrink-0" aria-hidden="true" />
               </Button>
             </div>
           </motion.div>

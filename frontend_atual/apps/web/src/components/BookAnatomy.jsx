@@ -17,7 +17,7 @@ const PAGES = [
   {
     title: 'A capa de vocês',
     description:
-      'A foto da família vira ilustração, com o sobrenome e o mês da viagem escritos na fonte do livro.',
+      'Com foto, a família inspira a ilustração; sem foto, a capa nasce do roteiro e dos destinos.',
   },
   {
     title: 'Nosso roteiro',
@@ -43,21 +43,21 @@ const PAGES = [
 
 const BookAnatomy = () => (
   <section
-    className="border-t border-border/50 bg-card py-20 sm:py-24"
+    className="travel-page storybook-blush relative overflow-hidden border-t border-primary/10 py-20 sm:py-24"
     aria-labelledby="anatomia-title"
   >
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div className="guide-shell">
       <GuideLockup
         id="anatomia-title"
         overline="Um livro, não uma folha solta"
         title="Do embarque até a volta para casa"
         arched="Começo, paradas e fim"
       />
-      <p className="mx-auto mt-4 max-w-2xl text-center text-lg font-medium text-muted-foreground">
+      <p className="editorial-copy mx-auto mt-4 max-w-2xl text-center text-foreground/70">
         Todo guia sai com esta espinha dorsal. O miolo muda conforme o roteiro e as idades.
       </p>
 
-      <ol className="mx-auto mt-14 grid max-w-5xl gap-x-12 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+      <ol className="mx-auto mt-14 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {PAGES.map((page, index) => (
           <motion.li
             key={page.title}
@@ -65,12 +65,12 @@ const BookAnatomy = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-60px' }}
             transition={{ duration: 0.45, delay: (index % 3) * 0.07 }}
-            className="flex gap-3"
+            className={`travel-card flex gap-3 p-5 sm:p-6 ${index % 3 === 1 ? 'travel-card-blue sm:translate-y-5' : 'travel-card-pink'}`}
           >
             <GuideStar className="mt-0.5 h-6 w-6" />
             <div>
               <h3 className="font-serif text-lg font-bold text-foreground">{page.title}</h3>
-              <p className="mt-1.5 font-medium leading-relaxed text-muted-foreground">
+              <p className="mt-1.5 leading-relaxed text-foreground/70">
                 {page.description}
               </p>
             </div>

@@ -34,6 +34,8 @@ test('dashboard exposes loading, error, retry, status, detail and owner actions'
   assert.match(dashboard, /Guias em criação/);
   assert.match(dashboard, /Preview aprovado/);
   assert.match(dashboard, /approved_page_count/);
+  assert.match(dashboard, /role="progressbar"/);
+  assert.match(dashboard, /Criar meu primeiro guia/);
   assert.match(dashboard, /setInterval\(\(\) => requestGuideList\(true\), 5000\)/);
 });
 

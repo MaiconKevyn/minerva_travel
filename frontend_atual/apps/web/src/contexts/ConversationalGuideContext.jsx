@@ -123,6 +123,7 @@ export const ConversationalGuideProvider = ({ children }) => {
   const [builderSessionId, setBuilderSessionIdState] = useState('');
   const lastSavedDraftPayload = useRef('');
   const saveInFlight = useRef(false);
+  const activeSave = useRef(null);
   const saveQueued = useRef(false);
   const draftReadyRef = useRef(false);
   const draftIdRef = useRef(null);
@@ -186,58 +187,67 @@ export const ConversationalGuideProvider = ({ children }) => {
     if (!draftReadyRef.current) return false;
     if (saveInFlight.current) {
       saveQueued.current = true;
-      return true;
+      return activeSave.current || false;
     }
 
     saveInFlight.current = true;
-    let succeeded = true;
+    const runSave = async () => {
+      let succeeded = true;
+      try {
+        do {
+          saveQueued.current = false;
+          const payload = latestGuideDraftPayload.current;
+          const serialized = JSON.stringify(payload);
+          if (!hasMeaningfulDraftContent(payload) || serialized === lastSavedDraftPayload.current) {
+            break;
+          }
+          if (mountedRef.current) {
+            setDraftStatus('saving');
+            setDraftError('');
+          }
+          try {
+            const saved = draftIdRef.current && draftRevisionRef.current
+              ? await updateGuideDraft(
+                  draftIdRef.current,
+                  {
+                    title: 'Rascunho de guia',
+                    payload,
+                    revision: draftRevisionRef.current,
+                  },
+                )
+              : await createGuideDraft({ title: 'Rascunho de guia', payload });
+            lastSavedDraftPayload.current = serialized;
+            draftIdRef.current = saved.id;
+            draftRevisionRef.current = saved.revision;
+            if (mountedRef.current) {
+              setDraftId(saved.id);
+              setDraftRevision(saved.revision);
+              setDraftStatus('saved');
+            }
+          } catch (error) {
+            succeeded = false;
+            if (mountedRef.current) {
+              setDraftStatus('error');
+              setDraftError(friendlyDraftError(error));
+            }
+            break;
+          }
+        } while (
+          saveQueued.current
+          || JSON.stringify(latestGuideDraftPayload.current) !== lastSavedDraftPayload.current
+        );
+      } finally {
+        saveInFlight.current = false;
+      }
+      return succeeded;
+    };
+
+    activeSave.current = runSave();
     try {
-      do {
-        saveQueued.current = false;
-        const payload = latestGuideDraftPayload.current;
-        const serialized = JSON.stringify(payload);
-        if (!hasMeaningfulDraftContent(payload) || serialized === lastSavedDraftPayload.current) {
-          break;
-        }
-        if (mountedRef.current) {
-          setDraftStatus('saving');
-          setDraftError('');
-        }
-        try {
-          const saved = draftIdRef.current && draftRevisionRef.current
-            ? await updateGuideDraft(
-                draftIdRef.current,
-                {
-                  title: 'Rascunho de guia',
-                  payload,
-                  revision: draftRevisionRef.current,
-                },
-              )
-            : await createGuideDraft({ title: 'Rascunho de guia', payload });
-          lastSavedDraftPayload.current = serialized;
-          draftIdRef.current = saved.id;
-          draftRevisionRef.current = saved.revision;
-          if (mountedRef.current) {
-            setDraftId(saved.id);
-            setDraftRevision(saved.revision);
-            setDraftStatus('saved');
-          }
-        } catch (error) {
-          succeeded = false;
-          if (mountedRef.current) {
-            setDraftStatus('error');
-            setDraftError(friendlyDraftError(error));
-          }
-          break;
-        }
-      } while (
-        saveQueued.current
-        || JSON.stringify(latestGuideDraftPayload.current) !== lastSavedDraftPayload.current
-      );
+      return await activeSave.current;
     } finally {
-      saveInFlight.current = false;
+      activeSave.current = null;
     }
-    return succeeded;
   }, []);
 
   useEffect(() => {
@@ -424,7 +434,10 @@ export const ConversationalGuideProvider = ({ children }) => {
 
   const discardDraft = async () => {
     try {
-      if (draftIdRef.current) await discardGuideDraft(draftIdRef.current);
+      if (draftIdRef.current) {
+        const deleted = await discardGuideDraft(draftIdRef.current);
+        if (!deleted) throw new Error('A API não confirmou o descarte do rascunho.');
+      }
     } catch (error) {
       setDraftStatus('error');
       setDraftError(error.message || 'Não foi possível descartar o rascunho.');
@@ -627,6 +640,7 @@ export const ConversationalGuideProvider = ({ children }) => {
         builderSessionId,
         checkpointBuilderSession,
         clearBuilderSessionCheckpoint,
+        saveDraftNow: persistLatestDraft,
         discardDraft,
       }}
     >

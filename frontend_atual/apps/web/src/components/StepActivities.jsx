@@ -182,7 +182,7 @@ const StepActivities = () => {
                         type="button"
                         onClick={() => setPreviewing(activity.type)}
                         aria-label={`Ver a página de ${activity.label} inteira`}
-                        className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-white/90 text-muted-foreground shadow-sm transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="absolute left-2 top-2 flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-white/90 text-muted-foreground shadow-sm transition hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/35"
                       >
                         <Eye className="h-4 w-4" aria-hidden="true" />
                       </button>
@@ -222,7 +222,7 @@ const StepActivities = () => {
                             type="button"
                             onClick={() => toggleActivity(onlyLandmark, activity.type)}
                             aria-describedby={`${inputId}-description`}
-                            className={`flex w-full items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-2 text-xs font-bold transition ${
+                            className={`flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-2 text-xs font-bold transition ${
                               chosen
                                 ? 'border-primary bg-primary/10 text-primary'
                                 : 'border-border/70 bg-background text-muted-foreground hover:border-primary/45 hover:text-foreground'

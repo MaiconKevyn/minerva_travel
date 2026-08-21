@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -31,7 +29,7 @@
 
     /* Creme e a sombra quente da paleta */
     --muted: 41 42% 93%;
-    --muted-foreground: 37 16% 46%;
+    --muted-foreground: 37 16% 40%;
 
     --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
@@ -45,6 +43,15 @@
     /* A estrela mostarda e o rosa do cartão "Você sabia?" das páginas. */
     --star: 40 75% 53%;
     --rosa: 347 61% 72%;
+
+    /* Capítulos do caderno. São derivados da paleta do guia, mas claros o
+       bastante para receber texto e preservar a sensação de papel. */
+    --paper: 42 43% 98%;
+    --sky: 188 37% 84%;
+    --mint: 151 24% 88%;
+    --blush: 350 52% 90%;
+    --cobalt: 217 56% 41%;
+    --sand: 38 49% 84%;
   }
 
   .dark {
@@ -60,7 +67,7 @@
     --popover-foreground: 42 40% 94%;
 
     /* Terracota e petroleo clareados para funcionar sobre fundo escuro. */
-    --primary: 10 62% 62%;
+    --primary: 10 62% 64%;
     --primary-foreground: 30 27% 12%;
 
     --secondary: 176 38% 58%;
@@ -81,6 +88,12 @@
 
     --star: 44 78% 60%;
     --rosa: 347 34% 42%;
+    --paper: 30 15% 17%;
+    --sky: 188 18% 22%;
+    --mint: 151 14% 21%;
+    --blush: 350 18% 22%;
+    --cobalt: 217 56% 68%;
+    --sand: 38 20% 25%;
   }
 
   * {
@@ -99,7 +112,7 @@
   }
 
   body {
-    font-family: "DM Sans", sans-serif;
+    font-family: "Zilla Slab", Georgia, serif;
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     overflow-x: clip;
@@ -113,11 +126,230 @@
     text-wrap: balance;
     font-weight: 600;
   }
+
+  button,
+  input,
+  select,
+  textarea,
+  [role='button'] {
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  ::selection {
+    background: hsl(var(--star) / 0.42);
+    color: hsl(var(--foreground));
+  }
+
+  :focus-visible {
+    scroll-margin-block: 6rem;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .font-ui {
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .font-hand {
+    font-family: "Kalam", "Comic Sans MS", cursive;
+  }
+
+  .guide-shell {
+    width: min(100% - 2rem, 80rem);
+    margin-inline: auto;
+  }
+
+  /* Uma superfície nunca é só uma cor: o grão e a leve variação dão a
+     sensação da folha ilustrada sem carregar uma imagem grande em toda tela. */
+  .travel-page {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .travel-page::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.18;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+  }
+
+  .dark .travel-page::before {
+    opacity: 0.06;
+    mix-blend-mode: screen;
+  }
+
+  .storybook-sky {
+    background-color: hsl(var(--sky));
+  }
+
+  .storybook-mint {
+    background-color: hsl(var(--mint));
+  }
+
+  .storybook-blush {
+    background-color: hsl(var(--blush));
+  }
+
+  .storybook-paper {
+    background-color: hsl(var(--paper));
+  }
+
+  .storybook-grid {
+    background-image:
+      linear-gradient(hsl(var(--secondary) / 0.075) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--secondary) / 0.075) 1px, transparent 1px);
+    background-size: 3.25rem 3.25rem;
+  }
+
+  .travel-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.8rem 0.3rem;
+    clip-path: polygon(2% 8%, 98% 0, 100% 88%, 4% 100%);
+    background: hsl(var(--paper));
+    color: hsl(var(--primary));
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    line-height: 1.25;
+    text-transform: uppercase;
+    box-shadow: 0 4px 0 hsl(var(--foreground) / 0.06);
+  }
+
+  .travel-stamp {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed currentColor;
+    border-radius: 999px;
+    padding: 0.42rem 0.9rem;
+    color: hsl(var(--primary));
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+    transform: rotate(-2deg);
+  }
+
+  .travel-card {
+    position: relative;
+    isolation: isolate;
+    border: 1px solid hsl(var(--foreground) / 0.14);
+    border-radius: 1.1rem 1.8rem 1.25rem 1.65rem;
+    background: hsl(var(--paper));
+    box-shadow:
+      0 2px 0 hsl(var(--foreground) / 0.08),
+      0 22px 50px -34px hsl(var(--foreground) / 0.55);
+  }
+
+  .travel-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: hsl(var(--star) / 0.28);
+    transform: translate(6px, 7px) rotate(0.35deg);
+  }
+
+  .travel-card-pink::after {
+    background: hsl(var(--rosa) / 0.34);
+  }
+
+  .travel-card-blue::after {
+    background: hsl(var(--cobalt) / 0.18);
+  }
+
+  .travel-cta {
+    border: 2px solid hsl(var(--primary));
+    border-radius: 1.15rem 1.65rem 1.25rem 1.8rem;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    box-shadow: 0 5px 0 hsl(var(--foreground) / 0.22);
+    transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  }
+
+  .travel-cta:hover {
+    background: hsl(var(--primary) / 0.92);
+    box-shadow: 0 3px 0 hsl(var(--foreground) / 0.24);
+    transform: translateY(2px) rotate(-0.4deg);
+  }
+
+  .travel-cta:active {
+    box-shadow: 0 1px 0 hsl(var(--foreground) / 0.25);
+    transform: translateY(4px);
+  }
+
+  .travel-cta:focus-visible,
+  .travel-paper-link:focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 4px;
+  }
+
+  .travel-paper-link {
+    position: relative;
+    color: hsl(var(--secondary));
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .travel-paper-link::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: -0.25rem;
+    left: 0;
+    height: 0.22rem;
+    border-radius: 999px;
+    background: hsl(var(--star));
+    transform: rotate(-1.2deg) scaleX(0.84);
+    transform-origin: left;
+    transition: transform 180ms ease;
+  }
+
+  .travel-paper-link:hover::after {
+    transform: rotate(0.4deg) scaleX(1);
+  }
+
+  .editorial-copy {
+    font-family: "Zilla Slab", Georgia, serif;
+    font-size: clamp(1.05rem, 1.2vw, 1.22rem);
+    line-height: 1.7;
+  }
+
+  .travel-note {
+    color: hsl(var(--secondary) / 0.78);
+    font-family: "Kalam", "Comic Sans MS", cursive;
+    font-size: 1rem;
+    line-height: 1.2;
+    transform: rotate(-3deg);
+  }
+
+  .route-dots {
+    border-color: hsl(var(--secondary) / 0.58);
+    border-style: dotted;
+  }
+
+  .page-corner {
+    position: absolute;
+    width: clamp(5rem, 10vw, 9rem);
+    aspect-ratio: 1;
+    pointer-events: none;
+    color: hsl(var(--secondary));
+    opacity: 0.16;
   }
 
   /* O cartão rosa de "Você sabia?" das páginas ilustradas: um tom lavado do
@@ -563,6 +795,14 @@
   .sample-guide-stage--expanded {
     min-height: min(68vh, 42rem);
   }
+}
+
+/* Sonner keeps dismissed toasts mounted briefly for the exit animation. Once
+   they are no longer visible, remove them from visual and keyboard discovery
+   as well so assistive technology never lands on a fading notification. */
+[data-sonner-toast][data-visible='false'] {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

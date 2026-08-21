@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  ChevronDown,
+  ChevronUp,
   Expand,
   MoveHorizontal,
   MousePointer2,
@@ -50,6 +52,7 @@ const SAMPLE_PAGES = [
 }));
 
 const LAST_PAGE_INDEX = SAMPLE_PAGES.length - 1;
+const FEATURED_PAGE_INDEXES = [0, 1, 10, 13, 17];
 
 const spreadStartForPage = (pageIndex) => {
   if (pageIndex <= 0) return 0;
@@ -104,7 +107,6 @@ const BookPage = ({ pageIndex, side, canTurn, onTurn, priority = false }) => {
       width="720"
       height="1080"
       loading={priority ? 'eager' : 'lazy'}
-      fetchPriority={priority ? 'high' : 'auto'}
       draggable="false"
       className="h-full w-full object-contain"
     />
@@ -273,6 +275,7 @@ const BookViewport = ({
 const SampleGuideReader = () => {
   const isMobile = useIsMobile();
   const [activePage, setActivePage] = useState(0);
+  const [readerOpen, setReaderOpen] = useState(false);
   // A pagina so muda quando a folha termina de girar. Trocar antes era o que
   // fazia o livro piscar no meio da virada.
   const [turn, setTurn] = useState(null);
@@ -309,6 +312,7 @@ const SampleGuideReader = () => {
   };
 
   useEffect(() => {
+    if (!readerOpen) return;
     const nextIndexes = isMobile
       ? [activePage + 1]
       : visiblePageIndexes(activePage === 0 ? 1 : activePage + 2, false);
@@ -318,7 +322,13 @@ const SampleGuideReader = () => {
         const image = new Image();
         image.src = SAMPLE_PAGES[index].image;
       });
-  }, [activePage, isMobile]);
+  }, [activePage, isMobile, readerOpen]);
+
+  const openReaderAt = (pageIndex) => {
+    setTurn(null);
+    setActivePage(isMobile ? pageIndex : spreadStartForPage(pageIndex));
+    setReaderOpen(true);
+  };
 
   const handleKeyboard = (event) => {
     if (event.key === 'ArrowRight') {
@@ -369,7 +379,7 @@ const SampleGuideReader = () => {
   return (
     <section
       id="guia-exemplo"
-      className="parchment-wash scroll-mt-20 border-t border-border/50 bg-card py-20 sm:py-24"
+      className="travel-page storybook-paper scroll-mt-20 border-t border-secondary/10 py-20 sm:py-24"
       aria-labelledby="guia-exemplo-title"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -386,114 +396,184 @@ const SampleGuideReader = () => {
             title="Folheie a aventura antes de criar a sua"
             arched="Família Knopp em Paris"
           />
-          <p className="mt-4 text-lg font-medium leading-relaxed text-muted-foreground">
-            São 19 páginas reais, da capa à volta para casa. Clique nas folhas, use as setas ou
-            deslize no celular para conhecer o livro inteiro.
+          <p className="editorial-copy mt-4 text-foreground/70">
+            Veja cinco páginas-chave agora. O livro tem 19 páginas reais, da capa à volta para
+            casa, e você pode abrir tudo quando quiser.
           </p>
-          <div className="mt-5 flex items-center justify-center gap-2 text-sm font-bold text-primary">
-            {isMobile ? (
-              <MoveHorizontal className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <MousePointer2 className="h-4 w-4" aria-hidden="true" />
-            )}
-            {isMobile
-              ? 'Deslize a página ou use os botões para folhear'
-              : 'Passe o mouse no canto e clique para folhear'}
-          </div>
         </motion.div>
 
         <div
-          className="mt-12 rounded-[2rem] border-2 border-border/60 bg-background/75 p-3 shadow-[0_28px_80px_-36px_rgba(74,55,30,0.55)] backdrop-blur sm:p-6 lg:p-8"
-          tabIndex={0}
-          onKeyDown={handleKeyboard}
-          aria-label="Leitor do guia de exemplo. Use as setas esquerda e direita para folhear."
+          className="travel-card travel-card-blue mt-10 p-4 sm:p-6 lg:p-8"
+          {...(readerOpen
+            ? {
+                tabIndex: 0,
+                onKeyDown: handleKeyboard,
+                'aria-label': 'Leitor do guia de exemplo. Use as setas esquerda e direita para folhear.',
+              }
+            : {})}
         >
-          <div className="mb-5 flex items-center justify-between gap-3">
+          <div className={`flex items-center justify-between gap-3 ${readerOpen ? 'mb-5' : 'mb-6'}`}>
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 -rotate-2 items-center justify-center rounded-[0.7rem_1rem_0.8rem_1.1rem] bg-primary/10 text-primary">
                 <BookOpen className="h-5 w-5" aria-hidden="true" />
               </span>
               <div>
                 <p className="font-serif text-lg font-bold text-foreground">Família Knopp em Paris</p>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Guia demonstrativo</p>
+                <p className="font-ui text-xs font-bold uppercase tracking-wider text-muted-foreground">Guia demonstrativo</p>
               </div>
             </div>
 
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full border-2"
-                  aria-label="Ampliar o guia"
-                >
-                  <Expand className="h-4 w-4 sm:mr-2" aria-hidden="true" />
-                  <span className="hidden sm:inline">Ampliar</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="h-[94vh] max-w-[min(96vw,1180px)] overflow-y-auto rounded-[1.75rem] border-2 p-4 sm:p-6">
-                <DialogHeader className="pr-10 text-left">
-                  <DialogTitle className="font-serif text-2xl">Guia demonstrativo completo</DialogTitle>
-                  <DialogDescription>{pageRangeLabel(visibleIndexes)}</DialogDescription>
-                </DialogHeader>
-                <BookViewport
-                  activePage={activePage}
-                  turn={turn}
-                  isMobile={isMobile}
-                  onNext={goNext}
-                  onPrevious={goPrevious}
-                  onTurnEnd={finishTurn}
-                  expanded
-                />
-                {controls}
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <BookViewport
-            activePage={activePage}
-            turn={turn}
-            isMobile={isMobile}
-            onNext={goNext}
-            onPrevious={goPrevious}
-            onTurnEnd={finishTurn}
-          />
-
-          <div className="mt-6">{controls}</div>
-
-          <div className="sample-guide-thumbnails mt-6" aria-label="Escolha uma página do guia">
-            {SAMPLE_PAGES.map((page) => {
-              const selected = visibleIndexes.includes(page.number - 1);
-              return (
-                <button
-                  key={page.image}
-                  type="button"
-                  onClick={() => goToPage(page.number - 1)}
-                  className="sample-guide-thumbnail"
-                  aria-label={`Ir para a página ${page.number}: ${page.title}`}
-                  aria-current={selected ? 'page' : undefined}
-                  title={page.title}
-                >
-                  <img
-                    src={page.image}
-                    alt=""
-                    width="72"
-                    height="108"
-                    loading="lazy"
-                    className="h-full w-full object-cover"
+            {readerOpen ? (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="font-ui min-h-11 rounded-full border-2 font-bold"
+                    aria-label="Ampliar o guia"
+                  >
+                    <Expand className="h-4 w-4 sm:mr-2" aria-hidden="true" />
+                    <span className="hidden sm:inline">Ampliar</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="h-[94vh] max-w-[min(96vw,1180px)] overflow-y-auto rounded-[1.75rem] border-2 p-4 sm:p-6">
+                  <DialogHeader className="pr-10 text-left">
+                    <DialogTitle className="font-serif text-2xl">Guia demonstrativo completo</DialogTitle>
+                    <DialogDescription>{pageRangeLabel(visibleIndexes)}</DialogDescription>
+                  </DialogHeader>
+                  <BookViewport
+                    activePage={activePage}
+                    turn={turn}
+                    isMobile={isMobile}
+                    onNext={goNext}
+                    onPrevious={goPrevious}
+                    onTurnEnd={finishTurn}
+                    expanded
                   />
-                  <span>{page.number}</span>
-                </button>
-              );
-            })}
+                  {controls}
+                </DialogContent>
+              </Dialog>
+            ) : null}
           </div>
+
+          {!readerOpen ? (
+            <>
+              <div className="flex snap-x gap-3 overflow-x-auto pb-3 sm:grid sm:grid-cols-5 sm:overflow-visible" aria-label="Páginas em destaque do guia">
+                {FEATURED_PAGE_INDEXES.map((pageIndex) => {
+                  const page = SAMPLE_PAGES[pageIndex];
+                  return (
+                    <button
+                      key={page.image}
+                      type="button"
+                      onClick={() => openReaderAt(pageIndex)}
+                      className="group w-36 shrink-0 snap-start rounded-xl border-2 border-secondary/15 bg-background/65 p-2 text-left transition hover:-translate-y-1 hover:border-primary/45 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/35 sm:w-auto"
+                      aria-label={`Abrir o guia na página ${page.number}: ${page.title}`}
+                    >
+                      <img
+                        src={page.image}
+                        alt=""
+                        width="180"
+                        height="270"
+                        loading="lazy"
+                        decoding="async"
+                        className="aspect-[2/3] w-full rounded-lg object-cover shadow-sm"
+                      />
+                      <span className="font-ui mt-2 block text-xs font-bold uppercase tracking-wide text-primary">
+                        Página {page.number}
+                      </span>
+                      <span className="mt-1 block text-sm font-bold leading-tight text-foreground group-hover:text-secondary">
+                        {page.title}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => openReaderAt(0)}
+                aria-expanded="false"
+                aria-controls="sample-guide-full-reader"
+                className="font-ui mx-auto mt-5 flex min-h-11 rounded-full border-2 px-6 font-bold"
+              >
+                <BookOpen className="mr-2 h-4 w-4" aria-hidden="true" />
+                Abrir as 19 páginas
+                <ChevronDown className="ml-2 h-4 w-4" aria-hidden="true" />
+              </Button>
+            </>
+          ) : (
+            <div id="sample-guide-full-reader">
+              <div className="font-ui mb-5 flex items-center justify-center gap-2 text-sm font-bold text-primary">
+                {isMobile ? (
+                  <MoveHorizontal className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <MousePointer2 className="h-4 w-4" aria-hidden="true" />
+                )}
+                {isMobile
+                  ? 'Deslize a página ou use os botões para folhear'
+                  : 'Clique no canto da página ou use as setas'}
+              </div>
+
+              <BookViewport
+                activePage={activePage}
+                turn={turn}
+                isMobile={isMobile}
+                onNext={goNext}
+                onPrevious={goPrevious}
+                onTurnEnd={finishTurn}
+              />
+
+              <div className="mt-6">{controls}</div>
+
+              <div className="sample-guide-thumbnails mt-6" aria-label="Escolha uma página do guia">
+                {SAMPLE_PAGES.map((page) => {
+                  const selected = visibleIndexes.includes(page.number - 1);
+                  return (
+                    <button
+                      key={page.image}
+                      type="button"
+                      onClick={() => goToPage(page.number - 1)}
+                      className="sample-guide-thumbnail"
+                      aria-label={`Ir para a página ${page.number}: ${page.title}`}
+                      aria-current={selected ? 'page' : undefined}
+                      title={page.title}
+                    >
+                      <img
+                        src={page.image}
+                        alt=""
+                        width="72"
+                        height="108"
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
+                      <span>{page.number}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setReaderOpen(false)}
+                disabled={Boolean(turn)}
+                aria-expanded="true"
+                aria-controls="sample-guide-full-reader"
+                className="font-ui mx-auto mt-6 flex min-h-11 rounded-full px-6 font-bold"
+              >
+                Recolher guia
+                <ChevronUp className="ml-2 h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="mt-9 flex flex-col items-center justify-center gap-4 text-center sm:flex-row">
-          <p className="max-w-lg font-medium text-muted-foreground">
+          <p className="editorial-copy max-w-lg text-foreground/70">
             O roteiro, os lugares e as atividades mudam. O cuidado com cada página permanece.
           </p>
-          <Button asChild size="lg" className="group rounded-full px-7 py-6 font-bold">
+          <Button asChild size="lg" className="travel-cta group h-auto px-7 py-4 font-bold">
             <Link to="/create">
               <Sparkles className="mr-2 h-5 w-5" aria-hidden="true" />
               Criar o guia da minha família

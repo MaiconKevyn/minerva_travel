@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Airplane, Flower } from './DecorativeElements.jsx';
+import { Airplane, RouteDoodle } from './DecorativeElements.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import ThemeToggle from '@/components/ThemeToggle.jsx';
 
@@ -30,40 +30,46 @@ const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <div className="flex items-center justify-between h-20">
+    <header className="travel-page storybook-paper sticky top-0 z-50 border-b border-foreground/10 bg-background/95 shadow-[0_8px_28px_-26px_hsl(var(--foreground))] backdrop-blur-md">
+      <div className="guide-shell relative">
+        <div className="flex h-[4.5rem] items-center justify-between sm:h-[5.35rem]">
 
           {/* Logo with Decorative Element */}
           <Link
             to="/"
             aria-label="Minerva Travel — página inicial"
-            className="flex items-center gap-3 group"
+            className="group flex items-center gap-3"
           >
             <div
               aria-hidden="true"
-              className="relative w-12 h-12 bg-secondary/10 rounded-2xl flex items-center justify-center group-hover:scale-105 transition-transform duration-300"
+              className="relative flex h-11 w-11 rotate-[-2deg] items-center justify-center rounded-[0.8rem_1.2rem_0.9rem_1.35rem] border-2 border-secondary/25 bg-[hsl(var(--mint))] shadow-[0_3px_0_hsl(var(--secondary)/0.16)] transition-transform duration-300 group-hover:-rotate-6 sm:h-12 sm:w-12"
             >
-              <Airplane className="w-8 h-8 text-secondary" />
-              <Flower className="absolute -bottom-2 -right-2 w-6 h-6 text-primary scale-0 group-hover:scale-100 transition-transform duration-300" />
+              <Airplane className="h-8 w-8 text-secondary" />
             </div>
-            <span className="text-2xl font-serif font-bold text-foreground tracking-tight hidden sm:block">
-              Minerva <span className="text-primary">Travel</span>
+            <span className="flex flex-col leading-none">
+              <span className="text-lg font-serif font-bold tracking-[-0.02em] text-secondary sm:text-[1.35rem]">
+                Guia de Memórias
+              </span>
+              <span className="font-ui mt-1 text-[0.58rem] font-bold uppercase tracking-[0.2em] text-primary sm:text-[0.62rem]">
+                por Minerva Travel
+              </span>
             </span>
           </Link>
 
+          <RouteDoodle className="pointer-events-none absolute left-[15.5rem] top-2 hidden h-12 w-28 text-secondary/20 xl:block" />
+
           {/* Desktop Navigation */}
-          <nav aria-label="Navegação principal" className="hidden md:flex items-center gap-4">
-            <div className="flex gap-2">
+          <nav aria-label="Navegação principal" className="font-ui hidden items-center gap-3 md:flex">
+            <div className="flex items-center gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
                   aria-current={isActive(link.path) ? 'page' : undefined}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                  className={`relative px-4 py-2 text-sm font-bold transition-colors duration-200 lg:px-5 ${
                     isActive(link.path)
-                      ? 'bg-primary text-primary-foreground shadow-md'
-                      : 'text-foreground/80 hover:bg-muted hover:text-foreground'
+                      ? 'text-primary after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[3px] after:-rotate-1 after:rounded-full after:bg-[hsl(var(--star))]'
+                      : 'text-foreground/75 hover:text-secondary'
                   }`}
                 >
                   {link.label}
@@ -71,32 +77,32 @@ const Header = () => {
               ))}
             </div>
 
-            <div className="w-px h-8 bg-border/60 mx-2"></div>
+            <div className="mx-1 h-8 border-l-2 border-dotted border-secondary/25 lg:mx-2"></div>
 
             <ThemeToggle />
 
             {isAuthenticated ? (
-              <div className="flex items-center gap-4 ml-2">
+              <div className="ml-1 flex items-center gap-2 lg:gap-3">
                 <Link
                   to="/dashboard"
                   aria-current={isActive('/dashboard') ? 'page' : undefined}
-                  className="flex items-center gap-2 text-sm font-bold hover:text-primary transition-colors"
+                  className="flex items-center gap-2 text-sm font-bold text-secondary transition-colors hover:text-primary"
                 >
-                  <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent-foreground">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-secondary/20 bg-accent/20 text-accent-foreground">
                     <User className="w-4 h-4" />
                   </div>
                   {user?.name || user?.email?.split('@')[0]}
                 </Link>
-                <Button variant="ghost" onClick={handleLogout} className="rounded-full font-medium hover:bg-destructive/10 hover:text-destructive">
+                <Button variant="ghost" onClick={handleLogout} className="rounded-full font-bold hover:bg-destructive/10 hover:text-destructive">
                   Sair
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-2 ml-2">
-                <Button variant="ghost" asChild className="rounded-full font-medium">
+              <div className="ml-1 flex items-center gap-2">
+                <Button variant="ghost" asChild className="rounded-full font-bold">
                   <Link to="/login">Entrar</Link>
                 </Button>
-                <Button asChild className="rounded-full bg-secondary hover:bg-secondary/90 text-white">
+                <Button asChild className="travel-cta px-5 font-bold">
                   <Link to="/signup">Criar Conta</Link>
                 </Button>
               </div>
@@ -104,7 +110,7 @@ const Header = () => {
           </nav>
 
           {/* Mobile Menu Button */}
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-1 md:hidden">
             <ThemeToggle />
             <Button
               variant="ghost"
@@ -129,7 +135,7 @@ const Header = () => {
           <nav
             id={mobileMenuId}
             aria-label="Navegação principal móvel"
-            className="md:hidden py-4 absolute top-20 left-0 w-full bg-background border-b border-border shadow-lg px-4 space-y-4 pb-6"
+            className="travel-page storybook-paper absolute left-0 top-[4.5rem] w-full space-y-4 border-b border-foreground/10 bg-background px-4 py-5 pb-7 shadow-xl sm:top-[5.35rem] md:hidden"
           >
             <div className="space-y-2">
               {navLinks.map((link) => (
@@ -138,7 +144,7 @@ const Header = () => {
                   to={link.path}
                   onClick={() => setMobileMenuOpen(false)}
                   aria-current={isActive(link.path) ? 'page' : undefined}
-                  className={`block px-5 py-3 rounded-2xl text-base font-medium transition-all duration-200 ${
+                  className={`font-ui block rounded-xl px-5 py-3 text-base font-bold transition-all duration-200 ${
                     isActive(link.path)
                       ? 'bg-primary/10 text-primary'
                       : 'text-foreground/80 hover:bg-muted'
@@ -149,7 +155,7 @@ const Header = () => {
               ))}
             </div>
 
-            <div className="h-px w-full bg-border"></div>
+            <div className="w-full border-t-2 border-dotted border-secondary/20"></div>
 
             {isAuthenticated ? (
               <div className="space-y-2">
@@ -157,14 +163,14 @@ const Header = () => {
                   to="/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-current={isActive('/dashboard') ? 'page' : undefined}
-                  className="block px-5 py-3 rounded-2xl text-base font-medium bg-accent/10 text-accent-foreground"
+                  className="font-ui block rounded-xl bg-accent/10 px-5 py-3 text-base font-bold text-accent-foreground"
                 >
                   Meu Painel
                 </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full text-left px-5 py-3 rounded-2xl text-base font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                  className="font-ui w-full rounded-xl px-5 py-3 text-left text-base font-bold text-destructive transition-colors hover:bg-destructive/10"
                 >
                   Sair da Conta
                 </button>
@@ -175,7 +181,7 @@ const Header = () => {
                   to="/login"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-current={isActive('/login') ? 'page' : undefined}
-                  className="block px-5 py-3 rounded-2xl text-base font-medium text-center border-2 border-border"
+                  className="font-ui block rounded-xl border-2 border-secondary/20 px-5 py-3 text-center text-base font-bold"
                 >
                   Entrar
                 </Link>
@@ -183,7 +189,7 @@ const Header = () => {
                   to="/signup"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-current={isActive('/signup') ? 'page' : undefined}
-                  className="block px-5 py-3 rounded-2xl text-base font-bold text-center bg-secondary text-white"
+                  className="travel-cta font-ui block px-5 py-3 text-center text-base font-bold"
                 >
                   Criar Conta
                 </Link>

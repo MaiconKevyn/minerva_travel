@@ -15,18 +15,19 @@ test('pricing reflects the server-owned checkout state without a hard-coded pric
 });
 
 test('privacy and terms routes are real links', async () => {
-  const [app, home, pricing] = await Promise.all([
+  const [app, home, pricing, footer] = await Promise.all([
     source('src/App.jsx'),
     source('src/pages/HomePage.jsx'),
     source('src/pages/PricingPage.jsx'),
+    source('src/components/SiteFooter.jsx'),
   ]);
 
   assert.match(app, /path="\/privacy"/);
   assert.match(app, /path="\/terms"/);
-  assert.match(home, /to="\/privacy"/);
-  assert.match(home, /to="\/terms"/);
-  assert.match(pricing, /to="\/privacy"/);
-  assert.match(pricing, /to="\/terms"/);
+  assert.match(home, /SiteFooter/);
+  assert.match(pricing, /SiteFooter/);
+  assert.match(footer, /to="\/privacy"/);
+  assert.match(footer, /to="\/terms"/);
 });
 
 test('photo step discloses processing and accepts only supported image types', async () => {

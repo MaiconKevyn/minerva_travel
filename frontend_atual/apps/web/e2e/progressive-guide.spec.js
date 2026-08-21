@@ -112,16 +112,16 @@ test('restored activity step keeps the no-optional path and mandatory memory vis
 
   await expect(page.getByRole('heading', { name: 'Atividades da aventura' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Minha melhor memória' })).toBeVisible();
-  await expect(page.getByText('0 de 8 páginas opcionais')).toBeVisible();
+  await expect(page.getByText('0 de 30 páginas opcionais')).toBeVisible();
   await page.getByRole('button', { name: 'Continuar sem atividades opcionais' }).click();
-  await expect(page.getByRole('heading', { name: /Escolha a foto de capa do PDF/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Seu roteiro está pronto. Como você quer a capa?/ })).toBeVisible();
 });
 
 test('reload restores the saved builder session and its generated pages', async ({ page }) => {
   const builderSession = {
     session_id: 'resumesession123',
     created_at: '2026-07-21T10:00:00+00:00',
-    expires_at: '2026-08-04T10:00:00+00:00',
+    expires_at: '2026-09-04T10:00:00+00:00',
     title: 'Família Aurora',
     revision: 5,
     layout_revision: 0,
@@ -194,7 +194,7 @@ test('reload restores the saved builder session and its generated pages', async 
       },
     }),
   );
-  await page.route('**/api/guide-builder**', async (route) => {
+  await page.route(/\/api\/guide-builder(?:\/.*)?$/, async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
     if (pathname === '/api/guide-builder/resumesession123' && request.method() === 'GET') {
@@ -217,12 +217,12 @@ test('reload restores the saved builder session and its generated pages', async 
   await authenticateLocalTestUser(page, email, 'Família Aurora');
   await page.goto('/create', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/create\?builder=resumesession123$/);
-  await expect(page.getByAltText('Versão escolhida de Capa da família')).toBeVisible();
+  await expect(page.getByAltText('Preview da capa do guia')).toBeVisible();
   await expect(page.getByText('Progresso recuperado. Suas páginas geradas continuam salvas com segurança.')).toBeVisible();
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Recuperando suas páginas…' })).toBeVisible();
-  await expect(page.getByAltText('Versão escolhida de Capa da família')).toBeVisible();
+  await expect(page.getByAltText('Preview da capa do guia')).toBeVisible();
   expect(builderGets).toBeGreaterThanOrEqual(2);
   expect(builderCreates).toBe(0);
 });
@@ -287,7 +287,7 @@ test('expired builder returns to the photo step without erasing the saved itiner
   const email = `expirada-${test.info().project.name}@example.test`;
   await authenticateLocalTestUser(page, email, 'Família Silva');
   await page.goto('/create', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: /Escolha a foto de capa do PDF/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Seu roteiro está pronto. Como você quer a capa?/ })).toBeVisible();
   await expect(page).toHaveURL(/\/create$/);
   await expect.poll(() => updatedPayload).not.toBeNull();
   expect(updatedPayload).toMatchObject({
@@ -298,61 +298,33 @@ test('expired builder returns to the photo step without erasing the saved itiner
   });
 });
 
-test('family reviews pages and controls family inclusion on a landmark', async ({
-  page,
-}) => {
+test('family reviews the cover and queues the complete guide', async ({ page }) => {
   test.setTimeout(60_000);
-  const consoleErrors = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
 
   let coverAttempts = [];
-  const coverRevisionRequests = [];
-  let rejectNextCoverRevision = false;
   let coverSelected = null;
   let coverApproved = false;
-  let summaryAttempts = [];
-  let summarySelected = null;
-  let summaryApproved = false;
-  let landmarkAttempts = [];
-  const landmarkFamilyRequests = [];
-  let landmarkSelected = null;
-  let landmarkApproved = false;
-  const activityAttempts = { coloring: [], word_search: [] };
-  const activitySelected = { coloring: null, word_search: null };
-  const activityApproved = { coloring: false, word_search: false };
-  const activityRequestBodies = [];
-  let wordSearchIncluded = false;
-  let layoutRevision = 0;
-  let memoryAttempts = [];
-  let memorySelected = null;
-  let memoryApproved = false;
-  let pdfExportRequests = 0;
+  let generationQueued = false;
   let sessionRevision = 0;
+  let builderCreates = 0;
+  let generationRequests = 0;
+  const revisionRequests = [];
 
   const sessionPayload = () => ({
     session_id: 'syntheticsession',
-    created_at: '2026-07-20T00:00:00+00:00',
-    expires_at: '2026-08-03T00:00:00+00:00',
+    created_at: '2026-08-20T00:00:00+00:00',
+    expires_at: '2026-09-03T00:00:00+00:00',
     title: 'Família Aurora',
     revision: ++sessionRevision,
-    layout_revision: layoutRevision,
-    active_page_id: !coverApproved
-      ? 'cover'
-      : !summaryApproved
-        ? 'summary'
-        : !landmarkApproved
-          ? 'landmark-1'
-          : !activityApproved.coloring
-            ? 'activity-coloring'
-          : wordSearchIncluded && !activityApproved.word_search
-              ? 'activity-word-search'
-              : !memoryApproved
-                ? 'best-memory'
-                : null,
-    is_complete: coverApproved && summaryApproved && landmarkApproved &&
-      activityApproved.coloring && (!wordSearchIncluded || activityApproved.word_search) && memoryApproved,
+    layout_revision: 0,
+    active_page_id: coverApproved ? null : 'cover',
+    is_complete: false,
+    ...(generationQueued
+      ? {
+          generation_job_id: 'syntheticjob',
+          generation_requested_at: '2026-08-20T00:02:00+00:00',
+        }
+      : {}),
     pages: [
       pageState({
         id: 'cover',
@@ -369,27 +341,14 @@ test('family reviews pages and controls family inclusion on a landmark', async (
         kind: 'trip_summary',
         title: 'Nosso roteiro ilustrado',
         position: 2,
-        requiredCopy: [
-          'Nosso roteiro',
-          'Família Aurora',
-          'Julho de 2026',
-          'Torre Eiffel',
-          'Coliseu',
-        ],
-        attempts: summaryAttempts,
-        selectedAttemptId: summarySelected,
-        approved: summaryApproved,
+        requiredCopy: ['Família Aurora', 'Torre Eiffel', 'Coliseu'],
       }),
       pageState({
         id: 'landmark-1',
         kind: 'landmark',
         title: 'Torre Eiffel, França',
         position: 3,
-        requiredCopy: ['Torre Eiffel', 'Paris, França', 'Família Aurora • Julho de 2026'],
-        attempts: landmarkAttempts,
-        selectedAttemptId: landmarkSelected,
-        approved: landmarkApproved,
-        metadata: { landmark_selection_id: 'eiffel', landmark_name: 'Torre Eiffel' },
+        requiredCopy: ['Torre Eiffel', 'Paris, França'],
       }),
       pageState({
         id: 'activity-coloring',
@@ -397,59 +356,34 @@ test('family reviews pages and controls family inclusion on a landmark', async (
         title: 'Página para colorir — Torre Eiffel',
         position: 4,
         requiredCopy: ['Torre Eiffel', 'Pinte sua aventura!'],
-        attempts: activityAttempts.coloring,
-        selectedAttemptId: activitySelected.coloring,
-        approved: activityApproved.coloring,
-        metadata: {
-          activity_type: 'coloring',
-          activity_label: 'Página para colorir',
-          landmark_selection_id: 'eiffel',
-          landmark_name: 'Torre Eiffel',
-          linked_landmark_page_id: 'landmark-1',
-        },
-      }),
-      pageState({
-        id: 'activity-word-search',
-        kind: 'landmark_activity',
-        title: 'Caça-palavras — Torre Eiffel',
-        position: 5,
-        requiredCopy: ['Torre Eiffel', 'Encontre as palavras'],
-        attempts: activityAttempts.word_search,
-        selectedAttemptId: activitySelected.word_search,
-        approved: activityApproved.word_search,
-        metadata: {
-          activity_type: 'word_search',
-          activity_label: 'Caça-palavras',
-          landmark_selection_id: 'eiffel',
-          landmark_name: 'Torre Eiffel',
-          linked_landmark_page_id: 'landmark-1',
-        },
       }),
       pageState({
         id: 'best-memory',
         kind: 'best_memory',
         title: 'Minha melhor memória',
-        position: 6,
-        requiredCopy: ['Minha melhor memória', 'O que eu mais gostei', 'Data'],
-        attempts: memoryAttempts,
-        selectedAttemptId: memorySelected,
-        approved: memoryApproved,
-        metadata: { age_complexity: 'early_reader' },
+        position: 5,
+        requiredCopy: ['Minha melhor memória', 'Data'],
       }),
-    ].filter((item) => wordSearchIncluded || item.id !== 'activity-word-search'),
+    ],
   });
 
   await page.route('**/api/guides', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '{"guides":[]}' }),
   );
+  await page.route('**/api/products/guide', (route) =>
+    route.fulfill({
+      status: 200,
+      json: { enabled: false, amount_minor: 1999, currency: 'BRL' },
+    }),
+  );
   await page.route('**/api/drafts/current', (route) =>
     route.fulfill({
       status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
+      json: {
         draft: {
           id: 'visual-draft',
           revision: 1,
+          updated_at: '2026-08-20T00:00:00+00:00',
           payload: {
             current_step: 7,
             family_name: 'Aurora',
@@ -470,60 +404,61 @@ test('family reviews pages and controls family inclusion on a landmark', async (
             parsed_data: {
               destinations: [{ id: 'europe', city: 'Paris e Roma', country: 'Europa' }],
               landmarks: [
-                { id: 'eiffel', destination_id: 'europe', name: 'Torre Eiffel' },
-                { id: 'colosseum', destination_id: 'europe', name: 'Coliseu' },
+                {
+                  id: 'eiffel',
+                  selection_id: 'eiffel',
+                  destination_id: 'europe',
+                  name: 'Torre Eiffel',
+                  city: 'Paris',
+                  country: 'França',
+                },
+                {
+                  id: 'colosseum',
+                  selection_id: 'colosseum',
+                  destination_id: 'europe',
+                  name: 'Coliseu',
+                  city: 'Roma',
+                  country: 'Itália',
+                },
               ],
             },
             selected_landmarks: ['eiffel', 'colosseum'],
             landmark_activity_selections: [
               { landmark_selection_id: 'eiffel', activity_type: 'coloring', order: 1 },
-              { landmark_selection_id: 'eiffel', activity_type: 'word_search', order: 2 },
             ],
             itinerary_preferences: { days: 5, interests: [], pace: 'balanced' },
             has_searched_landmarks: true,
           },
         },
-      }),
+      },
     }),
   );
   await page.route('**/api/drafts/visual-draft', (route) =>
     route.fulfill({
       status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
+      json: {
         id: 'visual-draft',
         revision: 2,
+        updated_at: '2026-08-20T00:01:00+00:00',
         payload: route.request().postDataJSON()?.payload || {},
-      }),
+      },
     }),
   );
-  await page.route('**/api/guide-builder**', async (route) => {
+  await page.route(/\/api\/guide-builder(?:\/.*)?$/, async (route) => {
     const request = route.request();
-    const url = new URL(request.url());
+    const pathname = new URL(request.url()).pathname;
     const method = request.method();
-    if (url.pathname === '/api/guide-builder' && method === 'POST') {
+
+    if (pathname === '/api/guide-builder' && method === 'POST') {
+      builderCreates += 1;
       return route.fulfill({ status: 201, json: sessionPayload() });
     }
-    if (url.pathname.endsWith('/activities') && method === 'POST') {
-      expect(request.postDataJSON()).toMatchObject({
-        landmark_selection_id: 'eiffel',
-        activity_type: 'word_search',
-        layout_revision: 0,
-      });
-      wordSearchIncluded = true;
-      layoutRevision += 1;
+    if (pathname === '/api/guide-builder/syntheticsession' && method === 'GET') {
       return route.fulfill({ status: 200, json: sessionPayload() });
     }
-    if (url.pathname.endsWith('/pages/cover/attempts') && method === 'POST') {
+    if (pathname.endsWith('/pages/cover/attempts') && method === 'POST') {
       const revisionInstruction = request.postDataJSON()?.revision_instruction || '';
-      coverRevisionRequests.push(revisionInstruction);
-      if (rejectNextCoverRevision) {
-        rejectNextCoverRevision = false;
-        return route.fulfill({
-          status: 502,
-          json: { detail: { message: 'Falha simulada ao refazer a capa.' } },
-        });
-      }
+      revisionRequests.push(revisionInstruction);
       const next = coverAttempts.length + 1;
       coverAttempts = [
         ...coverAttempts,
@@ -532,281 +467,82 @@ test('family reviews pages and controls family inclusion on a landmark', async (
       coverSelected = `cover-${next}`;
       return route.fulfill({ status: 200, json: sessionPayload() });
     }
-    if (url.pathname.endsWith('/pages/cover/selection') && method === 'PATCH') {
-      coverSelected = request.postDataJSON().attempt_id;
-      return route.fulfill({ status: 200, json: sessionPayload() });
-    }
-    if (url.pathname.endsWith('/pages/cover/approve') && method === 'POST') {
+    if (pathname.endsWith('/pages/cover/approve') && method === 'POST') {
       coverSelected = request.postDataJSON().attempt_id;
       coverApproved = true;
       return route.fulfill({ status: 200, json: sessionPayload() });
     }
-    if (url.pathname.endsWith('/pages/summary/attempts') && method === 'POST') {
-      summaryAttempts = [attempt('summary-1', 'summary-1.png')];
-      summarySelected = 'summary-1';
-      return route.fulfill({ status: 200, json: sessionPayload() });
-    }
-    if (url.pathname.endsWith('/pages/summary/approve') && method === 'POST') {
-      summaryApproved = true;
-      return route.fulfill({ status: 200, json: sessionPayload() });
-    }
-    if (url.pathname.endsWith('/pages/landmark-1/attempts') && method === 'POST') {
-      const requestPayload = request.postDataJSON() || {};
-      const includeFamily = requestPayload.include_family === true;
-      landmarkFamilyRequests.push(includeFamily);
-      const next = landmarkAttempts.length + 1;
-      if (next === 1) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-      landmarkAttempts = [
-        ...landmarkAttempts,
-        attempt(
-          `landmark-1-${next}`,
-          `landmark-1-${next}.png`,
-          requestPayload.revision_instruction || '',
-          includeFamily,
-        ),
-      ];
-      landmarkSelected = `landmark-1-${next}`;
-      return route.fulfill({ status: 200, json: sessionPayload() });
-    }
-    if (url.pathname.endsWith('/pages/landmark-1/approve') && method === 'POST') {
-      landmarkSelected = request.postDataJSON().attempt_id;
-      landmarkApproved = true;
-      return route.fulfill({ status: 200, json: sessionPayload() });
-    }
-    for (const [activityKey, pageId] of [
-      ['coloring', 'activity-coloring'],
-      ['word_search', 'activity-word-search'],
-    ]) {
-      if (url.pathname.endsWith(`/pages/${pageId}/attempts`) && method === 'POST') {
-        const requestPayload = request.postDataJSON() || {};
-        activityRequestBodies.push(requestPayload);
-        activityAttempts[activityKey] = [
-          attempt(`${pageId}-1`, `${pageId}-1.png`, requestPayload.revision_instruction || ''),
-        ];
-        activitySelected[activityKey] = `${pageId}-1`;
-        return route.fulfill({ status: 200, json: sessionPayload() });
-      }
-      if (url.pathname.endsWith(`/pages/${pageId}/approve`) && method === 'POST') {
-        activityApproved[activityKey] = true;
-        return route.fulfill({ status: 200, json: sessionPayload() });
-      }
-    }
-    if (url.pathname.endsWith('/pages/best-memory/attempts') && method === 'POST') {
-      const requestPayload = request.postDataJSON() || {};
-      activityRequestBodies.push(requestPayload);
-      memoryAttempts = [attempt('best-memory-1', 'best-memory-1.png')];
-      memorySelected = 'best-memory-1';
-      return route.fulfill({ status: 200, json: sessionPayload() });
-    }
-    if (url.pathname.endsWith('/pages/best-memory/approve') && method === 'POST') {
-      memoryApproved = true;
-      return route.fulfill({ status: 200, json: sessionPayload() });
-    }
-    if (url.pathname.endsWith('/complete') && method === 'POST') {
+    if (pathname.endsWith('/generation-jobs') && method === 'POST') {
+      generationRequests += 1;
+      generationQueued = true;
       return route.fulfill({
-        status: 200,
+        status: 202,
         json: {
-          session_id: 'syntheticsession',
-          pages: sessionPayload().pages.map((item) => ({
-            page_id: item.id,
-            attempt_id: item.selected_attempt_id,
-          })),
-        },
-      });
-    }
-    if (url.pathname.endsWith('/pdf') && method === 'POST') {
-      pdfExportRequests += 1;
-      if (pdfExportRequests === 1) {
-        return route.fulfill({
-          status: 503,
-          json: {
-            detail: {
-              code: 'approved_page_pdf_failed',
-              message: 'Não foi possível montar o PDF. Tente novamente.',
-            },
-          },
-        });
-      }
-      return route.fulfill({
-        status: 200,
-        json: {
-          session_id: 'syntheticsession',
-          download_url: '/guide-builder/syntheticsession/pdf',
-          filename: 'familia-aurora-minerva-travel.pdf',
-          page_count: 6,
+          job_id: 'syntheticjob',
+          status: 'queued',
+          stage: 'queued',
+          progress: 0,
         },
       });
     }
     return route.abort('failed');
   });
+  await page.route('**/api/jobs/syntheticjob', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        id: 'syntheticjob',
+        status: 'succeeded',
+        stage: 'complete',
+        progress: 100,
+        result: {
+          download_url: '/guide-builder/syntheticsession/pdf',
+          filename: 'familia-aurora-minerva-travel.pdf',
+          page_count: 5,
+        },
+      },
+    }),
+  );
   await page.route('**/guide-builder/syntheticsession/assets/*.png', (route) =>
     route.fulfill({ status: 200, contentType: 'image/png', body: onePixelPng }),
   );
-  await page.route('**/guide-builder/syntheticsession/pdf', (route) => {
-    if (new URL(route.request().url()).pathname.startsWith('/api/')) {
-      return route.fallback();
-    }
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/pdf',
-      headers: {
-        'Content-Disposition': 'attachment; filename="familia-aurora-minerva-travel.pdf"',
-      },
-      body: Buffer.from('%PDF-synthetic'),
-    });
-  });
 
-  const email = `paginas-${test.info().project.name}@example.test`;
+  const email = `capa-${test.info().project.name}@example.test`;
   await authenticateLocalTestUser(page, email, 'Família Aurora');
   await page.goto('/create', { waitUntil: 'domcontentloaded' });
 
-  await page.getByRole('button', { name: 'Começar pelas páginas' }).click();
-  await expect(page.getByText('Nenhuma imagem gerada ainda')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Perfeito! Aqui está o resumo do seu roteiro' })).toBeVisible();
+  await page.getByLabel('Confere: é assim que os nomes devem aparecer no livro.').check();
+  await page.getByRole('button', { name: 'Criar e revisar a capa' }).click();
 
-  await page.getByRole('button', { name: 'Adicionar atividades' }).click();
-  await expect(page.getByRole('heading', { name: 'Atividades do guia' })).toBeVisible();
-  const familyColoringCard = page.locator('article').filter({
-    hasText: 'Família de férias para colorir',
-  });
-  await expect(familyColoringCard).toBeVisible();
-  await familyColoringCard.getByRole('button', { name: /Ver exemplo completo/ }).click();
-  const familyColoringPreview = page.getByRole('dialog').filter({
-    has: page.getByRole('heading', { name: 'Família de férias para colorir' }),
-  });
-  await expect(familyColoringPreview).toBeVisible();
-  const familyPreviewImage = familyColoringPreview.getByAltText(
-    'Exemplo completo da atividade Família de férias para colorir',
+  await expect(page).toHaveURL(/\/create\?builder=syntheticsession$/);
+  await expect(page.getByRole('heading', { name: 'Aprove a capa do seu guia' })).toBeVisible();
+  await expect(page.getByText('Sua capa aparecerá aqui')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Gerar preview da capa' }).click();
+  await expect(page.getByAltText('Preview da capa do guia')).toBeVisible();
+  await page.getByPlaceholder(/use um estilo de livro infantil/).fill(
+    'Deixe o céu mais claro e mantenha as mesmas pessoas.',
   );
-  await expect(familyPreviewImage).toHaveAttribute(
-    'src',
-    '/activity-examples/family-coloring-real.webp',
-  );
-  expect(await familyPreviewImage.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
-  await familyColoringPreview.getByRole('button', { name: 'Close' }).click();
-  const investigatorCard = page.locator('article').filter({ hasText: 'Investigador' });
-  await expect(investigatorCard).toContainText('Cada criança recebe uma pista');
-  await investigatorCard.getByRole('button', { name: /Ver exemplo completo/ }).click();
-  const investigatorPreview = page.getByRole('dialog').filter({
-    has: page.getByRole('heading', { name: 'Investigador' }),
-  });
-  await expect(investigatorPreview).toBeVisible();
-  const investigatorPreviewImage = investigatorPreview.getByAltText(
-    'Exemplo completo da atividade Investigador',
-  );
-  await expect(investigatorPreviewImage).toHaveAttribute(
-    'src',
-    '/activity-examples/investigator-real.webp',
-  );
-  expect(await investigatorPreviewImage.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
-  await investigatorPreview.getByRole('button', { name: 'Close' }).click();
-  const wordSearchCard = page.locator('article').filter({ hasText: 'Caça-palavras' });
-  await wordSearchCard.getByRole('button', { name: /Ver exemplo completo/ }).click();
-  const previewDialog = page.getByRole('dialog').filter({
-    has: page.getByRole('heading', { name: 'Caça-palavras' }),
-  });
-  await expect(previewDialog).toBeVisible();
-  await previewDialog.getByRole('button', { name: 'Close' }).click();
-  await wordSearchCard.getByRole('button', { name: 'Adicionar ao guia' }).click();
-  await expect(page.getByText('Atividade adicionada. Você pode posicioná-la ou gerar quando quiser.')).toBeVisible();
-  await page.getByRole('button', { name: /Organizar páginas/ }).click();
-  const activityPanel = page.getByRole('dialog').filter({
-    has: page.getByRole('heading', { name: 'Atividades do guia' }),
-  });
-  await expect(activityPanel.getByText('Caça-palavras — Torre Eiffel', { exact: true })).toBeVisible();
-  await expect(activityPanel.getByLabel('Inserir Caça-palavras — Torre Eiffel depois de')).toBeVisible();
-  const panelAccessibility = await new AxeBuilder({ page })
-    .include('[role="dialog"]')
+  await page.getByRole('button', { name: 'Gerar nova versão' }).click();
+  await expect(page.getByAltText('Preview da capa do guia')).toBeVisible();
+  expect(revisionRequests).toEqual([
+    '',
+    'Deixe o céu mais claro e mantenha as mesmas pessoas.',
+  ]);
+
+  await page.getByRole('button', { name: 'Aprovar esta capa' }).click();
+  await expect(page.getByRole('heading', { name: 'Capa aprovada' })).toBeVisible();
+  await page.getByRole('button', { name: 'Criar guia completo' }).click();
+  await expect(page.getByRole('heading', { name: 'Guia pronto e enviado' })).toBeVisible();
+
+  expect(builderCreates).toBe(1);
+  expect(generationRequests).toBe(1);
+  const accessibility = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa'])
     .analyze();
-  expect(panelAccessibility.violations).toEqual([]);
-  await activityPanel.getByRole('button', { name: 'Close' }).click();
+  expect(accessibility.violations).toEqual([]);
 
-  await page.getByRole('button', { name: /Torre Eiffel, França/ }).click();
-  await page.getByRole('button', { name: 'Gerar página' }).click();
-  await expect(page.getByRole('button', { name: 'Gerando esta página...' })).toBeVisible();
-  await page.getByRole('button', { name: /Capa da família/ }).click();
-  await page.getByRole('button', { name: 'Gerar página' }).click();
-  await expect(page.getByAltText('Versão escolhida de Capa da família')).toBeVisible();
-  await page.getByRole('button', { name: /Torre Eiffel, França/ }).click();
-  await expect(page.getByAltText('Versão escolhida de Torre Eiffel, França')).toBeVisible();
-  await expect(page.getByText('Sem família', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /Capa da família/ }).click();
-  const revisionField = page.getByLabel('O que você quer mudar nesta versão?');
-  await expect(revisionField).toBeVisible();
-  await revisionField.fill('Mude para animação 3D, com tons azuis e título menor.');
-  await page.getByRole('button', { name: 'Gerar versão com ajustes' }).click();
-  await expect(page.getByText('Versão 2', { exact: true })).toBeVisible();
-  await expect(revisionField).toHaveValue('');
-  expect(coverRevisionRequests).toEqual([
-    '',
-    'Mude para animação 3D, com tons azuis e título menor.',
-  ]);
-  rejectNextCoverRevision = true;
-  await revisionField.fill('Troque apenas o fundo por uma cena noturna.');
-  await page.getByRole('button', { name: 'Gerar versão com ajustes' }).click();
-  await expect(page.getByText('Falha simulada ao refazer a capa.')).toBeVisible();
-  await expect(revisionField).toHaveValue('Troque apenas o fundo por uma cena noturna.');
-  expect(coverRevisionRequests.at(-1)).toBe(
-    'Troque apenas o fundo por uma cena noturna.',
-  );
-  expect(consoleErrors.some((message) => message.includes('502 (Bad Gateway)'))).toBe(true);
-  consoleErrors.length = 0;
-  await page.locator('button').filter({ hasText: 'Versão 1' }).click();
-  await page.getByRole('button', { name: 'Aprovar página' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Nosso roteiro ilustrado' })).toBeVisible();
-  await expect(page.getByText('Torre Eiffel', { exact: true })).toBeVisible();
-  await expect(page.getByText('Coliseu', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Gerar página' }).click();
-  await page.getByRole('button', { name: 'Aprovar página' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Torre Eiffel, França' })).toBeVisible();
-  const includeFamilySwitch = page.getByRole('switch', { name: 'Incluir família' });
-  await expect(includeFamilySwitch).not.toBeChecked();
-  await expect(page.getByText('Sem família', { exact: true })).toBeVisible();
-  await includeFamilySwitch.click();
-  await expect(includeFamilySwitch).toBeChecked();
-  await page.getByRole('button', { name: 'Gerar outra versão' }).click();
-  await expect(page.getByText('Com família', { exact: true })).toBeVisible();
-  expect(landmarkFamilyRequests).toEqual([false, true]);
-  await page.getByRole('button', { name: 'Aprovar página' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Página para colorir — Torre Eiffel' })).toBeVisible();
-  await expect(page.getByText('Ligada a Torre Eiffel')).toBeVisible();
-  await expect(page.getByRole('switch', { name: 'Incluir família' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Gerar página' }).click();
-  await page.getByRole('button', { name: 'Aprovar página' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Caça-palavras — Torre Eiffel' })).toBeVisible();
-  await expect(page.getByRole('switch', { name: 'Incluir família' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Gerar página' }).click();
-  await page.getByRole('button', { name: 'Aprovar página' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Minha melhor memória' })).toBeVisible();
-  await expect(page.locator('section span').getByText('Página obrigatória', { exact: true })).toBeVisible();
-  await expect(page.getByRole('switch', { name: 'Incluir família' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Gerar página' }).click();
-  await page.getByRole('button', { name: 'Aprovar página' }).click();
-  expect(activityRequestBodies).toHaveLength(3);
-  expect(activityRequestBodies.every((body) => body.include_family === false)).toBe(true);
-  await page.getByRole('button', { name: 'Ver páginas aprovadas' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Páginas aprovadas!' })).toBeVisible();
-  await page.getByRole('button', { name: 'Gerar PDF e baixar' }).click();
-  await expect(page.getByRole('alert')).toContainText('Não foi possível montar o PDF.');
-  const firstDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Gerar PDF e baixar' }).click();
-  expect((await firstDownload).suggestedFilename()).toBe('familia-aurora-minerva-travel.pdf');
-  await expect(page.getByText('PDF pronto com 6 páginas.')).toBeVisible();
-  const secondDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Baixar PDF novamente' }).click();
-  expect((await secondDownload).suggestedFilename()).toBe('familia-aurora-minerva-travel.pdf');
-  expect(pdfExportRequests).toBe(3);
-  expect(consoleErrors).toEqual([
-    expect.stringContaining('503 (Service Unavailable)'),
-  ]);
   await test.info().attach(`progressive-guide-${test.info().project.name}`, {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',

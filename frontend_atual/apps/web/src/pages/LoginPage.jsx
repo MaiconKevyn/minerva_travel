@@ -5,8 +5,7 @@ import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import Header from '@/components/Header.jsx';
-import { Airplane, Flower } from '@/components/DecorativeElements.jsx';
+import AuthTravelShell from '@/components/AuthTravelShell.jsx';
 import { Eye, EyeOff, Loader2, Key } from 'lucide-react';
 
 const LoginPage = () => {
@@ -69,28 +68,24 @@ const LoginPage = () => {
         <meta name="description" content="Faça login para acessar seus guias de viagem mágicos." />
       </Helmet>
 
-      <div className="min-h-screen bg-background flex flex-col transition-colors duration-200">
-        <Header />
-
-        <main id="main-content" tabIndex={-1} className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
-          <Flower className="absolute bottom-20 left-10 w-32 h-32 text-secondary opacity-10" />
-          <Airplane className="absolute top-20 right-20 w-24 h-24 text-primary opacity-10" />
-
-          <div className="w-full max-w-md bg-card dark:bg-slate-800 rounded-[40px] p-8 md:p-10 shadow-xl border-4 border-secondary/10 dark:border-slate-700 relative z-10 transition-colors duration-200">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary/10 mb-4">
-                <Key className="w-8 h-8 text-secondary" />
+      <AuthTravelShell
+        eyebrow="Passaporte da família"
+        title={signupReason ? 'Sua conta está pronta!' : 'Bem-vindo de volta!'}
+        description={signupReason === 'confirm-email'
+          ? 'Confirme o e-mail que enviamos e entre para começar.'
+          : signupReason === 'signed-up'
+            ? 'Entre com a senha que você acabou de criar.'
+            : 'Abra sua estante de viagens e continue de onde parou.'}
+        note="As próximas páginas da aventura já estão esperando por vocês."
+      >
+            <div className="mb-7 flex items-center gap-3 border-b-2 border-dashed border-secondary/20 pb-5">
+              <div className="flex h-12 w-12 -rotate-2 items-center justify-center rounded-[0.8rem_1.1rem_0.8rem_1.2rem] bg-secondary/10">
+                <Key className="h-6 w-6 text-secondary" aria-hidden="true" />
               </div>
-              <h1 className="text-3xl font-serif font-bold text-foreground mb-2">
-                {signupReason ? 'Sua conta está pronta!' : 'Bem-vindo de Volta!'}
-              </h1>
-              <p className="text-muted-foreground font-medium">
-                {signupReason === 'confirm-email'
-                  ? 'Confirme o e-mail que enviamos e entre para começar.'
-                  : signupReason === 'signed-up'
-                    ? 'Entre com a senha que você acabou de criar.'
-                    : 'Suas próximas aventuras aguardam.'}
-              </p>
+              <div>
+                <p className="font-hand text-xl font-bold text-secondary">Carimbe sua entrada</p>
+                <p className="font-ui text-sm text-muted-foreground">Seus guias ficam guardados com segurança.</p>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -103,7 +98,7 @@ const LoginPage = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
+                  className="font-ui w-full rounded-xl border-2 border-secondary/20 bg-background px-4 py-3 text-foreground outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/20"
                   placeholder="seu@email.com"
                 />
               </div>
@@ -128,7 +123,7 @@ const LoginPage = () => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 pr-14 rounded-2xl border-2 border-border bg-background focus:border-secondary focus:ring-4 focus:ring-secondary/20 outline-none transition-all text-foreground"
+                    className="font-ui w-full rounded-xl border-2 border-secondary/20 bg-background px-4 py-3 pr-14 text-foreground outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/20"
                     placeholder="••••••••"
                   />
                   <button
@@ -146,7 +141,7 @@ const LoginPage = () => {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full rounded-2xl py-6 bg-secondary hover:bg-secondary/90 text-white font-bold text-lg shadow-lg hover:-translate-y-1 transition-all mt-4"
+                className="travel-cta mt-4 w-full py-6 text-lg font-bold"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-6 h-6 animate-spin" />
@@ -164,9 +159,7 @@ const LoginPage = () => {
                 </Link>
               </p>
             </div>
-          </div>
-        </main>
-      </div>
+      </AuthTravelShell>
     </>
   );
 };

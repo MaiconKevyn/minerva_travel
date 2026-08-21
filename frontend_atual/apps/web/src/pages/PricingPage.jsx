@@ -1,13 +1,44 @@
-
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, Heart, ShieldCheck, Sparkles, ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Check, Heart, ShieldCheck, Sparkles, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
-import { Flower, Airplane } from '@/components/DecorativeElements.jsx';
+import {
+  CompassRose,
+  LeafSprig,
+  PassportStamp,
+  RouteDoodle,
+} from '@/components/DecorativeElements.jsx';
+import SiteFooter from '@/components/SiteFooter.jsx';
 import { formatPrice, getGuideProduct } from '@/utils/minerva-api.js';
+
+const FEATURES = [
+  'Livro infantil personalizado em PDF A4',
+  'Roteiro ilustrado na ordem da viagem',
+  'Atividades calibradas para cada idade',
+  'Foto familiar transformada em capa ilustrada',
+  'Download privado do guia completo',
+];
+
+const TRUST_NOTES = [
+  {
+    icon: ShieldCheck,
+    title: 'Pagamento fora do nosso site',
+    description: 'Os dados financeiros são informados no ambiente seguro do Mercado Pago.',
+  },
+  {
+    icon: Star,
+    title: 'Uma compra, um livro completo',
+    description: 'Sem mensalidade: o valor corresponde ao guia personalizado desta viagem.',
+  },
+  {
+    icon: Heart,
+    title: 'A foto continua sendo da família',
+    description: 'Uso consentido para criar a capa, com exclusão e privacidade explícitas.',
+  },
+];
 
 const PricingPage = () => {
   const [guideProduct, setGuideProduct] = useState(null);
@@ -26,13 +57,6 @@ const PricingPage = () => {
   const price = checkoutEnabled
     ? formatPrice(guideProduct.amount_minor, guideProduct.currency)
     : null;
-  const features = [
-    "Diário infantil em PDF A4",
-    "Roteiro confirmado e atividades por fase",
-    "Uma foto familiar sanitizada para a capa",
-    "Créditos de imagens licenciadas",
-    "Download privado com expiração"
-  ];
 
   return (
     <>
@@ -41,162 +65,137 @@ const PricingPage = () => {
         <meta name="description" content="Conheça o conteúdo e o valor do guia personalizado da Minerva Travel." />
       </Helmet>
 
-      <div className="min-h-screen flex flex-col bg-background transition-colors duration-200">
+      <div className="flex min-h-screen flex-col bg-background transition-colors duration-200">
         <Header />
 
-        <main id="main-content" tabIndex={-1} className="flex-1 relative overflow-hidden py-16 lg:py-24">
-          {/* Decorative Background Elements */}
-          <Flower className="absolute top-20 left-10 w-32 h-32 text-primary opacity-10 transform -rotate-12" />
-          <Airplane className="absolute bottom-40 right-10 w-24 h-24 text-secondary opacity-10 transform rotate-12" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+        <main id="main-content" tabIndex={-1} className="flex-1">
+          <section className="travel-page storybook-sky storybook-grid relative overflow-hidden border-b border-secondary/10 py-16 lg:py-24">
+            <CompassRose className="page-corner -right-5 top-8 rotate-12" />
+            <LeafSprig className="page-corner -bottom-8 -left-5 -rotate-12 text-secondary" />
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-
-            {/* Header Section */}
-            <div className="text-center max-w-3xl mx-auto mb-16">
+            <div className="guide-shell relative z-10">
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
+                className="mx-auto max-w-3xl text-center"
               >
-                <span className="text-secondary font-bold tracking-widest uppercase text-sm mb-4 block">
+                <span className="travel-label -rotate-1">
                   {checkoutEnabled ? 'Compra única' : 'Piloto controlado'}
                 </span>
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground mb-6 text-balance">
-                  Seu guia de memórias personalizado
+                <h1 className="mt-5 text-4xl font-serif font-bold leading-[1] tracking-[-0.03em] text-secondary md:text-6xl">
+                  Um livro inteiro para esta viagem
                 </h1>
-                <p className="text-xl text-muted-foreground font-medium text-balance">
-                  {checkoutEnabled
-                    ? 'Pague uma vez pelo guia completo. O checkout seguro aceita os meios disponibilizados pelo Mercado Pago.'
-                    : 'O checkout permanece desativado neste ambiente enquanto concluímos a homologação.'}
+                <p className="editorial-copy mx-auto mt-5 max-w-2xl text-foreground/70">
+                  Não é assinatura nem pacote de créditos. Você paga uma vez e recebe o guia de
+                  memórias personalizado da sua família, pronto para imprimir.
                 </p>
               </motion.div>
+
+              <div className="mx-auto mt-14 grid max-w-5xl items-center gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:gap-16">
+                <motion.div
+                  initial={{ opacity: 0, x: -18, rotate: -2 }}
+                  animate={{ opacity: 1, x: 0, rotate: -1.5 }}
+                  transition={{ duration: 0.62, delay: 0.08 }}
+                  className="relative mx-auto w-full max-w-[21rem]"
+                >
+                  <div className="page-frame p-2">
+                    <img
+                      src="/activity-examples/cover-sample.webp"
+                      alt="Capa ilustrada de exemplo do Guia de Memórias"
+                      width="1024"
+                      height="1536"
+                      className="aspect-[2/3] w-full object-cover"
+                    />
+                  </div>
+                  <PassportStamp className="absolute -bottom-9 -right-8 h-28 w-28 rotate-[-8deg] text-primary/65" />
+                  <p className="travel-note absolute -left-12 top-1/3 hidden -rotate-6 sm:block">feito só para vocês</p>
+                </motion.div>
+
+                <motion.article
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.58, delay: 0.12 }}
+                  className="travel-card travel-card-pink overflow-hidden p-7 sm:p-9"
+                  aria-labelledby="produto-guia-title"
+                >
+                  <RouteDoodle className="pointer-events-none absolute -right-5 top-1 h-20 w-44 rotate-6 text-secondary/20" />
+
+                  <div className="relative z-10 flex flex-col gap-7">
+                    <div className="flex items-start justify-between gap-5">
+                      <div>
+                        <p className="font-ui text-xs font-extrabold uppercase tracking-[0.2em] text-primary">
+                          Bilhete da aventura
+                        </p>
+                        <h2 id="produto-guia-title" className="mt-2 text-3xl font-serif font-bold text-secondary sm:text-4xl">
+                          Guia de Memórias personalizado
+                        </h2>
+                      </div>
+                      <span className="flex h-12 w-12 shrink-0 rotate-3 items-center justify-center rounded-[0.7rem_1rem_0.75rem_1.15rem] bg-primary/10 text-primary">
+                        <Sparkles className="h-6 w-6" aria-hidden="true" />
+                      </span>
+                    </div>
+
+                    <div className="border-y-2 border-dashed border-secondary/20 py-6">
+                      <p className="font-ui text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Valor do guia completo</p>
+                      <p className="mt-1 text-4xl font-serif font-bold text-secondary">
+                        {checkoutEnabled ? price : 'Sem cobrança ativa'}
+                      </p>
+                      <p className="font-ui mt-2 text-sm font-medium text-muted-foreground">
+                        {checkoutEnabled
+                          ? 'Pagamento único por este guia, processado pelo Mercado Pago.'
+                          : 'O preço aparece aqui assim que o checkout deste ambiente for ativado.'}
+                      </p>
+                    </div>
+
+                    <ul className="grid gap-3 sm:grid-cols-2">
+                      {FEATURES.map((feature) => (
+                        <li key={feature} className="flex items-start gap-2.5 text-foreground/90">
+                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+                            <Check className="h-3 w-3" aria-hidden="true" />
+                          </span>
+                          <span className="leading-snug">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button asChild size="lg" className="travel-cta group h-auto w-full px-7 py-4 text-base font-bold sm:text-lg">
+                      <Link to="/create">
+                        {checkoutEnabled ? 'Criar e comprar meu guia' : 'Criar um guia de teste'}
+                        <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                      </Link>
+                    </Button>
+                  </div>
+                </motion.article>
+              </div>
             </div>
+          </section>
 
-            {/* Pricing Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="max-w-lg mx-auto"
-            >
-              <div className="relative bg-card rounded-[2.5rem] p-8 md:p-12 shadow-2xl border-4 border-primary/10 overflow-hidden group hover:border-primary/30 transition-colors duration-500">
-                {/* Card Background Accent */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-secondary/10 rounded-full blur-3xl -mr-20 -mt-20 transition-transform duration-500 group-hover:scale-110" />
+          <section className="travel-page storybook-paper py-16 sm:py-20" aria-labelledby="compra-segura-title">
+            <div className="guide-shell">
+              <div className="mx-auto max-w-2xl text-center">
+                <span className="travel-label">Antes de embarcar</span>
+                <h2 id="compra-segura-title" className="mt-4 text-3xl font-serif font-bold text-secondary sm:text-4xl">
+                  Simples para comprar. Especial para guardar.
+                </h2>
+              </div>
 
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-8">
-                    <div>
-                      <h2 className="text-3xl font-serif font-bold text-foreground mb-2">Guia Personalizado</h2>
-                      <p className="text-muted-foreground font-medium">Crie seu guia personalizado para a família</p>
+              <div className="mt-10 grid gap-5 md:grid-cols-3">
+                {TRUST_NOTES.map(({ icon: Icon, title, description }, index) => (
+                  <article key={title} className={`travel-card p-6 ${index === 1 ? 'travel-card-blue md:-translate-y-3' : 'travel-card-pink'}`}>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary/10 text-secondary">
+                      <Icon className="h-5 w-5" aria-hidden="true" />
                     </div>
-                    <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0 transform rotate-3">
-                      <Sparkles className="w-8 h-8 text-primary" />
-                    </div>
-                  </div>
-
-                  <div className="mb-8 rounded-2xl border border-secondary/30 bg-secondary/10 p-5 text-foreground">
-                    <span className="block text-2xl font-extrabold tracking-tight">
-                      {checkoutEnabled ? price : 'Sem cobrança ativa'}
-                    </span>
-                    <span className="mt-1 block text-sm text-muted-foreground font-medium">
-                      {checkoutEnabled
-                        ? 'Pagamento único por este guia, processado pelo Mercado Pago.'
-                        : 'O preço aparece aqui assim que o checkout deste ambiente for ativado.'}
-                    </span>
-                  </div>
-
-                  <div className="space-y-5 mb-10">
-                    {features.map((feature, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.4, delay: 0.3 + (index * 0.1) }}
-                        className="flex items-start gap-4"
-                      >
-                        <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <Check className="w-4 h-4 text-secondary" />
-                        </div>
-                        <span className="text-foreground/90 font-medium">{feature}</span>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  <Button
-                    asChild
-                    size="lg"
-                    className="w-full rounded-full text-lg py-7 bg-primary hover:bg-primary/90 text-white shadow-[0_8px_30px_rgb(232,122,93,0.3)] hover:shadow-[0_8px_40px_rgb(232,122,93,0.4)] transition-all duration-300 hover:-translate-y-1 group"
-                  >
-                    <Link to="/create">
-                      {checkoutEnabled ? 'Criar e comprar meu guia' : 'Criar um guia de teste'}
-                      <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                  </Button>
-                </div>
+                    <h3 className="mt-4 text-xl font-serif font-bold text-secondary">{title}</h3>
+                    <p className="mt-2 leading-relaxed text-foreground/70">{description}</p>
+                  </article>
+                ))}
               </div>
-            </motion.div>
-
-            {/* Trust Signals */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.6 }}
-              className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto text-center"
-            >
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-                  <ShieldCheck className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="font-bold text-foreground">
-                  {checkoutEnabled ? 'Checkout Mercado Pago' : 'Piloto sem pagamento'}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {checkoutEnabled
-                    ? 'Os dados financeiros são informados no ambiente seguro do Mercado Pago.'
-                    : 'Nenhum cartão ou dado financeiro é solicitado.'}
-                </p>
-              </div>
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-                  <Star className="w-6 h-6 text-secondary" />
-                </div>
-                <h3 className="font-bold text-foreground">PDF A4 verificável</h3>
-                <p className="text-sm text-muted-foreground">Roteiro, atividades, créditos e download privado.</p>
-              </div>
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-                  <Heart className="w-6 h-6 text-accent" />
-                </div>
-                <h3 className="font-bold text-foreground">Privacidade explícita</h3>
-                <p className="text-sm text-muted-foreground">Consentimento, sanitização da foto e exclusão do guia.</p>
-              </div>
-            </motion.div>
-
-          </div>
+            </div>
+          </section>
         </main>
 
-        {/* Footer */}
-        <footer className="bg-muted py-12 border-t border-border mt-auto relative overflow-hidden transition-colors duration-200">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\' opacity=\'0.02\'/%3E%3C/svg%3E')] opacity-50"></div>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-card rounded-xl shadow-sm flex items-center justify-center">
-                  <Heart className="w-5 h-5 text-primary" />
-                </div>
-                <span className="font-serif font-bold text-xl text-foreground">Minerva Travel</span>
-              </div>
-              <div className="flex gap-8 text-sm font-medium">
-                <Link className="text-muted-foreground hover:text-foreground transition-colors" to="/privacy">Política de Privacidade</Link>
-                <Link className="text-muted-foreground hover:text-foreground transition-colors" to="/terms">Termos de Uso</Link>
-              </div>
-              <p className="text-sm text-muted-foreground font-medium">
-                © 2026 Minerva Travel · Projeto em piloto
-              </p>
-            </div>
-          </div>
-        </footer>
+        <SiteFooter />
       </div>
     </>
   );

@@ -26,8 +26,10 @@ const QUESTIONS = [
     question: 'Preciso mandar uma foto da família?',
     answer: (
       <>
-        Sim — é dela que nasce a capa ilustrada. A foto é processada só para gerar a ilustração,
-        não é usada para treinar modelos e você autoriza esse uso explicitamente antes de enviar.
+        Não. A foto é opcional: com ela, a família pode inspirar a capa ilustrada; sem ela,
+        criamos a composição a partir do roteiro e dos destinos. Se você enviar uma foto, ela é
+        processada só para gerar a ilustração, não é usada para treinar modelos e esse uso depende
+        da sua autorização explícita.
         Os detalhes estão na{' '}
         <Link className="font-bold text-primary underline underline-offset-4" to="/privacy">
           política de privacidade
@@ -42,9 +44,9 @@ const QUESTIONS = [
       'As atividades começam aos 4 anos e vão até a adolescência. Você informa a idade de cada criança e a dificuldade é calibrada a partir dela — o mesmo labirinto sai maior para quem tem 11 do que para quem tem 5.',
   },
   {
-    question: 'E se eu não gostar de uma página?',
+    question: 'E se eu não gostar da capa?',
     answer:
-      'Nenhuma página entra no livro sem a sua aprovação. Você acompanha cada uma sendo ilustrada, pede outra versão quantas vezes quiser e só depois fecha o PDF.',
+      'Você pode gerar outra versão da capa antes de aprová-la. Depois da aprovação, as demais páginas são criadas em segundo plano e o guia pronto aparece na sua biblioteca e chega por e-mail.',
   },
   {
     question: 'O guia fala sobre o idioma do país?',
@@ -66,7 +68,7 @@ const QUESTIONS = [
 ];
 
 const HomeFaq = () => (
-  <section className="border-t border-border/50 py-20 sm:py-24" aria-labelledby="faq-title">
+  <section className="travel-page storybook-sky border-t border-secondary/10 py-20 sm:py-24" aria-labelledby="faq-title">
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
       <GuideLockup id="faq-title" overline="Antes de começar" title="Perguntas que todo pai faz" />
 
@@ -74,7 +76,7 @@ const HomeFaq = () => (
         {QUESTIONS.map((item) => (
           <details
             key={item.question}
-            className="group rounded-3xl border border-border/50 bg-card px-6 py-1 transition-colors open:border-primary/40"
+            className="group travel-card overflow-hidden px-6 py-1 transition-colors open:border-primary/40"
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-serif text-lg font-bold text-foreground marker:content-none">
               {item.question}
@@ -83,7 +85,7 @@ const HomeFaq = () => (
                 aria-hidden="true"
               />
             </summary>
-            <p className="pb-5 pr-9 text-base font-medium leading-relaxed text-muted-foreground">
+            <p className="editorial-copy pb-5 pr-9 text-base text-foreground/70">
               {item.answer}
             </p>
           </details>

@@ -93,11 +93,11 @@ export function GuideLockup({ overline, title, arched, id, className = '' }) {
   return (
     <div className={`mx-auto max-w-2xl text-center ${className}`}>
       {overline ? (
-        <p className="font-serif text-sm font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-          {overline}
-        </p>
+        <div className="flex justify-center">
+          <p className="travel-label rotate-[-0.7deg]">{overline}</p>
+        </div>
       ) : null}
-      <h2 id={id} className="mt-3 text-3xl font-serif font-bold text-foreground sm:text-4xl">
+      <h2 id={id} className="mt-4 text-3xl font-serif font-bold leading-[1.05] tracking-[-0.025em] text-secondary sm:text-5xl">
         {title}
       </h2>
       {arched ? (

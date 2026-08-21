@@ -28,11 +28,15 @@ export default defineConfig({
       name: 'mobile-chromium',
       use: { ...devices['Pixel 7'] },
     },
+    {
+      name: 'tablet-chromium',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 768, height: 1024 } },
+    },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${port}`,
+        command: `npm exec -- vite --host 127.0.0.1 --port ${port}`,
         env: {
           ...process.env,
           VITE_AUTH_MODE: 'local',

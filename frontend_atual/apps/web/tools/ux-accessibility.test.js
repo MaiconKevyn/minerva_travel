@@ -27,6 +27,7 @@ test('header exposes an accessible logo and mobile navigation state', () => {
 test('family validation uses the mounted Sonner toaster and accessible inline feedback', () => {
   const app = readProjectFile('src/App.jsx');
   const familyStep = readProjectFile('src/components/EnhancedStep5FamilyDetails.jsx');
+  const styles = readProjectFile('src/index.css');
 
   assert.match(app, /import \{ Toaster \} from 'sonner';/);
   assert.match(app, /<Toaster/);
@@ -38,6 +39,8 @@ test('family validation uses the mounted Sonner toaster and accessible inline fe
   assert.match(familyStep, /aria-live="assertive"/);
   assert.match(familyStep, /aria-describedby=/);
   assert.match(familyStep, /document\.getElementById\(focusTargetId\)\?\.focus\(\)/);
+  assert.match(styles, /\[data-sonner-toast\]\[data-visible='false'\]/);
+  assert.match(styles, /visibility: hidden/);
 });
 
 test('destination additions no longer derive IDs from the current list length', () => {

@@ -46,7 +46,6 @@ const LandmarkCard = ({
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-50px" }}
         transition={{ duration: 0.4, delay: index * 0.1 }}
-        onClick={() => isSelectionMode && onToggle(data.id)}
         className={cn(
           "group relative rounded-3xl overflow-hidden transition-all duration-300 border bg-card dark:bg-slate-800 flex flex-col h-full",
           isSelectionMode ? "cursor-pointer" : "cursor-default",
@@ -61,12 +60,24 @@ const LandmarkCard = ({
                   : "border-border/60 dark:border-slate-700 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-primary/30"
         )}
       >
+        {isSelectionMode ? (
+          <button
+            type="button"
+            onClick={() => onToggle(data.id)}
+            aria-label={`${isSelected ? 'Remover' : 'Adicionar'} ${data.name} ${isSelected ? 'do' : 'ao'} guia`}
+            aria-pressed={isSelected}
+            className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-ring/45"
+          />
+        ) : null}
+
         {/* Top Image Header */}
         <div className="relative w-full h-56 overflow-hidden bg-muted">
           {data.image ? (
             <img
               src={data.image}
               alt={data.name}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
           ) : (
@@ -84,7 +95,7 @@ const LandmarkCard = ({
               title={`Ver ${data.name} no mapa`}
               aria-label={`Ver ${data.name} no mapa`}
               onClick={openEmbeddedMap}
-              className="absolute left-4 top-4 z-10 h-9 w-9 rounded-full bg-background/85 text-secondary shadow-sm backdrop-blur-sm border border-white/40 flex items-center justify-center transition-all hover:bg-background hover:text-primary hover:scale-105"
+              className="absolute left-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-background/85 text-secondary shadow-sm backdrop-blur-sm transition-all hover:scale-105 hover:bg-background hover:text-primary"
             >
               <MapIcon className="h-4 w-4" />
             </button>
@@ -96,14 +107,14 @@ const LandmarkCard = ({
               title={`Abrir ${data.name} no mapa`}
               aria-label={`Abrir ${data.name} no mapa`}
               onClick={(event) => event.stopPropagation()}
-              className="absolute left-4 top-4 z-10 h-9 w-9 rounded-full bg-background/85 text-secondary shadow-sm backdrop-blur-sm border border-white/40 flex items-center justify-center transition-all hover:bg-background hover:text-primary hover:scale-105"
+              className="absolute left-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-background/85 text-secondary shadow-sm backdrop-blur-sm transition-all hover:scale-105 hover:bg-background hover:text-primary"
             >
               <MapIcon className="h-4 w-4" />
             </a>
           ) : null}
 
         {photoAttribution && (
-          <div className="absolute left-3 bottom-3 z-10 max-w-[calc(100%-1.5rem)] rounded-full bg-black/55 backdrop-blur-sm px-3 py-1 text-[10px] font-medium text-white/90">
+          <div className="absolute bottom-3 left-3 z-20 max-w-[calc(100%-1.5rem)] rounded-full bg-black/55 px-3 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm">
             Foto:{' '}
             {photoAttribution.uri ? (
               <a
@@ -130,7 +141,7 @@ const LandmarkCard = ({
 
         {/* Checkbox Indicator (Selection Mode) */}
         {isSelectionMode && (
-          <div className="absolute top-4 right-4 z-10">
+          <div className="pointer-events-none absolute right-4 top-4 z-20">
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm border-2",
               isSelected

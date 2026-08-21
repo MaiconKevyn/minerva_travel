@@ -3,11 +3,15 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle,
+  ArrowRight,
   BookOpen,
   CalendarDays,
   ChevronDown,
+  CircleCheck,
+  Clock3,
   Download,
   Loader2,
+  Mail,
   MapPin,
   RefreshCw,
   Settings,
@@ -15,7 +19,12 @@ import {
 } from 'lucide-react';
 import Header from '@/components/Header.jsx';
 import GuideCover from '@/components/GuideCover.jsx';
-import { Suitcase } from '@/components/DecorativeElements.jsx';
+import {
+  CompassRose,
+  LeafSprig,
+  RouteDoodle,
+  Suitcase,
+} from '@/components/DecorativeElements.jsx';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import {
@@ -222,6 +231,21 @@ const DashboardPage = () => {
     }
   };
 
+  const readyGuideCount = guides.filter((guide) => guide.status === 'succeeded').length;
+  const activeJobCount = generationJobs.filter((job) => (
+    ['queued', 'running'].includes(job.status)
+  )).length;
+  const hasFailedJob = generationJobs.some((job) => job.status === 'failed');
+  const nextAction = loading
+    ? 'Organizando a estante'
+    : activeJobCount > 0
+      ? 'Acompanhe a criação'
+      : hasFailedJob
+        ? 'Revise a criação interrompida'
+        : readyGuideCount > 0
+          ? 'Planeje outra viagem'
+          : 'Crie o primeiro guia';
+
   return (
     <>
       <Helmet>
@@ -231,54 +255,105 @@ const DashboardPage = () => {
       <div className="min-h-screen bg-background flex flex-col transition-colors duration-200">
         <Header />
 
-        <main id="main-content" tabIndex={-1} className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
-          <div className="flex items-center gap-4 mb-12">
-            <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center">
-              <span className="text-3xl font-serif text-primary" aria-hidden="true">
-                {user?.name?.charAt(0)?.toUpperCase() || 'F'}
-              </span>
-            </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
-                Olá, {user?.name || 'Viajante'}!
-              </h1>
-              <p className="text-muted-foreground font-medium">Pronto para a próxima aventura?</p>
-            </div>
-          </div>
+        <main id="main-content" tabIndex={-1} className="travel-page storybook-paper relative flex-1 overflow-hidden px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+          <CompassRose className="page-corner -right-6 top-20 rotate-12" />
+          <LeafSprig className="page-corner -bottom-12 -left-8 -rotate-12 text-secondary" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <aside className="lg:col-span-1 space-y-8" aria-label="Dados da conta">
-              <div className="bg-card dark:bg-slate-800 rounded-[32px] p-6 shadow-md border-2 border-border/50 dark:border-slate-700 relative overflow-hidden transition-colors duration-200">
-                <div aria-hidden="true">
-                  <Suitcase className="absolute -bottom-4 -right-4 w-24 h-24 text-accent opacity-10" />
+          <div className="guide-shell relative z-10">
+            <section
+              className="travel-card storybook-sky relative overflow-hidden p-6 sm:p-8 lg:p-10"
+              aria-labelledby="dashboard-welcome-title"
+            >
+              <Suitcase className="pointer-events-none absolute -bottom-7 -right-5 h-32 w-32 rotate-6 text-accent opacity-20 sm:h-40 sm:w-40" />
+              <div className="relative flex flex-col items-start justify-between gap-7 lg:flex-row lg:items-center">
+                <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+                  <div className="flex h-14 w-14 shrink-0 -rotate-2 items-center justify-center rounded-[1rem_1.35rem_0.9rem_1.2rem] border-2 border-primary/20 bg-[hsl(var(--blush))] shadow-sm sm:h-20 sm:w-20">
+                    <span className="font-serif text-2xl text-primary sm:text-4xl" aria-hidden="true">
+                      {user?.name?.charAt(0)?.toUpperCase() || 'F'}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="travel-label mb-2 -rotate-1">Diário da família</span>
+                    <h1 id="dashboard-welcome-title" className="font-serif text-2xl font-bold text-secondary sm:text-4xl md:text-5xl">
+                      Olá, {user?.name || 'Viajante'}!
+                    </h1>
+                    <p className="editorial-copy mt-2 max-w-xl text-sm text-foreground/70 sm:text-base">
+                      Seus livros, lembranças e próximas aventuras moram aqui.
+                    </p>
+                  </div>
                 </div>
-
-                <h2 className="text-xl font-bold font-serif flex items-center gap-2 text-foreground mb-6">
-                  <Settings className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
-                  Seus dados
-                </h2>
-
-                <dl className="space-y-4">
-                  <div>
-                    <dt className="text-xs font-bold text-muted-foreground uppercase">Nome</dt>
-                    <dd className="font-medium text-foreground">{user?.name || 'Não informado'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-bold text-muted-foreground uppercase">Email</dt>
-                    <dd className="font-medium text-foreground break-words">{user?.email || 'Não informado'}</dd>
-                  </div>
-                </dl>
-              </div>
-            </aside>
-
-            <section className="lg:col-span-2" aria-labelledby="dashboard-guides-title">
-              <div className="flex items-center justify-between gap-4 mb-6">
-                <h2 id="dashboard-guides-title" className="text-2xl font-serif font-bold text-foreground">
-                  Seus Livros de Viagem
-                </h2>
-                <Button asChild className="rounded-full bg-secondary hover:bg-secondary/90 text-white shadow-md">
-                  <Link to="/create">Novo Guia</Link>
+                <Button asChild className="travel-cta w-full shrink-0 px-6 font-bold sm:w-auto">
+                  <Link to="/create">
+                    Criar novo guia
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
                 </Button>
+              </div>
+            </section>
+
+            <section className="mt-5 grid gap-4 sm:grid-cols-3" aria-label="Resumo da biblioteca">
+              <article className="travel-card flex items-center gap-4 p-5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700">
+                  <CircleCheck className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-2xl font-black text-secondary">{loading ? '—' : readyGuideCount}</p>
+                  <p className="text-sm font-bold text-muted-foreground">Na estante</p>
+                </div>
+              </article>
+              <article className="travel-card flex items-center gap-4 p-5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary/15 text-secondary">
+                  <Clock3 className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-2xl font-black text-secondary">{loading ? '—' : activeJobCount}</p>
+                  <p className="text-sm font-bold text-muted-foreground">Em criação</p>
+                </div>
+              </article>
+              <article className="travel-card storybook-blush flex items-center gap-4 p-5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <ArrowRight className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">Próximo passo</p>
+                  <p className="mt-1 font-serif text-base font-bold text-foreground">{nextAction}</p>
+                </div>
+              </article>
+            </section>
+
+            <details className="travel-card storybook-mint group mt-5 overflow-hidden px-5 py-1">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 py-3 font-bold text-secondary marker:content-none">
+                <span className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" aria-hidden="true" />
+                  Dados da conta
+                </span>
+                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <dl className="space-y-4">
+                <div className="grid gap-1 border-t border-secondary/10 pt-4 sm:grid-cols-[7rem_1fr]">
+                  <dt className="text-xs font-bold uppercase text-muted-foreground">Nome</dt>
+                  <dd className="font-medium text-foreground">{user?.name || 'Não informado'}</dd>
+                </div>
+                <div className="grid gap-1 pb-4 sm:grid-cols-[7rem_1fr]">
+                  <dt className="text-xs font-bold uppercase text-muted-foreground">Email</dt>
+                  <dd className="break-words font-medium text-foreground">{user?.email || 'Não informado'}</dd>
+                </div>
+              </dl>
+            </details>
+
+            <section className="mt-12" aria-labelledby="dashboard-guides-title">
+              <div className="relative mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+                <RouteDoodle className="pointer-events-none absolute -top-12 right-20 hidden h-16 w-36 text-secondary/25 sm:block" />
+                <div>
+                  <span className="travel-label mb-2 -rotate-1">Livros da família</span>
+                  <h2 id="dashboard-guides-title" className="font-serif text-2xl font-bold text-secondary sm:text-3xl">
+                    Sua estante de viagens
+                  </h2>
+                </div>
+                <p className="flex max-w-md items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Mail className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  Quando um guia ficar pronto, também avisaremos pelo seu e-mail.
+                </p>
               </div>
 
               {!loading && !loadError && generationJobs.length > 0 && (
@@ -289,7 +364,7 @@ const DashboardPage = () => {
                         Guias em criação
                       </h3>
                       <p className="mt-1 text-sm font-medium text-muted-foreground">
-                        A criação continua mesmo se você fechar o site.
+                        Pode fechar esta página: a criação continua e avisaremos por e-mail.
                       </p>
                     </div>
                   </div>
@@ -299,10 +374,12 @@ const DashboardPage = () => {
                       const status = statusForGuide(job.status);
                       const destinations = destinationNames(preview.destinations);
                       const progress = Math.min(100, Math.max(0, Number(job.progress) || 0));
+                      const readyPages = Math.max(0, Number(preview.approved_page_count) || 0);
+                      const totalPages = Math.max(0, Number(preview.page_count) || 0);
                       return (
                         <article
                           key={job.id}
-                          className="rounded-3xl border-2 border-secondary/25 bg-secondary/5 p-5 shadow-sm"
+                          className="travel-card storybook-sky p-5"
                         >
                           <div className="flex gap-4">
                             <GuideCover coverUrl={preview.cover_url} title={preview.title} />
@@ -328,7 +405,14 @@ const DashboardPage = () => {
                               </p>
                             </div>
                           </div>
-                          <div className="mt-5 h-2 overflow-hidden rounded-full bg-background/80">
+                          <div
+                            className="mt-5 h-2 overflow-hidden rounded-full bg-background/80"
+                            role="progressbar"
+                            aria-label={`Progresso de ${preview.title || 'guia de viagem'}`}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={progress}
+                          >
                             <div
                               className="h-full rounded-full bg-secondary transition-all duration-500"
                               style={{ width: `${progress}%` }}
@@ -337,7 +421,9 @@ const DashboardPage = () => {
                           <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-muted-foreground">
                             <span>{progress}% concluído</span>
                             <span>
-                              {preview.approved_page_count} de {preview.page_count} páginas prontas
+                              {totalPages > 0
+                                ? `${readyPages} de ${totalPages} páginas prontas`
+                                : 'Páginas sendo montadas'}
                             </span>
                           </div>
                           {job.status === 'failed' && (
@@ -356,15 +442,36 @@ const DashboardPage = () => {
                 <div
                   role="status"
                   aria-live="polite"
-                  className="bg-card dark:bg-slate-800 rounded-[32px] p-12 shadow-sm border border-border/50 flex flex-col items-center justify-center space-y-4 transition-colors duration-200"
+                  className="grid grid-cols-1 gap-6 md:grid-cols-2"
                 >
-                  <Loader2 className="w-10 h-10 animate-spin text-primary/50" aria-hidden="true" />
-                  <p className="text-muted-foreground font-medium">Buscando suas histórias...</p>
+                  <span className="sr-only">Buscando suas histórias...</span>
+                  <div className="travel-card animate-pulse p-5" aria-hidden="true">
+                    <div className="flex gap-4">
+                      <div className="aspect-[3/4] w-20 rounded-xl bg-secondary/10" />
+                      <div className="flex-1 space-y-3 pt-2">
+                        <div className="h-3 w-24 rounded-full bg-primary/10" />
+                        <div className="h-5 w-4/5 rounded-full bg-secondary/10" />
+                        <div className="h-3 w-2/3 rounded-full bg-secondary/10" />
+                      </div>
+                    </div>
+                    <div className="mt-5 h-11 rounded-full bg-secondary/10" />
+                  </div>
+                  <div className="travel-card hidden animate-pulse p-5 md:block" aria-hidden="true">
+                    <div className="flex gap-4">
+                      <div className="aspect-[3/4] w-20 rounded-xl bg-secondary/10" />
+                      <div className="flex-1 space-y-3 pt-2">
+                        <div className="h-3 w-24 rounded-full bg-primary/10" />
+                        <div className="h-5 w-4/5 rounded-full bg-secondary/10" />
+                        <div className="h-3 w-2/3 rounded-full bg-secondary/10" />
+                      </div>
+                    </div>
+                    <div className="mt-5 h-11 rounded-full bg-secondary/10" />
+                  </div>
                 </div>
               ) : loadError ? (
                 <div
                   role="alert"
-                  className="bg-card dark:bg-slate-800 rounded-[32px] p-10 shadow-sm border border-destructive/30 flex flex-col items-center text-center gap-4"
+                  className="travel-card flex flex-col items-center gap-4 border-destructive/30 p-10 text-center"
                 >
                   <AlertCircle className="w-10 h-10 text-destructive" aria-hidden="true" />
                   <div>
@@ -377,8 +484,8 @@ const DashboardPage = () => {
                   </Button>
                 </div>
               ) : guides.length === 0 ? (
-                <div className="bg-card dark:bg-slate-800 rounded-[32px] p-12 shadow-sm border-2 border-dashed border-border flex flex-col items-center justify-center text-center space-y-4 transition-colors duration-200">
-                  <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-2">
+                <div className="travel-card storybook-blush flex flex-col items-center justify-center space-y-4 border-2 border-dashed border-primary/25 px-5 py-10 text-center sm:p-12">
+                  <div className="mb-2 flex h-20 w-20 -rotate-3 items-center justify-center rounded-[1.2rem_1.6rem_1rem_1.5rem] bg-[hsl(var(--paper))]">
                     <BookOpen className="w-10 h-10 text-muted-foreground/50" aria-hidden="true" />
                   </div>
                   <h3 className="text-xl font-bold font-serif text-foreground">O livro está em branco!</h3>
@@ -387,6 +494,14 @@ const DashboardPage = () => {
                       ? 'Seu primeiro livro ainda está sendo criado e aparecerá aqui quando estiver pronto.'
                       : 'Você ainda não criou nenhum guia. Que tal planejar a próxima aventura?'}
                   </p>
+                  {generationJobs.length === 0 && (
+                    <Button asChild className="travel-cta mt-2 px-6 font-bold">
+                      <Link to="/create">
+                        Criar meu primeiro guia
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -403,7 +518,7 @@ const DashboardPage = () => {
                     return (
                       <article
                         key={guide.id}
-                        className="group bg-card dark:bg-slate-800 rounded-3xl p-6 shadow-sm border border-border/50 dark:border-slate-700 hover:shadow-lg hover:border-primary/30 transition-all duration-300 flex flex-col h-full"
+                        className="travel-card group flex h-full flex-col p-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg sm:p-6"
                       >
                         {/* A capa é o produto: cada item da lista é um livro,
                             não um registro de texto. */}
@@ -434,29 +549,13 @@ const DashboardPage = () => {
                           </div>
                         </div>
 
-                        <div className="mt-6 pt-4 border-t border-border space-y-4">
+                        <div className="mt-6 space-y-4 border-t-2 border-dashed border-secondary/20 pt-4">
                           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                             <CalendarDays className="w-4 h-4" aria-hidden="true" />
                             Criado em {formatDate(guide.created_at)}
                           </div>
 
                           <div className="flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => toggleGuideDetails(guide.id)}
-                              aria-expanded={detailsOpen}
-                              aria-controls={detailsId}
-                              className="rounded-full"
-                            >
-                              {detailsOpen ? 'Ocultar detalhes' : 'Ver detalhes'}
-                              <ChevronDown
-                                className={`w-4 h-4 transition-transform ${detailsOpen ? 'rotate-180' : ''}`}
-                                aria-hidden="true"
-                              />
-                            </Button>
-
                             {guide.download_url && (
                               <Button
                                 type="button"
@@ -473,6 +572,22 @@ const DashboardPage = () => {
                                 Baixar PDF
                               </Button>
                             )}
+
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleGuideDetails(guide.id)}
+                              aria-expanded={detailsOpen}
+                              aria-controls={detailsId}
+                              className="rounded-full"
+                            >
+                              {detailsOpen ? 'Ocultar detalhes' : 'Ver detalhes'}
+                              <ChevronDown
+                                className={`w-4 h-4 transition-transform ${detailsOpen ? 'rotate-180' : ''}`}
+                                aria-hidden="true"
+                              />
+                            </Button>
 
                             <Button
                               type="button"
@@ -544,7 +659,7 @@ const DashboardPage = () => {
                           <div
                             id={detailsId}
                             aria-live="polite"
-                            className="mt-5 rounded-2xl bg-muted/50 p-4 text-sm"
+                            className="storybook-mint mt-5 rounded-2xl border border-secondary/15 p-4 text-sm"
                           >
                             {detailLoading ? (
                               <div role="status" className="flex items-center gap-2 text-muted-foreground">

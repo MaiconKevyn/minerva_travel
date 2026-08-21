@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { ArchedText, GuideStar } from '@/components/GuideLockup.jsx';
+import { ArchedText } from '@/components/GuideLockup.jsx';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import HomeHero from '@/components/HomeHero.jsx';
@@ -12,6 +12,8 @@ import BookAnatomy from '@/components/BookAnatomy.jsx';
 import HowItWorks from '@/components/HowItWorks.jsx';
 import ActivityShowcase from '@/components/ActivityShowcase.jsx';
 import HomeFaq from '@/components/HomeFaq.jsx';
+import SiteFooter from '@/components/SiteFooter.jsx';
+import { MapPinDoodle, RouteDoodle } from '@/components/DecorativeElements.jsx';
 
 const HomePage = () => (
   <>
@@ -37,9 +39,11 @@ const HomePage = () => (
         {/* Fechamento: quem rolou a página inteira não pode precisar subir
             de volta até o topo para achar o botão. */}
         <section
-          className="parchment-wash border-t border-border/50 bg-card py-20 sm:py-24"
+          className="travel-page storybook-blush relative overflow-hidden border-t border-primary/10 py-20 sm:py-24"
           aria-labelledby="comecar-title"
         >
+          <MapPinDoodle className="pointer-events-none absolute -bottom-6 -left-4 h-36 w-36 -rotate-12 text-primary/10" />
+          <RouteDoodle className="pointer-events-none absolute -right-5 top-8 hidden h-36 w-72 rotate-6 text-secondary/20 sm:block" />
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -54,18 +58,18 @@ const HomePage = () => (
             </div>
             <h2
               id="comecar-title"
-              className="!mt-1 text-3xl font-serif font-bold text-foreground sm:text-4xl"
+              className="!mt-1 text-3xl font-serif font-bold leading-tight text-secondary sm:text-5xl"
             >
               A viagem já está marcada. Falta o livro.
             </h2>
-            <p className="mt-4 text-lg font-medium text-muted-foreground">
+            <p className="editorial-copy mt-4 text-foreground/70">
               Comece pelo roteiro que vocês já têm — em poucos minutos você vê a primeira página
               ilustrada na tela.
             </p>
             <Button
               asChild
               size="lg"
-              className="group mt-8 rounded-full bg-primary px-8 py-6 text-base font-bold text-white shadow-[0_8px_30px_hsl(var(--primary)/0.30)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary/90 sm:text-lg"
+              className="travel-cta group mt-8 h-auto px-8 py-4 text-base font-bold sm:text-lg"
             >
               <Link to="/create">
                 Criar o guia da minha família
@@ -76,27 +80,7 @@ const HomePage = () => (
         </section>
       </main>
 
-      <footer className="mt-auto border-t border-border bg-muted py-12 transition-colors duration-200">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-            <div className="flex items-center gap-2.5">
-              <GuideStar className="h-6 w-6" />
-              <span className="font-serif text-xl font-bold text-foreground">Minerva Travel</span>
-            </div>
-            <div className="flex gap-8 text-sm font-medium">
-              <Link className="text-muted-foreground transition-colors hover:text-foreground" to="/privacy">
-                Política de Privacidade
-              </Link>
-              <Link className="text-muted-foreground transition-colors hover:text-foreground" to="/terms">
-                Termos de Uso
-              </Link>
-            </div>
-            <p className="text-sm font-medium text-muted-foreground">
-              © 2026 Minerva Travel · Projeto em piloto
-            </p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   </>
 );

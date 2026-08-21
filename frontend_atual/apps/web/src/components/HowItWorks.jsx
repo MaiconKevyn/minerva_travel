@@ -27,10 +27,10 @@ const STEPS = [
 
 const HowItWorks = () => (
   <section
-    className="border-t border-border/50 py-20 sm:py-24"
+    className="travel-page storybook-mint relative overflow-hidden border-t border-secondary/10 py-20 sm:py-24"
     aria-labelledby="como-funciona-title"
   >
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div className="guide-shell">
       <GuideLockup
         id="como-funciona-title"
         overline="Como funciona"
@@ -69,7 +69,7 @@ const HowItWorks = () => (
                 <h3 className="pt-1.5 text-xl font-serif font-bold text-foreground">
                   {step.title}
                 </h3>
-                <p className="mt-2 font-medium leading-relaxed text-muted-foreground">
+                <p className="mt-2 leading-relaxed text-foreground/70">
                   {step.description}
                 </p>
               </div>

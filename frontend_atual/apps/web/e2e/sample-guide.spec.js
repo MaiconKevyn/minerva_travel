@@ -6,6 +6,9 @@ test('visitor can browse every page of the sample guide', async ({ page }, testI
   const guide = page.locator('#guia-exemplo');
   await guide.scrollIntoViewIfNeeded();
   await expect(guide.getByRole('heading', { name: 'Folheie a aventura antes de criar a sua' })).toBeVisible();
+  await expect(guide.getByRole('button', { name: /Abrir o guia na página/ })).toHaveCount(5);
+  await expect(guide.getByLabel('Leitor do guia de exemplo. Use as setas esquerda e direita para folhear.')).toHaveCount(0);
+  await guide.getByRole('button', { name: 'Abrir as 19 páginas' }).click();
   await expect(guide.getByText('Capa · página 1 de 19', { exact: true })).toBeVisible();
   await expect(guide.getByAltText(/Página 1 do guia de exemplo: Capa da Família Knopp/)).toBeVisible();
 
@@ -36,7 +39,9 @@ test('visitor can browse every page of the sample guide', async ({ page }, testI
 test('sample guide supports keyboard paging and links to creation', async ({ page }, testInfo) => {
   await page.goto('/');
 
-  const reader = page.getByLabel('Leitor do guia de exemplo. Use as setas esquerda e direita para folhear.');
+  const guide = page.locator('#guia-exemplo');
+  await guide.getByRole('button', { name: 'Abrir as 19 páginas' }).click();
+  const reader = guide.getByLabel('Leitor do guia de exemplo. Use as setas esquerda e direita para folhear.');
   await reader.scrollIntoViewIfNeeded();
   await reader.focus();
   await reader.press('ArrowRight');
@@ -57,6 +62,7 @@ test('a virada gira uma folha só, sem o livro sumir nem pular', async ({ page }
 
   const guide = page.locator('#guia-exemplo');
   await guide.scrollIntoViewIfNeeded();
+  await guide.getByRole('button', { name: 'Abrir as 19 páginas' }).click();
   const base = guide.locator('.sample-guide-book > .sample-guide-spread, .sample-guide-book > .sample-guide-single');
   const leaf = guide.locator('.sample-guide-leaf');
 

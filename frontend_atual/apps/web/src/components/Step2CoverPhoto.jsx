@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, UploadCloud, CheckCircle2, Wand2 } from 'lucide-react';
+import { ArrowRight, UploadCloud, CheckCircle2, ShieldCheck, Wand2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -183,52 +183,64 @@ const Step2CoverPhoto = () => {
               </p>
             )}
 
-            <div className="mx-auto max-w-xl rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm">
-              <label htmlFor="expected-cover-family-count" className="text-sm font-bold text-foreground">
-                Quantas pessoas aparecem na foto?
-              </label>
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <input
-                  id="expected-cover-family-count"
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={confirmedFamilyMemberCount || ''}
-                  onChange={handleFamilyMemberCountChange}
-                  placeholder={derivedFamilyMemberCount ? String(derivedFamilyMemberCount) : '4'}
-                  className="h-12 w-full rounded-xl border border-border bg-background px-4 text-base font-semibold text-foreground outline-none transition focus:border-primary sm:w-32"
-                />
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  Se a ilustração não preservar todo mundo, usamos uma capa segura com a foto original.
+            {!coverPhoto ? (
+              <div className="mx-auto flex max-w-xl items-start gap-3 rounded-2xl bg-secondary/10 px-4 py-3 text-left text-sm text-muted-foreground">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
+                <p>
+                  A foto é opcional. Só pediremos autorização e quantidade de pessoas depois que
+                  você enviar uma imagem.
                 </p>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="mx-auto max-w-xl rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm">
+                  <label htmlFor="expected-cover-family-count" className="text-sm font-bold text-foreground">
+                    Quantas pessoas aparecem na foto?
+                  </label>
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <input
+                      id="expected-cover-family-count"
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={confirmedFamilyMemberCount || ''}
+                      onChange={handleFamilyMemberCountChange}
+                      placeholder={derivedFamilyMemberCount ? String(derivedFamilyMemberCount) : '4'}
+                      className="h-12 w-full rounded-xl border border-border bg-background px-4 text-base font-semibold text-foreground outline-none transition focus:border-primary sm:w-32"
+                    />
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      Se a ilustração não preservar todo mundo, usamos uma capa segura com a foto original.
+                    </p>
+                  </div>
+                </div>
 
-            <div className="mx-auto max-w-xl rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm">
-              <label className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={photoProcessingConsent}
-                  onChange={(event) => updatePhotoProcessingConsent(event.target.checked)}
-                  className="mt-1 h-5 w-5 shrink-0 accent-primary"
-                  aria-describedby="photo-consent-details"
-                />
-                <span id="photo-consent-details">
-                  Autorizo o processamento desta foto e dos dados do guia para gerar o PDF.
-                  Conforme a configuração do serviço, a foto ou o texto podem ser enviados aos
-                  provedores de IA e mapas informados na{' '}
-                  <Link
-                    to="/privacy"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-bold text-primary underline"
-                  >
-                    Política de Privacidade
-                  </Link>
-                  . A foto não será usada para treinamento sem uma autorização separada.
-                </span>
-              </label>
-            </div>
+                <div className="mx-auto max-w-xl rounded-2xl border border-border/70 bg-card p-4 text-left shadow-sm">
+                  <label className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={photoProcessingConsent}
+                      onChange={(event) => updatePhotoProcessingConsent(event.target.checked)}
+                      className="mt-1 h-5 w-5 shrink-0 accent-primary"
+                      aria-describedby="photo-consent-details"
+                    />
+                    <span id="photo-consent-details">
+                      Autorizo o processamento desta foto e dos dados do guia para gerar o PDF.
+                      Conforme a configuração do serviço, a foto ou o texto podem ser enviados aos
+                      provedores de IA e mapas informados na{' '}
+                      <Link
+                        to="/privacy"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-bold text-primary underline"
+                      >
+                        Política de Privacidade
+                      </Link>
+                      . A foto não será usada para treinamento sem uma autorização separada.
+                    </span>
+                  </label>
+                </div>
+              </>
+            )}
 
             {/* A descrição vale com ou sem foto: sem ela, é a capa inteira;
                 com ela, dirige só o cenário, nunca quem aparece. */}

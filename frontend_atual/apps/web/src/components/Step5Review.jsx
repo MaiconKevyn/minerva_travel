@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Camera,
+  CreditCard,
+  FileText,
   Loader2,
   MapPin,
   Navigation,
@@ -12,11 +14,11 @@ import {
   BookHeart,
   AlertCircle,
   PenLine,
-  Mail,
   Plane,
   MessageCircleHeart,
   Puzzle,
   RefreshCcw,
+  ShieldCheck,
 } from 'lucide-react';
 import { useConversationalGuide } from '@/contexts/ConversationalGuideContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -629,21 +631,32 @@ const Step5Review = () => {
         </div>
       </div>
 
-      {/* O mesmo aviso do começo, agora com o endereço que vai receber. */}
+      {/* Confiança no ponto da decisão: preço, ordem da geração e entrega
+          aparecem juntos, imediatamente antes da ação de compra. */}
       <div className="mt-8 rounded-3xl border-2 border-secondary/25 bg-secondary/5 p-5 sm:p-6">
-        <div className="flex items-start gap-4">
-          <Mail className="mt-1 h-7 w-7 shrink-0 text-secondary" aria-hidden="true" />
-          <div>
-            <h3 className="text-xl font-serif font-bold text-foreground">
-              O guia chega no seu e-mail
-            </h3>
-            <p className="mt-1 text-sm font-medium text-muted-foreground">
+        <h3 className="text-xl font-serif font-bold text-foreground">O que acontece depois</h3>
+        <ul className="mt-4 grid gap-4 text-left sm:grid-cols-3">
+          <li className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
+            <p className="text-sm font-medium text-muted-foreground">
               {guideProduct?.enabled
-                ? 'Seu roteiro será salvo antes de abrir o Mercado Pago. Assim que o pagamento for confirmado, você volta para revisar a capa e criar o guia completo.'
-                : 'Na próxima tela você revisa apenas a capa. Depois de aprová-la, um único clique inicia o guia completo; você pode sair do site e receberá o link do PDF no e-mail da sua conta quando tudo estiver pronto.'}
+                ? `${formatPrice(guideProduct.amount_minor, guideProduct.currency)} em compra única no ambiente seguro do Mercado Pago.`
+                : 'Seu roteiro é salvo com segurança antes de criar qualquer imagem.'}
             </p>
-          </div>
-        </div>
+          </li>
+          <li className="flex items-start gap-3">
+            <Camera className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <p className="text-sm font-medium text-muted-foreground">
+              Você revisa e aprova a capa antes de criarmos o guia completo.
+            </p>
+          </li>
+          <li className="flex items-start gap-3">
+            <FileText className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
+            <p className="text-sm font-medium text-muted-foreground">
+              O PDF A4 chega no e-mail da sua conta; não é preciso esperar no site.
+            </p>
+          </li>
+        </ul>
       </div>
 
       <div className="flex justify-center pt-8">
@@ -657,7 +670,7 @@ const Step5Review = () => {
             <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Preparando o checkout...</>
           ) : guideProduct?.enabled ? (
             <>
-              <Sparkles className="w-6 h-6 mr-3 inline-block" /> Comprar por{' '}
+              <CreditCard className="mr-3 inline-block h-6 w-6" /> Comprar por{' '}
               {formatPrice(guideProduct.amount_minor, guideProduct.currency)}
             </>
           ) : (

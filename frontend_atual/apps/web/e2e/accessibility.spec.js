@@ -25,7 +25,8 @@ for (const route of publicRoutes) {
 }
 
 test('skip link is the first keyboard destination', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await expect(page.locator('main')).toBeVisible();
   await page.locator('body').evaluate((body) => {
     body.tabIndex = -1;
     body.focus();

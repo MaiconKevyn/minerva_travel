@@ -43,7 +43,7 @@ const ActivityLandmarkPicker = ({
         <button
           type="button"
           aria-label={`Escolher em quais pontos incluir ${activity.label}`}
-          className={`flex w-full items-center justify-between gap-2 rounded-xl border-2 px-3 py-2 text-xs font-bold transition ${
+          className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border-2 px-3 py-2 text-xs font-bold transition ${
             chosenIds.length > 0
               ? 'border-primary bg-primary/10 text-primary'
               : 'border-border/70 bg-background text-muted-foreground hover:border-primary/45 hover:text-foreground'
@@ -83,7 +83,7 @@ const ActivityLandmarkPicker = ({
                   disabled={Boolean(reason)}
                   onClick={() => onToggle(id)}
                   title={reason || undefined}
-                  className={`flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                  className={`flex min-h-11 w-full items-start gap-2 rounded-lg px-2 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
                     chosen ? 'bg-primary/10' : 'hover:bg-muted/70'
                   }`}
                 >
