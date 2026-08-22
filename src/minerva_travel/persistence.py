@@ -471,6 +471,20 @@ class GuideRepository:
                 );
                 CREATE INDEX IF NOT EXISTS entitlements_owner_builder_idx
                     ON entitlements(user_id, builder_session_id, status);
+                CREATE TABLE IF NOT EXISTS guide_access_grants (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    builder_session_id TEXT NOT NULL UNIQUE,
+                    source_permission TEXT NOT NULL,
+                    product_code TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK (status IN ('active', 'consumed', 'revoked')),
+                    created_at TEXT NOT NULL,
+                    consumed_at TEXT,
+                    revoked_at TEXT,
+                    UNIQUE(user_id, builder_session_id)
+                );
+                CREATE INDEX IF NOT EXISTS guide_access_grants_owner_builder_idx
+                    ON guide_access_grants(user_id, builder_session_id, status);
                 """
             )
             # SQLite does not support ADD COLUMN inside CREATE TABLE IF NOT
@@ -722,9 +736,7 @@ class GuideRepository:
                 """,
                 (user_id, builder_session_id),
             ).fetchone()
-            if row is None:
-                return False
-            if row["status"] == "active":
+            if row is not None and row["status"] == "active":
                 connection.execute(
                     """
                     UPDATE entitlements SET status = 'consumed', consumed_at = ?
@@ -732,7 +744,81 @@ class GuideRepository:
                     """,
                     (now, row["id"]),
                 )
+            if row is not None:
+                return True
+
+            grant = connection.execute(
+                """
+                SELECT * FROM guide_access_grants
+                WHERE user_id = ? AND builder_session_id = ?
+                  AND status IN ('active', 'consumed')
+                LIMIT 1
+                """,
+                (user_id, builder_session_id),
+            ).fetchone()
+            if grant is None:
+                return False
+            if grant["status"] == "active":
+                connection.execute(
+                    """
+                    UPDATE guide_access_grants SET status = 'consumed', consumed_at = ?
+                    WHERE id = ? AND status = 'active'
+                    """,
+                    (now, grant["id"]),
+                )
         return True
+
+    def grant_complimentary_builder_access(
+        self,
+        *,
+        user_id: str,
+        builder_session_id: str,
+        source_permission: str,
+        product_code: str,
+    ) -> bool:
+        """Persist an idempotent, server-authorized access grant for one guide.
+
+        Returns ``True`` only when a new grant was created, allowing the caller
+        to emit exactly one audit event even if a request is retried.
+        """
+
+        now = datetime.now(UTC).isoformat()
+        with self._connection() as connection:
+            result = connection.execute(
+                """
+                INSERT OR IGNORE INTO guide_access_grants (
+                    id, user_id, builder_session_id, source_permission,
+                    product_code, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, 'active', ?)
+                """,
+                (
+                    uuid4().hex,
+                    user_id,
+                    builder_session_id,
+                    source_permission,
+                    product_code,
+                    now,
+                ),
+            )
+        return result.rowcount == 1
+
+    def has_complimentary_builder_access(
+        self,
+        *,
+        user_id: str,
+        builder_session_id: str,
+    ) -> bool:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT 1 FROM guide_access_grants
+                WHERE user_id = ? AND builder_session_id = ?
+                  AND status IN ('active', 'consumed')
+                LIMIT 1
+                """,
+                (user_id, builder_session_id),
+            ).fetchone()
+        return row is not None
 
     def entitlement_for_builder(
         self,
@@ -1399,6 +1485,7 @@ class GuideRepository:
             connection.execute("DELETE FROM guide_drafts WHERE user_id = ?", (user_id,))
             connection.execute("DELETE FROM family_profiles WHERE user_id = ?", (user_id,))
             connection.execute("DELETE FROM entitlements WHERE user_id = ?", (user_id,))
+            connection.execute("DELETE FROM guide_access_grants WHERE user_id = ?", (user_id,))
             connection.execute("DELETE FROM payments WHERE user_id = ?", (user_id,))
         return result.rowcount
 

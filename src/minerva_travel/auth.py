@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from minerva_travel.config import (
     auth_required,
@@ -18,6 +18,7 @@ from minerva_travel.config import (
 )
 
 ASYMMETRIC_ALGORITHMS = {"RS256", "ES256"}
+GUIDE_PAYMENT_BYPASS_PERMISSION = "guide.generate_without_payment"
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -25,6 +26,31 @@ class AuthenticatedUser(BaseModel):
     id: str
     email: str | None = None
     role: str = "authenticated"
+    permissions: frozenset[str] = Field(default_factory=frozenset)
+
+    def has_permission(self, permission: str) -> bool:
+        return permission in self.permissions
+
+
+def _app_permissions(payload: dict[str, Any]) -> frozenset[str]:
+    """Read server-owned authorization claims only.
+
+    Supabase lets users edit ``user_metadata``, so it must never influence
+    authorization. ``app_metadata`` can only be changed with privileged server
+    credentials and is included in both the JWT and ``/auth/v1/user`` payload.
+    """
+
+    app_metadata = payload.get("app_metadata")
+    if not isinstance(app_metadata, dict):
+        return frozenset()
+    raw_permissions = app_metadata.get("permissions")
+    if not isinstance(raw_permissions, list):
+        return frozenset()
+    return frozenset(
+        permission.strip()
+        for permission in raw_permissions
+        if isinstance(permission, str) and permission.strip()
+    )
 
 
 class SupabaseTokenVerifier:
@@ -105,6 +131,7 @@ class SupabaseTokenVerifier:
             id=user_id,
             email=payload.get("email"),
             role=str(payload.get("role") or "authenticated"),
+            permissions=_app_permissions(payload),
         )
 
     def _user_from_claims(self, claims: dict[str, Any]) -> AuthenticatedUser:
@@ -115,6 +142,7 @@ class SupabaseTokenVerifier:
             id=str(claims["sub"]),
             email=claims.get("email"),
             role=role,
+            permissions=_app_permissions(claims),
         )
 
 

@@ -154,14 +154,13 @@ test('a virada gira uma folha só, sem o livro sumir nem pular', async ({ page }
   await expect(guide.getByText(expectedLabel, { exact: true })).toBeVisible();
 });
 
-test('a folha clicada assenta sem abrir vão nem acender uma sombra lateral', async ({ page }, testInfo) => {
+test('a folha protege a lombada nos dois sentidos e assenta sem abrir vão', async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
 
   const guide = page.locator('#guia-exemplo');
   const bookSurface = guide.locator('.sample-guide-spread, .sample-guide-single');
   const leaf = guide.locator('.sample-guide-leaf');
-  const castShadow = guide.locator('.sample-guide-cast-shadow');
   const rightPage = bookSurface.locator(
     ':scope > .sample-guide-page--right.sample-guide-page--turnable',
   );
@@ -179,20 +178,67 @@ test('a folha clicada assenta sem abrir vão nem acender uma sombra lateral', as
       };
     });
 
-  const expectGradualCastShadow = async (side) => {
+  const expectNaturalTurn = async (side) => {
     await expect(leaf).toHaveCount(1);
-    await expect(castShadow).toHaveClass(new RegExp(`sample-guide-cast-shadow--${side}`));
+    await expect(leaf).toHaveClass(new RegExp(`sample-guide-leaf--${side}`));
+    await expect(leaf.locator('.sample-guide-leaf-face-shade')).toHaveCount(2);
+    await expect(guide.locator('.sample-guide-cast-shadow')).toHaveCount(0);
+
+    // No inicio do gesto, tres pontos ao longo da lombada ainda pertencem a
+    // folha que gira. Tambem garantimos que ela nao e trazida para a frente e
+    // depois achatada: essa mudanca de Z criava um vazamento de um quadro.
+    const hinge = await leaf.evaluate((element, turningSide) => {
+      const book = element.closest('.sample-guide-book').getBoundingClientRect();
+      const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+      const oldPointerEvents = element.style.pointerEvents;
+      const oldTransform = element.style.getPropertyValue('transform');
+      const oldTransformPriority = element.style.getPropertyPriority('transform');
+      const isSingle = element.closest('.sample-guide-book').classList.contains('sample-guide-book--single');
+      const hingeX = isSingle
+        ? turningSide === 'right' ? book.left : book.right
+        : book.left + book.width / 2;
+
+      // Congela a folha nos primeiros 8 graus. Assim o teste nao depende do
+      // tempo que cada worker levou para chegar aqui durante a animacao real.
+      element.style.setProperty(
+        'transform',
+        `rotateY(${turningSide === 'right' ? -8 : 8}deg)`,
+        'important',
+      );
+      element.style.pointerEvents = 'auto';
+      const x = turningSide === 'right' ? hingeX + 1 : hingeX - 1;
+      const covered = [0.25, 0.5, 0.75].every((ratio) => {
+        const y = book.top + book.height * ratio;
+        const hit = document.elementFromPoint(x, y);
+        return hit === element || element.contains(hit);
+      });
+      element.style.pointerEvents = oldPointerEvents;
+      if (oldTransform) {
+        element.style.setProperty('transform', oldTransform, oldTransformPriority);
+      } else {
+        element.style.removeProperty('transform');
+      }
+      return { covered, depth: matrix.m43 };
+    }, side);
+    expect(hinge.covered).toBe(true);
+    expect(Math.abs(hinge.depth)).toBeLessThan(0.01);
+
+    // A sombra deve estar presa as duas faces da folha. Uma camada solta na
+    // pagina de baixo escurecia a borda interna antes do papel se mover e
+    // parecia um pedaco da pagina desaparecendo.
     await expect.poll(
-      async () => Number(await castShadow.evaluate((element) => getComputedStyle(element).opacity)),
+      async () => Number(await leaf.locator('.sample-guide-leaf-face-shade').first().evaluate(
+        (element) => getComputedStyle(element).opacity,
+      )),
       { timeout: 600 },
     ).toBeGreaterThan(0.04);
+
     await expect(leaf).toHaveCount(0, { timeout: 4000 });
-    await expect(castShadow).toHaveCount(0);
   };
 
   await rightPage.scrollIntoViewIfNeeded();
   await rightPage.click();
-  await expectGradualCastShadow('right');
+  await expectNaturalTurn('right');
 
   const settled = await measureSettlement();
   expect(Math.abs(settled.gap)).toBeLessThan(0.5);
@@ -206,11 +252,20 @@ test('a folha clicada assenta sem abrir vão nem acender uma sombra lateral', as
       ':scope > .sample-guide-page--left.sample-guide-page--turnable',
     );
     await leftPage.click();
-    await expectGradualCastShadow('left');
+    await expectNaturalTurn('left');
 
     const settledBack = await measureSettlement();
     expect(Math.abs(settledBack.gap)).toBeLessThan(0.5);
     expect(settledBack.leftTransform).toBe('none');
     expect(settledBack.rightTransform).toBe('none');
+  }
+
+  // A dobra e uma linha de separacao, nao uma faixa de sombra de 24px sobre
+  // a pagina esquerda.
+  if (!testInfo.project.name.includes('mobile')) {
+    const creaseWidth = await bookSurface.evaluate((element) => Number.parseFloat(
+      getComputedStyle(element, '::after').width,
+    ));
+    expect(creaseWidth).toBeLessThanOrEqual(1.5);
   }
 });

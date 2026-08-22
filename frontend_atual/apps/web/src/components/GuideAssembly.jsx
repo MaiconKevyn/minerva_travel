@@ -25,6 +25,7 @@ import {
   generateBuilderPageAttempt,
   getBuilderPayment,
   getGuideProduct,
+  getGuideProductAccess,
   getGuideJob,
   isRetryableBuilderGenerationError,
   mercadoPagoReturnPayment,
@@ -70,6 +71,7 @@ const GuideAssembly = ({ session: initialSession }) => {
   const [jobBusy, setJobBusy] = useState(false);
   const [jobError, setJobError] = useState('');
   const [guideProduct, setGuideProduct] = useState(null);
+  const [guideAccess, setGuideAccess] = useState(null);
   const [payment, setPayment] = useState(undefined);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState('');
@@ -84,8 +86,12 @@ const GuideAssembly = ({ session: initialSession }) => {
     (attempt) => attempt.id === cover.selected_attempt_id,
   ) || cover?.attempts.at(-1) || null;
   const generatedPageCount = Math.max(session.pages.length - 1, 0);
-  const paymentRequired = guideProduct?.enabled === true;
-  const paymentReady = Boolean(guideProduct && (!paymentRequired || payment?.status === 'paid'));
+  const paymentRequired = Boolean(
+    guideProduct?.enabled === true && guideAccess?.payment_required === true,
+  );
+  const paymentReady = Boolean(
+    guideProduct && guideAccess && (!paymentRequired || payment?.status === 'paid'),
+  );
 
   const loadCover = useCallback(async (attempt) => {
     if (!attempt?.asset_url) {
@@ -123,10 +129,14 @@ const GuideAssembly = ({ session: initialSession }) => {
   useEffect(() => {
     const controller = new AbortController();
     setPaymentError('');
-    getGuideProduct({ signal: controller.signal })
-      .then(async (product) => {
+    Promise.all([
+      getGuideProduct({ signal: controller.signal }),
+      getGuideProductAccess({ signal: controller.signal }),
+    ])
+      .then(async ([product, access]) => {
         setGuideProduct(product);
-        if (!product.enabled) {
+        setGuideAccess(access);
+        if (!product.enabled || !access.payment_required) {
           setPayment(null);
           return;
         }
@@ -356,6 +366,20 @@ const GuideAssembly = ({ session: initialSession }) => {
             </div>
           )}
 
+          {guideAccess?.access_mode === 'complimentary' && (
+            <div className="rounded-2xl border border-secondary/30 bg-[hsl(var(--mint))] p-4 text-foreground">
+              <div className="flex items-center gap-3">
+                <CircleCheck className="h-6 w-6 shrink-0 text-secondary" aria-hidden="true" />
+                <div>
+                  <p className="font-bold">Acesso interno liberado</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Esta conta pode criar o guia sem passar pelo checkout.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {paymentRequired && payment?.status !== 'paid' && (
             <div className="rounded-2xl border border-primary/25 bg-primary/5 p-6 shadow-sm">
               <CreditCard className="h-10 w-10 text-primary" aria-hidden="true" />
@@ -396,7 +420,7 @@ const GuideAssembly = ({ session: initialSession }) => {
             </div>
           )}
 
-          {!guideProduct && (
+          {(!guideProduct || !guideAccess) && (
             <div className="rounded-2xl border border-border bg-card p-4" role="status">
               <div className="flex items-center gap-3">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />

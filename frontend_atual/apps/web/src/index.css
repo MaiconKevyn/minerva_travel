@@ -713,10 +713,10 @@
     top: 0;
     bottom: 0;
     left: 50%;
-    width: 24px;
+    width: 1px;
     transform: translateX(-50%);
     pointer-events: none;
-    background: linear-gradient(90deg, transparent, rgba(61, 43, 24, 0.18), transparent);
+    background: rgba(61, 43, 24, 0.12);
   }
 
   .sample-guide-page {
@@ -740,44 +740,23 @@
   .sample-guide-page--left {
     transform-origin: right center;
     border-radius: 0.8rem 0 0 0.8rem;
+    box-shadow:
+      inset -9px 0 14px -13px rgba(61, 43, 24, 0.18),
+      inset 0 0 24px rgba(111, 82, 43, 0.08),
+      0 18px 26px -14px rgba(74, 55, 30, 0.45);
   }
 
   .sample-guide-page--right {
     transform-origin: left center;
     border-radius: 0 0.8rem 0.8rem 0;
+    box-shadow:
+      inset 9px 0 14px -13px rgba(61, 43, 24, 0.14),
+      inset 0 0 24px rgba(111, 82, 43, 0.08),
+      0 18px 26px -14px rgba(74, 55, 30, 0.45);
   }
 
   .sample-guide-single .sample-guide-page--right {
     border-radius: 0.8rem;
-  }
-
-  /* Sombra que a folha em movimento projeta sobre a pagina de baixo. Fica
-     fora da folha para continuar visivel enquanto ela cruza os 90 graus. */
-  .sample-guide-cast-shadow {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    z-index: 5;
-    width: 50%;
-    pointer-events: none;
-    will-change: opacity, transform;
-  }
-
-  .sample-guide-cast-shadow--right {
-    left: 50%;
-    transform-origin: left center;
-    background: linear-gradient(90deg, rgba(61, 43, 24, 0.3), rgba(61, 43, 24, 0.08) 18%, transparent 58%);
-  }
-
-  .sample-guide-cast-shadow--left {
-    left: 0;
-    transform-origin: right center;
-    background: linear-gradient(270deg, rgba(61, 43, 24, 0.3), rgba(61, 43, 24, 0.08) 18%, transparent 58%);
-  }
-
-  .sample-guide-book--single .sample-guide-cast-shadow {
-    left: 0;
-    width: 100%;
   }
 
   /* A folha que gira. Uma so, presa na lombada: e o unico jeito de parecer
@@ -789,6 +768,7 @@
     width: 50%;
     z-index: 6;
     transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
     will-change: transform;
     pointer-events: none;
   }
@@ -813,19 +793,23 @@
     inset: 0;
     display: grid;
     backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
 
   /* Fracao de pixel a frente do verso. Faces exatamente coplanares brigam
      pela profundidade e o verso aparece atraves da frente. */
   .sample-guide-leaf-face--front {
-    transform: translate3d(0, 0, 0.02px);
+    transform: translate3d(0, 0, 0.1px);
   }
 
   .sample-guide-leaf-face--back {
-    transform: rotateY(180deg);
+    transform: rotateY(180deg) translateZ(0.1px);
   }
 
-  .sample-guide-leaf-shade {
+  /* A sombra pertence a cada face da folha. Assim ela gira e e ocultada
+     junto do papel, sem uma camada independente cobrindo a pagina de baixo
+     antes de a folha realmente sair do lugar. */
+  .sample-guide-leaf-face-shade {
     position: absolute;
     inset: 0;
     z-index: 1;
@@ -833,7 +817,8 @@
     background: linear-gradient(90deg, rgba(61, 43, 24, 0.42), rgba(61, 43, 24, 0.04) 55%, transparent);
   }
 
-  .sample-guide-leaf--left .sample-guide-leaf-shade {
+  .sample-guide-leaf--left .sample-guide-leaf-face--front .sample-guide-leaf-face-shade,
+  .sample-guide-leaf--right .sample-guide-leaf-face--back .sample-guide-leaf-face-shade {
     background: linear-gradient(270deg, rgba(61, 43, 24, 0.42), rgba(61, 43, 24, 0.04) 55%, transparent);
   }
 

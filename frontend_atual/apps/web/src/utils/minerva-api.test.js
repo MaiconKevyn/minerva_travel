@@ -670,7 +670,7 @@ test('buildStructuredLandmarksPayload keeps only destinations with place and lan
   });
 });
 
-test('buildRouteSuggestionPayload sends freeform constraints and current structured destinations', () => {
+test('buildRouteSuggestionPayload lets new freeform text replace restored destinations', () => {
   assert.equal(typeof minervaApi.buildRouteSuggestionPayload, 'function');
   const payload = minervaApi.buildRouteSuggestionPayload({
     tripIdea: 'Queremos Paris e Londres com parques.',
@@ -691,10 +691,27 @@ test('buildRouteSuggestionPayload sends freeform constraints and current structu
     pace: 'light',
     interests: ['parques', 'museus'],
     children_ages: [6],
-    structured_destinations: [
-      { id: 'paris', place: 'Paris, França', timing: 'Julho de 2026', days: 3 },
+    structured_destinations: [],
+  });
+});
+
+test('buildRouteSuggestionPayload keeps current destinations only without a new trip idea', () => {
+  const payload = minervaApi.buildRouteSuggestionPayload({
+    tripIdea: '   ',
+    destinationsList: [
+      { id: 'rio', place: 'Rio de Janeiro, Brasil', timing: 'Setembro de 2026', days: 4 },
     ],
   });
+
+  assert.equal(payload.days, 4);
+  assert.deepEqual(payload.structured_destinations, [
+    {
+      id: 'rio',
+      place: 'Rio de Janeiro, Brasil',
+      timing: 'Setembro de 2026',
+      days: 4,
+    },
+  ]);
 });
 
 test('appendGuideMetadata preserves family cover count with child ages for PDF generation', () => {
@@ -1071,6 +1088,12 @@ test('guide checkout uses the authenticated payment endpoints and a caller idemp
         environment: 'test',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
+    if (path === '/api/products/guide/access') {
+      return new Response(JSON.stringify({
+        payment_required: true,
+        access_mode: 'payment',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     if (path === '/api/payments/checkout') {
       return new Response(JSON.stringify({
         payment_id: 'payment-1',
@@ -1103,23 +1126,26 @@ test('guide checkout uses the authenticated payment endpoints and a caller idemp
 
   try {
     const product = await minervaApi.getGuideProduct();
+    const access = await minervaApi.getGuideProductAccess();
     const checkout = await minervaApi.createGuideCheckout('builder-1', 'checkout-key-1');
     const missing = await minervaApi.getBuilderPayment('builder-without-payment');
     const confirmed = await minervaApi.refreshGuidePayment('payment-1', '987654321');
 
     assert.equal(minervaApi.formatPrice(product.amount_minor, product.currency), 'R$ 49,90');
+    assert.equal(access.payment_required, true);
     assert.equal(checkout.payment_id, 'payment-1');
     assert.equal(missing, null);
     assert.equal(confirmed.status, 'paid');
     assert.deepEqual(seen.map(({ url }) => new URL(url).pathname), [
       '/api/products/guide',
+      '/api/products/guide/access',
       '/api/payments/checkout',
       '/api/payments/by-builder/builder-without-payment',
       '/api/payments/payment-1/refresh',
     ]);
-    assert.equal(seen[1].options.headers.get('Idempotency-Key'), 'checkout-key-1');
-    assert.deepEqual(JSON.parse(seen[1].options.body), { builder_session_id: 'builder-1' });
-    assert.deepEqual(JSON.parse(seen[3].options.body), { provider_payment_id: '987654321' });
+    assert.equal(seen[2].options.headers.get('Idempotency-Key'), 'checkout-key-1');
+    assert.deepEqual(JSON.parse(seen[2].options.body), { builder_session_id: 'builder-1' });
+    assert.deepEqual(JSON.parse(seen[4].options.body), { provider_payment_id: '987654321' });
     seen.forEach(({ options }) => {
       assert.equal(options.headers.get('Authorization'), 'Bearer local-development-token');
     });

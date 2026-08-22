@@ -4,7 +4,11 @@ import hmac
 from fastapi.testclient import TestClient
 
 from minerva_travel.app import app
-from minerva_travel.auth import AuthenticatedUser, get_current_user
+from minerva_travel.auth import (
+    GUIDE_PAYMENT_BYPASS_PERMISSION,
+    AuthenticatedUser,
+    get_current_user,
+)
 from minerva_travel.builder import BuilderPage, create_builder_session
 from minerva_travel.payments import MercadoPagoPayment, MercadoPagoPreference
 from minerva_travel.persistence import GuideRepository
@@ -33,6 +37,14 @@ def _owner() -> AuthenticatedUser:
     return AuthenticatedUser(id="owner-payment", email="familia@example.com")
 
 
+def _complimentary_owner() -> AuthenticatedUser:
+    return AuthenticatedUser(
+        id="owner-complimentary",
+        email="equipe@example.com",
+        permissions=frozenset({GUIDE_PAYMENT_BYPASS_PERMISSION}),
+    )
+
+
 def _setup_payment_environment(monkeypatch, tmp_path) -> TestClient:
     monkeypatch.setattr("minerva_travel.storage.RUNTIME_DIR", tmp_path)
     monkeypatch.setattr("minerva_travel.app.MercadoPagoClient", FakeMercadoPagoClient)
@@ -49,9 +61,10 @@ def _setup_payment_environment(monkeypatch, tmp_path) -> TestClient:
     return TestClient(app)
 
 
-def _builder_session_id() -> str:
+def _builder_session_id(owner: AuthenticatedUser | None = None) -> str:
+    active_owner = owner or _owner()
     session = create_builder_session(
-        owner_id=_owner().id,
+        owner_id=active_owner.id,
         form={"title": "Família Teste"},
         photo_path=None,
         privacy_consent=None,
@@ -66,6 +79,57 @@ def _builder_session_id() -> str:
         ],
     )
     return session.id
+
+
+def test_product_access_is_user_specific_and_complimentary_access_skips_checkout(
+    monkeypatch,
+    tmp_path,
+):
+    client = _setup_payment_environment(monkeypatch, tmp_path)
+    try:
+        ordinary = client.get("/api/products/guide/access")
+        assert ordinary.status_code == 200
+        assert ordinary.json() == {"payment_required": True, "access_mode": "payment"}
+
+        app.dependency_overrides[get_current_user] = _complimentary_owner
+        session_id = _builder_session_id(_complimentary_owner())
+        access = client.get("/api/products/guide/access")
+        assert access.status_code == 200
+        assert access.json() == {
+            "payment_required": False,
+            "access_mode": "complimentary",
+        }
+
+        checkout = client.post(
+            "/api/payments/checkout",
+            headers={"Idempotency-Key": "must-not-charge"},
+            json={"builder_session_id": session_id},
+        )
+        assert checkout.status_code == 409
+        assert checkout.json()["detail"]["code"] == "guide_complimentary_access"
+        assert FakeMercadoPagoClient.preference_calls == []
+
+        incomplete = client.post(f"/api/guide-builder/{session_id}/complete")
+        assert incomplete.status_code == 409
+        assert incomplete.json()["detail"]["code"] == "builder_incomplete"
+
+        repository = GuideRepository(tmp_path / "minerva.sqlite3")
+        assert repository.has_complimentary_builder_access(
+            user_id=_complimentary_owner().id,
+            builder_session_id=session_id,
+        )
+        # Durable workers only receive the owner/session ids. The persisted
+        # grant must therefore remain claimable without the original JWT.
+        assert repository.claim_builder_entitlement(
+            user_id=_complimentary_owner().id,
+            builder_session_id=session_id,
+        )
+        assert repository.claim_builder_entitlement(
+            user_id=_complimentary_owner().id,
+            builder_session_id=session_id,
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
 
 
 def _signature(secret: str, request_id: str, data_id: str, timestamp: str = "1787189000") -> str:
@@ -259,9 +323,7 @@ def test_all_delivery_routes_require_payment_and_refund_revokes_entitlement(monk
             f"/api/webhooks/mercado-pago?data.id={provider_payment_id}",
             headers={
                 "x-request-id": request_id,
-                "x-signature": _signature(
-                    "webhook-test-secret", request_id, provider_payment_id
-                ),
+                "x-signature": _signature("webhook-test-secret", request_id, provider_payment_id),
             },
             json={"type": "payment", "data": {"id": provider_payment_id}},
         )

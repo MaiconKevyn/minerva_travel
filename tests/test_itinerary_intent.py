@@ -10,6 +10,7 @@ def test_parse_itinerary_intent_extracts_destination_must_see_and_child_requests
         "output_text": (
             "{"
             '"destination":"Paris, Franca",'
+            '"destinations":["Paris, Franca"],'
             '"must_see_places":["Torre Eiffel","Louvre"],'
             '"discovery_requests":['
             '{"kind":"educational","query":"locais para criancas aprenderem sobre arte",'
@@ -30,6 +31,7 @@ def test_parse_itinerary_intent_extracts_destination_must_see_and_child_requests
     )
 
     assert intent.destination == "Paris, Franca"
+    assert intent.destinations == ["Paris, Franca"]
     assert intent.must_see_places == ["Torre Eiffel", "Louvre"]
     assert [request.kind for request in intent.discovery_requests] == [
         "educational",

@@ -664,19 +664,24 @@ export const buildRouteSuggestionPayload = ({
   itineraryPreferences = {},
   childrenList = [],
 } = {}) => {
+  const normalizedTripIdea = String(tripIdea || '').trim();
   const structuredDestinations = normalizeGuideDestinations(destinationsList)
     .filter((item) => item.place && item.timing && item.days > 0);
   const explicitDays = Number.parseInt(itineraryPreferences.days, 10);
+  // Um destino recuperado do rascunho é só contexto quando o campo está
+  // vazio. Se a pessoa escreveu uma nova rota, enviá-lo faria o backend
+  // interpretar o rascunho antigo como a escolha atual.
+  const contextualDestinations = normalizedTripIdea ? [] : structuredDestinations;
 
   return {
-    trip_idea: String(tripIdea || '').trim(),
+    trip_idea: normalizedTripIdea,
     days: Number.isFinite(explicitDays) && explicitDays > 0
       ? explicitDays
-      : totalTripDays(structuredDestinations) || 3,
+      : totalTripDays(contextualDestinations) || 3,
     pace: itineraryPreferences.pace || 'balanced',
     interests: itineraryPreferences.interests || [],
     children_ages: deriveChildAges(childrenList),
-    structured_destinations: structuredDestinations.map(stripDestinationLandmarks),
+    structured_destinations: contextualDestinations.map(stripDestinationLandmarks),
   };
 };
 
@@ -1088,8 +1093,10 @@ export const suggestItineraryRoutes = async (payload) => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `Erro do servidor: ${response.status}`);
+    throw new Error(await responseErrorMessage(
+      response,
+      'Não conseguimos buscar sugestões agora',
+    ));
   }
 
   return response.json();
@@ -1269,6 +1276,18 @@ export const getGuideProduct = async ({ signal } = {}) => {
   });
   if (!response.ok) {
     throw await responseApiError(response, 'Não foi possível consultar o valor do guia');
+  }
+  return response.json();
+};
+
+export const getGuideProductAccess = async ({ signal } = {}) => {
+  const response = await authenticatedFetch(`${apiBaseUrl()}/api/products/guide/access`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) {
+    throw await responseApiError(response, 'Não foi possível conferir a liberação do guia');
   }
   return response.json();
 };

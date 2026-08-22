@@ -232,39 +232,30 @@ const BookViewport = ({
 
         {leaf ? (
           <>
-            {/* A folha projeta esta sombra na pagina que esta sendo revelada.
-                Ela nasce e morre com o giro, portanto nunca aparece apenas no
-                quadro em que a folha assenta. */}
-            <motion.div
-              className={`sample-guide-cast-shadow sample-guide-cast-shadow--${leaf.side}`}
-              aria-hidden="true"
-              initial={{ opacity: 0, scaleX: 0.12, z: 1 }}
-              animate={{ opacity: [0, 0.26, 0.08, 0], scaleX: [0.12, 1, 0.5, 0.18], z: 1 }}
-              transition={{
-                duration: turnSeconds,
-                times: [0, 0.46, 0.84, 1],
-                ease: 'easeInOut',
-              }}
-            />
-
             <motion.div
               className={`sample-guide-leaf ${LEAF_SIDE_CLASS[leaf.side]}`}
-              // A folha fica acima da base durante o giro, mas volta ao plano
-              // do livro nos ultimos 16%. Remover uma folha ainda 2px a frente
-              // era o micro-salto percebido no assentamento.
-              initial={{ rotateY: 0, z: 2 }}
-              animate={{
-                rotateY: leaf.side === 'right' ? -180 : 180,
-                z: [2, 2, 0.05],
-              }}
-              transition={{
-                rotateY: { duration: turnSeconds, ease: [0.36, 0, 0.16, 1] },
-                z: { duration: turnSeconds, times: [0, 0.84, 1], ease: 'easeInOut' },
-              }}
+              // Profundidade constante: aproximar e depois achatar a folha
+              // alterava a projecao junto da lombada e deixava a pagina de
+              // baixo vazar por um quadro. As faces, separadas por uma fracao
+              // de pixel, resolvem o z-fighting sem mover a folha inteira.
+              initial={{ rotateY: 0 }}
+              animate={{ rotateY: leaf.side === 'right' ? -180 : 180 }}
+              transition={{ duration: turnSeconds, ease: [0.36, 0, 0.16, 1] }}
               onAnimationComplete={onTurnEnd}
             >
               <div className="sample-guide-leaf-face sample-guide-leaf-face--front">
                 <BookPage pageIndex={leaf.front} side={leaf.side} canTurn={false} onTurn={() => {}} />
+                <motion.div
+                  className="sample-guide-leaf-face-shade"
+                  aria-hidden="true"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0.1, 0.3, 0.12, 0] }}
+                  transition={{
+                    duration: turnSeconds,
+                    times: [0, 0.18, 0.5, 0.82, 1],
+                    ease: 'easeInOut',
+                  }}
+                />
               </div>
               <div className="sample-guide-leaf-face sample-guide-leaf-face--back">
                 <BookPage
@@ -273,16 +264,18 @@ const BookViewport = ({
                   canTurn={false}
                   onTurn={() => {}}
                 />
+                <motion.div
+                  className="sample-guide-leaf-face-shade"
+                  aria-hidden="true"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 0.12, 0.3, 0.1, 0] }}
+                  transition={{
+                    duration: turnSeconds,
+                    times: [0, 0.18, 0.5, 0.82, 1],
+                    ease: 'easeInOut',
+                  }}
+                />
               </div>
-              {/* A sombra da propria dobra some nas duas pontas e enche no
-                  meio do giro; a sombra projetada acima cuida da base. */}
-              <motion.div
-                className="sample-guide-leaf-shade"
-                aria-hidden="true"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 0.34, 0] }}
-                transition={{ duration: turnSeconds, times: [0, 0.5, 1], ease: 'easeInOut' }}
-              />
             </motion.div>
           </>
         ) : null}

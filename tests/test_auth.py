@@ -8,7 +8,12 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from minerva_travel.app import app
-from minerva_travel.auth import decode_verified_token, get_current_user
+from minerva_travel.auth import (
+    GUIDE_PAYMENT_BYPASS_PERMISSION,
+    SupabaseTokenVerifier,
+    decode_verified_token,
+    get_current_user,
+)
 from minerva_travel.config import auth_required
 
 ISSUER = "https://project.supabase.co/auth/v1"
@@ -48,6 +53,32 @@ def test_decode_verified_token_validates_required_supabase_claims():
 
     assert claims["sub"] == "user-123"
     assert claims["role"] == "authenticated"
+
+
+def test_authorization_permissions_only_come_from_server_owned_app_metadata():
+    verifier = SupabaseTokenVerifier(
+        project_url="https://project.supabase.co",
+        publishable_key="publishable-test-key",
+    )
+
+    authorized = verifier._user_from_claims(
+        {
+            "sub": "user-authorized",
+            "role": "authenticated",
+            "email": "authorized@example.com",
+            "app_metadata": {"permissions": [GUIDE_PAYMENT_BYPASS_PERMISSION]},
+        }
+    )
+    forged = verifier._user_from_claims(
+        {
+            "sub": "user-forged",
+            "role": "authenticated",
+            "user_metadata": {"permissions": [GUIDE_PAYMENT_BYPASS_PERMISSION]},
+        }
+    )
+
+    assert authorized.has_permission(GUIDE_PAYMENT_BYPASS_PERMISSION)
+    assert not forged.has_permission(GUIDE_PAYMENT_BYPASS_PERMISSION)
 
 
 @pytest.mark.parametrize(

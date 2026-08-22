@@ -106,6 +106,7 @@ class DiscoveryRequest(BaseModel):
 
 class ItineraryIntent(BaseModel):
     destination: str = Field(default="", max_length=180)
+    destinations: list[str] = Field(default_factory=list, max_length=8)
     must_see_places: list[str] = Field(default_factory=list, max_length=20)
     discovery_requests: list[DiscoveryRequest] = Field(default_factory=list, max_length=12)
     inferred_interests: list[str] = Field(default_factory=list, max_length=12)
@@ -182,7 +183,10 @@ def _create_structured_response(api_key: str | None, model: str, message: str) -
                 "role": "system",
                 "content": (
                     "Voce entende pedidos de pais planejando viagem com filhos. "
-                    "Extraia o destino principal, pontos turisticos ja citados como "
+                    "Extraia o destino principal e a lista ordenada de cidades ou regioes "
+                    "que a familia quer visitar. Em destinations, use somente nomes de "
+                    "destinos, sem interesses, datas ou explicacoes. Extraia tambem pontos "
+                    "turisticos ja citados como "
                     "obrigatorios, pedidos de descoberta para criancas e interesses "
                     "inferidos. Nao invente locais. Preserve pedidos contextuais como "
                     "'almoco perto da Torre Eiffel'. Use portugues do Brasil. "
@@ -201,6 +205,11 @@ def _create_structured_response(api_key: str | None, model: str, message: str) -
                     "additionalProperties": False,
                     "properties": {
                         "destination": {"type": "string"},
+                        "destinations": {
+                            "type": "array",
+                            "maxItems": 8,
+                            "items": {"type": "string"},
+                        },
                         "must_see_places": {
                             "type": "array",
                             "maxItems": 20,
@@ -253,6 +262,7 @@ def _create_structured_response(api_key: str | None, model: str, message: str) -
                     },
                     "required": [
                         "destination",
+                        "destinations",
                         "must_see_places",
                         "discovery_requests",
                         "inferred_interests",

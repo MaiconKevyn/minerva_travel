@@ -1,5 +1,7 @@
+from collections.abc import Callable
 from unicodedata import normalize
 
+from minerva_travel.itinerary_intent import ItineraryIntent, parse_itinerary_intent
 from minerva_travel.models import (
     Catalog,
     RouteSuggestionOption,
@@ -12,21 +14,32 @@ from minerva_travel.models import (
 def suggest_itinerary_routes(
     request: RouteSuggestionRequest,
     catalog: Catalog,
+    *,
+    intent_parser: Callable[[str], ItineraryIntent] = parse_itinerary_intent,
 ) -> RouteSuggestionResponse:
-    destinations = _structured_destinations_from_request(request, catalog)
+    destinations = _structured_destinations_from_request(
+        request,
+        catalog,
+        intent_parser=intent_parser,
+    )
     if not destinations:
-        destinations = [
-            StructuredDestinationInput(
-                id="suggested-1",
-                place="Destino principal",
-                timing="defina a data ou período",
-                days=request.days,
-            )
-        ]
+        raise ValueError(
+            "Não consegui identificar os destinos. Inclua pelo menos uma cidade ou região, "
+            "por exemplo: ‘Paris e Londres com parques e museus’."
+        )
 
-    interests = ", ".join(request.interests) if request.interests else "os interesses da família"
+    focus = (
+        f"em {', '.join(request.interests)}"
+        if request.interests
+        else "nos interesses da família"
+    )
+    pace = {
+        "light": "leve",
+        "balanced": "equilibrado",
+        "full": "intenso",
+    }.get(request.pace, "equilibrado")
     summary = (
-        f"Roteiro {request.pace} com foco em {interests}, pronto para editar antes das atrações."
+        f"Roteiro {pace} com foco {focus}, pronto para editar antes das atrações."
     )
     return RouteSuggestionResponse(
         options=[
@@ -43,7 +56,19 @@ def suggest_itinerary_routes(
 def _structured_destinations_from_request(
     request: RouteSuggestionRequest,
     catalog: Catalog,
+    *,
+    intent_parser: Callable[[str], ItineraryIntent],
 ) -> list[StructuredDestinationInput]:
+    # O texto que a pessoa acabou de escrever deve vencer um rascunho antigo.
+    # Antes, um Rio de Janeiro restaurado fazia "Paris e Londres" devolver Rio
+    # silenciosamente, porque structured_destinations era consultado primeiro.
+    places = _mentioned_catalog_cities(request.trip_idea, catalog)
+    if places:
+        return _editable_destinations_from_places(
+            places=places,
+            total_days=request.days,
+        )
+
     if request.structured_destinations:
         places = [destination.place for destination in request.structured_destinations]
         return _editable_destinations_from_places(
@@ -52,11 +77,40 @@ def _structured_destinations_from_request(
             source_destinations=request.structured_destinations,
         )
 
-    places = _mentioned_catalog_cities(request.trip_idea, catalog)
+    places = _intent_destinations(request.trip_idea, intent_parser=intent_parser)
     return _editable_destinations_from_places(
         places=places,
         total_days=request.days,
     )
+
+
+def _intent_destinations(
+    trip_idea: str,
+    *,
+    intent_parser: Callable[[str], ItineraryIntent],
+) -> list[str]:
+    cleaned_idea = " ".join(trip_idea.split())
+    if not cleaned_idea:
+        return []
+
+    intent = intent_parser(cleaned_idea)
+    candidates = intent.destinations
+    if not candidates and intent.destination:
+        # Compatibilidade com respostas do schema anterior. A intencao de
+        # fallback repete a frase inteira; ela não é um nome de destino.
+        if _normalize_text(intent.destination) != _normalize_text(cleaned_idea):
+            candidates = [intent.destination]
+
+    destinations: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        place = " ".join(candidate.split()).strip(" ,;.")
+        normalized_place = _normalize_text(place)
+        if not place or normalized_place in seen:
+            continue
+        seen.add(normalized_place)
+        destinations.append(place)
+    return destinations[:8]
 
 
 def _editable_destinations_from_places(

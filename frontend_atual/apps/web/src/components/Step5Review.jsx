@@ -30,6 +30,7 @@ import {
   fetchGuideBuilderSession,
   formatPrice,
   getGuideProduct,
+  getGuideProductAccess,
   RESTAURANT_RECOMMENDATIONS_EXTRA,
   selectGuideLandmarks,
 } from '@/utils/minerva-api.js';
@@ -85,11 +86,18 @@ const Step5Review = () => {
   const [sessionRestoreError, setSessionRestoreError] = useState('');
   const [restoreAttempt, setRestoreAttempt] = useState(0);
   const [guideProduct, setGuideProduct] = useState(null);
+  const [guideAccess, setGuideAccess] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    getGuideProduct({ signal: controller.signal })
-      .then(setGuideProduct)
+    Promise.all([
+      getGuideProduct({ signal: controller.signal }),
+      getGuideProductAccess({ signal: controller.signal }),
+    ])
+      .then(([product, access]) => {
+        setGuideProduct(product);
+        setGuideAccess(access);
+      })
       .catch((error) => {
         if (error.name !== 'AbortError') {
           console.error('Não foi possível consultar o produto:', error);
@@ -186,8 +194,11 @@ const Step5Review = () => {
     try {
       const session = await createGuideBuilder(guideData);
       await checkpointBuilderSession(session.session_id);
-      const product = guideProduct || await getGuideProduct();
-      if (!product.enabled) {
+      const [product, access] = await Promise.all([
+        guideProduct || getGuideProduct(),
+        guideAccess || getGuideProductAccess(),
+      ]);
+      if (!product.enabled || !access.payment_required) {
         setBuilderSession(session);
         return;
       }
@@ -638,7 +649,9 @@ const Step5Review = () => {
           <li className="flex items-start gap-3">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden="true" />
             <p className="text-sm font-medium text-muted-foreground">
-              {guideProduct?.enabled
+              {guideAccess?.access_mode === 'complimentary'
+                ? 'Acesso interno liberado para esta conta. Nenhuma cobrança será criada.'
+                : guideProduct?.enabled
                 ? `${formatPrice(guideProduct.amount_minor, guideProduct.currency)} em compra única no ambiente seguro do Mercado Pago.`
                 : 'Seu roteiro é salvo com segurança antes de criar qualquer imagem.'}
             </p>
@@ -667,13 +680,15 @@ const Step5Review = () => {
         >
           {isGenerating ? (
             <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Preparando o checkout...</>
+          ) : guideAccess?.access_mode === 'complimentary' || guideProduct?.enabled === false ? (
+            <><Palette className="w-6 h-6 mr-3 inline-block" /> Criar e revisar a capa</>
           ) : guideProduct?.enabled ? (
             <>
               <CreditCard className="mr-3 inline-block h-6 w-6" /> Comprar por{' '}
               {formatPrice(guideProduct.amount_minor, guideProduct.currency)}
             </>
           ) : (
-            <><Palette className="w-6 h-6 mr-3 inline-block" /> Criar e revisar a capa</>
+            <><Loader2 className="w-6 h-6 animate-spin mr-3 inline-block" /> Conferindo acesso…</>
           )}
         </Button>
       </div>
@@ -684,7 +699,9 @@ const Step5Review = () => {
       )}
       {isGenerating && (
         <p className="mt-4 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
-          Salvando seu roteiro antes de abrir o Mercado Pago. Nenhuma imagem será criada sem sua confirmação nem antes da liberação do pagamento.
+          {guideAccess?.payment_required
+            ? 'Salvando seu roteiro antes de abrir o Mercado Pago. Nenhuma imagem será criada sem sua confirmação nem antes da liberação do pagamento.'
+            : 'Salvando seu roteiro e preparando a revisão da capa.'}
         </p>
       )}
     </div>

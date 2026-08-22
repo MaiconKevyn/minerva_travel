@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowRight,
   CalendarDays,
+  CheckCircle2,
   Landmark,
   ListChecks,
   Loader2,
@@ -92,8 +93,13 @@ const Step3Destination = () => {
   const [routeIdea, setRouteIdea] = useState('');
   const [suggestedRoutes, setSuggestedRoutes] = useState([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [suggestionError, setSuggestionError] = useState('');
+  const [suggestionStatus, setSuggestionStatus] = useState('');
+  const [appliedRouteId, setAppliedRouteId] = useState('');
   const pendingFocusDestinationId = useRef(null);
   const formErrorRef = useRef(null);
+  const routeIdeaRef = useRef(null);
+  const routeResultsRef = useRef(null);
 
   useEffect(() => {
     const hasMeaningfulChange = localDestinations.some((item) =>
@@ -131,6 +137,8 @@ const Step3Destination = () => {
   const changeItineraryMode = (mode) => {
     setItineraryMode(mode);
     setError('');
+    setSuggestionError('');
+    setSuggestionStatus('');
   };
 
   const updateDestinationField = (id, field, value) => {
@@ -291,19 +299,51 @@ const Step3Destination = () => {
   };
 
   const loadSuggestedRoutes = async () => {
+    const normalizedIdea = routeIdea.trim();
+    if (!normalizedIdea) {
+      setSuggestedRoutes([]);
+      setAppliedRouteId('');
+      setSuggestionStatus('');
+      setSuggestionError('Conte pelo menos quais cidades ou regiões vocês querem conhecer.');
+      routeIdeaRef.current?.focus();
+      return;
+    }
+
     setIsLoadingSuggestions(true);
     setError('');
+    setSuggestionError('');
+    setSuggestionStatus('');
+    setSuggestedRoutes([]);
+    setAppliedRouteId('');
     try {
       const payload = buildRouteSuggestionPayload({
-        tripIdea: routeIdea,
+        tripIdea: normalizedIdea,
         destinationsList: localDestinations,
         itineraryPreferences,
         childrenList,
       });
       const data = await suggestItineraryRoutes(payload);
-      setSuggestedRoutes(data.options || []);
+      const options = (data.options || []).filter(
+        (route) => Array.isArray(route.structured_destinations)
+          && route.structured_destinations.length > 0
+      );
+      if (options.length === 0) {
+        throw new Error(
+          'Não conseguimos identificar destinos nessa descrição. Tente incluir o nome das cidades.'
+        );
+      }
+      setSuggestedRoutes(options);
+      const destinationCount = options[0].structured_destinations.length;
+      setSuggestionStatus(
+        `${destinationCount} ${destinationCount === 1 ? 'destino encontrado' : 'destinos encontrados'}. `
+        + 'Revise a rota abaixo antes de aplicar.'
+      );
+      requestAnimationFrame(() => routeResultsRef.current?.focus());
     } catch (nextError) {
-      setError(nextError.message || 'Não conseguimos sugerir rotas agora. Tente de novo em instantes.');
+      setSuggestionError(
+        nextError.message || 'Não conseguimos sugerir rotas agora. Tente de novo em instantes.'
+      );
+      requestAnimationFrame(() => routeResultsRef.current?.focus());
     } finally {
       setIsLoadingSuggestions(false);
     }
@@ -313,8 +353,16 @@ const Step3Destination = () => {
     const destinations = normalizeRouteSuggestionDestinations(route.structured_destinations || []);
     if (destinations.length > 0) {
       setTimingDrafts({});
+      pendingFocusDestinationId.current = destinations[0].id;
       setLocalDestinations(canonicalizeDestinationTiming(destinations));
       setError('');
+      setSuggestionError('');
+      setAppliedRouteId(route.id);
+      const routeNames = destinations.map((destination) => destination.place).join(' → ');
+      setSuggestionStatus(
+        `Rota aplicada: ${routeNames}. Complete as datas abaixo; os pontos turísticos `
+        + 'serão sugeridos no passo 3.'
+      );
     }
   };
 
@@ -322,6 +370,9 @@ const Step3Destination = () => {
     setSuggestedRoutes([]);
     setItineraryMode('known');
     setError('');
+    setSuggestionError('');
+    setSuggestionStatus('');
+    setAppliedRouteId('');
   };
 
   return (
@@ -436,12 +487,23 @@ const Step3Destination = () => {
                 O que vocês imaginam para essa viagem?
               </Label>
               <Textarea
+                ref={routeIdeaRef}
                 id="route-suggestion"
                 value={routeIdea}
-                onChange={(event) => setRouteIdea(event.target.value)}
+                onChange={(event) => {
+                  setRouteIdea(event.target.value);
+                  setSuggestionError('');
+                  setSuggestionStatus('');
+                  setAppliedRouteId('');
+                }}
                 placeholder="Ex: Queremos Paris e Londres com parques, museus e ritmo leve."
                 className="min-h-28 rounded-xl text-base"
+                aria-describedby="route-suggestion-help route-suggestion-feedback"
               />
+              <p id="route-suggestion-help" className="text-sm leading-relaxed text-muted-foreground">
+                Escreva com suas palavras. Agora encontramos e organizamos os destinos; no passo 3,
+                sugerimos os pontos turísticos com fotos para vocês escolherem.
+              </p>
             </div>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button
@@ -468,6 +530,28 @@ const Step3Destination = () => {
                 </Button>
               )}
             </div>
+            <div
+              ref={routeResultsRef}
+              id="route-suggestion-feedback"
+              tabIndex={-1}
+              aria-live="polite"
+              className="outline-none"
+            >
+              {suggestionError && (
+                <p
+                  role="alert"
+                  className="mt-4 rounded-xl bg-destructive/10 px-4 py-3 text-sm font-bold text-destructive"
+                >
+                  {suggestionError}
+                </p>
+              )}
+              {suggestionStatus && (
+                <p className="mt-4 flex items-start gap-2 rounded-xl bg-secondary/10 px-4 py-3 text-sm font-bold leading-relaxed text-secondary">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>{suggestionStatus}</span>
+                </p>
+              )}
+            </div>
             {suggestedRoutes.length > 0 && (
               <div className="mt-5 space-y-3">
                 {suggestedRoutes.map((route) => (
@@ -476,13 +560,27 @@ const Step3Destination = () => {
                       <div>
                         <p className="font-display font-bold text-secondary">{route.title}</p>
                         <p className="mt-1 font-serif text-sm text-muted-foreground">{route.summary}</p>
+                        <ol className="mt-3 flex flex-wrap gap-2" aria-label="Destinos desta rota">
+                          {(route.structured_destinations || []).map((destination, index) => (
+                            <li
+                              key={`${route.id}-${destination.id || destination.place}-${index}`}
+                              className="rounded-full border border-secondary/20 bg-secondary/5 px-3 py-1.5 text-sm font-bold text-secondary"
+                            >
+                              {index + 1}. {destination.place}
+                              {Number(destination.days) > 0
+                                ? ` · ${destination.days} ${Number(destination.days) === 1 ? 'dia' : 'dias'}`
+                                : ''}
+                            </li>
+                          ))}
+                        </ol>
                       </div>
                       <Button
                         type="button"
                         onClick={() => acceptSuggestedRoute(route)}
+                        disabled={appliedRouteId === route.id}
                         className="rounded-full px-5 py-4"
                       >
-                        Usar rota
+                        {appliedRouteId === route.id ? 'Rota aplicada' : 'Usar rota'}
                       </Button>
                     </div>
                   </div>

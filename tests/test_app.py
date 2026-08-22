@@ -118,6 +118,35 @@ def test_route_suggestion_endpoint_preserves_current_structured_destinations():
     ]
 
 
+def test_route_suggestion_endpoint_prefers_new_trip_idea_over_restored_destination():
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/itinerary/routes/suggest",
+        json={
+            "trip_idea": "Queremos Paris e Londres com parques e museus.",
+            "days": 5,
+            "pace": "light",
+            "structured_destinations": [
+                {
+                    "id": "restored-rio",
+                    "place": "Rio de Janeiro, Brasil",
+                    "timing": "Setembro de 2026",
+                    "days": 1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    option = response.json()["options"][0]
+    assert [item["place"] for item in option["structured_destinations"]] == [
+        "Paris",
+        "Londres",
+    ]
+    assert "Roteiro leve" in option["summary"]
+
+
 def test_landmarks_parse_allows_browser_preflight_from_frontend_origin():
     client = TestClient(app)
 

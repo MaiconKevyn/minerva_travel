@@ -71,7 +71,11 @@ from minerva_travel.asset_policy import (
     assert_selected_asset_provenance,
     asset_provenance_required,
 )
-from minerva_travel.auth import AuthenticatedUser, CurrentUser
+from minerva_travel.auth import (
+    GUIDE_PAYMENT_BYPASS_PERMISSION,
+    AuthenticatedUser,
+    CurrentUser,
+)
 from minerva_travel.builder import (
     MAX_REVISION_INSTRUCTION_LENGTH,
     BuilderActivityAnchorInvalid,
@@ -603,6 +607,11 @@ class GuideProductResponse(BaseModel):
     amount_minor: int
     currency: str
     environment: Literal["test", "production"]
+
+
+class GuideProductAccessResponse(BaseModel):
+    payment_required: bool
+    access_mode: Literal["payment", "complimentary", "payments_disabled"]
 
 
 class PaymentCheckoutRequest(StrictRequestModel):
@@ -1361,7 +1370,10 @@ def api_suggest_itinerary_routes(
     _current_user: CurrentUser,
 ) -> RouteSuggestionResponse:
     catalog = load_catalog()
-    return suggest_itinerary_routes(payload, catalog)
+    try:
+        return suggest_itinerary_routes(payload, catalog)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @app.post("/api/custom-landmarks/resolve", response_model=CustomLandmarksResponse)
@@ -2293,12 +2305,12 @@ def _apply_mercado_pago_payment(record, provider_payment) -> PaymentResponse:
 def _claim_builder_payment(user_id: str, builder_session_id: str) -> None:
     if not payments_enabled():
         return
-    _payment_configuration_or_503()
     if guide_repository().claim_builder_entitlement(
         user_id=user_id,
         builder_session_id=builder_session_id,
     ):
         return
+    _payment_configuration_or_503()
     raise HTTPException(
         status_code=402,
         detail={
@@ -2306,6 +2318,30 @@ def _claim_builder_payment(user_id: str, builder_session_id: str) -> None:
             "message": "Confirme o pagamento deste guia antes de iniciar a geração.",
         },
     )
+
+
+def _authorize_builder_payment(
+    current_user: AuthenticatedUser,
+    builder_session_id: str,
+) -> None:
+    if not payments_enabled():
+        return
+    if current_user.has_permission(GUIDE_PAYMENT_BYPASS_PERMISSION):
+        created = guide_repository().grant_complimentary_builder_access(
+            user_id=current_user.id,
+            builder_session_id=builder_session_id,
+            source_permission=GUIDE_PAYMENT_BYPASS_PERMISSION,
+            product_code=guide_product_code(),
+        )
+        if created:
+            emit_event(
+                "guide_complimentary_access_granted",
+                user_id=current_user.id,
+                outcome="succeeded",
+                stage="authorization",
+            )
+        return
+    _claim_builder_payment(current_user.id, builder_session_id)
 
 
 @app.get("/api/products/guide", response_model=GuideProductResponse)
@@ -2322,6 +2358,23 @@ def guide_product() -> GuideProductResponse:
     )
 
 
+@app.get(
+    "/api/products/guide/access",
+    response_model=GuideProductAccessResponse,
+)
+def guide_product_access(current_user: CurrentUser) -> GuideProductAccessResponse:
+    if not payments_enabled():
+        return GuideProductAccessResponse(
+            payment_required=False,
+            access_mode="payments_disabled",
+        )
+    complimentary = current_user.has_permission(GUIDE_PAYMENT_BYPASS_PERMISSION)
+    return GuideProductAccessResponse(
+        payment_required=not complimentary,
+        access_mode="complimentary" if complimentary else "payment",
+    )
+
+
 @app.post("/api/payments/checkout", response_model=PaymentResponse)
 def create_payment_checkout(
     payload: PaymentCheckoutRequest,
@@ -2333,8 +2386,16 @@ def create_payment_checkout(
             status_code=409,
             detail={"code": "checkout_disabled", "message": "O checkout ainda não está ativo."},
         )
-    _payment_configuration_or_503()
     _builder_session_or_404(payload.builder_session_id, current_user)
+    if current_user.has_permission(GUIDE_PAYMENT_BYPASS_PERMISSION):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "guide_complimentary_access",
+                "message": "Esta conta já possui acesso interno à criação de guias.",
+            },
+        )
+    _payment_configuration_or_503()
     key = (idempotency_key or "").strip()
     if not key or len(key) > 200:
         raise HTTPException(
@@ -3425,8 +3486,6 @@ def _builder_activity_page(
     )
 
 
-
-
 def _country_key(country: str) -> str:
     """França e "franca" são o mesmo país; o nome chega como a família digitou."""
 
@@ -3791,7 +3850,7 @@ def queue_guide_builder_generation(
                     "message": "Gere e aprove a capa antes de criar o guia completo.",
                 },
             )
-        _claim_builder_payment(current_user.id, session.id)
+        _authorize_builder_payment(current_user, session.id)
         if any(page.pending_attempt_id for page in session.pages):
             raise HTTPException(
                 status_code=409,
@@ -4524,7 +4583,7 @@ def generate_builder_page_attempt(
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> BuilderSessionResponse:
     session = _builder_session_or_404(session_id, current_user)
-    _claim_builder_payment(current_user.id, session.id)
+    _authorize_builder_payment(current_user, session.id)
     return _generate_builder_page_attempt_impl(
         session_id,
         page_id,
@@ -4795,7 +4854,7 @@ def finalize_builder_guide_for_job(
 def complete_guide_builder(session_id: str, current_user: CurrentUser) -> BuilderCompletionResponse:
     with builder_session_lock(session_id):
         session = _builder_session_or_404(session_id, current_user)
-        _claim_builder_payment(current_user.id, session.id)
+        _authorize_builder_payment(current_user, session.id)
         try:
             pages = session.approved_manifest()
         except BuilderIncomplete as error:
@@ -4834,7 +4893,7 @@ def generate_guide_builder_pdf(
     try:
         with builder_session_lock(session_id):
             session = _builder_session_or_404(session_id, current_user)
-            _claim_builder_payment(current_user.id, session.id)
+            _authorize_builder_payment(current_user, session.id)
             output, pages = _write_builder_pdf(session)
             filename = _builder_pdf_download_filename(session)
             emailed_to = _notify_guide_ready(session, current_user, len(pages))
